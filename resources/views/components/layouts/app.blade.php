@@ -172,6 +172,7 @@
                 </header>
 
                 <main class="px-4 py-4 sm:px-5 lg:px-6">
+                    <x-breadcrumbs />
                     {{ $slot }}
                 </main>
             </div>
