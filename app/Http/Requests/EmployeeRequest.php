@@ -3,6 +3,7 @@
 namespace App\Http\Requests;
 
 use App\Models\Employee;
+use App\Models\EmployeeContract;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
@@ -49,7 +50,7 @@ class EmployeeRequest extends FormRequest
             'contract_type' => ['required', 'string', Rule::in(['PKWT', 'PKWTT', 'Probation', 'Internship'])],
             'contract_start_date' => ['required', 'date'],
             'contract_end_date' => ['nullable', 'date', 'after_or_equal:contract_start_date'],
-            'contract_status' => ['required', 'string', Rule::in(['active', 'expired', 'terminated'])],
+            'contract_status' => ['required', 'string', Rule::in(array_keys(EmployeeContract::statusLabels()))],
             'contract_notes' => ['nullable', 'string', 'max:1000'],
             'login_password' => [Rule::requiredIf($requiresLoginPassword), 'nullable', 'string', 'min:8'],
             'login_role_id' => ['nullable', 'integer', Rule::exists('roles', 'id')->where('guard_name', 'web')],

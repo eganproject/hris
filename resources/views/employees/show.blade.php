@@ -25,8 +25,8 @@
 
         <section class="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-5">
             <article class="rounded-lg border border-gray-200 bg-white p-5 shadow-sm">
-                <p class="text-sm text-gray-500">Status Karyawan</p>
-                <p class="mt-2 text-xl font-semibold text-gray-950">{{ $employee->employment_status_label }}</p>
+                <p class="text-sm text-gray-500">Status HR</p>
+                <p class="mt-2 text-xl font-semibold text-gray-950">{{ $employee->hr_status_label }}</p>
             </article>
             <article class="rounded-lg border border-gray-200 bg-white p-5 shadow-sm">
                 <p class="text-sm text-gray-500">Tanggal Bergabung</p>
@@ -115,7 +115,7 @@
                                             {{ $contract->start_date?->format('d M Y') }} - {{ $contract->end_date?->format('d M Y') ?? 'Tidak terbatas' }}
                                         </td>
                                         <td class="px-5 py-4">
-                                            <span class="rounded-md bg-gray-100 px-2 py-1 text-xs font-medium text-gray-700">{{ str($contract->status)->headline() }}</span>
+                                            <span class="rounded-md bg-gray-100 px-2 py-1 text-xs font-medium text-gray-700">{{ $contract->status_label }}</span>
                                         </td>
                                     </tr>
                                 @empty

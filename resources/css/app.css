@@ -4,8 +4,8 @@
 @source '../../storage/framework/views/*.php';
 
 @theme {
-    --font-sans: 'Instrument Sans', ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji',
-        'Segoe UI Symbol', 'Noto Color Emoji';
+    --font-sans: ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol',
+        'Noto Color Emoji';
     --color-primary: #000000;
     --color-primary-hover: #1f2937;
     --color-primary-soft: #f3f4f6;
@@ -213,6 +213,33 @@
         background: #1f2937;
     }
 
+    .page-loading-indicator {
+        position: fixed;
+        top: 0;
+        right: 0;
+        left: 0;
+        z-index: 95;
+        height: 0.1875rem;
+        overflow: hidden;
+        background: transparent;
+        pointer-events: none;
+    }
+
+    .page-loading-indicator[hidden] {
+        display: none;
+    }
+
+    .page-loading-indicator::before {
+        position: absolute;
+        inset: 0 auto 0 0;
+        width: 42%;
+        border-radius: 999px;
+        background: #111827;
+        box-shadow: 0 0 18px rgb(17 24 39 / 0.22);
+        content: '';
+        animation: page-loading-slide 900ms ease-in-out infinite;
+    }
+
     .app-loading-overlay {
         position: fixed;
         inset: 0;
@@ -272,6 +299,18 @@
     @keyframes app-loading-spin {
         to {
             transform: rotate(360deg);
+        }
+    }
+
+    @keyframes page-loading-slide {
+        0% {
+            transform: translateX(-110%);
+        }
+        55% {
+            transform: translateX(95vw);
+        }
+        100% {
+            transform: translateX(120vw);
         }
     }
 
@@ -644,6 +683,25 @@
     .flatpickr-current-month,
     .flatpickr-weekday {
         color: #111827;
+    }
+
+    .flatpickr-current-month .flatpickr-yearDropdown {
+        appearance: none;
+        -webkit-appearance: none;
+        border: none;
+        outline: none;
+        background: transparent;
+        color: inherit;
+        font: inherit;
+        font-weight: 600;
+        cursor: pointer;
+        margin-left: 0.35rem;
+        padding: 0.1rem 0.35rem;
+        border-radius: 0.25rem;
+    }
+
+    .flatpickr-current-month .flatpickr-yearDropdown:hover {
+        background: rgb(15 23 42 / 0.06);
     }
 
     .flatpickr-day {

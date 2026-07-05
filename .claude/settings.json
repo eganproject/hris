@@ -1,0 +1,18 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(php artisan *)",
+      "Bash(grep -o \"localhost:5173\\\\|@vite/client\\\\|__vite_ping\\\\|ws://\\\\|createHotContext\" public/build/assets/app-CDkiGOqL.js)",
+      "Bash(netstat -ano)",
+      "Bash(cd /c/laragon/www/hris-cok; ls node_modules/.bin/ 2>/dev/null | grep -iE \"playwright|puppeteer\" ; echo \"--- puppeteer/playwright in pkg? ---\"; grep -iE \"puppeteer|playwright\" package.json; echo \"--- node ---\"; node -v 2>&1; echo \"--- chrome present ---\"; ls \"/c/Program Files/Google/Chrome/Application/chrome.exe\" 2>/dev/null && echo \"chrome yes\")",
+      "Read(//c/Program Files/Google/Chrome/Application/**)",
+      "Bash(npm i *)",
+      "Bash(node tests/tmp_probe.cjs)",
+      "Bash(echo \"exit=$?\")",
+      "Bash(echo \"done exit=$?\")",
+      "Bash(node -e ' *)",
+      "Bash(npm run *)",
+      "Bash(npm remove *)"
+    ]
+  }
+}

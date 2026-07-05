@@ -140,6 +140,36 @@ class Employee extends Model
         return self::exitReasonLabels()[$this->exit_reason] ?? str($this->exit_reason)->headline()->toString();
     }
 
+    public function getHrStatusLabelAttribute(): string
+    {
+        if ($this->isInactive()) {
+            return trim('Tidak Aktif - '.($this->exit_reason_label ?? 'Alasan belum diisi'));
+        }
+
+        $status = $this->employment_status_label;
+        $contract = $this->currentContract;
+
+        if (! $contract) {
+            return "{$status} - Belum ada kontrak aktif";
+        }
+
+        if ($contract->end_date === null) {
+            return "{$status} - {$contract->contract_type} tanpa batas waktu";
+        }
+
+        $remainingDays = $this->remaining_contract_days;
+
+        if ($remainingDays !== null && $remainingDays < 0) {
+            return "{$status} - Kontrak berakhir ".abs($remainingDays).' hari lalu';
+        }
+
+        if ($remainingDays !== null && $remainingDays <= 30) {
+            return "{$status} - Kontrak habis {$remainingDays} hari lagi";
+        }
+
+        return "{$status} - {$contract->contract_type} sampai ".$contract->end_date->format('d M Y');
+    }
+
     public function isInactive(): bool
     {
         return $this->employment_status === 'inactive';

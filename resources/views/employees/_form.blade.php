@@ -165,8 +165,8 @@
                 <div>
                     <label for="contract_status" class="block text-sm font-medium text-gray-700">Status Kontrak <span class="field-requirement is-required" aria-label="Wajib diisi">*</span></label>
                     <select id="contract_status" name="contract_status" required class="mt-2 block w-full rounded-md border border-gray-300 px-3 py-2.5 text-sm shadow-xs outline-none focus:border-primary focus:ring-2 focus:ring-primary/20">
-                        @foreach ($contractStatuses as $status)
-                            <option value="{{ $status }}" @selected(old('contract_status', $contract?->status ?: 'active') === $status)>{{ str($status)->headline() }}</option>
+                        @foreach ($contractStatuses as $status => $label)
+                            <option value="{{ $status }}" @selected(old('contract_status', $contract?->status ?: 'active') === $status)>{{ $label }}</option>
                         @endforeach
                     </select>
                     @error('contract_status')<p class="mt-2 text-sm text-red-600">{{ $message }}</p>@enderror

@@ -368,7 +368,7 @@ test('employee can be resigned and login account is disabled', function () {
         ->and($employee->exit_reason_label)->toBe('Mengundurkan Diri')
         ->and($employee->exit_date->format('Y-m-d'))->toBe($resignedAt)
         ->and($employee->exit_notes)->toBe('Mengundurkan diri.')
-        ->and($contract->status)->toBe('terminated')
+        ->and($contract->status)->toBe('ended_early')
         ->and($contract->end_date->format('Y-m-d'))->toBe($resignedAt)
         ->and($loginUser->is_active)->toBeFalse();
 
@@ -416,6 +416,7 @@ test('employee can be marked as terminated for reporting', function () {
 
     expect($employee->employment_status)->toBe('inactive')
         ->and($employee->employment_status_label)->toBe('Tidak Aktif / Sudah Tidak Bekerja')
+        ->and($employee->hr_status_label)->toBe('Tidak Aktif - PHK')
         ->and($employee->exit_reason)->toBe('terminated')
         ->and($employee->exit_reason_label)->toBe('PHK')
         ->and($employee->exit_date->format('Y-m-d'))->toBe($endedAt)

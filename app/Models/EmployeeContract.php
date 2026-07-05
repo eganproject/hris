@@ -18,6 +18,15 @@ use Illuminate\Database\Eloquent\Model;
 ])]
 class EmployeeContract extends Model
 {
+    public const STATUS_LABELS = [
+        'active' => 'Aktif',
+        'completed' => 'Selesai Sesuai Masa Kontrak',
+        'ended_early' => 'Diakhiri Lebih Awal',
+        'renewed' => 'Diperpanjang',
+        'cancelled' => 'Dibatalkan',
+        'expired' => 'Kedaluwarsa / Belum Diperbarui',
+    ];
+
     public function employee(): BelongsTo
     {
         return $this->belongsTo(Employee::class);
@@ -43,6 +52,19 @@ class EmployeeContract extends Model
         }
 
         return now()->startOfDay()->diffInDays($this->end_date, false);
+    }
+
+    public function getStatusLabelAttribute(): string
+    {
+        return self::statusLabels()[$this->status] ?? str($this->status)->headline()->toString();
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    public static function statusLabels(): array
+    {
+        return self::STATUS_LABELS;
     }
 
     protected function casts(): array

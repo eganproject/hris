@@ -148,6 +148,38 @@ const resetLoadingControls = () => {
     });
 };
 
+const pageLoader = (() => {
+    const indicator = document.querySelector('[data-page-loading]');
+    let timer = null;
+    let fallbackTimer = null;
+
+    if (!indicator) {
+        return {
+            show() {},
+            hide() {},
+        };
+    }
+
+    const show = () => {
+        window.clearTimeout(timer);
+        window.clearTimeout(fallbackTimer);
+        timer = window.setTimeout(() => {
+            indicator.hidden = false;
+        }, 90);
+        fallbackTimer = window.setTimeout(() => {
+            indicator.hidden = true;
+        }, 8000);
+    };
+
+    const hide = () => {
+        window.clearTimeout(timer);
+        window.clearTimeout(fallbackTimer);
+        indicator.hidden = true;
+    };
+
+    return { show, hide };
+})();
+
 const loadingOverlay = (() => {
     const overlay = document.querySelector('[data-loading-overlay]');
 
@@ -189,11 +221,9 @@ const loadingOverlay = (() => {
 })();
 
 window.addEventListener('pageshow', () => {
+    pageLoader.hide();
     loadingOverlay.hide();
     resetLoadingControls();
-});
-window.addEventListener('beforeunload', () => {
-    loadingOverlay.show('Memuat halaman...', 'Menyiapkan tampilan berikutnya.');
 });
 
 const applySidebarState = (collapsed) => {
@@ -262,10 +292,66 @@ document.querySelectorAll('[data-tabs]').forEach((tabs) => {
     });
 });
 
+const flatpickrYearRange = (() => {
+    const currentYear = new Date().getFullYear();
+
+    return { min: currentYear - 100, max: currentYear + 10 };
+})();
+
+// flatpickr 4.6 ships a month dropdown but only tiny up/down arrows for the year,
+// which makes jumping to a birth year very tedious. Replace the year stepper with
+// a real dropdown so any year in range can be picked directly.
+const syncFlatpickrYearDropdown = (instance) => {
+    const monthNav = instance.calendarContainer?.querySelector('.flatpickr-current-month');
+
+    if (!monthNav) {
+        return;
+    }
+
+    let dropdown = monthNav.querySelector('.flatpickr-yearDropdown');
+
+    if (!dropdown) {
+        const yearInputWrapper = monthNav.querySelector('.numInputWrapper');
+
+        if (yearInputWrapper) {
+            yearInputWrapper.style.display = 'none';
+        }
+
+        dropdown = document.createElement('select');
+        dropdown.className = 'flatpickr-yearDropdown';
+        dropdown.setAttribute('aria-label', 'Pilih tahun');
+
+        for (let year = flatpickrYearRange.max; year >= flatpickrYearRange.min; year -= 1) {
+            const option = document.createElement('option');
+
+            option.value = String(year);
+            option.textContent = String(year);
+            dropdown.appendChild(option);
+        }
+
+        dropdown.addEventListener('change', () => {
+            instance.jumpToDate(new Date(Number(dropdown.value), instance.currentMonth, 1));
+        });
+
+        const monthDropdown = monthNav.querySelector('.flatpickr-monthDropdown-months');
+
+        if (monthDropdown) {
+            monthDropdown.after(dropdown);
+        } else {
+            monthNav.appendChild(dropdown);
+        }
+    }
+
+    dropdown.value = String(instance.currentYear);
+};
+
 flatpickr('input[type="date"], [data-flatpickr-date]', {
     allowInput: true,
     dateFormat: 'Y-m-d',
     disableMobile: true,
+    onReady: (selectedDates, dateStr, instance) => syncFlatpickrYearDropdown(instance),
+    onYearChange: (selectedDates, dateStr, instance) => syncFlatpickrYearDropdown(instance),
+    onMonthChange: (selectedDates, dateStr, instance) => syncFlatpickrYearDropdown(instance),
 });
 
 flatpickr('input[type="time"], [data-flatpickr-time]', {
@@ -278,7 +364,10 @@ flatpickr('input[type="time"], [data-flatpickr-time]', {
 });
 
 if (typeof $.fn.select2 === 'function') {
-    $('select').each(function () {
+    $('select').filter(function () {
+        // Skip flatpickr's own month/year dropdowns (they live inside the calendar).
+        return !this.closest('.flatpickr-calendar');
+    }).each(function () {
         const $select = $(this);
 
         if ($select.data('select2')) {
@@ -500,39 +589,18 @@ document.querySelectorAll('form').forEach((form) => {
             return;
         }
 
+        const method = (form.getAttribute('method') || 'GET').toUpperCase();
+
+        if (method === 'GET') {
+            pageLoader.show();
+            return;
+        }
+
         const [title, message] = loadingMessageForForm(form);
 
         markFormAsLoading(form, event.submitter);
         loadingOverlay.show(form.dataset.loadingTitle || title, form.dataset.loadingMessage || message);
     });
-});
-
-document.addEventListener('click', (event) => {
-    const link = event.target.closest('a[href]');
-
-    if (!link || event.defaultPrevented) {
-        return;
-    }
-
-    if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey || event.button !== 0) {
-        return;
-    }
-
-    if (link.target && link.target !== '_self') {
-        return;
-    }
-
-    if (link.hasAttribute('download') || link.dataset.noLoading === 'true') {
-        return;
-    }
-
-    const url = new URL(link.href, window.location.href);
-
-    if (url.origin !== window.location.origin || url.href === window.location.href || url.hash && url.pathname === window.location.pathname) {
-        return;
-    }
-
-    loadingOverlay.show(link.dataset.loadingTitle || 'Memuat data...', link.dataset.loadingMessage || 'Menyiapkan halaman yang dipilih.');
 });
 
 document.querySelectorAll('[data-employee-stepper]').forEach((stepper) => {
@@ -575,7 +643,11 @@ document.querySelectorAll('[data-employee-stepper]').forEach((stepper) => {
         buttons.forEach((button) => {
             const isActive = Number(button.dataset.stepperButton) === activeStep;
             const relatedPanel = panels[Number(button.dataset.stepperButton)];
-            const hasInvalidField = relatedPanel ? controlsFor(relatedPanel).some((control) => !control.checkValidity()) : false;
+            // Use the `validity` state (a property read) instead of `checkValidity()`,
+            // which dispatches an `invalid` event. The form has a capturing `invalid`
+            // listener that calls activate(), so calling checkValidity() here would
+            // recurse infinitely on the create page (all required fields start empty).
+            const hasInvalidField = relatedPanel ? controlsFor(relatedPanel).some((control) => !control.validity.valid) : false;
 
             button.setAttribute('aria-selected', isActive ? 'true' : 'false');
             button.classList.toggle('bg-primary', isActive);
@@ -661,12 +733,20 @@ document.querySelectorAll('[data-employee-stepper]').forEach((stepper) => {
 
     buttons.forEach((button) => {
         button.addEventListener('click', () => {
-            activate(Number(button.dataset.stepperButton));
+            const targetStep = Number(button.dataset.stepperButton);
+
+            if (validateThrough(targetStep)) {
+                activate(targetStep);
+            }
         });
     });
 
     previousButton?.addEventListener('click', () => activate(activeStep - 1));
-    nextButton?.addEventListener('click', () => activate(activeStep + 1));
+    nextButton?.addEventListener('click', () => {
+        if (validateStep(activeStep)) {
+            activate(activeStep + 1);
+        }
+    });
     emailField?.addEventListener('input', syncEmailDisplay);
 
     form?.addEventListener('invalid', (event) => {

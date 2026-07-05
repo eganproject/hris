@@ -147,7 +147,7 @@ class EmployeeManagementController extends Controller
             if ($employee->currentContract) {
                 $employee->currentContract->forceFill([
                     'end_date' => $exitDate,
-                    'status' => 'terminated',
+                    'status' => $request->validated('exit_reason') === 'contract_ended' ? 'completed' : 'ended_early',
                 ])->save();
             }
 
@@ -198,7 +198,7 @@ class EmployeeManagementController extends Controller
             'statuses' => Employee::employmentStatusLabels(),
             'exitReasons' => Employee::exitReasonLabels(),
             'contractTypes' => ['PKWT', 'PKWTT', 'Probation', 'Internship'],
-            'contractStatuses' => ['active', 'expired', 'terminated'],
+            'contractStatuses' => EmployeeContract::statusLabels(),
         ];
     }
 

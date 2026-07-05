@@ -7,10 +7,11 @@
 
         <title>{{ $title ?? config('app.name', 'HRIS') }}</title>
 
-        @fonts
         @vite(['resources/css/app.css', 'resources/js/app.js'])
     </head>
     <body class="min-h-screen bg-[#f5f7fa] font-sans text-[13px] text-gray-800 antialiased">
+        <div class="page-loading-indicator" data-page-loading hidden aria-hidden="true"></div>
+
         @if (session('status'))
             <div data-flash-notification data-type="success" data-message="{{ session('status') }}" hidden></div>
         @endif
