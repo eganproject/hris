@@ -691,6 +691,64 @@ test('renewing a contract reactivates an employee who had left', function () {
         ->and($employee->events()->where('type', 'reactivated')->exists())->toBeTrue();
 });
 
+test('editing a left employee with an active contract status reactivates them', function () {
+    $user = employeeManager();
+    ['branch' => $branch, 'department' => $department, 'position' => $position] = hrMasterData();
+
+    $loginUser = User::factory()->create(['email' => 'reedit@example.test', 'password' => 'Password!2']);
+    $loginUser->forceFill(['is_active' => false])->save();
+
+    $employee = Employee::query()->create([
+        'user_id' => $loginUser->id,
+        'branch_id' => $branch->id,
+        'department_id' => $department->id,
+        'job_position_id' => $position->id,
+        'employee_number' => 'EMP-REEDIT',
+        'full_name' => 'Aktif Lewat Edit',
+        'email' => 'reedit@example.test',
+        'join_date' => now()->subYears(2)->toDateString(),
+        'employment_status' => 'inactive',
+        'exit_reason' => 'contract_ended',
+        'exit_date' => now()->subMonth()->toDateString(),
+    ]);
+    $employee->contracts()->create([
+        'contract_number' => 'CTR-REEDIT-OLD',
+        'contract_type' => 'PKWT',
+        'start_date' => now()->subYears(2)->toDateString(),
+        'end_date' => now()->subMonth()->toDateString(),
+        'status' => 'completed',
+    ]);
+
+    $this->actingAs($user)
+        ->from("/employees/{$employee->id}/edit")
+        ->put("/employees/{$employee->id}", [
+            'branch_id' => $branch->id,
+            'department_id' => $department->id,
+            'job_position_id' => $position->id,
+            'employee_number' => 'EMP-REEDIT',
+            'full_name' => 'Aktif Lewat Edit',
+            'email' => 'reedit@example.test',
+            'join_date' => now()->subYears(2)->format('Y-m-d'),
+            'employment_status' => 'inactive',
+            'contract_number' => 'CTR-REEDIT-NEW',
+            'contract_type' => 'PKWT',
+            'contract_start_date' => now()->format('Y-m-d'),
+            'contract_end_date' => now()->addYear()->format('Y-m-d'),
+            'contract_status' => 'active',
+            'login_password' => '',
+        ])
+        ->assertRedirect('/employees');
+
+    $employee->refresh();
+    $loginUser->refresh();
+
+    expect($employee->employment_status)->toBe('active')
+        ->and($employee->exit_reason)->toBeNull()
+        ->and($employee->currentContract?->contract_number)->toBe('CTR-REEDIT-NEW')
+        ->and($loginUser->is_active)->toBeTrue()
+        ->and($employee->events()->where('type', 'reactivated')->exists())->toBeTrue();
+});
+
 test('pkwtt contract does not require an end date but others do', function () {
     $user = employeeManager();
     ['branch' => $branch, 'department' => $department, 'position' => $position] = hrMasterData();

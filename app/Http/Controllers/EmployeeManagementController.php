@@ -124,10 +124,17 @@ class EmployeeManagementController extends Controller
     {
         $oldPhotoPath = $employee->photo_path;
         $wasActive = ! $employee->isInactive();
-        $isExitViaEdit = $wasActive && $request->filled('exit_reason')
-            && in_array($request->validated('contract_status'), EmployeeContract::closingStatuses(), true);
+        $contractStatus = $request->validated('contract_status');
 
-        DB::transaction(function () use ($request, $employee, $isExitViaEdit) {
+        $isExitViaEdit = $wasActive && $request->filled('exit_reason')
+            && in_array($contractStatus, EmployeeContract::closingStatuses(), true);
+
+        // Symmetric to the exit flow: changing the contract of an employee who had
+        // left back to an active/ongoing status brings them back to "Aktif".
+        $isReactivateViaEdit = ! $wasActive
+            && ! in_array($contractStatus, EmployeeContract::closingStatuses(), true);
+
+        DB::transaction(function () use ($request, $employee, $isExitViaEdit, $isReactivateViaEdit) {
             $employee->update($this->employeePayload($request));
 
             $contract = $employee->currentContract ?: $employee->contracts()->make();
@@ -155,6 +162,18 @@ class EmployeeManagementController extends Controller
                     $exitDate,
                     ['exit_reason' => $employee->exit_reason],
                 );
+            } elseif ($isReactivateViaEdit) {
+                // Ensure the reactivated employee has a valid active contract.
+                $contract->forceFill(['status' => 'active'])->save();
+
+                $employee->reactivate();
+
+                $employee->recordEvent(
+                    'reactivated',
+                    "Diaktifkan kembali saat edit dengan kontrak {$contract->contract_number}.",
+                    now(),
+                    ['contract_number' => $contract->contract_number],
+                );
             }
         });
 
@@ -164,9 +183,11 @@ class EmployeeManagementController extends Controller
 
         return redirect()
             ->route('employees.index')
-            ->with('status', $isExitViaEdit
-                ? 'Data karyawan diperbarui dan status akhir (keluar) berhasil diproses.'
-                : 'Data karyawan berhasil diperbarui.');
+            ->with('status', match (true) {
+                $isExitViaEdit => 'Data karyawan diperbarui dan status akhir (keluar) berhasil diproses.',
+                $isReactivateViaEdit => 'Data karyawan diperbarui dan karyawan berhasil diaktifkan kembali.',
+                default => 'Data karyawan berhasil diperbarui.',
+            });
     }
 
     public function destroy(Employee $employee): RedirectResponse
@@ -222,18 +243,9 @@ class EmployeeManagementController extends Controller
             $employee->loadMissing('currentContract', 'user');
 
             // Renewing a contract for someone who has left = rehire: reactivate them
-            // and clear the exit details (the timeline keeps the history).
+            // (exit details are cleared; the timeline keeps the history).
             if ($wasInactive) {
-                $employee->forceFill([
-                    'employment_status' => 'active',
-                    'exit_reason' => null,
-                    'exit_date' => null,
-                    'exit_notes' => null,
-                ])->save();
-
-                if ($employee->user) {
-                    $employee->user->forceFill(['is_active' => true])->save();
-                }
+                $employee->reactivate();
             }
 
             $previous = $employee->currentContract;

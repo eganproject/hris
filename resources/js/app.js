@@ -1003,3 +1003,30 @@ document.querySelectorAll('[data-contract-type-toggle]').forEach((select) => {
     select.addEventListener('change', syncRequirement);
     syncRequirement();
 });
+
+// Editing an employee who has left: if the contract status is set to an active/
+// ongoing value, saving will reactivate them. Surface that in the confirmation
+// dialog so it's clear the save also brings the employee back to "Aktif".
+document.querySelectorAll('[data-reactivate-active="true"]').forEach((stepper) => {
+    const form = stepper.closest('form');
+    const contractStatus = stepper.querySelector('#contract_status');
+
+    if (!form || !contractStatus) {
+        return;
+    }
+
+    const closingStatuses = JSON.parse(stepper.dataset.reactivateClosingStatuses || '[]');
+
+    const syncConfirmMessage = () => {
+        if (! closingStatuses.includes(contractStatus.value)) {
+            form.dataset.confirmMessage = 'Aktifkan kembali karyawan ini? Status karyawan akan menjadi Aktif dan kontrak baru disimpan.';
+            form.dataset.confirmApprove = 'Ya, aktifkan kembali';
+        } else {
+            delete form.dataset.confirmMessage;
+            delete form.dataset.confirmApprove;
+        }
+    };
+
+    contractStatus.addEventListener('change', syncConfirmMessage);
+    syncConfirmMessage();
+});

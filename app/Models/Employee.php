@@ -237,6 +237,24 @@ class Employee extends Model
     }
 
     /**
+     * Bring an employee back to active. Exit details are cleared (the timeline keeps
+     * the history) and the login account is re-enabled.
+     */
+    public function reactivate(): void
+    {
+        $this->forceFill([
+            'employment_status' => 'active',
+            'exit_reason' => null,
+            'exit_date' => null,
+            'exit_notes' => null,
+        ])->save();
+
+        if ($this->user) {
+            $this->user->forceFill(['is_active' => true])->save();
+        }
+    }
+
+    /**
      * Employment (person) status, decoupled from the contract. Answers the single
      * question "is this person still an employee?".
      */

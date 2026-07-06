@@ -8,7 +8,9 @@
     data-exit-form
     data-exit-active="{{ $exitActive ? 'true' : 'false' }}"
     data-exit-open="{{ $exitModalOpen ? 'true' : 'false' }}"
-    data-exit-closing-statuses='@json($closingContractStatuses ?? [])'>
+    data-exit-closing-statuses='@json($closingContractStatuses ?? [])'
+    data-reactivate-active="{{ $employee->exists && $employee->isInactive() ? 'true' : 'false' }}"
+    data-reactivate-closing-statuses='@json($closingContractStatuses ?? [])'>
     <section class="rounded-lg border border-gray-200 bg-white p-3 shadow-sm">
         <div class="grid grid-cols-2 gap-2 lg:grid-cols-4" role="tablist" aria-label="Tahapan form karyawan">
             <button type="button" role="tab" data-stepper-button="0" class="rounded-md px-3 py-2 text-left text-sm font-semibold text-gray-600 transition hover:bg-gray-50">
@@ -93,10 +95,10 @@
             <div>
                 <label for="employment_status" class="block text-sm font-medium text-gray-700">Status Kepegawaian @unless ($employee->isInactive())<span class="field-requirement is-required" aria-label="Wajib diisi">*</span>@endunless</label>
                 @if ($employee->isInactive())
-                    {{-- Karyawan sudah keluar: status kepegawaian hanya boleh diubah lewat proses "Karyawan Keluar" di halaman detail, bukan lewat form ini. --}}
+                    {{-- Karyawan sudah keluar. Reaktivasi dilakukan dengan mengisi kontrak baru pada tab "Kontrak" dan menyimpan (status kontrak Aktif/Diperpanjang), atau lewat "Aktifkan Kembali" di halaman detail. --}}
                     <input type="hidden" name="employment_status" value="inactive">
-                    <div class="mt-2 rounded-md border border-gray-200 bg-gray-50 px-3 py-2.5 text-sm text-gray-600">
-                        Sudah Keluar — dikelola melalui menu <span class="font-medium">Status Akhir Karyawan</span> di halaman detail.
+                    <div class="mt-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2.5 text-sm text-amber-800">
+                        <span class="font-medium">Sudah Keluar.</span> Untuk mengaktifkan kembali, isi kontrak baru di tab <span class="font-medium">Kontrak</span> (status kontrak Aktif/Diperpanjang) lalu simpan.
                     </div>
                 @else
                     <select id="employment_status" name="employment_status" required class="mt-2 block w-full rounded-md border border-gray-300 px-3 py-2.5 text-sm shadow-xs outline-none focus:border-primary focus:ring-2 focus:ring-primary/20">
