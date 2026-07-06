@@ -14,31 +14,26 @@
         </section>
 
         <section class="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-5">
-            <article class="rounded-lg border border-gray-200 bg-white p-5 shadow-sm">
-                <p class="text-sm text-gray-500">Total Karyawan</p>
-                <p class="mt-2 text-3xl font-semibold text-gray-950">{{ number_format($summary['total']) }}</p>
-            </article>
-            <article class="rounded-lg border border-gray-200 bg-white p-5 shadow-sm">
-                <p class="text-sm text-gray-500">Karyawan Aktif</p>
-                <p class="mt-2 text-3xl font-semibold text-gray-950">{{ number_format($summary['active']) }}</p>
-            </article>
-            <article class="rounded-lg border border-gray-200 bg-white p-5 shadow-sm">
-                <p class="text-sm text-gray-500">Tidak Bekerja</p>
-                <p class="mt-2 text-3xl font-semibold text-gray-950">{{ number_format($summary['inactive']) }}</p>
-            </article>
-            <article class="rounded-lg border border-gray-200 bg-white p-5 shadow-sm">
-                <p class="text-sm text-gray-500">Lokasi Aktif</p>
-                <p class="mt-2 text-3xl font-semibold text-gray-950">{{ number_format($summary['locations']) }}</p>
-            </article>
-            <article class="rounded-lg border border-gray-200 bg-white p-5 shadow-sm">
-                <p class="text-sm text-gray-500">Kontrak Habis 30 Hari</p>
-                <p class="mt-2 text-3xl font-semibold text-gray-950">{{ number_format($summary['expiring_contracts']) }}</p>
-            </article>
+            <x-stat-card label="Total Karyawan" :value="number_format($summary['total'])" tone="primary">
+                <x-icon name="users" class="size-5"/>
+            </x-stat-card>
+            <x-stat-card label="Karyawan Aktif" :value="number_format($summary['active'])" tone="emerald">
+                <x-icon name="user-check" class="size-5"/>
+            </x-stat-card>
+            <x-stat-card label="Tidak Bekerja" :value="number_format($summary['inactive'])" tone="rose">
+                <x-icon name="user-x" class="size-5"/>
+            </x-stat-card>
+            <x-stat-card label="Lokasi Aktif" :value="number_format($summary['locations'])" tone="sky">
+                <x-icon name="map-pin" class="size-5"/>
+            </x-stat-card>
+            <x-stat-card label="Kontrak Habis 30 Hari" :value="number_format($summary['expiring_contracts'])" tone="amber">
+                <x-icon name="calendar-clock" class="size-5"/>
+            </x-stat-card>
         </section>
 
         <section class="rounded-lg border border-gray-200 bg-white p-5 shadow-sm">
-            <form method="GET" action="{{ route('employees.index') }}" class="grid grid-cols-1 gap-4 xl:grid-cols-[1fr_200px_200px_170px_190px_130px_auto]">
-                <div>
+            <form method="GET" action="{{ route('employees.index') }}" class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-7">
+                <div class="xl:col-span-2">
                     <label for="search" class="block text-sm font-medium text-gray-700">Cari</label>
                     <input id="search" name="search" value="{{ $filters['search'] ?? '' }}" class="mt-2 block w-full rounded-md border border-gray-300 bg-white px-3 py-2.5 text-sm shadow-xs outline-none focus:border-primary focus:ring-2 focus:ring-primary/20" placeholder="Nama, NIK karyawan, email">
                 </div>
@@ -90,11 +85,11 @@
                         @endforeach
                     </select>
                 </div>
-                <div class="flex items-end gap-2">
-                    <button type="submit" class="rounded-md bg-primary px-4 py-2.5 text-sm font-semibold text-white shadow-xs transition hover:bg-primary-hover focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2">
+                <div class="col-span-full flex flex-col gap-2 border-t border-gray-100 pt-4 sm:flex-row sm:justify-end">
+                    <button type="submit" class="w-full rounded-md bg-primary px-4 py-2.5 text-sm font-semibold text-white shadow-xs transition hover:bg-primary-hover focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 sm:w-auto">
                         Filter
                     </button>
-                    <a href="{{ route('employees.index') }}" class="rounded-md border border-gray-200 px-4 py-2.5 text-sm font-medium text-gray-700 transition hover:bg-gray-50">
+                    <a href="{{ route('employees.index') }}" class="w-full rounded-md border border-gray-200 px-4 py-2.5 text-center text-sm font-medium text-gray-700 transition hover:bg-gray-50 sm:w-auto">
                         Reset
                     </a>
                 </div>
@@ -108,50 +103,54 @@
             </div>
 
             <div class="overflow-x-auto">
-                <table class="min-w-full divide-y divide-gray-200 text-sm">
-                    <thead class="bg-gray-50">
+                <table class="data-table">
+                    <thead>
                         <tr>
-                            <th class="px-5 py-3 text-left font-medium text-gray-500">Karyawan</th>
-                            <th class="px-5 py-3 text-left font-medium text-gray-500">Lokasi</th>
-                            <th class="px-5 py-3 text-left font-medium text-gray-500">Jabatan</th>
-                            <th class="px-5 py-3 text-left font-medium text-gray-500">Kontrak</th>
-                            <th class="px-5 py-3 text-left font-medium text-gray-500">Status</th>
-                            <th class="px-5 py-3 text-right font-medium text-gray-500">Aksi</th>
+                            <th>Karyawan</th>
+                            <th>Lokasi</th>
+                            <th>Jabatan</th>
+                            <th>Kontrak</th>
+                            <th>Status</th>
+                            <th class="text-right">Aksi</th>
                         </tr>
                     </thead>
-                    <tbody class="divide-y divide-gray-100 bg-white">
+                    <tbody>
                         @forelse ($employees as $employee)
                             <tr>
-                                <td class="px-5 py-4">
-                                    @if ($employee->photo_url)
-                                        <img src="{{ $employee->photo_url }}" alt="Foto {{ $employee->full_name }}" class="mb-2 size-10 rounded-md border border-gray-200 object-cover">
-                                    @else
-                                        <div class="mb-2 flex size-10 items-center justify-center rounded-md border border-gray-200 bg-gray-100 text-sm font-semibold text-gray-500">
-                                            {{ str($employee->full_name ?: 'K')->substr(0, 1)->upper() }}
+                                <td>
+                                    <div class="flex items-center gap-3">
+                                        @if ($employee->photo_url)
+                                            <img src="{{ $employee->photo_url }}" alt="Foto {{ $employee->full_name }}" class="size-9 shrink-0 rounded-full border border-gray-200 object-cover">
+                                        @else
+                                            <div class="flex size-9 shrink-0 items-center justify-center rounded-full border border-gray-200 bg-gray-100 text-sm font-semibold text-gray-500">
+                                                {{ str($employee->full_name ?: 'K')->substr(0, 1)->upper() }}
+                                            </div>
+                                        @endif
+                                        <div class="min-w-0">
+                                            <a href="{{ route('employees.show', $employee) }}" class="font-medium text-gray-950 hover:underline">
+                                                {{ $employee->full_name ?? 'Tanpa nama' }}
+                                            </a>
+                                            <p class="mt-0.5 truncate text-xs text-gray-500">{{ $employee->employee_number ?? 'Belum ada NIK' }} · {{ $employee->email ?? '-' }}</p>
                                         </div>
-                                    @endif
-                                    <a href="{{ route('employees.show', $employee) }}" class="font-medium text-gray-950 hover:underline">
-                                        {{ $employee->full_name ?? 'Tanpa nama' }}
-                                    </a>
-                                    <p class="mt-1 text-xs text-gray-500">{{ $employee->employee_number ?? 'Belum ada NIK' }} · {{ $employee->email ?? '-' }}</p>
+                                    </div>
                                 </td>
-                                <td class="px-5 py-4 text-gray-600">
+                                <td>
                                     <p class="font-medium text-gray-800">{{ $employee->branch?->name ?? '-' }}</p>
-                                    <p class="mt-1 text-xs text-gray-500">{{ $employee->branch?->city ?? '-' }}</p>
+                                    <p class="mt-0.5 text-xs text-gray-500">{{ $employee->branch?->city ?? '-' }}</p>
                                 </td>
-                                <td class="px-5 py-4 text-gray-600">
+                                <td>
                                     <p>{{ $employee->jobPosition?->name ?? '-' }}</p>
-                                    <p class="mt-1 text-xs text-gray-500">{{ $employee->department?->name ?? '-' }}</p>
+                                    <p class="mt-0.5 text-xs text-gray-500">{{ $employee->department?->name ?? '-' }}</p>
                                 </td>
-                                <td class="px-5 py-4 text-gray-600">
+                                <td>
                                     @if ($employee->currentContract)
                                         <p class="font-medium text-gray-800">{{ $employee->currentContract->contract_type }} · {{ $employee->currentContract->contract_number }}</p>
-                                        <p class="mt-1 text-xs text-gray-500">
+                                        <p class="mt-0.5 text-xs text-gray-500">
                                             {{ $employee->currentContract->start_date?->format('d M Y') }} - {{ $employee->currentContract->end_date?->format('d M Y') ?? 'Tidak terbatas' }}
                                         </p>
                                         @if (! is_null($employee->remaining_contract_days))
                                             <p @class([
-                                                'mt-1 text-xs font-medium',
+                                                'mt-0.5 text-xs font-medium',
                                                 'text-red-600' => $employee->remaining_contract_days <= 30,
                                                 'text-gray-500' => $employee->remaining_contract_days > 30,
                                             ])>
@@ -162,7 +161,7 @@
                                         <span class="text-gray-400">Belum ada kontrak</span>
                                     @endif
                                 </td>
-                                <td class="px-5 py-4">
+                                <td>
                                     <x-status-badge :tone="$employee->kepegawaian_status_tone">{{ $employee->kepegawaian_status_label }}</x-status-badge>
                                     @if ($employee->isInactive())
                                         <p class="mt-1.5 text-xs text-gray-500">
@@ -172,31 +171,25 @@
                                         <p class="mt-1.5 text-xs font-medium text-red-600">Kontrak kedaluwarsa</p>
                                     @endif
                                 </td>
-                                <td class="px-5 py-4">
-                                    <div class="flex justify-end gap-2">
-                                        <a href="{{ route('employees.show', $employee) }}" class="rounded-md border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-700 transition hover:bg-gray-50">
-                                            Detail
-                                        </a>
+                                <td class="text-right">
+                                    <x-action-menu>
+                                        <a href="{{ route('employees.show', $employee) }}" class="action-menu-item"><x-icon name="eye"/> Detail</a>
                                         @can('employees.update')
-                                            <a href="{{ route('employees.edit', $employee) }}" class="rounded-md border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-700 transition hover:bg-gray-50">
-                                                Edit
-                                            </a>
+                                            <a href="{{ route('employees.edit', $employee) }}" class="action-menu-item"><x-icon name="pencil"/> Edit</a>
                                         @endcan
                                         @can('employees.delete')
                                             <form method="POST" action="{{ route('employees.destroy', $employee) }}">
                                                 @csrf
                                                 @method('DELETE')
-                                                <button type="submit" class="rounded-md border border-red-200 px-3 py-1.5 text-xs font-medium text-red-700 transition hover:bg-red-50">
-                                                    Hapus
-                                                </button>
+                                                <button type="submit" class="action-menu-item action-menu-item-danger"><x-icon name="trash"/> Hapus</button>
                                             </form>
                                         @endcan
-                                    </div>
+                                    </x-action-menu>
                                 </td>
                             </tr>
                         @empty
                             <tr>
-                                <td colspan="6" class="px-5 py-10 text-center text-sm text-gray-500">Belum ada data karyawan.</td>
+                                <td colspan="6" class="cell-empty">Belum ada data karyawan.</td>
                             </tr>
                         @endforelse
                     </tbody>

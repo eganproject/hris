@@ -19,10 +19,10 @@ class DashboardController extends Controller
 
         return view('dashboard', [
             'metrics' => collect([
-                ['label' => 'Karyawan Aktif', 'value' => Employee::query()->active()->count(), 'tone' => 'emerald', 'permission' => 'employees.view'],
-                ['label' => 'Departments', 'value' => Department::query()->count(), 'tone' => 'sky', 'permission' => 'organization.view'],
-                ['label' => 'Lokasi Kerja', 'value' => Branch::query()->where('is_active', true)->count(), 'tone' => 'amber', 'permission' => 'organization.view'],
-                ['label' => 'Kontrak Habis 30 Hari', 'value' => EmployeeContract::query()->expiringWithin(30)->count(), 'tone' => 'rose', 'permission' => 'employees.view'],
+                ['label' => 'Karyawan Aktif', 'value' => Employee::query()->active()->count(), 'tone' => 'emerald', 'icon' => 'user-check', 'permission' => 'employees.view'],
+                ['label' => 'Departments', 'value' => Department::query()->count(), 'tone' => 'sky', 'icon' => 'layers', 'permission' => 'organization.view'],
+                ['label' => 'Lokasi Kerja', 'value' => Branch::query()->where('is_active', true)->count(), 'tone' => 'amber', 'icon' => 'map-pin', 'permission' => 'organization.view'],
+                ['label' => 'Kontrak Habis 30 Hari', 'value' => EmployeeContract::query()->expiringWithin(30)->count(), 'tone' => 'rose', 'icon' => 'calendar-clock', 'permission' => 'employees.view'],
             ])->filter(fn (array $metric) => $user?->can($metric['permission']))->values(),
             'modules' => collect([
                 ['name' => 'Employee', 'description' => 'People records, contracts, and assignments.', 'count' => Employee::query()->count(), 'permission' => 'employees.view', 'route' => 'employees.index'],

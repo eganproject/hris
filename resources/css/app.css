@@ -704,6 +704,87 @@
         background: rgb(15 23 42 / 0.06);
     }
 
+    /* Clean, elegant data tables */
+    .data-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 0.8125rem;
+    }
+
+    .data-table thead th {
+        padding: 0.6rem 1.25rem;
+        text-align: left;
+        font-size: 0.6875rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+        color: #6b7280;
+        background: #f9fafb;
+        border-bottom: 1px solid #e5e7eb;
+        white-space: nowrap;
+    }
+
+    .data-table tbody td {
+        padding: 0.85rem 1.25rem;
+        color: #374151;
+        vertical-align: middle;
+        border-bottom: 1px solid #f3f4f6;
+    }
+
+    .data-table tbody tr {
+        transition: background-color 0.12s ease;
+    }
+
+    .data-table tbody tr:hover {
+        background: #fafafa;
+    }
+
+    .data-table tbody tr:last-child td {
+        border-bottom: 0;
+    }
+
+    .data-table .cell-empty {
+        padding: 2.5rem 1.25rem;
+        text-align: center;
+        color: #6b7280;
+    }
+
+    /* Action dropdown menu items */
+    .action-menu-item {
+        display: flex;
+        width: 100%;
+        align-items: center;
+        gap: 0.5rem;
+        padding: 0.5rem 0.75rem;
+        text-align: left;
+        font-size: 0.8125rem;
+        font-weight: 500;
+        color: #374151;
+        transition: background-color 0.12s ease, color 0.12s ease;
+    }
+
+    .action-menu-item:hover {
+        background: #f9fafb;
+        color: #111827;
+    }
+
+    .action-menu-item svg {
+        color: #9ca3af;
+    }
+
+    .action-menu-item-danger {
+        color: #b91c1c;
+    }
+
+    .action-menu-item-danger:hover {
+        background: #fef2f2;
+        color: #b91c1c;
+    }
+
+    .action-menu-item-danger svg {
+        color: #f87171;
+    }
+
     .flatpickr-day {
         border-radius: 0.375rem;
     }

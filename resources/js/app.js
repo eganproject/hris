@@ -254,6 +254,63 @@ document.querySelectorAll('[data-sidebar-toggle]').forEach((button) => {
     });
 });
 
+// Generic dropdown menus (e.g. row action menus). The panel is positioned with
+// `fixed` so it is never clipped by a table's horizontal-scroll container.
+const closeAllDropdowns = (except = null) => {
+    document.querySelectorAll('[data-dropdown-menu]').forEach((menu) => {
+        if (menu === except || menu.hidden) {
+            return;
+        }
+
+        menu.hidden = true;
+        menu.closest('[data-dropdown]')?.querySelector('[data-dropdown-trigger]')?.setAttribute('aria-expanded', 'false');
+    });
+};
+
+document.querySelectorAll('[data-dropdown]').forEach((dropdown) => {
+    const trigger = dropdown.querySelector('[data-dropdown-trigger]');
+    const menu = dropdown.querySelector('[data-dropdown-menu]');
+
+    if (!trigger || !menu) {
+        return;
+    }
+
+    const openMenu = () => {
+        closeAllDropdowns(menu);
+
+        const rect = trigger.getBoundingClientRect();
+
+        menu.style.position = 'fixed';
+        menu.style.top = `${Math.round(rect.bottom + 6)}px`;
+        menu.style.left = 'auto';
+        menu.style.right = `${Math.round(window.innerWidth - rect.right)}px`;
+        menu.style.zIndex = '50';
+        menu.hidden = false;
+        trigger.setAttribute('aria-expanded', 'true');
+    };
+
+    trigger.addEventListener('click', (event) => {
+        event.stopPropagation();
+
+        if (menu.hidden) {
+            openMenu();
+        } else {
+            closeAllDropdowns();
+        }
+    });
+
+    menu.addEventListener('click', (event) => event.stopPropagation());
+});
+
+document.addEventListener('click', () => closeAllDropdowns());
+document.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape') {
+        closeAllDropdowns();
+    }
+});
+window.addEventListener('resize', () => closeAllDropdowns());
+window.addEventListener('scroll', () => closeAllDropdowns(), true);
+
 document.querySelectorAll('[data-tabs]').forEach((tabs) => {
     const storageKey = tabs.dataset.tabsStorageKey;
     const buttons = [...tabs.querySelectorAll('[data-tab-button]')];

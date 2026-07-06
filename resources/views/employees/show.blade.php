@@ -147,30 +147,30 @@
                         <h2 class="text-base font-semibold text-gray-950">Histori Kontrak</h2>
                     </div>
                     <div class="overflow-x-auto">
-                        <table class="min-w-full divide-y divide-gray-200 text-sm">
-                            <thead class="bg-gray-50">
+                        <table class="data-table">
+                            <thead>
                                 <tr>
-                                    <th class="px-5 py-3 text-left font-medium text-gray-500">Nomor</th>
-                                    <th class="px-5 py-3 text-left font-medium text-gray-500">Jenis</th>
-                                    <th class="px-5 py-3 text-left font-medium text-gray-500">Periode</th>
-                                    <th class="px-5 py-3 text-left font-medium text-gray-500">Status</th>
+                                    <th>Nomor</th>
+                                    <th>Jenis</th>
+                                    <th>Periode</th>
+                                    <th>Status</th>
                                 </tr>
                             </thead>
-                            <tbody class="divide-y divide-gray-100">
+                            <tbody>
                                 @forelse ($employee->contracts as $contract)
                                     <tr>
-                                        <td class="px-5 py-4 font-medium text-gray-950">{{ $contract->contract_number }}</td>
-                                        <td class="px-5 py-4 text-gray-600">{{ $contract->contract_type }}</td>
-                                        <td class="px-5 py-4 text-gray-600">
+                                        <td class="font-medium text-gray-950">{{ $contract->contract_number }}</td>
+                                        <td>{{ $contract->contract_type }}</td>
+                                        <td>
                                             {{ $contract->start_date?->format('d M Y') }} - {{ $contract->end_date?->format('d M Y') ?? 'Tidak terbatas' }}
                                         </td>
-                                        <td class="px-5 py-4">
+                                        <td>
                                             <x-status-badge :tone="$contract->effective_status_tone">{{ $contract->effective_status_label }}</x-status-badge>
                                         </td>
                                     </tr>
                                 @empty
                                     <tr>
-                                        <td colspan="4" class="px-5 py-8 text-center text-gray-500">Belum ada kontrak.</td>
+                                        <td colspan="4" class="cell-empty">Belum ada kontrak.</td>
                                     </tr>
                                 @endforelse
                             </tbody>

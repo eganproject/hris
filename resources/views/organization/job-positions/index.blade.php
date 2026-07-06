@@ -24,28 +24,35 @@
         </section>
         <section class="overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm">
             <div class="overflow-x-auto">
-                <table class="min-w-full divide-y divide-gray-200 text-sm">
-                    <thead class="bg-gray-50"><tr><th class="px-5 py-3 text-left font-medium text-gray-500">Jabatan</th><th class="px-5 py-3 text-left font-medium text-gray-500">Tersedia untuk Divisi</th><th class="px-5 py-3 text-left font-medium text-gray-500">Level</th><th class="px-5 py-3 text-left font-medium text-gray-500">Default Role</th><th class="px-5 py-3 text-right font-medium text-gray-500">Karyawan</th><th class="px-5 py-3 text-right font-medium text-gray-500">Aksi</th></tr></thead>
-                    <tbody class="divide-y divide-gray-100">
+                <table class="data-table">
+                    <thead><tr><th>Jabatan</th><th>Tersedia untuk Divisi</th><th>Level</th><th>Default Role</th><th class="text-right">Karyawan</th><th class="text-right">Aksi</th></tr></thead>
+                    <tbody>
                         @forelse ($jobPositions as $jobPosition)
                             <tr>
-                                <td class="px-5 py-4"><p class="font-medium text-gray-950">{{ $jobPosition->name }}</p><p class="mt-1 text-xs text-gray-500">{{ $jobPosition->code }}</p></td>
-                                <td class="px-5 py-4 text-gray-600">
-                                    <div class="flex flex-wrap gap-2">
+                                <td><p class="font-medium text-gray-950">{{ $jobPosition->name }}</p><p class="mt-0.5 text-xs text-gray-500">{{ $jobPosition->code }}</p></td>
+                                <td>
+                                    <div class="flex flex-wrap gap-1.5">
                                         @forelse ($jobPosition->activeDepartments as $department)
-                                            <span class="rounded-md bg-gray-100 px-2 py-1 text-xs font-medium text-gray-700">{{ $department->name }}</span>
+                                            <span class="rounded-md bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-700">{{ $department->name }}</span>
                                         @empty
                                             <span class="text-gray-400">Belum dipetakan</span>
                                         @endforelse
                                     </div>
                                 </td>
-                                <td class="px-5 py-4 text-gray-600">{{ $jobPosition->level ?? '-' }}</td>
-                                <td class="px-5 py-4 text-gray-600">{{ $jobPosition->defaultRole?->name ?? '-' }}</td>
-                                <td class="px-5 py-4 text-right text-gray-600">{{ number_format($jobPosition->employees_count) }}</td>
-                                <td class="px-5 py-4"><div class="flex justify-end gap-2">@can('organization.update')<a href="{{ route('organization.job-positions.edit', $jobPosition) }}" class="rounded-md border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50">Edit</a>@endcan @can('organization.delete')<form method="POST" action="{{ route('organization.job-positions.destroy', $jobPosition) }}">@csrf @method('DELETE')<button type="submit" class="rounded-md border border-red-200 px-3 py-1.5 text-xs font-medium text-red-700 hover:bg-red-50">Hapus</button></form>@endcan</div></td>
+                                <td>{{ $jobPosition->level ?? '-' }}</td>
+                                <td>{{ $jobPosition->defaultRole?->name ?? '-' }}</td>
+                                <td class="text-right">{{ number_format($jobPosition->employees_count) }}</td>
+                                <td class="text-right">
+                                    @canany(['organization.update', 'organization.delete'])
+                                        <x-action-menu>
+                                            @can('organization.update')<a href="{{ route('organization.job-positions.edit', $jobPosition) }}" class="action-menu-item"><x-icon name="pencil"/> Edit</a>@endcan
+                                            @can('organization.delete')<form method="POST" action="{{ route('organization.job-positions.destroy', $jobPosition) }}">@csrf @method('DELETE')<button type="submit" class="action-menu-item action-menu-item-danger"><x-icon name="trash"/> Hapus</button></form>@endcan
+                                        </x-action-menu>
+                                    @endcanany
+                                </td>
                             </tr>
                         @empty
-                            <tr><td colspan="6" class="px-5 py-10 text-center text-gray-500">Belum ada jabatan.</td></tr>
+                            <tr><td colspan="6" class="cell-empty">Belum ada jabatan.</td></tr>
                         @endforelse
                     </tbody>
                 </table>

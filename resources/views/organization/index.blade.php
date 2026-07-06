@@ -14,22 +14,18 @@
         </section>
 
         <section class="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-            <article class="rounded-lg border border-gray-200 bg-white p-5 shadow-sm">
-                <p class="text-sm text-gray-500">Lokasi Aktif</p>
-                <p class="mt-2 text-3xl font-semibold text-gray-950">{{ number_format($summary['locations']) }}</p>
-            </article>
-            <article class="rounded-lg border border-gray-200 bg-white p-5 shadow-sm">
-                <p class="text-sm text-gray-500">Gudang</p>
-                <p class="mt-2 text-3xl font-semibold text-gray-950">{{ number_format($summary['warehouses']) }}</p>
-            </article>
-            <article class="rounded-lg border border-gray-200 bg-white p-5 shadow-sm">
-                <p class="text-sm text-gray-500">Divisi Aktif</p>
-                <p class="mt-2 text-3xl font-semibold text-gray-950">{{ number_format($summary['departments']) }}</p>
-            </article>
-            <article class="rounded-lg border border-gray-200 bg-white p-5 shadow-sm">
-                <p class="text-sm text-gray-500">Karyawan Aktif</p>
-                <p class="mt-2 text-3xl font-semibold text-gray-950">{{ number_format($summary['active_employees']) }}</p>
-            </article>
+            <x-stat-card label="Lokasi Aktif" :value="number_format($summary['locations'])" tone="sky">
+                <x-icon name="map-pin" class="size-5"/>
+            </x-stat-card>
+            <x-stat-card label="Gudang" :value="number_format($summary['warehouses'])" tone="amber">
+                <x-icon name="box" class="size-5"/>
+            </x-stat-card>
+            <x-stat-card label="Divisi Aktif" :value="number_format($summary['departments'])" tone="violet">
+                <x-icon name="layers" class="size-5"/>
+            </x-stat-card>
+            <x-stat-card label="Karyawan Aktif" :value="number_format($summary['active_employees'])" tone="emerald">
+                <x-icon name="users" class="size-5"/>
+            </x-stat-card>
         </section>
 
         <section class="overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm">
@@ -39,52 +35,52 @@
             </div>
 
             <div class="overflow-x-auto">
-                <table class="min-w-full divide-y divide-gray-200 text-sm">
-                    <thead class="bg-gray-50">
+                <table class="data-table">
+                    <thead>
                         <tr>
-                            <th class="px-5 py-3 text-left font-medium text-gray-500">Lokasi</th>
-                            <th class="px-5 py-3 text-left font-medium text-gray-500">Jenis</th>
-                            <th class="px-5 py-3 text-left font-medium text-gray-500">Divisi</th>
-                            <th class="px-5 py-3 text-right font-medium text-gray-500">Karyawan Aktif</th>
+                            <th>Lokasi</th>
+                            <th>Jenis</th>
+                            <th>Divisi</th>
+                            <th class="text-right">Karyawan Aktif</th>
                         </tr>
                     </thead>
-                    <tbody class="divide-y divide-gray-100 bg-white">
+                    <tbody>
                         @forelse ($branches as $branch)
                             <tr>
-                                <td class="px-5 py-4">
+                                <td>
                                     <p class="font-medium text-gray-950">{{ $branch->name }}</p>
-                                    <p class="mt-1 text-xs text-gray-500">{{ $branch->city ?? '-' }} · {{ $branch->address ?? '-' }}</p>
+                                    <p class="mt-0.5 text-xs text-gray-500">{{ $branch->city ?? '-' }} · {{ $branch->address ?? '-' }}</p>
                                 </td>
-                                <td class="px-5 py-4">
+                                <td>
                                     <span @class([
-                                        'rounded-md px-2 py-1 text-xs font-medium',
+                                        'rounded-md px-2 py-0.5 text-xs font-medium',
                                         'bg-gray-950 text-white' => $branch->type === 'warehouse',
                                         'bg-gray-100 text-gray-700' => $branch->type !== 'warehouse',
                                     ])>
                                         {{ $branch->type === 'warehouse' ? 'Gudang' : str($branch->type ?: 'office')->headline() }}
                                     </span>
                                 </td>
-                                <td class="px-5 py-4">
-                                    <div class="flex flex-wrap gap-2">
+                                <td>
+                                    <div class="flex flex-wrap gap-1.5">
                                         @forelse ($branch->departments as $department)
-                                            <span class="rounded-md bg-gray-100 px-2 py-1 text-xs font-medium text-gray-700">
+                                            <span class="rounded-md bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-700">
                                                 {{ $department->name }}
                                                 @if ($department->pivot->is_primary)
                                                     · Utama
                                                 @endif
                                             </span>
                                         @empty
-                                            <span class="text-sm text-gray-400">Belum ada divisi</span>
+                                            <span class="text-gray-400">Belum ada divisi</span>
                                         @endforelse
                                     </div>
                                 </td>
-                                <td class="px-5 py-4 text-right font-semibold text-gray-950">
+                                <td class="text-right font-semibold text-gray-950">
                                     {{ number_format($branch->active_employees_count) }}
                                 </td>
                             </tr>
                         @empty
                             <tr>
-                                <td colspan="4" class="px-5 py-10 text-center text-sm text-gray-500">Belum ada lokasi kerja.</td>
+                                <td colspan="4" class="cell-empty">Belum ada lokasi kerja.</td>
                             </tr>
                         @endforelse
                     </tbody>

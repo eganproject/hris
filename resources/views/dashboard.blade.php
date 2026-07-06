@@ -13,23 +13,9 @@
 
         <section class="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
             @foreach ($metrics as $metric)
-                @php
-                    $tone = [
-                        'emerald' => 'bg-emerald-50 text-emerald-700 ring-emerald-100',
-                        'sky' => 'bg-sky-50 text-sky-700 ring-sky-100',
-                        'amber' => 'bg-amber-50 text-amber-700 ring-amber-100',
-                        'rose' => 'bg-rose-50 text-rose-700 ring-rose-100',
-                    ][$metric['tone']];
-                @endphp
-                <article class="rounded-lg border border-gray-200 bg-white p-5 shadow-sm">
-                    <div class="flex items-start justify-between gap-4">
-                        <div>
-                            <p class="text-sm text-gray-500">{{ $metric['label'] }}</p>
-                            <p class="mt-2 text-3xl font-semibold text-gray-950">{{ number_format($metric['value']) }}</p>
-                        </div>
-                        <span class="rounded-md px-2.5 py-1 text-xs font-medium ring-1 {{ $tone }}">Live</span>
-                    </div>
-                </article>
+                <x-stat-card :label="$metric['label']" :value="number_format($metric['value'])" :tone="$metric['tone']">
+                    <x-icon :name="$metric['icon']" class="size-5"/>
+                </x-stat-card>
             @endforeach
         </section>
 
