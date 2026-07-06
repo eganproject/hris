@@ -26,7 +26,6 @@ class DashboardController extends Controller
             ])->filter(fn (array $metric) => $user?->can($metric['permission']))->values(),
             'modules' => collect([
                 ['name' => 'Employee', 'description' => 'People records, contracts, and assignments.', 'count' => Employee::query()->count(), 'permission' => 'employees.view', 'route' => 'employees.index'],
-                ['name' => 'Payroll', 'description' => 'Salary, payroll runs, and confidential compensation data.', 'count' => 0, 'permission' => 'payroll.view', 'route' => 'payroll.index'],
                 ['name' => 'Department', 'description' => 'Organization units and reporting groups.', 'count' => Department::query()->count(), 'permission' => 'organization.view', 'route' => 'organization.departments.index'],
                 ['name' => 'Branch', 'description' => 'Office locations, warehouses, and operational areas.', 'count' => Branch::query()->count(), 'permission' => 'organization.view', 'route' => 'organization.branches.index'],
                 ['name' => 'Shift', 'description' => 'Work schedules and shift templates.', 'count' => Shift::query()->count(), 'permission' => 'attendance.view', 'route' => 'attendance.shifts.index'],

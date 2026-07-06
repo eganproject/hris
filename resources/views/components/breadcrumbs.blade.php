@@ -25,8 +25,6 @@
         'attendance.shifts.create' => ['label' => 'Tambah Shift', 'parent' => 'attendance.shifts.index'],
         'attendance.shifts.edit' => ['label' => 'Edit Shift', 'parent' => 'attendance.shifts.index'],
 
-        'payroll.index' => ['label' => 'Gaji / Payroll', 'parent' => 'dashboard'],
-
         'access-control.index' => ['label' => 'Pengaturan Akses', 'parent' => 'dashboard'],
     ];
 

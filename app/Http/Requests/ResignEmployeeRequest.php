@@ -43,4 +43,17 @@ class ResignEmployeeRequest extends FormRequest
             'exit_notes' => 'catatan keluar',
         ];
     }
+
+    /**
+     * Flash the employee so the list page can re-open the exit modal with errors
+     * when the process is triggered straight from the employee table.
+     */
+    protected function failedValidation(\Illuminate\Contracts\Validation\Validator $validator): void
+    {
+        if ($employee = $this->route('employee')) {
+            session()->flash('resign_employee', ['id' => $employee->id, 'name' => $employee->full_name]);
+        }
+
+        parent::failedValidation($validator);
+    }
 }

@@ -7,10 +7,6 @@ return [
         'employees.create',
         'employees.update',
         'employees.delete',
-        'payroll.view',
-        'payroll.create',
-        'payroll.update',
-        'payroll.delete',
         'attendance.view',
         'attendance.create',
         'attendance.update',
@@ -47,13 +43,6 @@ return [
         ],
         'employee' => [
             'dashboard.view',
-        ],
-        'payroll-manager' => [
-            'dashboard.view',
-            'payroll.view',
-            'payroll.create',
-            'payroll.update',
-            'payroll.delete',
         ],
     ],
 ];

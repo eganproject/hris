@@ -18,7 +18,6 @@ class UserSeeder extends Seeder
                 'admin@cahayaoptima.test',
                 'hr@cahayaoptima.test',
                 'reader@cahayaoptima.test',
-                'payroll@cahayaoptima.test',
             ])
             ->delete();
 

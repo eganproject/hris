@@ -643,6 +643,68 @@ test('renewing a contract creates a new active contract and records history', fu
         ->and($employee->events()->where('type', 'contract_renewed')->exists())->toBeTrue();
 });
 
+test('renewing from the employee list redirects back to the list', function () {
+    $user = employeeManager();
+    ['branch' => $branch, 'department' => $department, 'position' => $position] = hrMasterData();
+
+    $employee = Employee::query()->create([
+        'branch_id' => $branch->id,
+        'department_id' => $department->id,
+        'job_position_id' => $position->id,
+        'employee_number' => 'EMP-LIST',
+        'full_name' => 'Perpanjang Dari List',
+        'join_date' => now()->subYear()->toDateString(),
+        'employment_status' => 'active',
+    ]);
+    $employee->contracts()->create([
+        'contract_number' => 'CTR-LIST-OLD',
+        'contract_type' => 'PKWT',
+        'start_date' => now()->subYear()->toDateString(),
+        'end_date' => now()->toDateString(),
+        'status' => 'active',
+    ]);
+
+    $this->actingAs($user)
+        ->post("/employees/{$employee->id}/renew-contract", [
+            'from_list' => '1',
+            'contract_number' => 'CTR-LIST-NEW',
+            'contract_type' => 'PKWT',
+            'start_date' => now()->addDay()->format('Y-m-d'),
+            'end_date' => now()->addYear()->format('Y-m-d'),
+        ])
+        ->assertRedirect('/employees');
+
+    expect($employee->fresh()->currentContract->contract_number)->toBe('CTR-LIST-NEW');
+});
+
+test('a failed renewal flashes the employee so the modal can re-open', function () {
+    $user = employeeManager();
+    ['branch' => $branch, 'department' => $department, 'position' => $position] = hrMasterData();
+
+    $employee = Employee::query()->create([
+        'branch_id' => $branch->id,
+        'department_id' => $department->id,
+        'job_position_id' => $position->id,
+        'employee_number' => 'EMP-LISTF',
+        'full_name' => 'Gagal Validasi',
+        'join_date' => now()->subYear()->toDateString(),
+        'employment_status' => 'active',
+    ]);
+
+    // PKWT without an end date fails validation.
+    $this->actingAs($user)
+        ->from('/employees')
+        ->post("/employees/{$employee->id}/renew-contract", [
+            'from_list' => '1',
+            'contract_number' => 'CTR-FAIL',
+            'contract_type' => 'PKWT',
+            'start_date' => now()->format('Y-m-d'),
+        ])
+        ->assertRedirect('/employees')
+        ->assertSessionHasErrors('end_date')
+        ->assertSessionHas('renew_employee');
+});
+
 test('renewing a contract reactivates an employee who had left', function () {
     $user = employeeManager();
     ['branch' => $branch, 'department' => $department, 'position' => $position] = hrMasterData();

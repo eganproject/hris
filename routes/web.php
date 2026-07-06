@@ -8,7 +8,6 @@ use App\Http\Controllers\DepartmentController;
 use App\Http\Controllers\EmployeeManagementController;
 use App\Http\Controllers\JobPositionController;
 use App\Http\Controllers\OrganizationController;
-use App\Http\Controllers\PayrollController;
 use App\Http\Controllers\ShiftController;
 use Illuminate\Support\Facades\Route;
 
@@ -57,10 +56,6 @@ Route::middleware('auth')->group(function () {
             ->middleware('permission:employees.delete')
             ->name('destroy');
     });
-
-    Route::get('payroll', [PayrollController::class, 'index'])
-        ->middleware('permission:payroll.view')
-        ->name('payroll.index');
 
     Route::get('organization', OrganizationController::class)
         ->middleware('permission:organization.view')

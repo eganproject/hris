@@ -99,18 +99,6 @@
                         </div>
                     @endcan
 
-                    @can('payroll.view')
-                        <div>
-                            <p class="sidebar-section-label px-2.5 text-[10px] font-semibold uppercase text-gray-400">Payroll</p>
-                            <div class="mt-1.5">
-                                <a href="{{ route('payroll.index') }}" @class(['sidebar-nav-link flex items-center gap-2.5 rounded px-2.5 py-1.5 text-[13px] font-medium transition', 'bg-white text-gray-950 shadow-xs ring-1 ring-gray-200' => request()->routeIs('payroll.*'), 'text-gray-600 hover:bg-white hover:text-gray-950' => ! request()->routeIs('payroll.*')]) title="Gaji / Payroll">
-                                    <svg class="size-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="6" width="18" height="12" rx="2"></rect><circle cx="12" cy="12" r="2.5"></circle><path d="M6 9h.01M18 15h.01"></path></svg>
-                                    <span class="sidebar-label truncate">Gaji / Payroll</span>
-                                </a>
-                            </div>
-                        </div>
-                    @endcan
-
                     @can('access-control.view')
                         <div>
                             <p class="sidebar-section-label px-2.5 text-[10px] font-semibold uppercase text-gray-400">System</p>

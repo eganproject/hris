@@ -176,6 +176,12 @@
                                         <a href="{{ route('employees.show', $employee) }}" class="action-menu-item"><x-icon name="eye"/> Detail</a>
                                         @can('employees.update')
                                             <a href="{{ route('employees.edit', $employee) }}" class="action-menu-item"><x-icon name="pencil"/> Edit</a>
+                                            @if ($employee->isInactive())
+                                                <button type="button" class="action-menu-item" data-open-renew data-mode="reactivate" data-url="{{ route('employees.renew-contract', $employee) }}" data-name="{{ $employee->full_name }}"><x-icon name="refresh"/> Aktifkan Kembali</button>
+                                            @else
+                                                <button type="button" class="action-menu-item" data-open-renew data-mode="renew" data-url="{{ route('employees.renew-contract', $employee) }}" data-name="{{ $employee->full_name }}"><x-icon name="refresh"/> Perpanjang Kontrak</button>
+                                                <button type="button" class="action-menu-item" data-open-exit data-url="{{ route('employees.resign', $employee) }}" data-name="{{ $employee->full_name }}"><x-icon name="user-x"/> Proses Keluar</button>
+                                            @endif
                                         @endcan
                                         @can('employees.delete')
                                             <form method="POST" action="{{ route('employees.destroy', $employee) }}">
@@ -200,5 +206,98 @@
                 {{ $employees->links() }}
             </div>
         </section>
+
+        @can('employees.update')
+            @php
+                $renewFlash = session('renew_employee');
+                $renewOpen = $renewFlash && $errors->hasAny(['contract_number', 'contract_type', 'start_date', 'end_date']);
+                $renewMode = $renewFlash['mode'] ?? 'renew';
+                $exitFlash = session('resign_employee');
+                $exitOpen = $exitFlash && $errors->hasAny(['exit_reason', 'exit_date', 'exit_notes']);
+            @endphp
+
+            {{-- Perpanjang kontrak / aktifkan kembali langsung dari daftar --}}
+            <div data-list-modal="renew" @unless ($renewOpen) hidden @endunless class="fixed inset-0 z-50 flex items-center justify-center bg-gray-950/50 p-4">
+                <div class="w-full max-w-md rounded-lg border border-gray-200 bg-white p-6 shadow-xl" role="dialog" aria-modal="true">
+                    <h2 class="text-base font-semibold text-gray-950">
+                        <span data-renew-heading>{{ $renewMode === 'reactivate' ? 'Aktifkan Kembali' : 'Perpanjang Kontrak' }}</span><span class="font-normal text-gray-500" data-renew-name>{{ $renewOpen ? ' — '.$renewFlash['name'] : '' }}</span>
+                    </h2>
+                    <p class="mt-1 text-sm text-gray-500" data-renew-desc>Kontrak baru dibuat sebagai kontrak aktif. Kontrak sebelumnya ditandai "Diperpanjang".</p>
+                    <form method="POST" data-list-renew-form data-no-confirm="true" action="{{ $renewOpen ? route('employees.renew-contract', $renewFlash['id']) : '' }}" class="mt-5 space-y-4">
+                        @csrf
+                        <input type="hidden" name="from_list" value="1">
+                        <div>
+                            <label for="lm_renew_number" class="block text-sm font-medium text-gray-700">Nomor Kontrak Baru <span class="field-requirement is-required" aria-label="Wajib diisi">*</span></label>
+                            <input id="lm_renew_number" name="contract_number" value="{{ old('contract_number') }}" required class="mt-2 block w-full rounded-md border border-gray-300 px-3 py-2.5 text-sm shadow-xs outline-none focus:border-primary focus:ring-2 focus:ring-primary/20">
+                            @error('contract_number')<p class="mt-2 text-sm text-red-600">{{ $message }}</p>@enderror
+                        </div>
+                        <div>
+                            <label for="lm_renew_type" class="block text-sm font-medium text-gray-700">Jenis Kontrak <span class="field-requirement is-required" aria-label="Wajib diisi">*</span></label>
+                            <select id="lm_renew_type" name="contract_type" required data-contract-type-toggle="#lm_renew_end" class="mt-2 block w-full rounded-md border border-gray-300 px-3 py-2.5 text-sm shadow-xs outline-none focus:border-primary focus:ring-2 focus:ring-primary/20">
+                                @foreach ($contractTypes as $type)
+                                    <option value="{{ $type }}" @selected(old('contract_type', 'PKWT') === $type)>{{ $type }}</option>
+                                @endforeach
+                            </select>
+                            @error('contract_type')<p class="mt-2 text-sm text-red-600">{{ $message }}</p>@enderror
+                        </div>
+                        <div class="grid grid-cols-2 gap-3">
+                            <div>
+                                <label for="lm_renew_start" class="block text-sm font-medium text-gray-700">Mulai <span class="field-requirement is-required" aria-label="Wajib diisi">*</span></label>
+                                <input id="lm_renew_start" name="start_date" type="date" value="{{ old('start_date', now()->format('Y-m-d')) }}" required class="mt-2 block w-full rounded-md border border-gray-300 px-3 py-2.5 text-sm shadow-xs outline-none focus:border-primary focus:ring-2 focus:ring-primary/20">
+                                @error('start_date')<p class="mt-2 text-sm text-red-600">{{ $message }}</p>@enderror
+                            </div>
+                            <div>
+                                <label for="lm_renew_end" class="block text-sm font-medium text-gray-700">Selesai</label>
+                                <input id="lm_renew_end" name="end_date" type="date" value="{{ old('end_date') }}" class="mt-2 block w-full rounded-md border border-gray-300 px-3 py-2.5 text-sm shadow-xs outline-none focus:border-primary focus:ring-2 focus:ring-primary/20">
+                                @error('end_date')<p class="mt-2 text-sm text-red-600">{{ $message }}</p>@enderror
+                            </div>
+                        </div>
+                        <div>
+                            <label for="lm_renew_notes" class="block text-sm font-medium text-gray-700">Catatan</label>
+                            <textarea id="lm_renew_notes" name="notes" rows="2" class="mt-2 block w-full rounded-md border border-gray-300 px-3 py-2.5 text-sm shadow-xs outline-none focus:border-primary focus:ring-2 focus:ring-primary/20">{{ old('notes') }}</textarea>
+                        </div>
+                        <div class="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+                            <button type="button" data-modal-close class="rounded-md border border-gray-200 px-4 py-2.5 text-sm font-medium text-gray-700 transition hover:bg-gray-50">Batal</button>
+                            <button type="submit" data-renew-submit class="rounded-md bg-primary px-4 py-2.5 text-sm font-semibold text-white shadow-xs transition hover:bg-primary-hover">{{ $renewMode === 'reactivate' ? 'Aktifkan Kembali & Simpan' : 'Simpan Kontrak Baru' }}</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            {{-- Proses karyawan keluar langsung dari daftar --}}
+            <div data-list-modal="exit" @unless ($exitOpen) hidden @endunless class="fixed inset-0 z-50 flex items-center justify-center bg-gray-950/50 p-4">
+                <div class="w-full max-w-md rounded-lg border border-gray-200 bg-white p-6 shadow-xl" role="dialog" aria-modal="true">
+                    <h2 class="text-base font-semibold text-gray-950">Proses Karyawan Keluar<span class="font-normal text-gray-500" data-exit-name>{{ $exitOpen ? ' — '.$exitFlash['name'] : '' }}</span></h2>
+                    <p class="mt-1 text-sm text-gray-500">Karyawan akan dinonaktifkan dan akun login dimatikan. Lengkapi data berikut.</p>
+                    <form method="POST" data-list-exit-form data-no-confirm="true" action="{{ $exitOpen ? route('employees.resign', $exitFlash['id']) : '' }}" class="mt-5 space-y-4">
+                        @csrf
+                        @method('PATCH')
+                        <div>
+                            <label for="lm_exit_reason" class="block text-sm font-medium text-gray-700">Alasan Keluar <span class="field-requirement is-required" aria-label="Wajib diisi">*</span></label>
+                            <select id="lm_exit_reason" name="exit_reason" required class="mt-2 block w-full rounded-md border border-gray-300 px-3 py-2.5 text-sm shadow-xs outline-none focus:border-primary focus:ring-2 focus:ring-primary/20">
+                                @foreach ($exitReasons as $reason => $label)
+                                    <option value="{{ $reason }}" @selected(old('exit_reason', 'resigned') === $reason)>{{ $label }}</option>
+                                @endforeach
+                            </select>
+                            @error('exit_reason')<p class="mt-2 text-sm text-red-600">{{ $message }}</p>@enderror
+                        </div>
+                        <div>
+                            <label for="lm_exit_date" class="block text-sm font-medium text-gray-700">Tanggal Keluar <span class="field-requirement is-required" aria-label="Wajib diisi">*</span></label>
+                            <input id="lm_exit_date" name="exit_date" type="date" value="{{ old('exit_date', now()->format('Y-m-d')) }}" required class="mt-2 block w-full rounded-md border border-gray-300 px-3 py-2.5 text-sm shadow-xs outline-none focus:border-primary focus:ring-2 focus:ring-primary/20">
+                            @error('exit_date')<p class="mt-2 text-sm text-red-600">{{ $message }}</p>@enderror
+                        </div>
+                        <div>
+                            <label for="lm_exit_notes" class="block text-sm font-medium text-gray-700">Catatan Keluar</label>
+                            <textarea id="lm_exit_notes" name="exit_notes" rows="2" class="mt-2 block w-full rounded-md border border-gray-300 px-3 py-2.5 text-sm shadow-xs outline-none focus:border-primary focus:ring-2 focus:ring-primary/20">{{ old('exit_notes') }}</textarea>
+                            @error('exit_notes')<p class="mt-2 text-sm text-red-600">{{ $message }}</p>@enderror
+                        </div>
+                        <div class="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+                            <button type="button" data-modal-close class="rounded-md border border-gray-200 px-4 py-2.5 text-sm font-medium text-gray-700 transition hover:bg-gray-50">Batal</button>
+                            <button type="submit" class="rounded-md border border-red-200 bg-red-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-red-700">Proses Keluar</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        @endcan
     </div>
 </x-layouts.app>

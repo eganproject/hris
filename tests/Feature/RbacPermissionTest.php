@@ -19,7 +19,7 @@ function grantPermissions(User $user, array $permissions): void
     $user->givePermissionTo($permissions);
 }
 
-test('payroll menu is hidden and route is forbidden without payroll permission', function () {
+test('the dashboard never exposes a payroll menu', function () {
     $user = User::factory()->create();
 
     grantPermissions($user, [
@@ -32,10 +32,15 @@ test('payroll menu is hidden and route is forbidden without payroll permission',
         ->assertSuccessful()
         ->assertSee('Data Karyawan')
         ->assertDontSee('Gaji / Payroll');
+});
+
+test('the payroll route no longer exists', function () {
+    $user = User::factory()->create();
+    grantPermissions($user, ['dashboard.view']);
 
     $this->actingAs($user)
         ->get('/payroll')
-        ->assertForbidden();
+        ->assertNotFound();
 });
 
 test('employee read only users can see employee menu without mutation buttons', function () {

@@ -426,7 +426,8 @@ if (typeof $.fn.select2 === 'function') {
         // modal, and the collapsible "renew contract" form (a hidden <details>).
         return !this.closest('.flatpickr-calendar')
             && !this.closest('[data-exit-modal]')
-            && !this.closest('[data-renew-form]');
+            && !this.closest('[data-renew-form]')
+            && !this.closest('[data-list-modal]');
     }).each(function () {
         const $select = $(this);
 
@@ -1060,6 +1061,105 @@ document.querySelectorAll('[data-contract-type-toggle]').forEach((select) => {
     select.addEventListener('change', syncRequirement);
     syncRequirement();
 });
+
+// List-page action modals: renew/reactivate contract and process exit, opened from
+// the row action menu so these don't require visiting the detail page.
+(() => {
+    const renewModal = document.querySelector('[data-list-modal="renew"]');
+    const exitModal = document.querySelector('[data-list-modal="exit"]');
+
+    if (!renewModal && !exitModal) {
+        return;
+    }
+
+    const open = (modal) => {
+        if (modal) {
+            modal.hidden = false;
+        }
+    };
+
+    const close = (modal) => {
+        if (modal) {
+            modal.hidden = true;
+        }
+    };
+
+    const renewCopy = {
+        renew: {
+            heading: 'Perpanjang Kontrak',
+            desc: 'Kontrak baru dibuat sebagai kontrak aktif. Kontrak sebelumnya ditandai "Diperpanjang".',
+            submit: 'Simpan Kontrak Baru',
+        },
+        reactivate: {
+            heading: 'Aktifkan Kembali',
+            desc: 'Karyawan diaktifkan kembali (status Aktif) dan kontrak baru dibuat sebagai kontrak aktif.',
+            submit: 'Aktifkan Kembali & Simpan',
+        },
+    };
+
+    document.querySelectorAll('[data-open-renew]').forEach((button) => {
+        button.addEventListener('click', () => {
+            if (!renewModal) {
+                return;
+            }
+
+            const mode = button.dataset.mode === 'reactivate' ? 'reactivate' : 'renew';
+
+            renewModal.querySelector('[data-list-renew-form]').action = button.dataset.url;
+            renewModal.querySelector('[data-renew-heading]').textContent = renewCopy[mode].heading;
+            renewModal.querySelector('[data-renew-name]').textContent = ' — ' + button.dataset.name;
+            renewModal.querySelector('[data-renew-desc]').textContent = renewCopy[mode].desc;
+            renewModal.querySelector('[data-renew-submit]').textContent = renewCopy[mode].submit;
+
+            closeAllDropdowns();
+            open(renewModal);
+        });
+    });
+
+    document.querySelectorAll('[data-open-exit]').forEach((button) => {
+        button.addEventListener('click', () => {
+            if (!exitModal) {
+                return;
+            }
+
+            exitModal.querySelector('[data-list-exit-form]').action = button.dataset.url;
+            exitModal.querySelector('[data-exit-name]').textContent = ' — ' + button.dataset.name;
+
+            closeAllDropdowns();
+            open(exitModal);
+        });
+    });
+
+    [renewModal, exitModal].forEach((modal) => {
+        if (!modal) {
+            return;
+        }
+
+        modal.addEventListener('click', (event) => {
+            if (event.target === modal) {
+                close(modal);
+            }
+        });
+
+        modal.querySelectorAll('[data-modal-close]').forEach((button) => {
+            button.addEventListener('click', () => close(modal));
+        });
+    });
+
+    document.addEventListener('keydown', (event) => {
+        if (event.key !== 'Escape') {
+            return;
+        }
+
+        if (renewModal && !renewModal.hidden) {
+            close(renewModal);
+        }
+
+        if (exitModal && !exitModal.hidden) {
+            close(exitModal);
+        }
+    });
+})();
 
 // Editing an employee who has left: if the contract status is set to an active/
 // ongoing value, saving will reactivate them. Surface that in the confirmation

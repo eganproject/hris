@@ -35,7 +35,7 @@ class HrMasterDataSeeder extends Seeder
         $departments = collect([
             ['code' => 'AKR', 'name' => 'Akrilik & Aksesoris', 'description' => 'Produksi, perakitan, dan pengelolaan aksesoris.'],
             ['code' => 'OTO', 'name' => 'Otomotif', 'description' => 'Operasional dan layanan terkait otomotif.'],
-            ['code' => 'ACC', 'name' => 'Accounting', 'description' => 'Accounting, payroll, dan administrasi keuangan.'],
+            ['code' => 'ACC', 'name' => 'Accounting', 'description' => 'Accounting dan administrasi keuangan.'],
         ])->mapWithKeys(fn (array $department) => [
             $department['code'] => Department::query()->updateOrCreate(['code' => $department['code']], [...$department, 'is_active' => true]),
         ]);

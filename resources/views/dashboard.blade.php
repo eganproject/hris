@@ -62,7 +62,7 @@
                         @can('attendance.create')
                             <a href="#" class="rounded-md border border-gray-200 px-3 py-3 text-sm font-medium text-gray-700 transition hover:bg-gray-50">Shift Plan</a>
                         @endcan
-                        @canany(['employees.view', 'attendance.view', 'payroll.view'])
+                        @canany(['employees.view', 'attendance.view'])
                             <a href="#" class="rounded-md border border-gray-200 px-3 py-3 text-sm font-medium text-gray-700 transition hover:bg-gray-50">Reports</a>
                         @endcanany
                     </div>

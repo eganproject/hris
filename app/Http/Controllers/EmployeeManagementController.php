@@ -16,6 +16,7 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rule;
 use Illuminate\View\View;
 use Spatie\Permission\Models\Role;
@@ -62,6 +63,7 @@ class EmployeeManagementController extends Controller
             'perPage' => $perPage,
             'statuses' => Employee::employmentStatusLabels(),
             'exitReasons' => Employee::exitReasonLabels(),
+            'contractTypes' => ['PKWT', 'PKWTT', 'Probation', 'Internship'],
         ]);
     }
 
@@ -227,7 +229,9 @@ class EmployeeManagementController extends Controller
 
     public function renewContract(Request $request, Employee $employee): RedirectResponse
     {
-        $validated = $request->validate([
+        $wasInactive = $employee->isInactive();
+
+        $validator = Validator::make($request->all(), [
             'contract_number' => ['required', 'string', 'max:100', 'unique:employee_contracts,contract_number'],
             'contract_type' => ['required', 'string', Rule::in(['PKWT', 'PKWTT', 'Probation', 'Internship'])],
             'start_date' => ['required', 'date'],
@@ -237,7 +241,19 @@ class EmployeeManagementController extends Controller
             'end_date.required' => 'Tanggal selesai kontrak wajib diisi untuk jenis kontrak selain PKWTT.',
         ]);
 
-        $wasInactive = $employee->isInactive();
+        if ($validator->fails()) {
+            // Flash the employee so the list page can re-open the right modal with errors.
+            return back()
+                ->withErrors($validator)
+                ->withInput()
+                ->with('renew_employee', [
+                    'id' => $employee->id,
+                    'name' => $employee->full_name,
+                    'mode' => $wasInactive ? 'reactivate' : 'renew',
+                ]);
+        }
+
+        $validated = $validator->validated();
 
         DB::transaction(function () use ($validated, $employee, $wasInactive) {
             $employee->loadMissing('currentContract', 'user');
@@ -283,7 +299,7 @@ class EmployeeManagementController extends Controller
         });
 
         return redirect()
-            ->route('employees.show', $employee)
+            ->to($request->boolean('from_list') ? route('employees.index') : route('employees.show', $employee))
             ->with('status', $wasInactive
                 ? 'Karyawan berhasil diaktifkan kembali dengan kontrak baru.'
                 : 'Kontrak berhasil diperpanjang.');
