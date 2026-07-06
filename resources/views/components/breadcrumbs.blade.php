@@ -43,23 +43,25 @@
 @endphp
 
 @if (count($items) > 1)
-    <nav aria-label="Breadcrumb" class="mb-4">
-        <ol class="flex flex-wrap items-center gap-x-1.5 gap-y-1 text-[12px] text-gray-500">
+    <nav aria-label="Breadcrumb" class="mt-0.5 hidden overflow-hidden sm:block">
+        <ol class="flex flex-nowrap items-center gap-1 whitespace-nowrap text-[11px] leading-none text-gray-400">
             @foreach ($items as $item)
-                <li class="flex items-center gap-x-1.5">
+                <li class="flex min-w-0 items-center gap-1">
                     @unless ($loop->first)
-                        <svg class="size-3.5 shrink-0 text-gray-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                        <svg class="size-2.5 shrink-0 text-gray-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                             <path d="m9 6 6 6-6 6"></path>
                         </svg>
                     @endunless
 
                     @if ($loop->last)
-                        <span class="font-medium text-gray-700" aria-current="page">{{ $item['label'] }}</span>
+                        <span class="truncate font-medium text-gray-600" aria-current="page">{{ $item['label'] }}</span>
                     @else
-                        <a href="{{ route($item['route']) }}" class="transition hover:text-gray-900">{{ $item['label'] }}</a>
+                        <a href="{{ route($item['route']) }}" class="shrink-0 transition hover:text-primary">{{ $item['label'] }}</a>
                     @endif
                 </li>
             @endforeach
         </ol>
     </nav>
+@else
+    <p class="hidden text-[11px] text-gray-500 sm:block">Administration workspace</p>
 @endif

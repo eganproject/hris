@@ -1,8 +1,14 @@
 @php
     $contract = old('contract_number') ? null : ($employee->currentContract ?? null);
+    $exitActive = $employee->exists && ! $employee->isInactive();
+    $exitModalOpen = $errors->hasAny(['exit_reason', 'exit_date', 'exit_notes']);
 @endphp
 
-<div class="space-y-4" data-employee-stepper data-placement-form data-placement-catalog='@json($placementCatalog)'>
+<div class="space-y-4" data-employee-stepper data-placement-form data-placement-catalog='@json($placementCatalog)'
+    data-exit-form
+    data-exit-active="{{ $exitActive ? 'true' : 'false' }}"
+    data-exit-open="{{ $exitModalOpen ? 'true' : 'false' }}"
+    data-exit-closing-statuses='@json($closingContractStatuses ?? [])'>
     <section class="rounded-lg border border-gray-200 bg-white p-3 shadow-sm">
         <div class="grid grid-cols-2 gap-2 lg:grid-cols-4" role="tablist" aria-label="Tahapan form karyawan">
             <button type="button" role="tab" data-stepper-button="0" class="rounded-md px-3 py-2 text-left text-sm font-semibold text-gray-600 transition hover:bg-gray-50">
@@ -28,18 +34,22 @@
         <h2 class="text-base font-semibold text-gray-950">Informasi Karyawan</h2>
 
         <div class="mt-5 grid grid-cols-1 gap-5 md:grid-cols-2">
-            <div class="md:col-span-2">
+            <div class="md:col-span-2" data-image-field>
                 <label for="photo" class="block text-sm font-medium text-gray-700">Foto Karyawan</label>
                 <div class="mt-2 flex flex-col gap-4 sm:flex-row sm:items-center">
-                    @if ($employee->photo_url)
-                        <img src="{{ $employee->photo_url }}" alt="Foto {{ $employee->full_name }}" class="size-20 rounded-md border border-gray-200 object-cover">
-                    @else
-                        <div class="flex size-20 items-center justify-center rounded-md border border-gray-200 bg-gray-100 text-lg font-semibold text-gray-500">
-                            {{ str($employee->full_name ?: 'K')->substr(0, 1)->upper() }}
-                        </div>
-                    @endif
+                    <img
+                        @if ($employee->photo_url) src="{{ $employee->photo_url }}" @else hidden @endif
+                        alt="Pratinjau foto {{ $employee->full_name }}"
+                        data-image-preview
+                        class="size-20 rounded-md border border-gray-200 object-cover">
+                    <div
+                        data-image-placeholder
+                        @if ($employee->photo_url) hidden @endif
+                        class="flex size-20 items-center justify-center rounded-md border border-gray-200 bg-gray-100 text-lg font-semibold text-gray-500">
+                        {{ str($employee->full_name ?: 'K')->substr(0, 1)->upper() }}
+                    </div>
                     <div class="min-w-0 flex-1">
-                        <input id="photo" name="photo" type="file" accept="image/jpeg,image/png,image/webp" class="block w-full rounded-md border border-gray-300 bg-white px-3 py-2.5 text-sm shadow-xs outline-none file:mr-3 file:rounded-sm file:border-0 file:bg-gray-100 file:px-3 file:py-1.5 file:text-xs file:font-semibold file:text-gray-700 hover:file:bg-gray-200 focus:border-primary focus:ring-2 focus:ring-primary/20">
+                        <input id="photo" name="photo" type="file" accept="image/jpeg,image/png,image/webp" data-image-input class="block w-full rounded-md border border-gray-300 bg-white px-3 py-2.5 text-sm shadow-xs outline-none file:mr-3 file:rounded-sm file:border-0 file:bg-gray-100 file:px-3 file:py-1.5 file:text-xs file:font-semibold file:text-gray-700 hover:file:bg-gray-200 focus:border-primary focus:ring-2 focus:ring-primary/20">
                         <p class="mt-2 text-xs text-gray-500">Format JPG, PNG, atau WebP. Maksimal 2MB. Resolusi minimal 300x300 px dan maksimal 3000x3000 px.</p>
                         @error('photo')<p class="mt-2 text-sm text-red-600">{{ $message }}</p>@enderror
                     </div>
@@ -81,12 +91,21 @@
                 @error('join_date')<p class="mt-2 text-sm text-red-600">{{ $message }}</p>@enderror
             </div>
             <div>
-                <label for="employment_status" class="block text-sm font-medium text-gray-700">Status Karyawan <span class="field-requirement is-required" aria-label="Wajib diisi">*</span></label>
-                <select id="employment_status" name="employment_status" required class="mt-2 block w-full rounded-md border border-gray-300 px-3 py-2.5 text-sm shadow-xs outline-none focus:border-primary focus:ring-2 focus:ring-primary/20">
-                    @foreach ($statuses as $status => $label)
-                        <option value="{{ $status }}" @selected(old('employment_status', $employee->employment_status ?: 'active') === $status)>{{ $label }}</option>
-                    @endforeach
-                </select>
+                <label for="employment_status" class="block text-sm font-medium text-gray-700">Status Kepegawaian @unless ($employee->isInactive())<span class="field-requirement is-required" aria-label="Wajib diisi">*</span>@endunless</label>
+                @if ($employee->isInactive())
+                    {{-- Karyawan sudah keluar: status kepegawaian hanya boleh diubah lewat proses "Karyawan Keluar" di halaman detail, bukan lewat form ini. --}}
+                    <input type="hidden" name="employment_status" value="inactive">
+                    <div class="mt-2 rounded-md border border-gray-200 bg-gray-50 px-3 py-2.5 text-sm text-gray-600">
+                        Sudah Keluar — dikelola melalui menu <span class="font-medium">Status Akhir Karyawan</span> di halaman detail.
+                    </div>
+                @else
+                    <select id="employment_status" name="employment_status" required class="mt-2 block w-full rounded-md border border-gray-300 px-3 py-2.5 text-sm shadow-xs outline-none focus:border-primary focus:ring-2 focus:ring-primary/20">
+                        @foreach ($statuses as $status => $label)
+                            <option value="{{ $status }}" @selected(old('employment_status', $employee->employment_status ?: 'active') === $status)>{{ $label }}</option>
+                        @endforeach
+                    </select>
+                    <p class="mt-2 text-xs text-gray-500">Untuk memproses karyawan berhenti/keluar, gunakan tombol "Proses Karyawan Keluar" di halaman detail.</p>
+                @endif
                 @error('employment_status')<p class="mt-2 text-sm text-red-600">{{ $message }}</p>@enderror
             </div>
             <div class="md:col-span-2">
@@ -143,11 +162,12 @@
                 </div>
                 <div>
                     <label for="contract_type" class="block text-sm font-medium text-gray-700">Jenis Kontrak <span class="field-requirement is-required" aria-label="Wajib diisi">*</span></label>
-                    <select id="contract_type" name="contract_type" required class="mt-2 block w-full rounded-md border border-gray-300 px-3 py-2.5 text-sm shadow-xs outline-none focus:border-primary focus:ring-2 focus:ring-primary/20">
+                    <select id="contract_type" name="contract_type" required data-contract-type-toggle="#contract_end_date" class="mt-2 block w-full rounded-md border border-gray-300 px-3 py-2.5 text-sm shadow-xs outline-none focus:border-primary focus:ring-2 focus:ring-primary/20">
                         @foreach ($contractTypes as $type)
                             <option value="{{ $type }}" @selected(old('contract_type', $contract?->contract_type ?: 'PKWT') === $type)>{{ $type }}</option>
                         @endforeach
                     </select>
+                    <p class="mt-2 text-xs text-gray-500">PKWTT (kontrak tetap) tidak memerlukan tanggal selesai.</p>
                     @error('contract_type')<p class="mt-2 text-sm text-red-600">{{ $message }}</p>@enderror
                 </div>
                 <div class="grid grid-cols-2 gap-3">
@@ -223,4 +243,41 @@
             </button>
         </div>
     </section>
+
+    @if ($exitActive)
+        {{-- Verifikasi keluar: muncul saat status kontrak diubah menjadi tidak aktif (Selesai/Diakhiri/Kedaluwarsa/Dibatalkan) lalu disimpan. --}}
+        <div data-exit-modal @unless ($exitModalOpen) hidden @endunless class="fixed inset-0 z-50 flex items-center justify-center bg-gray-950/50 p-4">
+            <div class="w-full max-w-md rounded-lg border border-gray-200 bg-white p-6 shadow-xl" role="dialog" aria-modal="true" aria-labelledby="exit-modal-title">
+                <h2 id="exit-modal-title" class="text-base font-semibold text-gray-950">Proses Karyawan Keluar</h2>
+                <p class="mt-1 text-sm text-gray-500">Status kontrak diubah menjadi tidak aktif, sehingga karyawan akan dinonaktifkan. Lengkapi data berikut untuk memproses status keluar.</p>
+
+                <div class="mt-5 space-y-4">
+                    <div>
+                        <label for="exit_reason" class="block text-sm font-medium text-gray-700">Alasan Keluar <span class="field-requirement is-required" aria-label="Wajib diisi">*</span></label>
+                        <select id="exit_reason" name="exit_reason" data-exit-field class="mt-2 block w-full rounded-md border border-gray-300 px-3 py-2.5 text-sm shadow-xs outline-none focus:border-primary focus:ring-2 focus:ring-primary/20">
+                            @foreach ($exitReasons as $reason => $label)
+                                <option value="{{ $reason }}" @selected(old('exit_reason', 'contract_ended') === $reason)>{{ $label }}</option>
+                            @endforeach
+                        </select>
+                        @error('exit_reason')<p class="mt-2 text-sm text-red-600">{{ $message }}</p>@enderror
+                    </div>
+                    <div>
+                        <label for="exit_date" class="block text-sm font-medium text-gray-700">Tanggal Keluar <span class="field-requirement is-required" aria-label="Wajib diisi">*</span></label>
+                        <input id="exit_date" name="exit_date" type="date" value="{{ old('exit_date', now()->format('Y-m-d')) }}" data-exit-field class="mt-2 block w-full rounded-md border border-gray-300 px-3 py-2.5 text-sm shadow-xs outline-none focus:border-primary focus:ring-2 focus:ring-primary/20">
+                        @error('exit_date')<p class="mt-2 text-sm text-red-600">{{ $message }}</p>@enderror
+                    </div>
+                    <div>
+                        <label for="exit_notes" class="block text-sm font-medium text-gray-700">Catatan Keluar</label>
+                        <textarea id="exit_notes" name="exit_notes" rows="3" data-exit-field class="mt-2 block w-full rounded-md border border-gray-300 px-3 py-2.5 text-sm shadow-xs outline-none focus:border-primary focus:ring-2 focus:ring-primary/20">{{ old('exit_notes') }}</textarea>
+                        @error('exit_notes')<p class="mt-2 text-sm text-red-600">{{ $message }}</p>@enderror
+                    </div>
+                </div>
+
+                <div class="mt-6 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+                    <button type="button" data-exit-cancel class="rounded-md border border-gray-200 px-4 py-2.5 text-sm font-medium text-gray-700 transition hover:bg-gray-50">Batal</button>
+                    <button type="button" data-exit-confirm class="rounded-md border border-red-200 bg-red-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-red-700">Ya, proses keluar &amp; simpan</button>
+                </div>
+            </div>
+        </div>
+    @endif
 </div>

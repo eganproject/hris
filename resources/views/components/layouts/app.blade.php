@@ -153,7 +153,7 @@
                         </div>
                         <div class="min-w-0">
                             <p class="truncate text-[13px] font-semibold text-gray-900">{{ $heading ?? 'Dashboard' }}</p>
-                            <p class="hidden text-[11px] text-gray-500 sm:block">Administration workspace</p>
+                            <x-breadcrumbs />
                         </div>
                     </div>
 
@@ -172,7 +172,6 @@
                 </header>
 
                 <main class="px-4 py-4 sm:px-5 lg:px-6">
-                    <x-breadcrumbs />
                     {{ $slot }}
                 </main>
             </div>

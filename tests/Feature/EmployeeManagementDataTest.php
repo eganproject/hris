@@ -1,5 +1,6 @@
 <?php
 
+use App\Actions\DeactivateExpiredContracts;
 use App\Models\Branch;
 use App\Models\Department;
 use App\Models\Employee;
@@ -433,4 +434,320 @@ test('employee can be marked as terminated for reporting', function () {
         ->assertSuccessful()
         ->assertSee('Tono Prasetyo')
         ->assertSee('PHK');
+});
+
+test('employee with an expired contract is auto-deactivated', function () {
+    employeeManager();
+    ['branch' => $branch, 'department' => $department, 'position' => $position] = hrMasterData();
+
+    $loginUser = User::factory()->create(['email' => 'expired@example.test', 'password' => 'Password!2']);
+
+    $employee = Employee::query()->create([
+        'user_id' => $loginUser->id,
+        'branch_id' => $branch->id,
+        'department_id' => $department->id,
+        'job_position_id' => $position->id,
+        'employee_number' => 'EMP-EXP',
+        'full_name' => 'Kontrak Habis',
+        'join_date' => now()->subYear()->toDateString(),
+        'employment_status' => 'active',
+    ]);
+
+    $expiredEnd = now()->subDays(5)->startOfDay();
+    $contract = $employee->contracts()->create([
+        'contract_number' => 'CTR-EXP',
+        'contract_type' => 'PKWT',
+        'start_date' => now()->subYear()->toDateString(),
+        'end_date' => $expiredEnd->toDateString(),
+        'status' => 'active',
+    ]);
+
+    // A second employee whose contract has NOT expired yet must stay active.
+    $stillActive = Employee::query()->create([
+        'branch_id' => $branch->id,
+        'department_id' => $department->id,
+        'job_position_id' => $position->id,
+        'employee_number' => 'EMP-OK',
+        'full_name' => 'Masih Aktif',
+        'join_date' => now()->subMonths(2)->toDateString(),
+        'employment_status' => 'active',
+    ]);
+    $stillActive->contracts()->create([
+        'contract_number' => 'CTR-OK',
+        'contract_type' => 'PKWT',
+        'start_date' => now()->subMonths(2)->toDateString(),
+        'end_date' => now()->addMonths(3)->toDateString(),
+        'status' => 'active',
+    ]);
+
+    $count = app(DeactivateExpiredContracts::class)->run();
+
+    $employee->refresh();
+    $contract->refresh();
+    $loginUser->refresh();
+    $stillActive->refresh();
+
+    expect($count)->toBe(1)
+        ->and($employee->employment_status)->toBe('inactive')
+        ->and($employee->exit_reason)->toBe('contract_ended')
+        ->and($employee->exit_date->format('Y-m-d'))->toBe($expiredEnd->format('Y-m-d'))
+        ->and($contract->status)->toBe('completed')
+        ->and($loginUser->is_active)->toBeFalse()
+        ->and($stillActive->employment_status)->toBe('active');
+});
+
+test('closing the contract during edit processes the employee exit inline', function () {
+    $user = employeeManager();
+    ['branch' => $branch, 'department' => $department, 'position' => $position] = hrMasterData();
+
+    $loginUser = User::factory()->create(['email' => 'edit-exit@example.test', 'password' => 'Password!2']);
+
+    $employee = Employee::query()->create([
+        'user_id' => $loginUser->id,
+        'branch_id' => $branch->id,
+        'department_id' => $department->id,
+        'job_position_id' => $position->id,
+        'employee_number' => 'EMP-EDX',
+        'full_name' => 'Edit Keluar',
+        'email' => 'edit-exit@example.test',
+        'join_date' => now()->subMonths(6)->toDateString(),
+        'employment_status' => 'active',
+    ]);
+    $employee->contracts()->create([
+        'contract_number' => 'CTR-EDX',
+        'contract_type' => 'PKWT',
+        'start_date' => now()->subMonths(6)->toDateString(),
+        'end_date' => now()->addMonths(6)->toDateString(),
+        'status' => 'active',
+    ]);
+
+    $exitDate = now()->subDay()->format('Y-m-d');
+
+    $this->actingAs($user)
+        ->from("/employees/{$employee->id}/edit")
+        ->put("/employees/{$employee->id}", [
+            'branch_id' => $branch->id,
+            'department_id' => $department->id,
+            'job_position_id' => $position->id,
+            'employee_number' => 'EMP-EDX',
+            'full_name' => 'Edit Keluar',
+            'email' => 'edit-exit@example.test',
+            'join_date' => now()->subMonths(6)->format('Y-m-d'),
+            'employment_status' => 'active',
+            'contract_number' => 'CTR-EDX',
+            'contract_type' => 'PKWT',
+            'contract_start_date' => now()->subMonths(6)->format('Y-m-d'),
+            'contract_end_date' => now()->addMonths(6)->format('Y-m-d'),
+            'contract_status' => 'completed',
+            'login_password' => '',
+            'exit_reason' => 'contract_ended',
+            'exit_date' => $exitDate,
+            'exit_notes' => 'Kontrak selesai.',
+        ])
+        ->assertRedirect('/employees');
+
+    $employee->refresh();
+    $loginUser->refresh();
+
+    expect($employee->employment_status)->toBe('inactive')
+        ->and($employee->exit_reason)->toBe('contract_ended')
+        ->and($employee->exit_date->format('Y-m-d'))->toBe($exitDate)
+        ->and($employee->exit_notes)->toBe('Kontrak selesai.')
+        ->and($employee->currentContract)->toBeNull()
+        ->and($employee->contracts()->first()->status)->toBe('completed')
+        ->and($loginUser->is_active)->toBeFalse();
+});
+
+test('closing the contract during edit requires an exit reason', function () {
+    $user = employeeManager();
+    ['branch' => $branch, 'department' => $department, 'position' => $position] = hrMasterData();
+
+    $employee = Employee::query()->create([
+        'branch_id' => $branch->id,
+        'department_id' => $department->id,
+        'job_position_id' => $position->id,
+        'employee_number' => 'EMP-EDX2',
+        'full_name' => 'Tanpa Alasan',
+        'join_date' => now()->subMonths(6)->toDateString(),
+        'employment_status' => 'active',
+    ]);
+    $employee->contracts()->create([
+        'contract_number' => 'CTR-EDX2',
+        'contract_type' => 'PKWT',
+        'start_date' => now()->subMonths(6)->toDateString(),
+        'end_date' => now()->addMonths(6)->toDateString(),
+        'status' => 'active',
+    ]);
+
+    $this->actingAs($user)
+        ->from("/employees/{$employee->id}/edit")
+        ->put("/employees/{$employee->id}", [
+            'branch_id' => $branch->id,
+            'department_id' => $department->id,
+            'job_position_id' => $position->id,
+            'employee_number' => 'EMP-EDX2',
+            'full_name' => 'Tanpa Alasan',
+            'join_date' => now()->subMonths(6)->format('Y-m-d'),
+            'employment_status' => 'active',
+            'contract_number' => 'CTR-EDX2',
+            'contract_type' => 'PKWT',
+            'contract_start_date' => now()->subMonths(6)->format('Y-m-d'),
+            'contract_end_date' => now()->addMonths(6)->format('Y-m-d'),
+            'contract_status' => 'ended_early',
+            'login_password' => '',
+        ])
+        ->assertRedirect("/employees/{$employee->id}/edit")
+        ->assertSessionHasErrors('exit_reason');
+
+    expect($employee->fresh()->employment_status)->toBe('active');
+});
+
+test('renewing a contract creates a new active contract and records history', function () {
+    $user = employeeManager();
+    ['branch' => $branch, 'department' => $department, 'position' => $position] = hrMasterData();
+
+    $employee = Employee::query()->create([
+        'branch_id' => $branch->id,
+        'department_id' => $department->id,
+        'job_position_id' => $position->id,
+        'employee_number' => 'EMP-REN',
+        'full_name' => 'Perpanjang Kontrak',
+        'join_date' => now()->subYear()->toDateString(),
+        'employment_status' => 'active',
+    ]);
+    $old = $employee->contracts()->create([
+        'contract_number' => 'CTR-OLD',
+        'contract_type' => 'PKWT',
+        'start_date' => now()->subYear()->toDateString(),
+        'end_date' => now()->toDateString(),
+        'status' => 'active',
+    ]);
+
+    $this->actingAs($user)
+        ->post("/employees/{$employee->id}/renew-contract", [
+            'contract_number' => 'CTR-NEW',
+            'contract_type' => 'PKWT',
+            'start_date' => now()->addDay()->format('Y-m-d'),
+            'end_date' => now()->addYear()->format('Y-m-d'),
+            'notes' => 'Perpanjangan tahun kedua.',
+        ])
+        ->assertRedirect("/employees/{$employee->id}");
+
+    $employee->refresh();
+    $old->refresh();
+
+    expect($employee->contracts()->count())->toBe(2)
+        ->and($old->status)->toBe('renewed')
+        ->and($employee->currentContract->contract_number)->toBe('CTR-NEW')
+        ->and($employee->currentContract->status)->toBe('active')
+        ->and($employee->events()->where('type', 'contract_renewed')->exists())->toBeTrue();
+});
+
+test('renewing a contract reactivates an employee who had left', function () {
+    $user = employeeManager();
+    ['branch' => $branch, 'department' => $department, 'position' => $position] = hrMasterData();
+
+    $loginUser = User::factory()->create(['email' => 'rehire@example.test', 'password' => 'Password!2']);
+    $loginUser->forceFill(['is_active' => false])->save();
+
+    $employee = Employee::query()->create([
+        'user_id' => $loginUser->id,
+        'branch_id' => $branch->id,
+        'department_id' => $department->id,
+        'job_position_id' => $position->id,
+        'employee_number' => 'EMP-REN2',
+        'full_name' => 'Direkrut Ulang',
+        'join_date' => now()->subYears(2)->toDateString(),
+        'employment_status' => 'inactive',
+        'exit_reason' => 'contract_ended',
+        'exit_date' => now()->subMonth()->toDateString(),
+        'exit_notes' => 'Kontrak selesai.',
+    ]);
+    $employee->contracts()->create([
+        'contract_number' => 'CTR-OLD2',
+        'contract_type' => 'PKWT',
+        'start_date' => now()->subYears(2)->toDateString(),
+        'end_date' => now()->subMonth()->toDateString(),
+        'status' => 'completed',
+    ]);
+
+    $this->actingAs($user)
+        ->post("/employees/{$employee->id}/renew-contract", [
+            'contract_number' => 'CTR-REHIRE',
+            'contract_type' => 'PKWT',
+            'start_date' => now()->format('Y-m-d'),
+            'end_date' => now()->addYear()->format('Y-m-d'),
+        ])
+        ->assertRedirect("/employees/{$employee->id}");
+
+    $employee->refresh();
+    $loginUser->refresh();
+
+    expect($employee->employment_status)->toBe('active')
+        ->and($employee->exit_reason)->toBeNull()
+        ->and($employee->exit_date)->toBeNull()
+        ->and($employee->currentContract->contract_number)->toBe('CTR-REHIRE')
+        ->and($loginUser->is_active)->toBeTrue()
+        ->and($employee->events()->where('type', 'reactivated')->exists())->toBeTrue();
+});
+
+test('pkwtt contract does not require an end date but others do', function () {
+    $user = employeeManager();
+    ['branch' => $branch, 'department' => $department, 'position' => $position] = hrMasterData();
+
+    $basePayload = [
+        'branch_id' => $branch->id,
+        'department_id' => $department->id,
+        'job_position_id' => $position->id,
+        'full_name' => 'Karyawan Tetap',
+        'join_date' => now()->format('Y-m-d'),
+        'employment_status' => 'active',
+        'contract_start_date' => now()->format('Y-m-d'),
+        'contract_status' => 'active',
+    ];
+
+    // PKWT without an end date must fail.
+    $this->actingAs($user)
+        ->from('/employees/create')
+        ->post('/employees', [...$basePayload, 'employee_number' => 'EMP-PKWT', 'contract_number' => 'CTR-PKWT', 'contract_type' => 'PKWT'])
+        ->assertRedirect('/employees/create')
+        ->assertSessionHasErrors('contract_end_date');
+
+    // PKWTT without an end date must pass.
+    $this->actingAs($user)
+        ->post('/employees', [...$basePayload, 'employee_number' => 'EMP-PKWTT', 'contract_number' => 'CTR-PKWTT', 'contract_type' => 'PKWTT'])
+        ->assertRedirect('/employees')
+        ->assertSessionHasNoErrors();
+
+    $employee = Employee::query()->where('employee_number', 'EMP-PKWTT')->firstOrFail();
+
+    expect($employee->currentContract->contract_type)->toBe('PKWTT')
+        ->and($employee->currentContract->end_date)->toBeNull();
+});
+
+test('creating an employee records joined and contract events', function () {
+    $user = employeeManager();
+    ['branch' => $branch, 'department' => $department, 'position' => $position] = hrMasterData();
+
+    $this->actingAs($user)
+        ->post('/employees', [
+            'branch_id' => $branch->id,
+            'department_id' => $department->id,
+            'job_position_id' => $position->id,
+            'employee_number' => 'EMP-EVT',
+            'full_name' => 'Riwayat Baru',
+            'join_date' => now()->format('Y-m-d'),
+            'employment_status' => 'active',
+            'contract_number' => 'CTR-EVT',
+            'contract_type' => 'PKWT',
+            'contract_start_date' => now()->format('Y-m-d'),
+            'contract_end_date' => now()->addYear()->format('Y-m-d'),
+            'contract_status' => 'active',
+        ])
+        ->assertRedirect('/employees');
+
+    $employee = Employee::query()->where('employee_number', 'EMP-EVT')->firstOrFail();
+
+    expect($employee->events()->where('type', 'joined')->exists())->toBeTrue()
+        ->and($employee->events()->where('type', 'contract_created')->exists())->toBeTrue();
 });

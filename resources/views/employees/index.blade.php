@@ -163,11 +163,13 @@
                                     @endif
                                 </td>
                                 <td class="px-5 py-4">
-                                    <span class="rounded-md bg-gray-100 px-2 py-1 text-xs font-medium text-gray-700">
-                                        {{ $employee->hr_status_label }}
-                                    </span>
-                                    @if ($employee->isInactive() && $employee->exit_date)
-                                        <p class="mt-1 text-xs text-gray-500">Keluar {{ $employee->exit_date->format('d M Y') }}</p>
+                                    <x-status-badge :tone="$employee->kepegawaian_status_tone">{{ $employee->kepegawaian_status_label }}</x-status-badge>
+                                    @if ($employee->isInactive())
+                                        <p class="mt-1.5 text-xs text-gray-500">
+                                            {{ $employee->exit_reason_label ?? 'Alasan belum diisi' }}@if ($employee->exit_date) · {{ $employee->exit_date->format('d M Y') }}@endif
+                                        </p>
+                                    @elseif ($employee->contract_needs_attention)
+                                        <p class="mt-1.5 text-xs font-medium text-red-600">Kontrak kedaluwarsa</p>
                                     @endif
                                 </td>
                                 <td class="px-5 py-4">

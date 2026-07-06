@@ -47,6 +47,9 @@ Route::middleware('auth')->group(function () {
         Route::patch('{employee}/resign', [EmployeeManagementController::class, 'resign'])
             ->middleware('permission:employees.update')
             ->name('resign');
+        Route::post('{employee}/renew-contract', [EmployeeManagementController::class, 'renewContract'])
+            ->middleware('permission:employees.update')
+            ->name('renew-contract');
         Route::put('{employee}', [EmployeeManagementController::class, 'update'])
             ->middleware('permission:employees.update')
             ->name('update');

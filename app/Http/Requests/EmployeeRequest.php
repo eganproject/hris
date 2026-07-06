@@ -21,10 +21,18 @@ class EmployeeRequest extends FormRequest
      */
     public function rules(): array
     {
-        $employeeId = $this->route('employee')?->id;
-        $contractId = $this->route('employee')?->currentContract?->id;
-        $userId = $this->route('employee')?->user_id;
+        $employee = $this->route('employee');
+        $employeeId = $employee?->id;
+        $contractId = $employee?->currentContract?->id;
+        $userId = $employee?->user_id;
         $requiresLoginPassword = $this->isMethod('post') && $this->filled('email') && ! $userId;
+
+        // When an active employee's contract is closed during edit, the exit details
+        // (reason & date) become required so the exit can be processed inline.
+        $isClosingExit = $this->isMethod('put')
+            && $employee && ! $employee->isInactive()
+            && in_array($this->input('contract_status'), EmployeeContract::closingStatuses(), true);
+        $exitJoinDate = $employee?->join_date?->format('Y-m-d');
 
         return [
             'branch_id' => ['required', 'integer', 'exists:branches,id'],
@@ -49,11 +57,34 @@ class EmployeeRequest extends FormRequest
             'contract_number' => ['required', 'string', 'max:100', Rule::unique('employee_contracts', 'contract_number')->ignore($contractId)],
             'contract_type' => ['required', 'string', Rule::in(['PKWT', 'PKWTT', 'Probation', 'Internship'])],
             'contract_start_date' => ['required', 'date'],
-            'contract_end_date' => ['nullable', 'date', 'after_or_equal:contract_start_date'],
+            'contract_end_date' => [
+                Rule::requiredIf(fn () => $this->input('contract_type') !== 'PKWTT'),
+                'nullable',
+                'date',
+                'after_or_equal:contract_start_date',
+            ],
             'contract_status' => ['required', 'string', Rule::in(array_keys(EmployeeContract::statusLabels()))],
             'contract_notes' => ['nullable', 'string', 'max:1000'],
+            'exit_reason' => [Rule::requiredIf($isClosingExit), 'nullable', 'string', Rule::in(array_keys(Employee::exitReasonLabels()))],
+            'exit_date' => array_filter([
+                $isClosingExit ? 'required' : 'nullable',
+                'date',
+                'before_or_equal:today',
+                $exitJoinDate ? 'after_or_equal:'.$exitJoinDate : null,
+            ]),
+            'exit_notes' => ['nullable', 'string', 'max:1000'],
             'login_password' => [Rule::requiredIf($requiresLoginPassword), 'nullable', 'string', 'min:8'],
             'login_role_id' => ['nullable', 'integer', Rule::exists('roles', 'id')->where('guard_name', 'web')],
+        ];
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    public function messages(): array
+    {
+        return [
+            'contract_end_date.required' => 'Tanggal selesai kontrak wajib diisi untuk jenis kontrak selain PKWTT.',
         ];
     }
 

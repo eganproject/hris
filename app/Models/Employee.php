@@ -28,8 +28,6 @@ use Illuminate\Support\Facades\Storage;
     'exit_date',
     'exit_notes',
     'address',
-    'resigned_at',
-    'resignation_reason',
 ])]
 class Employee extends Model
 {
@@ -38,6 +36,17 @@ class Employee extends Model
         'probation' => 'Probation',
         'suspended' => 'Skorsing / Ditangguhkan',
         'inactive' => 'Tidak Aktif / Sudah Tidak Bekerja',
+    ];
+
+    /**
+     * Statuses that describe an employee who is still working. "inactive" (exited)
+     * is intentionally excluded: it may only be reached through the dedicated
+     * "Karyawan Keluar" flow, which captures the exit reason and date.
+     */
+    public const WORK_STATUS_LABELS = [
+        'active' => 'Aktif',
+        'probation' => 'Probation',
+        'suspended' => 'Skorsing / Ditangguhkan',
     ];
 
     public const EXIT_REASON_LABELS = [
@@ -75,6 +84,11 @@ class Employee extends Model
     public function contracts(): HasMany
     {
         return $this->hasMany(EmployeeContract::class);
+    }
+
+    public function events(): HasMany
+    {
+        return $this->hasMany(EmployeeEvent::class);
     }
 
     public function currentContract(): HasOne
@@ -176,11 +190,102 @@ class Employee extends Model
     }
 
     /**
+     * Append an entry to the employee's work-history timeline. The causer defaults
+     * to the authenticated user (null for background/console actions).
+     *
+     * @param  array<string, mixed>  $properties
+     */
+    public function recordEvent(string $type, ?string $description = null, ?\Carbon\CarbonInterface $occurredAt = null, array $properties = []): EmployeeEvent
+    {
+        return $this->events()->create([
+            'type' => $type,
+            'description' => $description,
+            'occurred_at' => $occurredAt ?? now(),
+            'causer_id' => \Illuminate\Support\Facades\Auth::id(),
+            'properties' => $properties === [] ? null : $properties,
+        ]);
+    }
+
+    /**
+     * Mark the employee as exited (nonaktif) in one place: employment record, the
+     * current contract, and the login account. Used by the manual resign flow, the
+     * automatic "contract expired" deactivation, and the inline exit during edit.
+     *
+     * @param  bool  $syncContract  When false, the caller has already set the contract
+     *                              state (e.g. the edit form), so we leave it untouched.
+     */
+    public function markAsExited(string $reason, \Carbon\CarbonInterface $exitDate, ?string $notes = null, bool $syncContract = true): void
+    {
+        $this->forceFill([
+            'employment_status' => 'inactive',
+            'exit_reason' => $reason,
+            'exit_date' => $exitDate,
+            'exit_notes' => $notes,
+        ])->save();
+
+        if ($syncContract && $this->currentContract) {
+            $this->currentContract->forceFill([
+                'end_date' => $exitDate,
+                'status' => $reason === 'contract_ended' ? 'completed' : 'ended_early',
+            ])->save();
+        }
+
+        if ($this->user) {
+            $this->user->forceFill(['is_active' => false])->save();
+            \Illuminate\Support\Facades\DB::table('sessions')->where('user_id', $this->user->id)->delete();
+        }
+    }
+
+    /**
+     * Employment (person) status, decoupled from the contract. Answers the single
+     * question "is this person still an employee?".
+     */
+    public function getKepegawaianStatusLabelAttribute(): string
+    {
+        return match ($this->employment_status) {
+            'active' => 'Aktif',
+            'probation' => 'Probation',
+            'suspended' => 'Skorsing',
+            'inactive' => 'Sudah Keluar',
+            default => $this->employment_status_label,
+        };
+    }
+
+    public function getKepegawaianStatusToneAttribute(): string
+    {
+        return match ($this->employment_status) {
+            'active' => 'success',
+            'probation' => 'warning',
+            'suspended' => 'neutral',
+            'inactive' => 'danger',
+            default => 'neutral',
+        };
+    }
+
+    /**
+     * The employee is still active, but their current contract period has already
+     * lapsed and nobody has renewed it or processed the exit yet. This is the
+     * situation that needs an explicit HR decision (renew vs. exit).
+     */
+    public function getContractNeedsAttentionAttribute(): bool
+    {
+        return ! $this->isInactive() && (bool) $this->currentContract?->is_lapsed;
+    }
+
+    /**
      * @return array<string, string>
      */
     public static function employmentStatusLabels(): array
     {
         return self::EMPLOYMENT_STATUS_LABELS;
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    public static function workStatusLabels(): array
+    {
+        return self::WORK_STATUS_LABELS;
     }
 
     /**
@@ -197,7 +302,6 @@ class Employee extends Model
             'birth_date' => 'date',
             'join_date' => 'date',
             'exit_date' => 'date',
-            'resigned_at' => 'datetime',
         ];
     }
 }

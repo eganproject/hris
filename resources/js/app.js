@@ -365,8 +365,11 @@ flatpickr('input[type="time"], [data-flatpickr-time]', {
 
 if (typeof $.fn.select2 === 'function') {
     $('select').filter(function () {
-        // Skip flatpickr's own month/year dropdowns (they live inside the calendar).
-        return !this.closest('.flatpickr-calendar');
+        // Skip flatpickr's own month/year dropdowns (inside the calendar), the exit
+        // modal, and the collapsible "renew contract" form (a hidden <details>).
+        return !this.closest('.flatpickr-calendar')
+            && !this.closest('[data-exit-modal]')
+            && !this.closest('[data-renew-form]');
     }).each(function () {
         const $select = $(this);
 
@@ -425,6 +428,63 @@ document.querySelectorAll('input:not([type="hidden"]):not([type="checkbox"]):not
     marker.setAttribute('aria-label', isRequired ? 'Wajib diisi' : 'Opsional');
     marker.textContent = isRequired ? '*' : 'Opsional';
     label.append(' ', marker);
+});
+
+// Live image preview: when a file is chosen for an [data-image-input], show it in
+// the sibling [data-image-preview] and hide the [data-image-placeholder]. Clearing
+// the input restores the original photo (edit) or the placeholder (create).
+document.querySelectorAll('[data-image-input]').forEach((input) => {
+    const field = input.closest('[data-image-field]');
+
+    if (!field) {
+        return;
+    }
+
+    const preview = field.querySelector('[data-image-preview]');
+    const placeholder = field.querySelector('[data-image-placeholder]');
+    const originalSrc = preview?.getAttribute('src') || '';
+    let objectUrl = null;
+
+    const restoreOriginal = () => {
+        if (preview) {
+            if (originalSrc) {
+                preview.src = originalSrc;
+                preview.hidden = false;
+            } else {
+                preview.removeAttribute('src');
+                preview.hidden = true;
+            }
+        }
+
+        if (placeholder) {
+            placeholder.hidden = Boolean(originalSrc);
+        }
+    };
+
+    input.addEventListener('change', () => {
+        const file = input.files && input.files[0];
+
+        if (objectUrl) {
+            URL.revokeObjectURL(objectUrl);
+            objectUrl = null;
+        }
+
+        if (!file || !file.type.startsWith('image/')) {
+            restoreOriginal();
+            return;
+        }
+
+        objectUrl = URL.createObjectURL(file);
+
+        if (preview) {
+            preview.src = objectUrl;
+            preview.hidden = false;
+        }
+
+        if (placeholder) {
+            placeholder.hidden = true;
+        }
+    });
 });
 
 const confirmationModal = (() => {
@@ -824,4 +884,122 @@ document.querySelectorAll('[data-placement-form]').forEach((form) => {
     departmentSelect.addEventListener('change', syncPositions);
 
     syncDepartments();
+});
+
+// Inline exit verification: when an active employee's contract status is changed to
+// a "closing" value and the form is saved, ask for the exit reason/date/notes in a
+// modal and process the exit together with the edit — no need to open the detail page.
+document.querySelectorAll('[data-exit-form]').forEach((stepper) => {
+    const form = stepper.closest('form');
+    const modal = stepper.querySelector('[data-exit-modal]');
+
+    if (!form || !modal || stepper.dataset.exitActive !== 'true') {
+        return;
+    }
+
+    const closingStatuses = JSON.parse(stepper.dataset.exitClosingStatuses || '[]');
+    const contractStatus = stepper.querySelector('#contract_status');
+    const reasonField = modal.querySelector('#exit_reason');
+    const dateField = modal.querySelector('#exit_date');
+    const confirmButton = modal.querySelector('[data-exit-confirm]');
+    const cancelButton = modal.querySelector('[data-exit-cancel]');
+
+    let exitConfirmed = false;
+
+    const isClosing = () => Boolean(contractStatus) && closingStatuses.includes(contractStatus.value);
+    const openModal = () => { modal.hidden = false; };
+    const closeModal = () => { modal.hidden = true; };
+
+    // Runs in the capture phase after the stepper's own validation handler, so all
+    // steps are validated first. If the contract is being closed, show the exit modal
+    // instead of submitting straight away.
+    form.addEventListener('submit', (event) => {
+        if (exitConfirmed || form.dataset.confirmed === 'true' || !isClosing()) {
+            return;
+        }
+
+        event.preventDefault();
+        event.stopImmediatePropagation();
+        openModal();
+    }, true);
+
+    confirmButton?.addEventListener('click', () => {
+        if (!reasonField?.value) {
+            reasonField?.focus();
+            return;
+        }
+
+        if (!dateField?.value) {
+            dateField?.reportValidity?.();
+            dateField?.focus();
+            return;
+        }
+
+        exitConfirmed = true;
+        form.dataset.confirmed = 'true'; // skip the generic "Simpan perubahan?" confirmation
+        closeModal();
+
+        if (typeof form.requestSubmit === 'function') {
+            form.requestSubmit();
+        } else {
+            form.submit();
+        }
+    });
+
+    cancelButton?.addEventListener('click', () => {
+        closeModal();
+        exitConfirmed = false;
+
+        // Revert the contract status back to active so the user isn't forced to exit.
+        if (contractStatus) {
+            contractStatus.value = 'active';
+
+            if (typeof $ === 'function') {
+                $(contractStatus).trigger('change.select2');
+            }
+        }
+    });
+
+    document.addEventListener('keydown', (event) => {
+        if (!modal.hidden && event.key === 'Escape') {
+            cancelButton?.click();
+        }
+    });
+});
+
+// PKWTT (permanent) contracts don't need an end date; every other type does.
+// Toggle the `required` attribute and the required/optional marker on the linked
+// end-date field whenever the contract type changes.
+document.querySelectorAll('[data-contract-type-toggle]').forEach((select) => {
+    const endField = document.querySelector(select.dataset.contractTypeToggle);
+
+    if (!endField) {
+        return;
+    }
+
+    const label = endField.id
+        ? document.querySelector(`label[for="${endField.id}"]`)
+        : endField.closest('label');
+
+    const syncRequirement = () => {
+        const required = select.value !== 'PKWTT';
+
+        endField.required = required;
+
+        if (label) {
+            let marker = label.querySelector('.field-requirement');
+
+            if (!marker) {
+                marker = document.createElement('span');
+                label.append(' ', marker);
+            }
+
+            marker.className = required ? 'field-requirement is-required' : 'field-requirement is-optional';
+            marker.setAttribute('aria-label', required ? 'Wajib diisi' : 'Opsional');
+            marker.textContent = required ? '*' : 'Opsional';
+        }
+    };
+
+    select.addEventListener('change', syncRequirement);
+    syncRequirement();
 });
