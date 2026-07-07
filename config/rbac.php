@@ -7,6 +7,7 @@ return [
         'employees.create',
         'employees.update',
         'employees.delete',
+        'leave.request',
         'attendance.view',
         'attendance.create',
         'attendance.update',
@@ -28,6 +29,7 @@ return [
             'employees.create',
             'employees.update',
             'employees.delete',
+            'leave.request',
             'attendance.view',
             'attendance.create',
             'attendance.update',
@@ -43,6 +45,7 @@ return [
         ],
         'employee' => [
             'dashboard.view',
+            'leave.request',
         ],
     ],
 ];

@@ -151,8 +151,79 @@
                     </select>
                     @error('job_position_id')<p class="mt-2 text-sm text-red-600">{{ $message }}</p>@enderror
                 </div>
+                <div>
+                    <label for="manager_id" class="block text-sm font-medium text-gray-700">Atasan Langsung</label>
+                    <select id="manager_id" name="manager_id" class="mt-2 block w-full rounded-md border border-gray-300 px-3 py-2.5 text-sm shadow-xs outline-none focus:border-primary focus:ring-2 focus:ring-primary/20">
+                        <option value="">— Tidak ada —</option>
+                        @foreach ($managers as $manager)
+                            @continue($employee->exists && $manager->id === $employee->id)
+                            <option value="{{ $manager->id }}" @selected(old('manager_id', $employee->manager_id) == $manager->id)>{{ $manager->full_name }} · {{ $manager->employee_number }}</option>
+                        @endforeach
+                    </select>
+                    <p class="mt-2 text-xs text-gray-500">Penyetuju pertama untuk pengajuan cuti/izin karyawan ini.</p>
+                    @error('manager_id')<p class="mt-2 text-sm text-red-600">{{ $message }}</p>@enderror
+                </div>
+                <div class="md:col-span-3" data-pin-repeater>
+                    @php
+                        $pinRows = old('machine_pins');
+                        if ($pinRows === null) {
+                            $pinRows = $employee->exists
+                                ? $employee->deviceMappings->map(fn ($m) => ['device_id' => $m->device_id, 'machine_user_id' => $m->machine_user_id])->values()->all()
+                                : [];
+                        }
+                    @endphp
+                    <label class="block text-sm font-medium text-gray-700">PIN Mesin Absensi <span class="field-requirement is-required" aria-label="Wajib diisi">*</span></label>
+                    <p class="mt-1 text-xs text-gray-500">Minimal satu PIN wajib diisi. Pilih <span class="font-medium">Semua mesin</span> bila PIN sama di semua mesin, atau tambahkan baris per mesin bila berbeda.</p>
+                    @error('machine_pins')<p class="mt-2 text-sm text-red-600">{{ $message }}</p>@enderror
+
+                    <div class="mt-3 space-y-2" data-pin-rows>
+                        @if (count($pinRows))
+                            @foreach ($pinRows as $i => $row)
+                                @include('employees._pin-row', ['index' => $i, 'row' => $row])
+                            @endforeach
+                        @else
+                            @include('employees._pin-row', ['index' => 0, 'row' => ['device_id' => null, 'machine_user_id' => '']])
+                        @endif
+                    </div>
+
+                    <button type="button" data-pin-add class="mt-2 inline-flex items-center gap-1 text-sm font-medium text-primary hover:underline">+ Tambah PIN mesin</button>
+
+                    <template data-pin-template>
+                        @include('employees._pin-row', ['index' => '__IDX__', 'row' => ['device_id' => null, 'machine_user_id' => '']])
+                    </template>
+                </div>
             </div>
     </section>
+
+    @push('scripts')
+    <script>
+        (function () {
+            const rep = document.querySelector('[data-pin-repeater]');
+            if (!rep) return;
+            const rows = rep.querySelector('[data-pin-rows]');
+            const tpl = rep.querySelector('[data-pin-template]');
+
+            let idx = 0;
+            rows.querySelectorAll('[data-pin-row]').forEach(function (r) {
+                const el = r.querySelector('select, input');
+                const m = el && el.name.match(/machine_pins\[(\d+)\]/);
+                if (m) idx = Math.max(idx, parseInt(m[1]) + 1);
+            });
+
+            rep.querySelector('[data-pin-add]').addEventListener('click', function () {
+                const wrap = document.createElement('div');
+                wrap.innerHTML = tpl.innerHTML.replace(/__IDX__/g, idx++).trim();
+                rows.appendChild(wrap.firstElementChild);
+            });
+
+            rows.addEventListener('click', function (e) {
+                const btn = e.target.closest('[data-pin-remove]');
+                if (!btn) return;
+                btn.closest('[data-pin-row]').remove();
+            });
+        })();
+    </script>
+    @endpush
 
     <section class="rounded-lg border border-gray-200 bg-white p-6 shadow-sm" role="tabpanel" data-stepper-panel="2" hidden>
         <h2 class="text-base font-semibold text-gray-950">Kontrak Aktif</h2>

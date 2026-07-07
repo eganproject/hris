@@ -2,18 +2,35 @@
 
 use App\Http\Controllers\Auth\AuthenticatedSessionController;
 use App\Http\Controllers\AccessControlController;
+use App\Http\Controllers\AttendanceController;
 use App\Http\Controllers\BranchController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\DepartmentController;
+use App\Http\Controllers\DeviceController;
 use App\Http\Controllers\EmployeeManagementController;
+use App\Http\Controllers\HolidayController;
+use App\Http\Controllers\IclockController;
 use App\Http\Controllers\JobPositionController;
+use App\Http\Controllers\LeaveController;
+use App\Http\Controllers\MyLeaveController;
 use App\Http\Controllers\OrganizationController;
+use App\Http\Controllers\PunchController;
+use App\Http\Controllers\ScheduleController;
+use App\Http\Controllers\SchedulePatternController;
 use App\Http\Controllers\ShiftController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', function () {
     return redirect()->route(auth()->check() ? 'dashboard' : 'login');
 });
+
+// ZKTeco iclock push protocol (Solution X100-C). Public, gated by device serial
+// allowlist inside the controller; must run over HTTPS in production.
+Route::match(['GET', 'POST'], 'iclock/cdata', function (\Illuminate\Http\Request $request, IclockController $controller) {
+    return $request->isMethod('post') ? $controller->receive($request) : $controller->handshake($request);
+});
+Route::get('iclock/getrequest', [IclockController::class, 'getrequest']);
+Route::post('iclock/devicecmd', [IclockController::class, 'devicecmd']);
 
 Route::middleware('guest')->group(function () {
     Route::get('login', [AuthenticatedSessionController::class, 'create'])->name('login');
@@ -91,6 +108,61 @@ Route::middleware('auth')->group(function () {
         Route::get('shifts/{shift}/edit', [ShiftController::class, 'edit'])->middleware('permission:attendance.update')->name('shifts.edit');
         Route::put('shifts/{shift}', [ShiftController::class, 'update'])->middleware('permission:attendance.update')->name('shifts.update');
         Route::delete('shifts/{shift}', [ShiftController::class, 'destroy'])->middleware('permission:attendance.delete')->name('shifts.destroy');
+
+        Route::get('holidays', [HolidayController::class, 'index'])->middleware('permission:attendance.view')->name('holidays.index');
+        Route::get('holidays/create', [HolidayController::class, 'create'])->middleware('permission:attendance.create')->name('holidays.create');
+        Route::post('holidays', [HolidayController::class, 'store'])->middleware('permission:attendance.create')->name('holidays.store');
+        Route::get('holidays/{holiday}/edit', [HolidayController::class, 'edit'])->middleware('permission:attendance.update')->name('holidays.edit');
+        Route::put('holidays/{holiday}', [HolidayController::class, 'update'])->middleware('permission:attendance.update')->name('holidays.update');
+        Route::delete('holidays/{holiday}', [HolidayController::class, 'destroy'])->middleware('permission:attendance.delete')->name('holidays.destroy');
+
+        Route::get('devices', [DeviceController::class, 'index'])->middleware('permission:attendance.view')->name('devices.index');
+        Route::get('devices/create', [DeviceController::class, 'create'])->middleware('permission:attendance.create')->name('devices.create');
+        Route::post('devices', [DeviceController::class, 'store'])->middleware('permission:attendance.create')->name('devices.store');
+        Route::get('devices/{device}/edit', [DeviceController::class, 'edit'])->middleware('permission:attendance.update')->name('devices.edit');
+        Route::put('devices/{device}', [DeviceController::class, 'update'])->middleware('permission:attendance.update')->name('devices.update');
+        Route::delete('devices/{device}', [DeviceController::class, 'destroy'])->middleware('permission:attendance.delete')->name('devices.destroy');
+        Route::post('devices/{device}/mappings', [DeviceController::class, 'storeMapping'])->middleware('permission:attendance.update')->name('devices.mappings.store');
+        Route::delete('devices/mappings/{mapping}', [DeviceController::class, 'destroyMapping'])->middleware('permission:attendance.update')->name('devices.mappings.destroy');
+
+        Route::get('punches', [PunchController::class, 'index'])->middleware('permission:attendance.view')->name('punches.index');
+        Route::post('punches/assign', [PunchController::class, 'assign'])->middleware('permission:attendance.update')->name('punches.assign');
+        Route::post('punches/{punch}/ignore', [PunchController::class, 'ignore'])->middleware('permission:attendance.update')->name('punches.ignore');
+
+        Route::get('daily', [AttendanceController::class, 'index'])->middleware('permission:attendance.view')->name('daily.index');
+        Route::post('daily/process', [AttendanceController::class, 'process'])->middleware('permission:attendance.update')->name('daily.process');
+        Route::post('daily/punch', [AttendanceController::class, 'storePunch'])->middleware('permission:attendance.update')->name('daily.punch');
+
+        Route::get('schedule-patterns', [SchedulePatternController::class, 'index'])->middleware('permission:attendance.view')->name('schedule-patterns.index');
+        Route::get('schedule-patterns/create', [SchedulePatternController::class, 'create'])->middleware('permission:attendance.create')->name('schedule-patterns.create');
+        Route::post('schedule-patterns', [SchedulePatternController::class, 'store'])->middleware('permission:attendance.create')->name('schedule-patterns.store');
+        Route::get('schedule-patterns/{schedulePattern}/edit', [SchedulePatternController::class, 'edit'])->middleware('permission:attendance.update')->name('schedule-patterns.edit');
+        Route::put('schedule-patterns/{schedulePattern}', [SchedulePatternController::class, 'update'])->middleware('permission:attendance.update')->name('schedule-patterns.update');
+        Route::delete('schedule-patterns/{schedulePattern}', [SchedulePatternController::class, 'destroy'])->middleware('permission:attendance.delete')->name('schedule-patterns.destroy');
+
+        Route::get('schedules', [ScheduleController::class, 'index'])->middleware('permission:attendance.view')->name('schedules.index');
+        Route::get('schedules/assign', [ScheduleController::class, 'create'])->middleware('permission:attendance.create')->name('schedules.assign');
+        Route::post('schedules/assign', [ScheduleController::class, 'store'])->middleware('permission:attendance.create')->name('schedules.store');
+        Route::post('schedules/generate', [ScheduleController::class, 'generate'])->middleware('permission:attendance.update')->name('schedules.generate');
+        Route::post('schedules/override', [ScheduleController::class, 'override'])->middleware('permission:attendance.update')->name('schedules.override');
+        Route::delete('schedules/assignments/{assignment}', [ScheduleController::class, 'destroyAssignment'])->middleware('permission:attendance.delete')->name('schedules.assignments.destroy');
+
+        Route::get('leave', [LeaveController::class, 'index'])->middleware('permission:attendance.view')->name('leave.index');
+        Route::get('leave/create', [LeaveController::class, 'create'])->middleware('permission:attendance.create')->name('leave.create');
+        Route::post('leave', [LeaveController::class, 'store'])->middleware('permission:attendance.create')->name('leave.store');
+        Route::patch('leave/{leaveRequest}/approve', [LeaveController::class, 'approve'])->middleware('permission:attendance.update')->name('leave.approve');
+        Route::patch('leave/{leaveRequest}/reject', [LeaveController::class, 'reject'])->middleware('permission:attendance.update')->name('leave.reject');
+        Route::delete('leave/{leaveRequest}', [LeaveController::class, 'destroy'])->middleware('permission:attendance.delete')->name('leave.destroy');
+    });
+
+    // Employee self-service: request own leave, and (as a supervisor) approve subordinates.
+    Route::prefix('my-leave')->name('my-leave.')->middleware('permission:leave.request')->group(function () {
+        Route::get('/', [MyLeaveController::class, 'index'])->name('index');
+        Route::get('create', [MyLeaveController::class, 'create'])->name('create');
+        Route::post('/', [MyLeaveController::class, 'store'])->name('store');
+        Route::patch('{leaveRequest}/cancel', [MyLeaveController::class, 'cancel'])->name('cancel');
+        Route::patch('{leaveRequest}/approve', [MyLeaveController::class, 'approve'])->name('approve');
+        Route::patch('{leaveRequest}/reject', [MyLeaveController::class, 'reject'])->name('reject');
     });
 
     Route::prefix('access-control')->name('access-control.')->group(function () {

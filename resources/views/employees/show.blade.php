@@ -239,7 +239,36 @@
                             <dt class="text-gray-500">Jabatan</dt>
                             <dd class="mt-1 font-medium text-gray-950">{{ $employee->jobPosition?->name ?? '-' }}</dd>
                         </div>
+                        <div>
+                            <dt class="text-gray-500">Atasan Langsung</dt>
+                            <dd class="mt-1 font-medium text-gray-950">{{ $employee->manager?->full_name ?? '-' }}</dd>
+                        </div>
                     </dl>
+                </section>
+
+                <section class="rounded-lg border border-gray-200 bg-white p-6 shadow-sm">
+                    <div class="flex items-center justify-between gap-3">
+                        <h2 class="text-base font-semibold text-gray-950">Absensi &amp; Perangkat</h2>
+                        @can('employees.update')<a href="{{ route('employees.edit', $employee) }}" class="text-xs font-medium text-primary hover:underline">Atur PIN</a>@endcan
+                    </div>
+                    <p class="mt-1 text-xs text-gray-500">PIN karyawan ini di mesin sidik jari. Dipakai untuk mencocokkan absensi otomatis.</p>
+                    @if ($employee->deviceMappings->isNotEmpty())
+                        <ul class="mt-4 space-y-2">
+                            @foreach ($employee->deviceMappings as $mapping)
+                                <li class="flex items-center justify-between gap-3 rounded-md border border-gray-200 px-3 py-2 text-sm">
+                                    <span class="min-w-0">
+                                        <span class="block truncate text-gray-800">{{ $mapping->device?->name ?? 'Semua mesin' }}</span>
+                                        <span class="block truncate text-xs text-gray-500">{{ $mapping->device ? ($mapping->device->branch?->name ?? 'Tanpa lokasi') : 'Berlaku untuk semua mesin' }}</span>
+                                    </span>
+                                    <span class="shrink-0 rounded bg-gray-100 px-2 py-0.5 font-mono text-xs font-semibold text-gray-800">PIN {{ $mapping->machine_user_id }}</span>
+                                </li>
+                            @endforeach
+                        </ul>
+                    @else
+                        <div class="mt-4 rounded-md border border-dashed border-gray-200 px-3 py-3 text-sm text-gray-500">
+                            Belum ada PIN mesin. @can('employees.update')<a href="{{ route('employees.edit', $employee) }}" class="text-primary hover:underline">Tambahkan di form karyawan</a> agar absensinya bisa dicocokkan otomatis.@endcan
+                        </div>
+                    @endif
                 </section>
 
                 <section class="rounded-lg border border-gray-200 bg-white p-6 shadow-sm">

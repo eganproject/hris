@@ -7,10 +7,12 @@ use App\Http\Requests\EmployeeRequest;
 use App\Http\Requests\ResignEmployeeRequest;
 use App\Models\Branch;
 use App\Models\Department;
+use App\Models\Device;
 use App\Models\Employee;
 use App\Models\EmployeeContract;
 use App\Models\JobPosition;
 use App\Models\User;
+use App\Services\PunchIngestionService;
 use Illuminate\Http\Request;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\Cache;
@@ -79,6 +81,7 @@ class EmployeeManagementController extends Controller
 
             $contract = $employee->contracts()->create($this->contractPayload($request));
             $this->syncLoginAccount($request, $employee);
+            $this->syncMachinePins($employee, $request->validated('machine_pins', []));
 
             $employee->recordEvent('joined', 'Bergabung sebagai karyawan.', $employee->join_date);
             $employee->recordEvent(
@@ -104,6 +107,7 @@ class EmployeeManagementController extends Controller
             'contracts' => fn ($query) => $query->latest('start_date'),
             'events' => fn ($query) => $query->latest('occurred_at')->latest('id'),
             'events.causer',
+            'deviceMappings.device.branch',
         ]);
 
         return view('employees.show', [
@@ -114,7 +118,7 @@ class EmployeeManagementController extends Controller
 
     public function edit(Employee $employee): View
     {
-        $employee->load('currentContract', 'user.roles');
+        $employee->load('currentContract', 'user.roles', 'deviceMappings.device');
 
         return view('employees.edit', [
             'employee' => $employee,
@@ -144,6 +148,7 @@ class EmployeeManagementController extends Controller
             $contract->save();
 
             $this->syncLoginAccount($request, $employee);
+            $this->syncMachinePins($employee, $request->validated('machine_pins', []));
 
             // The contract was closed during this edit: process the exit here so the
             // user does not have to go to the detail page. The contract state was
@@ -357,12 +362,48 @@ class EmployeeManagementController extends Controller
                 ]),
             ],
             'roles' => Role::query()->where('guard_name', 'web')->orderBy('name')->get(),
+            'managers' => Employee::query()->active()->orderBy('full_name')->get(['id', 'full_name', 'employee_number']),
+            'devices' => Device::query()->with('branch')->orderBy('name')->get(),
             'statuses' => Employee::workStatusLabels(),
             'exitReasons' => Employee::exitReasonLabels(),
             'contractTypes' => ['PKWT', 'PKWTT', 'Probation', 'Internship'],
             'contractStatuses' => EmployeeContract::statusLabels(),
             'closingContractStatuses' => EmployeeContract::closingStatuses(),
         ];
+    }
+
+    /**
+     * Sync the employee's fingerprint-machine PIN mappings from the form. Each row is
+     * a device (null = any machine) + PIN. Assigning a PIN also back-fills punches
+     * already received under it (see PunchIngestionService); removed rows are deleted.
+     *
+     * @param  array<int, array{device_id?: mixed, machine_user_id?: mixed}>  $rows
+     */
+    private function syncMachinePins(Employee $employee, array $rows): void
+    {
+        $ingestion = app(PunchIngestionService::class);
+        $kept = [];
+
+        foreach ($rows as $row) {
+            $pin = trim((string) ($row['machine_user_id'] ?? ''));
+
+            if ($pin === '') {
+                continue;
+            }
+
+            $deviceId = ($row['device_id'] ?? null) ?: null;
+            $device = $deviceId ? Device::find($deviceId) : null;
+
+            $ingestion->assignPin($employee, $device, $pin);
+            $kept[] = (int) $deviceId.'|'.$pin;
+        }
+
+        // Drop mappings the user removed from the form.
+        foreach ($employee->deviceMappings()->get() as $mapping) {
+            if (! in_array((int) $mapping->device_id.'|'.$mapping->machine_user_id, $kept, true)) {
+                $mapping->delete();
+            }
+        }
     }
 
     /**
@@ -374,6 +415,7 @@ class EmployeeManagementController extends Controller
             'branch_id',
             'department_id',
             'job_position_id',
+            'manager_id',
             'employee_number',
             'full_name',
             'email',

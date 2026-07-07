@@ -91,9 +91,45 @@
                         <div>
                             <p class="sidebar-section-label px-2.5 text-[10px] font-semibold uppercase text-gray-400">Attendance</p>
                             <div class="mt-1.5 space-y-0.5">
+                                <a href="{{ route('attendance.daily.index') }}" @class(['sidebar-nav-link flex items-center gap-2.5 rounded px-2.5 py-1.5 text-[13px] font-medium transition', 'bg-white text-gray-950 shadow-xs ring-1 ring-gray-200' => request()->routeIs('attendance.daily.*'), 'text-gray-600 hover:bg-white hover:text-gray-950' => ! request()->routeIs('attendance.daily.*')]) title="Absensi Harian">
+                                    <svg class="size-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 11l3 3L22 4"></path><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path></svg>
+                                    <span class="sidebar-label truncate">Absensi Harian</span>
+                                </a>
+                                <a href="{{ route('attendance.devices.index') }}" @class(['sidebar-nav-link flex items-center gap-2.5 rounded px-2.5 py-1.5 text-[13px] font-medium transition', 'bg-white text-gray-950 shadow-xs ring-1 ring-gray-200' => request()->routeIs('attendance.devices.*') || request()->routeIs('attendance.punches.*'), 'text-gray-600 hover:bg-white hover:text-gray-950' => ! request()->routeIs('attendance.devices.*') && ! request()->routeIs('attendance.punches.*')]) title="Perangkat Absensi">
+                                    <svg class="size-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="2" width="16" height="20" rx="2"></rect><path d="M12 6a3 3 0 0 1 3 3c0 1.5-1 2-1 3.5M12 18h.01"></path></svg>
+                                    <span class="sidebar-label truncate">Perangkat Absensi</span>
+                                </a>
                                 <a href="{{ route('attendance.shifts.index') }}" @class(['sidebar-nav-link flex items-center gap-2.5 rounded px-2.5 py-1.5 text-[13px] font-medium transition', 'bg-white text-gray-950 shadow-xs ring-1 ring-gray-200' => request()->routeIs('attendance.shifts.*'), 'text-gray-600 hover:bg-white hover:text-gray-950' => ! request()->routeIs('attendance.shifts.*')]) title="Shift Kerja">
                                     <svg class="size-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M12 7v5l3 2"></path></svg>
                                     <span class="sidebar-label truncate">Shift Kerja</span>
+                                </a>
+                                <a href="{{ route('attendance.holidays.index') }}" @class(['sidebar-nav-link flex items-center gap-2.5 rounded px-2.5 py-1.5 text-[13px] font-medium transition', 'bg-white text-gray-950 shadow-xs ring-1 ring-gray-200' => request()->routeIs('attendance.holidays.*'), 'text-gray-600 hover:bg-white hover:text-gray-950' => ! request()->routeIs('attendance.holidays.*')]) title="Hari Libur">
+                                    <svg class="size-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 2v4M16 2v4M3 10h18"></path><rect x="3" y="4" width="18" height="18" rx="2"></rect></svg>
+                                    <span class="sidebar-label truncate">Hari Libur</span>
+                                </a>
+                                <a href="{{ route('attendance.schedule-patterns.index') }}" @class(['sidebar-nav-link flex items-center gap-2.5 rounded px-2.5 py-1.5 text-[13px] font-medium transition', 'bg-white text-gray-950 shadow-xs ring-1 ring-gray-200' => request()->routeIs('attendance.schedule-patterns.*'), 'text-gray-600 hover:bg-white hover:text-gray-950' => ! request()->routeIs('attendance.schedule-patterns.*')]) title="Pola Jadwal">
+                                    <svg class="size-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"></rect><path d="M3 9h18M8 4v3M16 4v3"></path></svg>
+                                    <span class="sidebar-label truncate">Pola Jadwal</span>
+                                </a>
+                                <a href="{{ route('attendance.schedules.index') }}" @class(['sidebar-nav-link flex items-center gap-2.5 rounded px-2.5 py-1.5 text-[13px] font-medium transition', 'bg-white text-gray-950 shadow-xs ring-1 ring-gray-200' => request()->routeIs('attendance.schedules.*'), 'text-gray-600 hover:bg-white hover:text-gray-950' => ! request()->routeIs('attendance.schedules.*')]) title="Jadwal Kerja">
+                                    <svg class="size-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"></rect><path d="M3 9h18M8 4v3M16 4v3"></path><path d="M7 13h2v2H7zM15 13h2v2h-2z"></path></svg>
+                                    <span class="sidebar-label truncate">Jadwal Kerja</span>
+                                </a>
+                                <a href="{{ route('attendance.leave.index') }}" @class(['sidebar-nav-link flex items-center gap-2.5 rounded px-2.5 py-1.5 text-[13px] font-medium transition', 'bg-white text-gray-950 shadow-xs ring-1 ring-gray-200' => request()->routeIs('attendance.leave.*'), 'text-gray-600 hover:bg-white hover:text-gray-950' => ! request()->routeIs('attendance.leave.*')]) title="Cuti & Izin">
+                                    <svg class="size-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z"></path><path d="M14 2v6h6"></path><path d="m9 15 2 2 4-4"></path></svg>
+                                    <span class="sidebar-label truncate">Cuti & Izin</span>
+                                </a>
+                            </div>
+                        </div>
+                    @endcan
+
+                    @can('leave.request')
+                        <div>
+                            <p class="sidebar-section-label px-2.5 text-[10px] font-semibold uppercase text-gray-400">Self-service</p>
+                            <div class="mt-1.5">
+                                <a href="{{ route('my-leave.index') }}" @class(['sidebar-nav-link flex items-center gap-2.5 rounded px-2.5 py-1.5 text-[13px] font-medium transition', 'bg-white text-gray-950 shadow-xs ring-1 ring-gray-200' => request()->routeIs('my-leave.*'), 'text-gray-600 hover:bg-white hover:text-gray-950' => ! request()->routeIs('my-leave.*')]) title="Cuti Saya">
+                                    <svg class="size-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 2v4M16 2v4M3 10h18"></path><rect x="3" y="4" width="18" height="18" rx="2"></rect><path d="M8 14h.01M12 14h.01M16 14h.01"></path></svg>
+                                    <span class="sidebar-label truncate">Cuti Saya</span>
                                 </a>
                             </div>
                         </div>
@@ -164,5 +200,7 @@
                 </main>
             </div>
         </div>
+
+        @stack('scripts')
     </body>
 </html>

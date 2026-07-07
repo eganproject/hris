@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
@@ -15,6 +16,7 @@ use Illuminate\Support\Facades\Storage;
     'user_id',
     'department_id',
     'job_position_id',
+    'manager_id',
     'employee_number',
     'photo_path',
     'full_name',
@@ -79,6 +81,57 @@ class Employee extends Model
     public function jobPosition(): BelongsTo
     {
         return $this->belongsTo(JobPosition::class);
+    }
+
+    public function manager(): BelongsTo
+    {
+        return $this->belongsTo(Employee::class, 'manager_id');
+    }
+
+    public function subordinates(): HasMany
+    {
+        return $this->hasMany(Employee::class, 'manager_id');
+    }
+
+    public function leaveRequests(): HasMany
+    {
+        return $this->hasMany(LeaveRequest::class);
+    }
+
+    public function scheduleAssignments(): HasMany
+    {
+        return $this->hasMany(ScheduleAssignment::class);
+    }
+
+    public function schedules(): HasMany
+    {
+        return $this->hasMany(EmployeeSchedule::class);
+    }
+
+    public function attendances(): HasMany
+    {
+        return $this->hasMany(Attendance::class);
+    }
+
+    public function deviceMappings(): HasMany
+    {
+        return $this->hasMany(EmployeeDevice::class);
+    }
+
+    public function punches(): HasMany
+    {
+        return $this->hasMany(AttendancePunch::class);
+    }
+
+    /**
+     * The employee's fingerprint-machine PIN (the global mapping, i.e. one that
+     * applies to any device). Managed from the employee form for convenience.
+     */
+    protected function machineUserId(): Attribute
+    {
+        return Attribute::get(
+            fn () => $this->deviceMappings()->whereNull('device_id')->value('machine_user_id'),
+        );
     }
 
     public function contracts(): HasMany

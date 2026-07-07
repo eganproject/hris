@@ -20,6 +20,10 @@ return Application::configure(basePath: dirname(__DIR__))
             'role' => RoleMiddleware::class,
             'role_or_permission' => RoleOrPermissionMiddleware::class,
         ]);
+
+        // The fingerprint machine speaks the ZKTeco iclock protocol and cannot send
+        // a CSRF token; these device endpoints are gated by a serial-number allowlist.
+        $middleware->validateCsrfTokens(except: ['iclock/*']);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         $exceptions->shouldRenderJsonWhen(

@@ -3,6 +3,7 @@
 use App\Actions\DeactivateExpiredContracts;
 use App\Models\Branch;
 use App\Models\Department;
+use App\Models\Device;
 use App\Models\Employee;
 use App\Models\JobPosition;
 use App\Models\User;
@@ -112,6 +113,7 @@ test('employee can be created with placement and contract data', function () {
             'department_id' => $department->id,
             'job_position_id' => $position->id,
             'employee_number' => 'EMP-0101',
+            'machine_pins' => [['device_id' => null, 'machine_user_id' => '1']],
             'full_name' => 'Nina Kartika',
             'email' => 'nina@example.test',
             'phone' => '08129990001',
@@ -141,6 +143,118 @@ test('employee can be created with placement and contract data', function () {
         ->and($employee->user->hasRole('employee'))->toBeTrue();
 });
 
+test('an employee can be given a global machine PIN from the form', function () {
+    $user = employeeManager();
+    ['branch' => $branch, 'department' => $department, 'position' => $position] = hrMasterData();
+
+    $this->actingAs($user)
+        ->post('/employees', [
+            'branch_id' => $branch->id,
+            'department_id' => $department->id,
+            'job_position_id' => $position->id,
+            'employee_number' => 'EMP-PIN1',
+            'full_name' => 'Rudi Absen',
+            'join_date' => now()->format('Y-m-d'),
+            'employment_status' => 'active',
+            'machine_pins' => [['device_id' => null, 'machine_user_id' => '17']],
+            'contract_number' => 'CTR-PIN1',
+            'contract_type' => 'PKWT',
+            'contract_start_date' => now()->format('Y-m-d'),
+            'contract_end_date' => now()->addYear()->format('Y-m-d'),
+            'contract_status' => 'active',
+        ])
+        ->assertRedirect('/employees');
+
+    $employee = Employee::query()->where('employee_number', 'EMP-PIN1')->firstOrFail();
+
+    expect($employee->machine_user_id)->toBe('17')
+        ->and($employee->deviceMappings()->whereNull('device_id')->where('machine_user_id', '17')->exists())->toBeTrue();
+});
+
+test('creating an employee without a machine PIN is rejected', function () {
+    $user = employeeManager();
+    ['branch' => $branch, 'department' => $department, 'position' => $position] = hrMasterData();
+
+    $this->actingAs($user)
+        ->from('/employees/create')
+        ->post('/employees', [
+            'branch_id' => $branch->id,
+            'department_id' => $department->id,
+            'job_position_id' => $position->id,
+            'employee_number' => 'EMP-NOPIN',
+            'full_name' => 'Tanpa PIN',
+            'join_date' => now()->format('Y-m-d'),
+            'employment_status' => 'active',
+            'contract_number' => 'CTR-NOPIN',
+            'contract_type' => 'PKWT',
+            'contract_start_date' => now()->format('Y-m-d'),
+            'contract_end_date' => now()->addYear()->format('Y-m-d'),
+            'contract_status' => 'active',
+        ])
+        ->assertRedirect('/employees/create')
+        ->assertSessionHasErrors('machine_pins');
+
+    expect(Employee::query()->where('employee_number', 'EMP-NOPIN')->exists())->toBeFalse();
+});
+
+test('an employee can be given different PINs on specific machines', function () {
+    $user = employeeManager();
+    ['branch' => $branch, 'department' => $department, 'position' => $position] = hrMasterData();
+    $lobby = Device::query()->create(['serial_number' => 'LOB', 'name' => 'Lobby', 'branch_id' => $branch->id, 'is_active' => true]);
+    $plant = Device::query()->create(['serial_number' => 'PLT', 'name' => 'Pabrik', 'branch_id' => $branch->id, 'is_active' => true]);
+
+    $this->actingAs($user)
+        ->post('/employees', [
+            'branch_id' => $branch->id,
+            'department_id' => $department->id,
+            'job_position_id' => $position->id,
+            'employee_number' => 'EMP-PIN9',
+            'full_name' => 'Multi Mesin',
+            'join_date' => now()->format('Y-m-d'),
+            'employment_status' => 'active',
+            'machine_pins' => [
+                ['device_id' => $lobby->id, 'machine_user_id' => '17'],
+                ['device_id' => $plant->id, 'machine_user_id' => '88'],
+            ],
+            'contract_number' => 'CTR-PIN9',
+            'contract_type' => 'PKWT',
+            'contract_start_date' => now()->format('Y-m-d'),
+            'contract_end_date' => now()->addYear()->format('Y-m-d'),
+            'contract_status' => 'active',
+        ])
+        ->assertRedirect('/employees');
+
+    $employee = Employee::query()->where('employee_number', 'EMP-PIN9')->firstOrFail();
+
+    expect($employee->deviceMappings()->count())->toBe(2)
+        ->and($employee->deviceMappings()->where('device_id', $lobby->id)->where('machine_user_id', '17')->exists())->toBeTrue()
+        ->and($employee->deviceMappings()->where('device_id', $plant->id)->where('machine_user_id', '88')->exists())->toBeTrue();
+});
+
+test('two employees cannot share the same global machine PIN', function () {
+    $user = employeeManager();
+    ['branch' => $branch, 'department' => $department, 'position' => $position] = hrMasterData();
+
+    $base = [
+        'branch_id' => $branch->id,
+        'department_id' => $department->id,
+        'job_position_id' => $position->id,
+        'join_date' => now()->format('Y-m-d'),
+        'employment_status' => 'active',
+        'machine_pins' => [['device_id' => null, 'machine_user_id' => '20']],
+        'contract_type' => 'PKWT',
+        'contract_start_date' => now()->format('Y-m-d'),
+        'contract_end_date' => now()->addYear()->format('Y-m-d'),
+        'contract_status' => 'active',
+    ];
+
+    $this->actingAs($user)->post('/employees', [...$base, 'employee_number' => 'EMP-PIN2', 'full_name' => 'A', 'contract_number' => 'CTR-PIN2'])->assertRedirect('/employees');
+
+    $this->actingAs($user)
+        ->post('/employees', [...$base, 'employee_number' => 'EMP-PIN3', 'full_name' => 'B', 'contract_number' => 'CTR-PIN3'])
+        ->assertSessionHasErrors('machine_pins.0.machine_user_id');
+});
+
 test('employee photo can be uploaded and replaced', function () {
     Storage::fake('public');
 
@@ -154,6 +268,7 @@ test('employee photo can be uploaded and replaced', function () {
             'job_position_id' => $position->id,
             'employee_number' => 'EMP-0105',
             'full_name' => 'Dian Pratama',
+            'machine_pins' => [['device_id' => null, 'machine_user_id' => '1']],
             'email' => 'dian@example.test',
             'join_date' => now()->format('Y-m-d'),
             'employment_status' => 'active',
@@ -180,6 +295,7 @@ test('employee photo can be uploaded and replaced', function () {
             'job_position_id' => $position->id,
             'employee_number' => 'EMP-0105',
             'full_name' => 'Dian Pratama Updated',
+            'machine_pins' => [['device_id' => null, 'machine_user_id' => '1']],
             'email' => 'dian.updated@example.test',
             'join_date' => now()->format('Y-m-d'),
             'employment_status' => 'active',
@@ -299,6 +415,7 @@ test('employee with login account can be updated without changing password', fun
             'job_position_id' => $position->id,
             'employee_number' => 'EMP-0103',
             'full_name' => 'Nina Kartika Updated',
+            'machine_pins' => [['device_id' => null, 'machine_user_id' => '1']],
             'email' => 'nina.updated@example.test',
             'join_date' => now()->subMonth()->format('Y-m-d'),
             'employment_status' => 'active',
@@ -539,6 +656,7 @@ test('closing the contract during edit processes the employee exit inline', func
             'contract_start_date' => now()->subMonths(6)->format('Y-m-d'),
             'contract_end_date' => now()->addMonths(6)->format('Y-m-d'),
             'contract_status' => 'completed',
+            'machine_pins' => [['device_id' => null, 'machine_user_id' => '1']],
             'login_password' => '',
             'exit_reason' => 'contract_ended',
             'exit_date' => $exitDate,
@@ -793,6 +911,7 @@ test('editing a left employee with an active contract status reactivates them', 
             'join_date' => now()->subYears(2)->format('Y-m-d'),
             'employment_status' => 'inactive',
             'contract_number' => 'CTR-REEDIT-NEW',
+            'machine_pins' => [['device_id' => null, 'machine_user_id' => '1']],
             'contract_type' => 'PKWT',
             'contract_start_date' => now()->format('Y-m-d'),
             'contract_end_date' => now()->addYear()->format('Y-m-d'),
@@ -820,6 +939,7 @@ test('pkwtt contract does not require an end date but others do', function () {
         'department_id' => $department->id,
         'job_position_id' => $position->id,
         'full_name' => 'Karyawan Tetap',
+        'machine_pins' => [['device_id' => null, 'machine_user_id' => '1']],
         'join_date' => now()->format('Y-m-d'),
         'employment_status' => 'active',
         'contract_start_date' => now()->format('Y-m-d'),
@@ -855,6 +975,7 @@ test('creating an employee records joined and contract events', function () {
             'department_id' => $department->id,
             'job_position_id' => $position->id,
             'employee_number' => 'EMP-EVT',
+            'machine_pins' => [['device_id' => null, 'machine_user_id' => '1']],
             'full_name' => 'Riwayat Baru',
             'join_date' => now()->format('Y-m-d'),
             'employment_status' => 'active',

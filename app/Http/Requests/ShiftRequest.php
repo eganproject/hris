@@ -25,6 +25,10 @@ class ShiftRequest extends FormRequest
             'start_time' => ['required', 'date_format:H:i'],
             'end_time' => ['required', 'date_format:H:i'],
             'break_minutes' => ['required', 'integer', 'min:0', 'max:480'],
+            'late_tolerance_minutes' => ['nullable', 'integer', 'min:0', 'max:240'],
+            'early_leave_tolerance_minutes' => ['nullable', 'integer', 'min:0', 'max:240'],
+            'overtime_starts_after_minutes' => ['nullable', 'integer', 'min:0', 'max:480'],
+            'overtime_min_minutes' => ['nullable', 'integer', 'min:0', 'max:480'],
             'is_active' => ['sometimes', 'boolean'],
         ];
     }
@@ -37,6 +41,8 @@ class ShiftRequest extends FormRequest
         return [
             ...$this->safe()->except('is_active'),
             'is_active' => $this->boolean('is_active'),
+            // Overnight is derived from the times so it can never be inconsistent.
+            'crosses_midnight' => $this->input('end_time') <= $this->input('start_time'),
         ];
     }
 }

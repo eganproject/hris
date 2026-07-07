@@ -25,6 +25,30 @@
         'attendance.shifts.create' => ['label' => 'Tambah Shift', 'parent' => 'attendance.shifts.index'],
         'attendance.shifts.edit' => ['label' => 'Edit Shift', 'parent' => 'attendance.shifts.index'],
 
+        'attendance.holidays.index' => ['label' => 'Hari Libur', 'parent' => 'dashboard'],
+        'attendance.holidays.create' => ['label' => 'Tambah Libur', 'parent' => 'attendance.holidays.index'],
+        'attendance.holidays.edit' => ['label' => 'Edit Libur', 'parent' => 'attendance.holidays.index'],
+
+        'attendance.daily.index' => ['label' => 'Absensi Harian', 'parent' => 'dashboard'],
+
+        'attendance.devices.index' => ['label' => 'Perangkat Absensi', 'parent' => 'dashboard'],
+        'attendance.devices.create' => ['label' => 'Tambah Perangkat', 'parent' => 'attendance.devices.index'],
+        'attendance.devices.edit' => ['label' => 'Edit Perangkat', 'parent' => 'attendance.devices.index'],
+        'attendance.punches.index' => ['label' => 'Log Punch', 'parent' => 'attendance.devices.index'],
+
+        'attendance.schedule-patterns.index' => ['label' => 'Pola Jadwal', 'parent' => 'dashboard'],
+        'attendance.schedule-patterns.create' => ['label' => 'Tambah Pola', 'parent' => 'attendance.schedule-patterns.index'],
+        'attendance.schedule-patterns.edit' => ['label' => 'Edit Pola', 'parent' => 'attendance.schedule-patterns.index'],
+
+        'attendance.schedules.index' => ['label' => 'Jadwal Kerja', 'parent' => 'dashboard'],
+        'attendance.schedules.assign' => ['label' => 'Tugaskan Pola', 'parent' => 'attendance.schedules.index'],
+
+        'attendance.leave.index' => ['label' => 'Cuti & Izin', 'parent' => 'dashboard'],
+        'attendance.leave.create' => ['label' => 'Ajukan Cuti/Izin', 'parent' => 'attendance.leave.index'],
+
+        'my-leave.index' => ['label' => 'Cuti Saya', 'parent' => 'dashboard'],
+        'my-leave.create' => ['label' => 'Ajukan Cuti/Izin', 'parent' => 'my-leave.index'],
+
         'access-control.index' => ['label' => 'Pengaturan Akses', 'parent' => 'dashboard'],
     ];
 

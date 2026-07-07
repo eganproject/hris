@@ -38,6 +38,10 @@ class EmployeeRequest extends FormRequest
             'branch_id' => ['required', 'integer', 'exists:branches,id'],
             'department_id' => ['required', 'integer', 'exists:departments,id'],
             'job_position_id' => ['required', 'integer', 'exists:job_positions,id'],
+            'manager_id' => ['nullable', 'integer', 'exists:employees,id', Rule::notIn([$employeeId])],
+            'machine_pins' => ['nullable', 'array'],
+            'machine_pins.*.device_id' => ['nullable', 'integer', 'exists:devices,id'],
+            'machine_pins.*.machine_user_id' => ['nullable', 'string', 'max:50'],
             'employee_number' => ['required', 'string', 'max:50', Rule::unique('employees', 'employee_number')->ignore($employeeId)],
             'photo' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:2048', 'dimensions:min_width=300,min_height=300,max_width=3000,max_height=3000'],
             'full_name' => ['required', 'string', 'max:255'],
@@ -103,6 +107,45 @@ class EmployeeRequest extends FormRequest
                     $validator->errors()->add('email', 'Email karyawan wajib diisi karena akun login sudah aktif.');
 
                     return;
+                }
+
+                // Validate the fingerprint PIN rows: no duplicate machine within the
+                // form, and no PIN already used by another employee on that machine.
+                $currentId = $this->route('employee')?->id;
+                $seenDevices = [];
+                $validPins = 0;
+
+                foreach ((array) $this->input('machine_pins', []) as $index => $row) {
+                    $pin = trim((string) ($row['machine_user_id'] ?? ''));
+
+                    if ($pin === '') {
+                        continue; // empty rows are ignored on save
+                    }
+
+                    $validPins++;
+                    $deviceId = ($row['device_id'] ?? null) ?: null;
+                    $deviceKey = (int) $deviceId;
+
+                    if (in_array($deviceKey, $seenDevices, true)) {
+                        $validator->errors()->add("machine_pins.$index.device_id", 'Mesin ini sudah dipilih di baris lain.');
+
+                        continue;
+                    }
+                    $seenDevices[] = $deviceKey;
+
+                    $conflict = DB::table('employee_devices')
+                        ->when($deviceId, fn ($q) => $q->where('device_id', $deviceId), fn ($q) => $q->whereNull('device_id'))
+                        ->where('machine_user_id', $pin)
+                        ->when($currentId, fn ($q) => $q->where('employee_id', '!=', $currentId))
+                        ->exists();
+
+                    if ($conflict) {
+                        $validator->errors()->add("machine_pins.$index.machine_user_id", 'PIN ini sudah dipakai karyawan lain pada mesin tersebut.');
+                    }
+                }
+
+                if ($validPins === 0) {
+                    $validator->errors()->add('machine_pins', 'Minimal satu PIN mesin absensi wajib diisi.');
                 }
 
                 $branchId = $this->integer('branch_id');

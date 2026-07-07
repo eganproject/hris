@@ -25,13 +25,21 @@
         <section class="overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm">
             <div class="overflow-x-auto">
                 <table class="data-table">
-                    <thead><tr><th>Shift</th><th>Jam Kerja</th><th>Istirahat</th><th>Status</th><th class="text-right">Aksi</th></tr></thead>
+                    <thead><tr><th>Shift</th><th>Jam Kerja</th><th>Istirahat</th><th>Toleransi</th><th>Status</th><th class="text-right">Aksi</th></tr></thead>
                     <tbody>
                         @forelse ($shifts as $shift)
                             <tr>
                                 <td><p class="font-medium text-gray-950">{{ $shift->name }}</p><p class="mt-0.5 text-xs text-gray-500">{{ $shift->code }}</p></td>
-                                <td>{{ str($shift->start_time)->substr(0, 5) }} - {{ str($shift->end_time)->substr(0, 5) }}</td>
+                                <td>
+                                    {{ $shift->time_range_label }}
+                                    @if ($shift->crosses_midnight)<span class="ml-1 rounded bg-indigo-50 px-1.5 py-0.5 text-[10px] font-semibold text-indigo-700">Lintas malam</span>@endif
+                                    <p class="mt-0.5 text-xs text-gray-500">{{ $shift->work_minutes !== null ? floor($shift->work_minutes / 60).'j '.($shift->work_minutes % 60).'m kerja' : '-' }}</p>
+                                </td>
                                 <td>{{ number_format($shift->break_minutes) }} menit</td>
+                                <td class="text-xs text-gray-600">
+                                    Telat {{ $shift->late_tolerance_minutes }}m · Pulang {{ $shift->early_leave_tolerance_minutes }}m
+                                    <p class="mt-0.5 text-gray-400">Lembur: {{ $shift->overtime_rule_label }}</p>
+                                </td>
                                 <td>
                                     <x-status-badge :tone="$shift->is_active ? 'success' : 'neutral'">{{ $shift->is_active ? 'Aktif' : 'Nonaktif' }}</x-status-badge>
                                 </td>
@@ -45,7 +53,7 @@
                                 </td>
                             </tr>
                         @empty
-                            <tr><td colspan="5" class="cell-empty">Belum ada shift.</td></tr>
+                            <tr><td colspan="6" class="cell-empty">Belum ada shift.</td></tr>
                         @endforelse
                     </tbody>
                 </table>
