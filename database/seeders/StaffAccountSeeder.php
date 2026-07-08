@@ -1,0 +1,111 @@
+<?php
+
+namespace Database\Seeders;
+
+use App\Models\Branch;
+use App\Models\Department;
+use App\Models\Employee;
+use App\Models\JobPosition;
+use App\Models\User;
+use Illuminate\Database\Seeder;
+
+/**
+ * Creates two ready-to-use login accounts — a Superadmin and an HR Manager —
+ * each already linked to an employee record (with an active contract), so they
+ * appear in the employee list and can use the self-service features.
+ *
+ * Idempotent: safe to run repeatedly. Standalone-safe: ensures roles/permissions
+ * exist first, and links to seeded master data when available.
+ */
+class StaffAccountSeeder extends Seeder
+{
+    public function run(): void
+    {
+        // Make sure roles + permissions exist even if this seeder is run on its own.
+        $this->callOnce(RbacSeeder::class);
+
+        // Link to seeded master data when present; otherwise fall back gracefully.
+        $branch = Branch::query()->firstWhere('code', 'SBY-OFC-01') ?? Branch::query()->first();
+        $department = Department::query()->firstWhere('code', 'ACC') ?? Department::query()->first();
+        $position = JobPosition::query()->firstWhere('code', 'SPV') ?? JobPosition::query()->first();
+
+        $accounts = [
+            [
+                'role' => 'superadmin',
+                'email' => 'superadmin@cahayaoptima.test',
+                'password' => 'Password!2',
+                'employee_number' => 'EMP-SA01',
+                'full_name' => 'Super Admin',
+                'phone' => '081200000001',
+                'contract_number' => 'CTR-SA01',
+            ],
+            [
+                'role' => 'hr-manager',
+                'email' => 'hr1@cahayaoptima.test',
+                'password' => 'Password!2',
+                'employee_number' => 'EMP-HR01',
+                'full_name' => 'HR Satu',
+                'phone' => '081200000002',
+                'contract_number' => 'CTR-HR01',
+            ],
+            [
+                'role' => 'hr-manager',
+                'email' => 'hr2@cahayaoptima.test',
+                'password' => 'Password!2',
+                'employee_number' => 'EMP-HR02',
+                'full_name' => 'HR Dua',
+                'phone' => '081200000003',
+                'contract_number' => 'CTR-HR02',
+            ],
+        ];
+
+        // Bersihkan akun HR generik lama (digantikan hr1 & hr2), jika ada.
+        $legacy = User::query()->where('email', 'hr@cahayaoptima.test')->first();
+        if ($legacy) {
+            Employee::query()->where('user_id', $legacy->id)->update(['user_id' => null]);
+            $legacy->delete();
+        }
+
+        foreach ($accounts as $data) {
+            $user = User::query()->updateOrCreate(
+                ['email' => $data['email']],
+                [
+                    'name' => $data['full_name'],
+                    'password' => $data['password'], // hashed via the model cast
+                    'is_active' => true,
+                ],
+            );
+
+            $user->syncRoles([$data['role']]);
+
+            $employee = Employee::query()->updateOrCreate(
+                ['employee_number' => $data['employee_number']],
+                [
+                    'user_id' => $user->id,
+                    'branch_id' => $branch?->id,
+                    'department_id' => $department?->id,
+                    'job_position_id' => $position?->id,
+                    'full_name' => $data['full_name'],
+                    'email' => $data['email'],
+                    'phone' => $data['phone'],
+                    'join_date' => now()->subYear()->toDateString(),
+                    'employment_status' => 'active',
+                ],
+            );
+
+            // A permanent (PKWTT) contract so the account never lapses.
+            $employee->contracts()->updateOrCreate(
+                ['contract_number' => $data['contract_number']],
+                [
+                    'contract_type' => 'PKWTT',
+                    'start_date' => $employee->join_date,
+                    'end_date' => null,
+                    'status' => 'active',
+                    'notes' => 'Akun sistem (seeder).',
+                ],
+            );
+
+            $this->command?->info("Akun {$data['role']} siap: {$data['email']} / {$data['password']}");
+        }
+    }
+}
