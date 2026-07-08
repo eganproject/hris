@@ -1,0 +1,9 @@
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+
+    # Teruskan semua request ke folder public/ (front controller Laravel).
+    # Berguna bila document root hosting menunjuk ke root project,
+    # bukan ke folder public/ (kasus umum di shared hosting seperti Hostinger).
+    RewriteCond %{REQUEST_URI} !^/public/
+    RewriteRule ^(.*)$ public/$1 [L]
+</IfModule>
