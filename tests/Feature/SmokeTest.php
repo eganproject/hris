@@ -99,8 +99,14 @@ test('every page renders without a server error', function () {
         route('attendance.holidays.edit', $holiday),
         route('attendance.leave.index'),
         route('attendance.leave.create'),
+        route('attendance.corrections.index'),
+        route('attendance.overtime.index'),
+        route('attendance.overtime.recap'),
+        route('attendance.swaps.index'),
         route('my-leave.index'),
         route('my-leave.create'),
+        route('my-attendance.index'),
+        route('my-schedule.index'),
         route('access-control.index'),
     ];
 

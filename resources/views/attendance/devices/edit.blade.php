@@ -60,5 +60,46 @@
                 </table>
             </div>
         </section>
+
+        {{-- Device commands (iclock) --}}
+        <section class="overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm">
+            <div class="border-b border-gray-200 px-5 py-3">
+                <h2 class="text-sm font-semibold text-gray-950">Perintah Mesin</h2>
+                <p class="mt-0.5 text-xs text-gray-500">Perintah dimasukkan ke antrean &amp; dikirim saat mesin polling berikutnya (butuh mesin online).</p>
+            </div>
+            <div class="flex flex-wrap gap-2 border-b border-gray-100 px-5 py-4">
+                @foreach ([
+                    'sync_users' => 'Sinkron Nama Karyawan',
+                    'check' => 'Cek Koneksi',
+                    'info' => 'Minta Info',
+                    'clear_log' => 'Hapus Log Absensi',
+                    'reboot' => 'Reboot Mesin',
+                ] as $action => $label)
+                    <form method="POST" action="{{ route('attendance.devices.commands.store', $device) }}" @if (in_array($action, ['clear_log', 'reboot'])) onsubmit="return confirm('Yakin kirim perintah: {{ $label }}?')" @endif>
+                        @csrf
+                        <input type="hidden" name="action" value="{{ $action }}">
+                        <button type="submit" @class(['rounded-md px-3 py-2 text-sm font-medium', 'border border-red-200 text-red-700 hover:bg-red-50' => in_array($action, ['clear_log', 'reboot']), 'border border-gray-200 text-gray-700 hover:bg-gray-50' => ! in_array($action, ['clear_log', 'reboot'])])>{{ $label }}</button>
+                    </form>
+                @endforeach
+            </div>
+            <div class="overflow-x-auto">
+                <table class="data-table">
+                    <thead><tr><th>Perintah</th><th>Status</th><th>Dibuat</th><th>Terkirim</th><th>Selesai</th></tr></thead>
+                    <tbody>
+                        @forelse ($device->commands as $command)
+                            <tr>
+                                <td class="text-sm text-gray-800">{{ $command->label }}</td>
+                                <td><x-status-badge :tone="$command->status_tone">{{ $command->status_label }}</x-status-badge>@if ($command->return_code !== null && $command->status === 'failed')<span class="ml-1 text-xs text-red-500">kode {{ $command->return_code }}</span>@endif</td>
+                                <td class="text-xs text-gray-500">{{ $command->created_at->format('d M H:i') }}</td>
+                                <td class="text-xs text-gray-500">{{ $command->sent_at?->format('d M H:i') ?? '—' }}</td>
+                                <td class="text-xs text-gray-500">{{ $command->completed_at?->format('d M H:i') ?? '—' }}</td>
+                            </tr>
+                        @empty
+                            <tr><td colspan="5" class="cell-empty">Belum ada perintah.</td></tr>
+                        @endforelse
+                    </tbody>
+                </table>
+            </div>
+        </section>
     </div>
 </x-layouts.app>

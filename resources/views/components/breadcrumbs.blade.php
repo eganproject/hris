@@ -50,6 +50,17 @@
         'my-leave.index' => ['label' => 'Cuti Saya', 'parent' => 'dashboard'],
         'my-leave.create' => ['label' => 'Ajukan Cuti/Izin', 'parent' => 'my-leave.index'],
 
+        'my-attendance.index' => ['label' => 'Absensi Saya', 'parent' => 'dashboard'],
+
+        'my-schedule.index' => ['label' => 'Tukar Jadwal', 'parent' => 'dashboard'],
+
+        'attendance.swaps.index' => ['label' => 'Tukar Jadwal', 'parent' => 'dashboard'],
+
+        'attendance.corrections.index' => ['label' => 'Koreksi Absensi', 'parent' => 'dashboard'],
+
+        'attendance.overtime.index' => ['label' => 'Persetujuan Lembur', 'parent' => 'dashboard'],
+        'attendance.overtime.recap' => ['label' => 'Rekap Lembur', 'parent' => 'attendance.overtime.index'],
+
         'access-control.index' => ['label' => 'Pengaturan Akses', 'parent' => 'dashboard'],
     ];
 

@@ -56,6 +56,11 @@ class Device extends Model
         return $this->hasMany(DeviceCommunication::class);
     }
 
+    public function commands(): HasMany
+    {
+        return $this->hasMany(DeviceCommand::class);
+    }
+
     public function latestCommunication(): HasOne
     {
         return $this->hasOne(DeviceCommunication::class)->latestOfMany();

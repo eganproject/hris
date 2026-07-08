@@ -9,6 +9,7 @@ use App\Models\Device;
 use App\Models\DeviceCommunication;
 use App\Models\Employee;
 use App\Models\EmployeeDevice;
+use App\Services\DeviceCommandService;
 use App\Services\PunchIngestionService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -16,8 +17,10 @@ use Illuminate\View\View;
 
 class DeviceController extends Controller
 {
-    public function __construct(private readonly PunchIngestionService $ingestion)
-    {
+    public function __construct(
+        private readonly PunchIngestionService $ingestion,
+        private readonly DeviceCommandService $commands,
+    ) {
     }
 
     public function index(Request $request): View
@@ -82,13 +85,31 @@ class DeviceController extends Controller
 
     public function edit(Device $device): View
     {
-        $device->load(['mappings.employee']);
+        $device->load(['mappings.employee', 'commands' => fn ($q) => $q->latest('id')->limit(15)]);
 
         return view('attendance.devices.edit', [
             'device' => $device,
             'branches' => Branch::query()->orderBy('name')->get(),
             'employees' => Employee::query()->active()->orderBy('full_name')->get(),
         ]);
+    }
+
+    /**
+     * Queue an iclock command for the device (delivered on its next poll).
+     */
+    public function command(Request $request, Device $device): RedirectResponse
+    {
+        $message = match ($request->string('action')->toString()) {
+            'check' => tap('Perintah cek koneksi masuk antrean.', fn () => $this->commands->check($device)),
+            'info' => tap('Perintah minta info masuk antrean.', fn () => $this->commands->info($device)),
+            'reboot' => tap('Perintah reboot masuk antrean.', fn () => $this->commands->reboot($device)),
+            'clear_log' => tap('Perintah hapus log absensi masuk antrean.', fn () => $this->commands->clearAttendanceLog($device)),
+            'sync_users' => 'Sinkron nama '.$this->commands->syncAllUsers($device).' user masuk antrean.',
+            default => abort(400, 'Aksi tidak dikenal.'),
+        };
+
+        return redirect()->route('attendance.devices.edit', $device)
+            ->with('status', $message.' Akan dikirim saat mesin polling berikutnya.');
     }
 
     public function update(DeviceRequest $request, Device $device): RedirectResponse

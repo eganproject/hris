@@ -124,6 +124,21 @@ class Employee extends Model
         return $this->hasMany(AttendancePunch::class);
     }
 
+    public function attendanceCorrections(): HasMany
+    {
+        return $this->hasMany(AttendanceCorrection::class);
+    }
+
+    public function swapRequests(): HasMany
+    {
+        return $this->hasMany(ShiftSwapRequest::class, 'requester_id');
+    }
+
+    public function swapRequestsAsPartner(): HasMany
+    {
+        return $this->hasMany(ShiftSwapRequest::class, 'partner_id');
+    }
+
     /**
      * The employee's fingerprint-machine PIN (the global mapping, i.e. one that
      * applies to any device). Managed from the employee form for convenience.

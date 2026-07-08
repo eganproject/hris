@@ -8,6 +8,8 @@ return [
         'employees.update',
         'employees.delete',
         'leave.request',
+        'attendance.correction',
+        'schedule.swap',
         'attendance.view',
         'attendance.create',
         'attendance.update',
@@ -30,6 +32,8 @@ return [
             'employees.update',
             'employees.delete',
             'leave.request',
+            'attendance.correction',
+            'schedule.swap',
             'attendance.view',
             'attendance.create',
             'attendance.update',
@@ -46,6 +50,8 @@ return [
         'employee' => [
             'dashboard.view',
             'leave.request',
+            'attendance.correction',
+            'schedule.swap',
         ],
     ],
 ];

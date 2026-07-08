@@ -3,6 +3,7 @@
 use App\Http\Controllers\Auth\AuthenticatedSessionController;
 use App\Http\Controllers\AccessControlController;
 use App\Http\Controllers\AttendanceController;
+use App\Http\Controllers\AttendanceCorrectionController;
 use App\Http\Controllers\BranchController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\DepartmentController;
@@ -12,12 +13,16 @@ use App\Http\Controllers\HolidayController;
 use App\Http\Controllers\IclockController;
 use App\Http\Controllers\JobPositionController;
 use App\Http\Controllers\LeaveController;
+use App\Http\Controllers\MyAttendanceController;
 use App\Http\Controllers\MyLeaveController;
+use App\Http\Controllers\MyScheduleController;
 use App\Http\Controllers\OrganizationController;
+use App\Http\Controllers\OvertimeController;
 use App\Http\Controllers\PunchController;
 use App\Http\Controllers\ScheduleController;
 use App\Http\Controllers\SchedulePatternController;
 use App\Http\Controllers\ShiftController;
+use App\Http\Controllers\ShiftSwapController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', function () {
@@ -123,6 +128,7 @@ Route::middleware('auth')->group(function () {
         Route::get('devices/{device}/edit', [DeviceController::class, 'edit'])->middleware('permission:attendance.update')->name('devices.edit');
         Route::put('devices/{device}', [DeviceController::class, 'update'])->middleware('permission:attendance.update')->name('devices.update');
         Route::delete('devices/{device}', [DeviceController::class, 'destroy'])->middleware('permission:attendance.delete')->name('devices.destroy');
+        Route::post('devices/{device}/commands', [DeviceController::class, 'command'])->middleware('permission:attendance.update')->name('devices.commands.store');
         Route::post('devices/{device}/mappings', [DeviceController::class, 'storeMapping'])->middleware('permission:attendance.update')->name('devices.mappings.store');
         Route::delete('devices/mappings/{mapping}', [DeviceController::class, 'destroyMapping'])->middleware('permission:attendance.update')->name('devices.mappings.destroy');
 
@@ -133,6 +139,19 @@ Route::middleware('auth')->group(function () {
         Route::get('daily', [AttendanceController::class, 'index'])->middleware('permission:attendance.view')->name('daily.index');
         Route::post('daily/process', [AttendanceController::class, 'process'])->middleware('permission:attendance.update')->name('daily.process');
         Route::post('daily/punch', [AttendanceController::class, 'storePunch'])->middleware('permission:attendance.update')->name('daily.punch');
+
+        Route::get('corrections', [AttendanceCorrectionController::class, 'index'])->middleware('permission:attendance.view')->name('corrections.index');
+        Route::patch('corrections/{correction}/approve', [AttendanceCorrectionController::class, 'approve'])->middleware('permission:attendance.update')->name('corrections.approve');
+        Route::patch('corrections/{correction}/reject', [AttendanceCorrectionController::class, 'reject'])->middleware('permission:attendance.update')->name('corrections.reject');
+
+        Route::get('overtime', [OvertimeController::class, 'index'])->middleware('permission:attendance.view')->name('overtime.index');
+        Route::get('overtime/recap', [OvertimeController::class, 'recap'])->middleware('permission:attendance.view')->name('overtime.recap');
+        Route::post('overtime/approve', [OvertimeController::class, 'approve'])->middleware('permission:attendance.update')->name('overtime.approve');
+        Route::post('overtime/reject', [OvertimeController::class, 'reject'])->middleware('permission:attendance.update')->name('overtime.reject');
+
+        Route::get('swaps', [ShiftSwapController::class, 'index'])->middleware('permission:attendance.view')->name('swaps.index');
+        Route::patch('swaps/{swap}/approve', [ShiftSwapController::class, 'approve'])->middleware('permission:attendance.update')->name('swaps.approve');
+        Route::patch('swaps/{swap}/reject', [ShiftSwapController::class, 'reject'])->middleware('permission:attendance.update')->name('swaps.reject');
 
         Route::get('schedule-patterns', [SchedulePatternController::class, 'index'])->middleware('permission:attendance.view')->name('schedule-patterns.index');
         Route::get('schedule-patterns/create', [SchedulePatternController::class, 'create'])->middleware('permission:attendance.create')->name('schedule-patterns.create');
@@ -164,6 +183,21 @@ Route::middleware('auth')->group(function () {
         Route::patch('{leaveRequest}/cancel', [MyLeaveController::class, 'cancel'])->name('cancel');
         Route::patch('{leaveRequest}/approve', [MyLeaveController::class, 'approve'])->name('approve');
         Route::patch('{leaveRequest}/reject', [MyLeaveController::class, 'reject'])->name('reject');
+    });
+
+    // Employee self-service: view own attendance and request corrections.
+    Route::prefix('my-attendance')->name('my-attendance.')->middleware('permission:attendance.correction')->group(function () {
+        Route::get('/', [MyAttendanceController::class, 'index'])->name('index');
+        Route::post('corrections', [MyAttendanceController::class, 'store'])->name('corrections.store');
+        Route::delete('corrections/{correction}', [MyAttendanceController::class, 'cancel'])->name('corrections.cancel');
+    });
+
+    // Employee self-service: view own schedule and request shift swaps.
+    Route::prefix('my-schedule')->name('my-schedule.')->middleware('permission:schedule.swap')->group(function () {
+        Route::get('/', [MyScheduleController::class, 'index'])->name('index');
+        Route::post('swaps', [MyScheduleController::class, 'store'])->name('swaps.store');
+        Route::patch('swaps/{swap}/respond', [MyScheduleController::class, 'respond'])->name('swaps.respond');
+        Route::delete('swaps/{swap}', [MyScheduleController::class, 'cancel'])->name('swaps.cancel');
     });
 
     Route::prefix('access-control')->name('access-control.')->group(function () {

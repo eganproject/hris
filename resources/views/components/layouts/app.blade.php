@@ -123,21 +123,47 @@
                                     <svg class="size-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z"></path><path d="M14 2v6h6"></path><path d="m9 15 2 2 4-4"></path></svg>
                                     <span class="sidebar-label truncate">Cuti & Izin</span>
                                 </a>
-                            </div>
-                        </div>
-                    @endcan
-
-                    @can('leave.request')
-                        <div>
-                            <p class="sidebar-section-label px-2.5 text-[10px] font-semibold uppercase text-gray-400">Self-service</p>
-                            <div class="mt-1.5">
-                                <a href="{{ route('my-leave.index') }}" @class(['sidebar-nav-link flex items-center gap-2.5 rounded px-2.5 py-1.5 text-[13px] font-medium transition', 'bg-white text-gray-950 shadow-xs ring-1 ring-gray-200' => request()->routeIs('my-leave.*'), 'text-gray-600 hover:bg-white hover:text-gray-950' => ! request()->routeIs('my-leave.*')]) title="Cuti Saya">
-                                    <svg class="size-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 2v4M16 2v4M3 10h18"></path><rect x="3" y="4" width="18" height="18" rx="2"></rect><path d="M8 14h.01M12 14h.01M16 14h.01"></path></svg>
-                                    <span class="sidebar-label truncate">Cuti Saya</span>
+                                <a href="{{ route('attendance.corrections.index') }}" @class(['sidebar-nav-link flex items-center gap-2.5 rounded px-2.5 py-1.5 text-[13px] font-medium transition', 'bg-white text-gray-950 shadow-xs ring-1 ring-gray-200' => request()->routeIs('attendance.corrections.*'), 'text-gray-600 hover:bg-white hover:text-gray-950' => ! request()->routeIs('attendance.corrections.*')]) title="Koreksi Absensi">
+                                    <svg class="size-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20h9"></path><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"></path></svg>
+                                    <span class="sidebar-label truncate">Koreksi Absensi</span>
+                                </a>
+                                <a href="{{ route('attendance.overtime.index') }}" @class(['sidebar-nav-link flex items-center gap-2.5 rounded px-2.5 py-1.5 text-[13px] font-medium transition', 'bg-white text-gray-950 shadow-xs ring-1 ring-gray-200' => request()->routeIs('attendance.overtime.*'), 'text-gray-600 hover:bg-white hover:text-gray-950' => ! request()->routeIs('attendance.overtime.*')]) title="Lembur">
+                                    <svg class="size-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M12 8v4l3 2"></path></svg>
+                                    <span class="sidebar-label truncate">Lembur</span>
+                                </a>
+                                <a href="{{ route('attendance.swaps.index') }}" @class(['sidebar-nav-link flex items-center gap-2.5 rounded px-2.5 py-1.5 text-[13px] font-medium transition', 'bg-white text-gray-950 shadow-xs ring-1 ring-gray-200' => request()->routeIs('attendance.swaps.*'), 'text-gray-600 hover:bg-white hover:text-gray-950' => ! request()->routeIs('attendance.swaps.*')]) title="Tukar Jadwal">
+                                    <svg class="size-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 3 4 7l4 4"></path><path d="M4 7h16"></path><path d="m16 21 4-4-4-4"></path><path d="M20 17H4"></path></svg>
+                                    <span class="sidebar-label truncate">Tukar Jadwal</span>
                                 </a>
                             </div>
                         </div>
                     @endcan
+
+                    @canany(['leave.request', 'attendance.correction', 'schedule.swap'])
+                        <div>
+                            <p class="sidebar-section-label px-2.5 text-[10px] font-semibold uppercase text-gray-400">Self-service</p>
+                            <div class="mt-1.5 space-y-0.5">
+                                @can('leave.request')
+                                    <a href="{{ route('my-leave.index') }}" @class(['sidebar-nav-link flex items-center gap-2.5 rounded px-2.5 py-1.5 text-[13px] font-medium transition', 'bg-white text-gray-950 shadow-xs ring-1 ring-gray-200' => request()->routeIs('my-leave.*'), 'text-gray-600 hover:bg-white hover:text-gray-950' => ! request()->routeIs('my-leave.*')]) title="Cuti Saya">
+                                        <svg class="size-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 2v4M16 2v4M3 10h18"></path><rect x="3" y="4" width="18" height="18" rx="2"></rect><path d="M8 14h.01M12 14h.01M16 14h.01"></path></svg>
+                                        <span class="sidebar-label truncate">Cuti Saya</span>
+                                    </a>
+                                @endcan
+                                @can('attendance.correction')
+                                    <a href="{{ route('my-attendance.index') }}" @class(['sidebar-nav-link flex items-center gap-2.5 rounded px-2.5 py-1.5 text-[13px] font-medium transition', 'bg-white text-gray-950 shadow-xs ring-1 ring-gray-200' => request()->routeIs('my-attendance.*'), 'text-gray-600 hover:bg-white hover:text-gray-950' => ! request()->routeIs('my-attendance.*')]) title="Absensi Saya">
+                                        <svg class="size-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 11l3 3L22 4"></path><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path></svg>
+                                        <span class="sidebar-label truncate">Absensi Saya</span>
+                                    </a>
+                                @endcan
+                                @can('schedule.swap')
+                                    <a href="{{ route('my-schedule.index') }}" @class(['sidebar-nav-link flex items-center gap-2.5 rounded px-2.5 py-1.5 text-[13px] font-medium transition', 'bg-white text-gray-950 shadow-xs ring-1 ring-gray-200' => request()->routeIs('my-schedule.*'), 'text-gray-600 hover:bg-white hover:text-gray-950' => ! request()->routeIs('my-schedule.*')]) title="Tukar Jadwal">
+                                        <svg class="size-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 3 4 7l4 4"></path><path d="M4 7h16"></path><path d="m16 21 4-4-4-4"></path><path d="M20 17H4"></path></svg>
+                                        <span class="sidebar-label truncate">Tukar Jadwal</span>
+                                    </a>
+                                @endcan
+                            </div>
+                        </div>
+                    @endcanany
 
                     @can('access-control.view')
                         <div>

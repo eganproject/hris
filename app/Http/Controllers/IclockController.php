@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Device;
+use App\Services\DeviceCommandService;
 use App\Services\PunchIngestionService;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
@@ -16,8 +17,10 @@ use Illuminate\Http\Response;
  */
 class IclockController extends Controller
 {
-    public function __construct(private readonly PunchIngestionService $ingestion)
-    {
+    public function __construct(
+        private readonly PunchIngestionService $ingestion,
+        private readonly DeviceCommandService $commands,
+    ) {
     }
 
     /**
@@ -68,23 +71,55 @@ class IclockController extends Controller
     }
 
     /**
-     * GET /iclock/getrequest — the device polls for server commands. None for now.
+     * GET /iclock/getrequest — the device polls for server commands. Deliver any
+     * pending queued commands (one per line), else OK.
      */
     public function getrequest(Request $request): Response
     {
-        $this->record($this->device($request), $request, 'poll');
+        $device = $this->device($request);
+        $this->record($device, $request, 'poll');
+
+        $batch = $this->commands->nextBatch($device);
+
+        if ($batch->isEmpty()) {
+            return $this->text('OK');
+        }
+
+        return $this->text($batch->map(fn ($command) => $this->commands->toWire($command))->implode("\n"));
+    }
+
+    /**
+     * POST /iclock/devicecmd — the device reports command results.
+     * Body is form-encoded, e.g. "ID=12&Return=0&CMD=DATA".
+     */
+    public function devicecmd(Request $request): Response
+    {
+        $device = $this->device($request);
+        $this->record($device, $request, 'command');
+
+        $params = $this->parseParams($request);
+
+        if (isset($params['ID'])) {
+            $this->commands->acknowledge($device, (int) $params['ID'], (int) ($params['Return'] ?? -1));
+        }
 
         return $this->text('OK');
     }
 
     /**
-     * POST /iclock/devicecmd — the device reports command results.
+     * Read key=value params from the request (query, parsed body, or raw body).
+     *
+     * @return array<string, string>
      */
-    public function devicecmd(Request $request): Response
+    private function parseParams(Request $request): array
     {
-        $this->record($this->device($request), $request, 'command');
+        if ($request->has('ID')) {
+            return $request->all();
+        }
 
-        return $this->text('OK');
+        parse_str(str_replace("\n", '&', trim($request->getContent())), $params);
+
+        return $params;
     }
 
     /**
