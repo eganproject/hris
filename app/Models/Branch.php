@@ -2,14 +2,16 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Model;
 
-#[Fillable(['code', 'name', 'type', 'city', 'province', 'address', 'is_active'])]
 class Branch extends Model
 {
+    /** @var list<string> */
+    protected $fillable = ['code', 'name', 'type', 'city', 'province', 'address', 'is_active'
+    ];
+
     public function employees(): HasMany
     {
         return $this->hasMany(Employee::class);

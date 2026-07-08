@@ -2,18 +2,19 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Model;
 
-#[Fillable([
+class LeaveBalance extends Model
+{
+    /** @var list<string> */
+    protected $fillable = [
     'employee_id',
     'leave_type_id',
     'year',
     'quota_days',
-])]
-class LeaveBalance extends Model
-{
+    ];
+
     protected function casts(): array
     {
         return [

@@ -2,15 +2,17 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Model;
 
-#[Fillable(['default_role_id', 'code', 'name', 'level', 'is_active'])]
 class JobPosition extends Model
 {
+    /** @var list<string> */
+    protected $fillable = ['default_role_id', 'code', 'name', 'level', 'is_active'
+    ];
+
     public function departments(): BelongsToMany
     {
         return $this->belongsToMany(Department::class)

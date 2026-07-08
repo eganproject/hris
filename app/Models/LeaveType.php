@@ -3,11 +3,13 @@
 namespace App\Models;
 
 use App\Enums\AttendanceStatus;
-use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Model;
 
-#[Fillable([
+class LeaveType extends Model
+{
+    /** @var list<string> */
+    protected $fillable = [
     'code',
     'name',
     'attendance_status',
@@ -15,9 +17,8 @@ use Illuminate\Database\Eloquent\Model;
     'counts_against_balance',
     'default_quota_days',
     'is_active',
-])]
-class LeaveType extends Model
-{
+    ];
+
     protected function casts(): array
     {
         return [

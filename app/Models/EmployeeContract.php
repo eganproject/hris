@@ -2,12 +2,14 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Model;
 
-#[Fillable([
+class EmployeeContract extends Model
+{
+    /** @var list<string> */
+    protected $fillable = [
     'employee_id',
     'contract_number',
     'contract_type',
@@ -15,9 +17,8 @@ use Illuminate\Database\Eloquent\Model;
     'end_date',
     'status',
     'notes',
-])]
-class EmployeeContract extends Model
-{
+    ];
+
     public const STATUS_LABELS = [
         'active' => 'Aktif',
         'completed' => 'Selesai Sesuai Masa Kontrak',

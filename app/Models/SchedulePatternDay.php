@@ -2,17 +2,18 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
-#[Fillable([
+class SchedulePatternDay extends Model
+{
+    /** @var list<string> */
+    protected $fillable = [
     'schedule_pattern_id',
     'day_index',
     'shift_id',
-])]
-class SchedulePatternDay extends Model
-{
+    ];
+
     protected function casts(): array
     {
         return [

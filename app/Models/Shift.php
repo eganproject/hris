@@ -3,11 +3,13 @@
 namespace App\Models;
 
 use Carbon\CarbonInterface;
-use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Carbon;
 
-#[Fillable([
+class Shift extends Model
+{
+    /** @var list<string> */
+    protected $fillable = [
     'code',
     'name',
     'start_time',
@@ -19,9 +21,8 @@ use Illuminate\Support\Carbon;
     'overtime_starts_after_minutes',
     'overtime_min_minutes',
     'is_active',
-])]
-class Shift extends Model
-{
+    ];
+
     protected function casts(): array
     {
         return [

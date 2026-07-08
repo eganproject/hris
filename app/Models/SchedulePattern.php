@@ -4,21 +4,22 @@ namespace App\Models;
 
 use App\Enums\SchedulePatternType;
 use Carbon\CarbonInterface;
-use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Carbon;
 
-#[Fillable([
+class SchedulePattern extends Model
+{
+    /** @var list<string> */
+    protected $fillable = [
     'code',
     'name',
     'type',
     'cycle_length',
     'anchor_date',
     'is_active',
-])]
-class SchedulePattern extends Model
-{
+    ];
+
     protected function casts(): array
     {
         return [

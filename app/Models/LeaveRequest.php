@@ -3,12 +3,14 @@
 namespace App\Models;
 
 use App\Enums\LeaveRequestStatus;
-use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Model;
 
-#[Fillable([
+class LeaveRequest extends Model
+{
+    /** @var list<string> */
+    protected $fillable = [
     'employee_id',
     'leave_type_id',
     'supervisor_id',
@@ -21,9 +23,8 @@ use Illuminate\Database\Eloquent\Model;
     'approved_by',
     'decided_at',
     'decision_notes',
-])]
-class LeaveRequest extends Model
-{
+    ];
+
     protected function casts(): array
     {
         return [

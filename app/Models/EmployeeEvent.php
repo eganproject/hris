@@ -2,20 +2,21 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Model;
 
-#[Fillable([
+class EmployeeEvent extends Model
+{
+    /** @var list<string> */
+    protected $fillable = [
     'employee_id',
     'type',
     'description',
     'occurred_at',
     'causer_id',
     'properties',
-])]
-class EmployeeEvent extends Model
-{
+    ];
+
     /**
      * type => [label, tone] where tone maps to the <x-status-badge> colour set.
      */

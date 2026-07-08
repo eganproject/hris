@@ -3,20 +3,21 @@
 namespace App\Models;
 
 use Carbon\CarbonInterface;
-use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Support\Carbon;
 
-#[Fillable([
+class ScheduleAssignment extends Model
+{
+    /** @var list<string> */
+    protected $fillable = [
     'employee_id',
     'schedule_pattern_id',
     'start_date',
     'end_date',
-])]
-class ScheduleAssignment extends Model
-{
+    ];
+
     protected function casts(): array
     {
         return [

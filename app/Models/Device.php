@@ -2,12 +2,14 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
-#[Fillable([
+class Device extends Model
+{
+    /** @var list<string> */
+    protected $fillable = [
     'serial_number',
     'name',
     'branch_id',
@@ -16,9 +18,8 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
     'last_seen_at',
     'last_ip',
     'options',
-])]
-class Device extends Model
-{
+    ];
+
     protected function casts(): array
     {
         return [

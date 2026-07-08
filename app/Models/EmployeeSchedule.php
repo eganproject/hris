@@ -3,13 +3,15 @@
 namespace App\Models;
 
 use App\Enums\ScheduleSource;
-use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Support\Carbon;
 
-#[Fillable([
+class EmployeeSchedule extends Model
+{
+    /** @var list<string> */
+    protected $fillable = [
     'employee_id',
     'work_date',
     'shift_id',
@@ -17,9 +19,8 @@ use Illuminate\Support\Carbon;
     'source',
     'schedule_assignment_id',
     'note',
-])]
-class EmployeeSchedule extends Model
-{
+    ];
+
     protected function casts(): array
     {
         return [

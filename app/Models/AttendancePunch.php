@@ -2,12 +2,14 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
-#[Fillable([
+class AttendancePunch extends Model
+{
+    /** @var list<string> */
+    protected $fillable = [
     'device_id',
     'employee_id',
     'machine_user_id',
@@ -17,9 +19,8 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
     'status',
     'dedup_hash',
     'raw',
-])]
-class AttendancePunch extends Model
-{
+    ];
+
     public const STATUS_MATCHED = 'matched';
     public const STATUS_UNMATCHED = 'unmatched';
     public const STATUS_IGNORED = 'ignored';

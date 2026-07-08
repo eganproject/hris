@@ -2,20 +2,21 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Model;
 
-#[Fillable([
+class Holiday extends Model
+{
+    /** @var list<string> */
+    protected $fillable = [
     'date',
     'name',
     'is_national',
     'branch_id',
     'notes',
-])]
-class Holiday extends Model
-{
+    ];
+
     protected function casts(): array
     {
         return [
