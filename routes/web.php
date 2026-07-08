@@ -117,6 +117,7 @@ Route::middleware('auth')->group(function () {
         Route::delete('holidays/{holiday}', [HolidayController::class, 'destroy'])->middleware('permission:attendance.delete')->name('holidays.destroy');
 
         Route::get('devices', [DeviceController::class, 'index'])->middleware('permission:attendance.view')->name('devices.index');
+        Route::get('devices/monitor', [DeviceController::class, 'monitor'])->middleware('permission:attendance.view')->name('devices.monitor');
         Route::get('devices/create', [DeviceController::class, 'create'])->middleware('permission:attendance.create')->name('devices.create');
         Route::post('devices', [DeviceController::class, 'store'])->middleware('permission:attendance.create')->name('devices.store');
         Route::get('devices/{device}/edit', [DeviceController::class, 'edit'])->middleware('permission:attendance.update')->name('devices.edit');

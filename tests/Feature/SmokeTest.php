@@ -82,6 +82,7 @@ test('every page renders without a server error', function () {
         route('organization.job-positions.edit', $position),
         route('attendance.daily.index'),
         route('attendance.devices.index'),
+        route('attendance.devices.monitor'),
         route('attendance.devices.create'),
         route('attendance.devices.edit', $device),
         route('attendance.punches.index'),

@@ -32,6 +32,7 @@
         'attendance.daily.index' => ['label' => 'Absensi Harian', 'parent' => 'dashboard'],
 
         'attendance.devices.index' => ['label' => 'Perangkat Absensi', 'parent' => 'dashboard'],
+        'attendance.devices.monitor' => ['label' => 'Monitor Mesin', 'parent' => 'attendance.devices.index'],
         'attendance.devices.create' => ['label' => 'Tambah Perangkat', 'parent' => 'attendance.devices.index'],
         'attendance.devices.edit' => ['label' => 'Edit Perangkat', 'parent' => 'attendance.devices.index'],
         'attendance.punches.index' => ['label' => 'Log Punch', 'parent' => 'attendance.devices.index'],

@@ -6,7 +6,8 @@
                 <h1 class="mt-1 text-2xl font-semibold text-gray-950">Perangkat Absensi</h1>
                 <p class="mt-1 text-sm text-gray-500">Mesin fingerprint (Solution X100-C) yang mengirim data via protokol iclock.</p>
             </div>
-            <div class="flex gap-2">
+            <div class="flex flex-wrap gap-2">
+                <a href="{{ route('attendance.devices.monitor') }}" class="rounded-md border border-gray-200 px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50">Monitor Mesin</a>
                 <a href="{{ route('attendance.punches.index') }}" class="rounded-md border border-gray-200 px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50">Log Punch</a>
                 @can('attendance.create')<a href="{{ route('attendance.devices.create') }}" class="rounded-md bg-primary px-4 py-2.5 text-sm font-semibold text-white shadow-xs hover:bg-primary-hover">Tambah Perangkat</a>@endcan
             </div>

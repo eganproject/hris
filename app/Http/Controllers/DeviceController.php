@@ -3,8 +3,10 @@
 namespace App\Http\Controllers;
 
 use App\Http\Requests\DeviceRequest;
+use App\Models\AttendancePunch;
 use App\Models\Branch;
 use App\Models\Device;
+use App\Models\DeviceCommunication;
 use App\Models\Employee;
 use App\Models\EmployeeDevice;
 use App\Services\PunchIngestionService;
@@ -27,6 +29,40 @@ class DeviceController extends Controller
             ->get();
 
         return view('attendance.devices.index', ['devices' => $devices]);
+    }
+
+    /**
+     * Live monitor of device communication: online status, last contact, and a
+     * rolling log of iclock interactions (handshake / attendance push / polling).
+     */
+    public function monitor(): View
+    {
+        $devices = Device::query()
+            ->with(['branch', 'latestCommunication'])
+            ->withCount('punches')
+            ->orderByDesc('is_active')
+            ->orderBy('name')
+            ->get();
+
+        $punchesToday = AttendancePunch::query()
+            ->whereDate('punched_at', now()->toDateString())
+            ->selectRaw('device_id, count(*) as total')
+            ->groupBy('device_id')
+            ->pluck('total', 'device_id');
+
+        $recent = DeviceCommunication::query()
+            ->with('device')
+            ->latest('id')
+            ->limit(80)
+            ->get();
+
+        return view('attendance.devices.monitor', [
+            'devices' => $devices,
+            'punchesToday' => $punchesToday,
+            'recent' => $recent,
+            'onlineWithin' => Device::ONLINE_WITHIN_MINUTES,
+            'onlineCount' => $devices->filter->isOnline()->count(),
+        ]);
     }
 
     public function create(): View

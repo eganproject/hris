@@ -1,6 +1,7 @@
 <?php
 
 use App\Models\Device;
+use App\Models\DeviceCommunication;
 use App\Models\Employee;
 use App\Models\EmployeeDevice;
 use App\Models\User;
@@ -55,6 +56,31 @@ test('a device can be updated and deleted', function () {
 
     $this->actingAs($user)->delete("/attendance/devices/{$device->id}")->assertRedirect('/attendance/devices');
     expect(Device::query()->count())->toBe(0);
+});
+
+test('iclock interactions are logged and shown on the monitor, marking the device online', function () {
+    $user = deviceAdmin();
+    $device = Device::query()->create(['serial_number' => 'MON1', 'name' => 'Mesin Lobby', 'is_active' => true]);
+
+    // Public device endpoints (no auth): a handshake and a poll.
+    $this->get('/iclock/cdata?SN=MON1')->assertOk();
+    $this->get('/iclock/getrequest?SN=MON1')->assertOk();
+
+    expect(DeviceCommunication::query()->where('device_id', $device->id)->count())->toBe(2)
+        ->and($device->fresh()->isOnline())->toBeTrue()
+        ->and($device->fresh()->status_label)->toBe('Online');
+
+    $this->actingAs($user)->get('/attendance/devices/monitor')
+        ->assertOk()
+        ->assertSee('Monitor Mesin')
+        ->assertSee('Handshake');
+});
+
+test('a device with no recent contact is reported offline', function () {
+    $device = Device::query()->create(['serial_number' => 'OFF1', 'name' => 'Mesin Lama', 'is_active' => true, 'last_seen_at' => now()->subHour()]);
+
+    expect($device->isOnline())->toBeFalse()
+        ->and($device->status_label)->toBe('Offline');
 });
 
 test('mapping a PIN from the device page enrolls the employee', function () {
