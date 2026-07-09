@@ -139,7 +139,7 @@
                         </div>
                     @endcan
 
-                    @canany(['leave.request', 'attendance.correction', 'schedule.swap'])
+                    @canany(['leave.request', 'attendance.correction', 'schedule.swap', 'overtime.request'])
                         <div>
                             <p class="sidebar-section-label px-2.5 text-[10px] font-semibold uppercase text-gray-400">Self-service</p>
                             <div class="mt-1.5 space-y-0.5">
@@ -159,6 +159,12 @@
                                     <a href="{{ route('my-schedule.index') }}" @class(['sidebar-nav-link flex items-center gap-2.5 rounded px-2.5 py-1.5 text-[13px] font-medium transition', 'bg-white text-gray-950 shadow-xs ring-1 ring-gray-200' => request()->routeIs('my-schedule.*'), 'text-gray-600 hover:bg-white hover:text-gray-950' => ! request()->routeIs('my-schedule.*')]) title="Tukar Jadwal">
                                         <svg class="size-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 3 4 7l4 4"></path><path d="M4 7h16"></path><path d="m16 21 4-4-4-4"></path><path d="M20 17H4"></path></svg>
                                         <span class="sidebar-label truncate">Tukar Jadwal</span>
+                                    </a>
+                                @endcan
+                                @can('overtime.request')
+                                    <a href="{{ route('my-overtime.index') }}" @class(['sidebar-nav-link flex items-center gap-2.5 rounded px-2.5 py-1.5 text-[13px] font-medium transition', 'bg-white text-gray-950 shadow-xs ring-1 ring-gray-200' => request()->routeIs('my-overtime.*'), 'text-gray-600 hover:bg-white hover:text-gray-950' => ! request()->routeIs('my-overtime.*')]) title="Lembur Saya">
+                                        <svg class="size-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M12 8v4l3 2"></path></svg>
+                                        <span class="sidebar-label truncate">Lembur Saya</span>
                                     </a>
                                 @endcan
                             </div>

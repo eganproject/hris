@@ -10,6 +10,7 @@ return [
         'leave.request',
         'attendance.correction',
         'schedule.swap',
+        'overtime.request',
         'attendance.view',
         'attendance.create',
         'attendance.update',
@@ -34,6 +35,7 @@ return [
             'leave.request',
             'attendance.correction',
             'schedule.swap',
+            'overtime.request',
             'attendance.view',
             'attendance.create',
             'attendance.update',
@@ -52,6 +54,7 @@ return [
             'leave.request',
             'attendance.correction',
             'schedule.swap',
+            'overtime.request',
         ],
     ],
 ];

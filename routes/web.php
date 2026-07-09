@@ -15,6 +15,7 @@ use App\Http\Controllers\JobPositionController;
 use App\Http\Controllers\LeaveController;
 use App\Http\Controllers\MyAttendanceController;
 use App\Http\Controllers\MyLeaveController;
+use App\Http\Controllers\MyOvertimeController;
 use App\Http\Controllers\MyScheduleController;
 use App\Http\Controllers\OrganizationController;
 use App\Http\Controllers\OvertimeController;
@@ -155,10 +156,10 @@ Route::middleware('auth')->group(function () {
         Route::patch('corrections/{correction}/approve', [AttendanceCorrectionController::class, 'approve'])->middleware('permission:attendance.update')->name('corrections.approve');
         Route::patch('corrections/{correction}/reject', [AttendanceCorrectionController::class, 'reject'])->middleware('permission:attendance.update')->name('corrections.reject');
 
+        // Overtime is submitted by employees and approved by their supervisor (see the
+        // my-overtime routes below). HR only monitors and recaps the approved totals.
         Route::get('overtime', [OvertimeController::class, 'index'])->middleware('permission:attendance.view')->name('overtime.index');
         Route::get('overtime/recap', [OvertimeController::class, 'recap'])->middleware('permission:attendance.view')->name('overtime.recap');
-        Route::post('overtime/approve', [OvertimeController::class, 'approve'])->middleware('permission:attendance.update')->name('overtime.approve');
-        Route::post('overtime/reject', [OvertimeController::class, 'reject'])->middleware('permission:attendance.update')->name('overtime.reject');
 
         Route::get('swaps', [ShiftSwapController::class, 'index'])->middleware('permission:attendance.view')->name('swaps.index');
         Route::patch('swaps/{swap}/approve', [ShiftSwapController::class, 'approve'])->middleware('permission:attendance.update')->name('swaps.approve');
@@ -209,6 +210,16 @@ Route::middleware('auth')->group(function () {
         Route::post('swaps', [MyScheduleController::class, 'store'])->name('swaps.store');
         Route::patch('swaps/{swap}/respond', [MyScheduleController::class, 'respond'])->name('swaps.respond');
         Route::delete('swaps/{swap}', [MyScheduleController::class, 'cancel'])->name('swaps.cancel');
+    });
+
+    // Employee self-service: submit own overtime, and (as a supervisor) approve
+    // subordinates' overtime requests.
+    Route::prefix('my-overtime')->name('my-overtime.')->middleware('permission:overtime.request')->group(function () {
+        Route::get('/', [MyOvertimeController::class, 'index'])->name('index');
+        Route::post('/', [MyOvertimeController::class, 'store'])->name('store');
+        Route::delete('{overtime}', [MyOvertimeController::class, 'cancel'])->name('cancel');
+        Route::patch('{overtime}/approve', [MyOvertimeController::class, 'approve'])->name('approve');
+        Route::patch('{overtime}/reject', [MyOvertimeController::class, 'reject'])->name('reject');
     });
 
     Route::prefix('access-control')->name('access-control.')->group(function () {
