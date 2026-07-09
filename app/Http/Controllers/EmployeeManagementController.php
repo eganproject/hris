@@ -3,8 +3,11 @@
 namespace App\Http\Controllers;
 
 use App\Actions\DeactivateExpiredContracts;
+use App\Exports\EmployeesExport;
+use App\Exports\EmployeeTemplateExport;
 use App\Http\Requests\EmployeeRequest;
 use App\Http\Requests\ResignEmployeeRequest;
+use App\Imports\EmployeesImport;
 use App\Models\Branch;
 use App\Models\Department;
 use App\Models\Device;
@@ -13,15 +16,17 @@ use App\Models\EmployeeContract;
 use App\Models\JobPosition;
 use App\Models\User;
 use App\Services\PunchIngestionService;
-use Illuminate\Http\Request;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rule;
 use Illuminate\View\View;
+use Maatwebsite\Excel\Facades\Excel;
 use Spatie\Permission\Models\Role;
+use Symfony\Component\HttpFoundation\BinaryFileResponse;
 
 class EmployeeManagementController extends Controller
 {
@@ -95,6 +100,57 @@ class EmployeeManagementController extends Controller
         return redirect()
             ->route('employees.index')
             ->with('status', 'Data karyawan berhasil dibuat.');
+    }
+
+    /**
+     * Download the blank .xlsx import template (data sheet + instructions sheet).
+     */
+    public function importTemplate(): BinaryFileResponse
+    {
+        return Excel::download(new EmployeeTemplateExport, 'template-import-karyawan.xlsx');
+    }
+
+    /**
+     * Export the employee list (honouring the current filters) to .xlsx.
+     */
+    public function export(Request $request): BinaryFileResponse
+    {
+        $filters = $request->only(['branch_id', 'department_id', 'status', 'exit_reason', 'search']);
+
+        return Excel::download(
+            new EmployeesExport($filters),
+            'data-karyawan-'.now()->format('Y-m-d').'.xlsx',
+        );
+    }
+
+    /**
+     * Import employees from the filled-in .xlsx/.csv template. Validation is
+     * all-or-nothing: if any row is invalid, nothing is saved and the row-level
+     * errors are flashed back so the import modal can show them.
+     */
+    public function import(Request $request): RedirectResponse
+    {
+        $request->validate([
+            'file' => ['required', 'file', 'mimes:xlsx,xls,csv', 'max:10240'],
+        ], [], ['file' => 'file Excel']);
+
+        $import = new EmployeesImport;
+
+        try {
+            Excel::import($import, $request->file('file'));
+        } catch (\Throwable $exception) {
+            report($exception);
+
+            return back()->with('import_errors', ['Gagal membaca file. Pastikan file sesuai template. ('.$exception->getMessage().')']);
+        }
+
+        if ($import->errors() !== []) {
+            return back()->with('import_errors', $import->errors());
+        }
+
+        return redirect()
+            ->route('employees.index')
+            ->with('status', "Berhasil mengimpor {$import->imported()} data karyawan.");
     }
 
     public function show(Employee $employee): View
@@ -464,7 +520,7 @@ class EmployeeManagementController extends Controller
             return;
         }
 
-        $user ??= new User();
+        $user ??= new User;
 
         $user->fill([
             'name' => $employee->full_name,

@@ -6,11 +6,21 @@
                 <h1 class="mt-1 text-2xl font-semibold text-gray-950">Manajemen Karyawan</h1>
             </div>
 
-            @can('employees.create')
-                <a href="{{ route('employees.create') }}" class="inline-flex items-center justify-center rounded-md bg-primary px-4 py-2.5 text-sm font-semibold text-white shadow-xs transition hover:bg-primary-hover focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2">
-                    Tambah Karyawan
-                </a>
-            @endcan
+            <div class="flex flex-wrap items-center gap-2">
+                @can('employees.view')
+                    <a href="{{ route('employees.export', request()->query()) }}" class="inline-flex items-center justify-center gap-1.5 rounded-md border border-gray-200 bg-white px-4 py-2.5 text-sm font-semibold text-gray-700 shadow-xs transition hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2">
+                        <x-icon name="download" class="size-4"/> Export Excel
+                    </a>
+                @endcan
+                @can('employees.create')
+                    <button type="button" data-open-import class="inline-flex items-center justify-center gap-1.5 rounded-md border border-gray-200 bg-white px-4 py-2.5 text-sm font-semibold text-gray-700 shadow-xs transition hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2">
+                        <x-icon name="upload" class="size-4"/> Import Excel
+                    </button>
+                    <a href="{{ route('employees.create') }}" class="inline-flex items-center justify-center rounded-md bg-primary px-4 py-2.5 text-sm font-semibold text-white shadow-xs transition hover:bg-primary-hover focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2">
+                        Tambah Karyawan
+                    </a>
+                @endcan
+            </div>
         </section>
 
         <section class="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-5">
@@ -298,6 +308,92 @@
                     </form>
                 </div>
             </div>
+        @endcan
+
+        @can('employees.create')
+            @php $importErrors = session('import_errors', []); @endphp
+            <div data-import-modal @unless ($importErrors) hidden @endunless class="fixed inset-0 z-50 flex items-center justify-center bg-gray-950/50 p-4">
+                <div class="w-full max-w-lg rounded-lg border border-gray-200 bg-white shadow-xl" role="dialog" aria-modal="true" aria-labelledby="import-modal-title">
+                    <div class="flex items-start justify-between gap-4 border-b border-gray-100 p-5">
+                        <div>
+                            <h2 id="import-modal-title" class="text-base font-semibold text-gray-950">Import Data Karyawan dari Excel</h2>
+                            <p class="mt-1 text-sm text-gray-500">Tambah banyak karyawan sekaligus dari file Excel sesuai template.</p>
+                        </div>
+                        <button type="button" data-import-close class="-m-1 rounded-md p-1 text-gray-400 transition hover:bg-gray-100 hover:text-gray-600" aria-label="Tutup">&times;</button>
+                    </div>
+
+                    <div class="max-h-[70vh] overflow-y-auto p-5">
+                        @if ($importErrors)
+                            <div class="mb-4 rounded-md border border-red-200 bg-red-50 p-3">
+                                <p class="text-sm font-semibold text-red-800">Import dibatalkan — perbaiki {{ count($importErrors) }} masalah berikut. Tidak ada data yang tersimpan.</p>
+                                <ul class="mt-2 max-h-48 space-y-1 overflow-y-auto pr-1 text-xs text-red-700">
+                                    @foreach ($importErrors as $importError)
+                                        <li>• {{ $importError }}</li>
+                                    @endforeach
+                                </ul>
+                            </div>
+                        @endif
+
+                        <ol class="space-y-3 text-sm text-gray-600">
+                            <li class="flex gap-3">
+                                <span class="flex size-6 flex-none items-center justify-center rounded-full bg-primary-soft text-xs font-semibold text-gray-700">1</span>
+                                <span>
+                                    Unduh template, lalu isi data mulai <strong>baris ke-2</strong> pada sheet <strong>“Data Karyawan”</strong>. Jangan mengubah baris judul kolom.
+                                    <a href="{{ route('employees.import.template') }}" class="mt-2 inline-flex items-center gap-1.5 rounded-md border border-gray-200 bg-white px-3 py-1.5 text-xs font-semibold text-gray-700 transition hover:bg-gray-50">
+                                        <x-icon name="download" class="size-3.5"/> Unduh Template Excel
+                                    </a>
+                                </span>
+                            </li>
+                            <li class="flex gap-3">
+                                <span class="flex size-6 flex-none items-center justify-center rounded-full bg-primary-soft text-xs font-semibold text-gray-700">2</span>
+                                <span>Baca sheet <strong>“Petunjuk Pengisian”</strong> di dalam template untuk keterangan dan contoh tiap kolom.</span>
+                            </li>
+                            <li class="flex gap-3">
+                                <span class="flex size-6 flex-none items-center justify-center rounded-full bg-primary-soft text-xs font-semibold text-gray-700">3</span>
+                                <span>Tulis <strong>Lokasi Kerja</strong>, <strong>Divisi</strong>, dan <strong>Jabatan</strong> persis sesuai nama yang sudah terdaftar. Setiap karyawan wajib punya <strong>Nomor Kontrak</strong> dan <strong>PIN Mesin</strong> yang unik.</span>
+                            </li>
+                            <li class="flex gap-3">
+                                <span class="flex size-6 flex-none items-center justify-center rounded-full bg-primary-soft text-xs font-semibold text-gray-700">4</span>
+                                <span>Unggah file di bawah. Jika ada <strong>satu baris saja</strong> yang salah, seluruh import dibatalkan dan kesalahannya ditampilkan — tidak ada data setengah jadi.</span>
+                            </li>
+                        </ol>
+
+                        <p class="mt-3 rounded-md bg-amber-50 px-3 py-2 text-xs text-amber-700">Catatan: akun login dan foto tidak dibuat otomatis dari import — keduanya diatur lewat menu Edit karyawan.</p>
+
+                        <form method="POST" action="{{ route('employees.import') }}" enctype="multipart/form-data" data-no-confirm="true" data-loading-title="Mengimpor data..." data-loading-message="Memvalidasi dan menyimpan data karyawan." class="mt-5 space-y-4">
+                            @csrf
+                            <div>
+                                <label for="import-file" class="block text-sm font-medium text-gray-700">File Excel (.xlsx, .xls, .csv) <span class="field-requirement is-required" aria-label="Wajib diisi">*</span></label>
+                                <input id="import-file" name="file" type="file" accept=".xlsx,.xls,.csv" required class="mt-2 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-700 shadow-xs outline-none file:mr-3 file:rounded file:border-0 file:bg-gray-100 file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-gray-700 focus:border-primary focus:ring-2 focus:ring-primary/20">
+                                @error('file')<p class="mt-2 text-sm text-red-600">{{ $message }}</p>@enderror
+                            </div>
+                            <div class="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+                                <button type="button" data-import-close class="rounded-md border border-gray-200 px-4 py-2.5 text-sm font-medium text-gray-700 transition hover:bg-gray-50">Batal</button>
+                                <button type="submit" class="inline-flex items-center justify-center gap-1.5 rounded-md bg-primary px-4 py-2.5 text-sm font-semibold text-white shadow-xs transition hover:bg-primary-hover">
+                                    <x-icon name="upload" class="size-4"/> Import Sekarang
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+
+            @push('scripts')
+            <script>
+                (function () {
+                    const modal = document.querySelector('[data-import-modal]');
+                    if (!modal) return;
+
+                    const open = () => { modal.hidden = false; };
+                    const close = () => { modal.hidden = true; };
+
+                    document.querySelectorAll('[data-open-import]').forEach((button) => button.addEventListener('click', open));
+                    modal.querySelectorAll('[data-import-close]').forEach((button) => button.addEventListener('click', close));
+                    modal.addEventListener('click', (event) => { if (event.target === modal) close(); });
+                    document.addEventListener('keydown', (event) => { if (event.key === 'Escape' && !modal.hidden) close(); });
+                })();
+            </script>
+            @endpush
         @endcan
     </div>
 </x-layouts.app>

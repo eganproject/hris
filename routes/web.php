@@ -59,6 +59,17 @@ Route::middleware('auth')->group(function () {
         Route::post('/', [EmployeeManagementController::class, 'store'])
             ->middleware('permission:employees.create')
             ->name('store');
+        // Import/export must be declared before the "{employee}" wildcard so the
+        // literal segments are not captured as a route-model-bound employee.
+        Route::get('import/template', [EmployeeManagementController::class, 'importTemplate'])
+            ->middleware('permission:employees.create')
+            ->name('import.template');
+        Route::post('import', [EmployeeManagementController::class, 'import'])
+            ->middleware('permission:employees.create')
+            ->name('import');
+        Route::get('export', [EmployeeManagementController::class, 'export'])
+            ->middleware('permission:employees.view')
+            ->name('export');
         Route::get('{employee}', [EmployeeManagementController::class, 'show'])
             ->middleware('permission:employees.view')
             ->name('show');
