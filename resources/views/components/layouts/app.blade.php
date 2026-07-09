@@ -218,6 +218,40 @@
                     </div>
 
                     <div class="flex items-center gap-3">
+                        @php
+                            $notifUser = auth()->user();
+                            $unreadCount = $notifUser->unreadNotifications()->count();
+                            $recentNotifs = $notifUser->notifications()->latest()->limit(8)->get();
+                        @endphp
+                        <div class="relative" data-dropdown>
+                            <button type="button" data-dropdown-trigger aria-expanded="false" class="relative flex size-9 items-center justify-center rounded-md border border-gray-200 bg-white text-gray-600 transition hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-primary/20" title="Notifikasi" aria-label="Notifikasi">
+                                <svg class="size-[18px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"></path><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"></path></svg>
+                                <span data-notif-count data-notif-poll="{{ route('notifications.count') }}" @unless ($unreadCount > 0) hidden @endunless class="absolute -right-1 -top-1 flex h-4 min-w-[1rem] items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-semibold leading-none text-white">{{ $unreadCount > 9 ? '9+' : $unreadCount }}</span>
+                            </button>
+                            <div data-dropdown-menu hidden class="w-80 overflow-hidden rounded-lg border border-gray-200 bg-white shadow-lg">
+                                <div class="flex items-center justify-between border-b border-gray-100 px-4 py-2.5">
+                                    <p class="text-sm font-semibold text-gray-900">Notifikasi</p>
+                                    @if ($unreadCount > 0)
+                                        <form method="POST" action="{{ route('notifications.read-all') }}" data-no-confirm="true" data-no-loading="true">@csrf<button type="submit" class="text-xs font-medium text-primary hover:underline">Tandai semua dibaca</button></form>
+                                    @endif
+                                </div>
+                                <div class="max-h-96 overflow-y-auto">
+                                    @forelse ($recentNotifs as $notif)
+                                        <a href="{{ route('notifications.read', $notif->id) }}" @class(['flex flex-col gap-0.5 border-b border-gray-50 px-4 py-2.5 transition hover:bg-gray-50', 'bg-primary-soft' => is_null($notif->read_at)])>
+                                            <span class="flex items-center gap-2 text-[13px] font-semibold text-gray-900">
+                                                @if (is_null($notif->read_at))<span class="size-1.5 shrink-0 rounded-full bg-red-500"></span>@endif
+                                                {{ $notif->data['title'] ?? 'Notifikasi' }}
+                                            </span>
+                                            <span class="text-xs text-gray-600">{{ $notif->data['message'] ?? '' }}</span>
+                                            <span class="text-[11px] text-gray-400">{{ $notif->created_at->diffForHumans() }}</span>
+                                        </a>
+                                    @empty
+                                        <p class="px-4 py-6 text-center text-sm text-gray-400">Belum ada notifikasi.</p>
+                                    @endforelse
+                                </div>
+                                <a href="{{ route('notifications.index') }}" class="block border-t border-gray-100 px-4 py-2.5 text-center text-xs font-medium text-gray-600 hover:bg-gray-50">Lihat semua notifikasi</a>
+                            </div>
+                        </div>
                         <div class="hidden text-right sm:block">
                             <p class="text-[12px] font-medium text-gray-900">{{ auth()->user()->name }}</p>
                             <p class="text-[11px] text-gray-500">Signed in</p>

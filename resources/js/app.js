@@ -14,6 +14,40 @@ if (typeof select2Factory === 'function') {
     select2Factory(window, $);
 }
 
+// Keep the topbar notification badge fresh without a full reload by polling the
+// lightweight unread-count endpoint every minute.
+(() => {
+    const badge = document.querySelector('[data-notif-count]');
+    const url = badge?.dataset.notifPoll;
+
+    if (!badge || !url) {
+        return;
+    }
+
+    const refresh = async () => {
+        try {
+            const response = await fetch(url, { headers: { Accept: 'application/json' }, credentials: 'same-origin' });
+
+            if (!response.ok) {
+                return;
+            }
+
+            const { count } = await response.json();
+
+            if (count > 0) {
+                badge.textContent = count > 9 ? '9+' : String(count);
+                badge.hidden = false;
+            } else {
+                badge.hidden = true;
+            }
+        } catch (_) {
+            // Network hiccup — try again on the next tick.
+        }
+    };
+
+    window.setInterval(refresh, 60000);
+})();
+
 const playNotificationSound = () => {
     try {
         const AudioContext = window.AudioContext || window.webkitAudioContext;

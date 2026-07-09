@@ -15,16 +15,23 @@ class Device extends Model
      */
     public const ONLINE_WITHIN_MINUTES = 3;
 
+    /**
+     * How long a device may stay silent before HR is alerted. Deliberately longer
+     * than ONLINE_WITHIN_MINUTES so brief network blips don't trigger a notification.
+     */
+    public const OFFLINE_ALERT_MINUTES = 15;
+
     /** @var list<string> */
     protected $fillable = [
-    'serial_number',
-    'name',
-    'branch_id',
-    'timezone',
-    'is_active',
-    'last_seen_at',
-    'last_ip',
-    'options',
+        'serial_number',
+        'name',
+        'branch_id',
+        'timezone',
+        'is_active',
+        'last_seen_at',
+        'offline_notified_at',
+        'last_ip',
+        'options',
     ];
 
     protected function casts(): array
@@ -32,6 +39,7 @@ class Device extends Model
         return [
             'is_active' => 'boolean',
             'last_seen_at' => 'datetime',
+            'offline_notified_at' => 'datetime',
             'options' => 'array',
         ];
     }
@@ -68,7 +76,8 @@ class Device extends Model
 
     public function markSeen(?string $ip = null): void
     {
-        $this->forceFill(['last_seen_at' => now(), 'last_ip' => $ip])->save();
+        // Clearing offline_notified_at re-arms the offline alert for the next outage.
+        $this->forceFill(['last_seen_at' => now(), 'last_ip' => $ip, 'offline_notified_at' => null])->save();
     }
 
     public function isOnline(): bool

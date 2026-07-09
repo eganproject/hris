@@ -4,15 +4,14 @@ namespace App\Http\Controllers;
 
 use App\Models\AttendanceCorrection;
 use App\Services\AttendanceResolver;
+use App\Support\ApprovalNotifier;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
 
 class AttendanceCorrectionController extends Controller
 {
-    public function __construct(private readonly AttendanceResolver $resolver)
-    {
-    }
+    public function __construct(private readonly AttendanceResolver $resolver) {}
 
     public function index(Request $request): View
     {
@@ -55,6 +54,8 @@ class AttendanceCorrectionController extends Controller
             'decided_at' => now(),
         ])->save();
 
+        app(ApprovalNotifier::class)->correctionDecided($correction);
+
         return redirect()->route('attendance.corrections.index')->with('status', 'Koreksi disetujui & absensi diperbarui.');
     }
 
@@ -68,6 +69,8 @@ class AttendanceCorrectionController extends Controller
             'decided_at' => now(),
             'decision_notes' => $request->string('decision_notes')->toString() ?: null,
         ])->save();
+
+        app(ApprovalNotifier::class)->correctionDecided($correction);
 
         return redirect()->route('attendance.corrections.index')->with('status', 'Koreksi ditolak.');
     }

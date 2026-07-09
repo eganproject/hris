@@ -6,6 +6,7 @@ use App\Enums\LeaveRequestStatus;
 use App\Models\Employee;
 use App\Models\LeaveRequest;
 use App\Models\User;
+use App\Support\ApprovalNotifier;
 
 /**
  * Two-level leave approval: employee → direct supervisor → HR.
@@ -20,7 +21,7 @@ class LeaveWorkflow
     {
         $employee->loadMissing('manager');
 
-        return LeaveRequest::query()->create([
+        $request = LeaveRequest::query()->create([
             'employee_id' => $employee->id,
             'leave_type_id' => $data['leave_type_id'],
             'supervisor_id' => $employee->manager_id,
@@ -31,6 +32,10 @@ class LeaveWorkflow
                 ? LeaveRequestStatus::PendingSupervisor
                 : LeaveRequestStatus::PendingHr,
         ]);
+
+        app(ApprovalNotifier::class)->leaveSubmitted($request);
+
+        return $request;
     }
 
     public function supervisorApprove(LeaveRequest $request, User $actor): void
@@ -40,6 +45,8 @@ class LeaveWorkflow
             'supervisor_approved_by' => $actor->id,
             'supervisor_decided_at' => now(),
         ]);
+
+        app(ApprovalNotifier::class)->leavePendingHr($request);
     }
 
     public function hrApprove(LeaveRequest $request, User $actor): void
@@ -49,6 +56,8 @@ class LeaveWorkflow
             'approved_by' => $actor->id,
             'decided_at' => now(),
         ]);
+
+        app(ApprovalNotifier::class)->leaveDecided($request);
     }
 
     public function reject(LeaveRequest $request, User $actor, ?string $notes = null): void
@@ -63,6 +72,8 @@ class LeaveWorkflow
             'approved_by' => $atSupervisorStep ? $request->approved_by : $actor->id,
             'decided_at' => $atSupervisorStep ? $request->decided_at : now(),
         ]);
+
+        app(ApprovalNotifier::class)->leaveDecided($request);
     }
 
     public function cancel(LeaveRequest $request): void

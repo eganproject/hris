@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\Employee;
 use App\Models\EmployeeSchedule;
 use App\Models\ShiftSwapRequest;
+use App\Support\ApprovalNotifier;
 use Carbon\CarbonInterface;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Auth;
@@ -17,9 +18,7 @@ use Illuminate\Support\Facades\Auth;
  */
 class ShiftSwapService
 {
-    public function __construct(private readonly ScheduleGenerator $generator)
-    {
-    }
+    public function __construct(private readonly ScheduleGenerator $generator) {}
 
     /**
      * Return a list of human-readable conflicts (empty = OK).
@@ -96,7 +95,7 @@ class ShiftSwapService
 
     public function submit(Employee $requester, array $data): ShiftSwapRequest
     {
-        return ShiftSwapRequest::query()->create([
+        $request = ShiftSwapRequest::query()->create([
             'requester_id' => $requester->id,
             'requester_date' => $data['requester_date'],
             'partner_id' => $data['partner_id'],
@@ -105,6 +104,10 @@ class ShiftSwapService
             'reason' => $data['reason'] ?? null,
             'status' => ShiftSwapRequest::STATUS_PENDING_PARTNER,
         ]);
+
+        app(ApprovalNotifier::class)->swapRequested($request);
+
+        return $request;
     }
 
     public function partnerRespond(ShiftSwapRequest $request, bool $accept): void
@@ -113,6 +116,12 @@ class ShiftSwapService
             'status' => $accept ? ShiftSwapRequest::STATUS_PENDING_HR : ShiftSwapRequest::STATUS_REJECTED,
             'partner_responded_at' => now(),
         ])->save();
+
+        if ($accept) {
+            app(ApprovalNotifier::class)->swapPendingHr($request);
+        } else {
+            app(ApprovalNotifier::class)->swapRejectedByPartner($request);
+        }
     }
 
     public function hrApprove(ShiftSwapRequest $request, ?string $notes = null): array
@@ -138,6 +147,8 @@ class ShiftSwapService
             'decision_notes' => $notes,
         ])->save();
 
+        app(ApprovalNotifier::class)->swapDecidedByHr($request);
+
         return [];
     }
 
@@ -149,6 +160,8 @@ class ShiftSwapService
             'decided_at' => now(),
             'decision_notes' => $notes,
         ])->save();
+
+        app(ApprovalNotifier::class)->swapDecidedByHr($request);
     }
 
     public function cancel(ShiftSwapRequest $request): void

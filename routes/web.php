@@ -17,6 +17,7 @@ use App\Http\Controllers\MyAttendanceController;
 use App\Http\Controllers\MyLeaveController;
 use App\Http\Controllers\MyOvertimeController;
 use App\Http\Controllers\MyScheduleController;
+use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\OrganizationController;
 use App\Http\Controllers\OvertimeController;
 use App\Http\Controllers\PunchController;
@@ -49,6 +50,14 @@ Route::middleware('auth')->group(function () {
     Route::get('dashboard', DashboardController::class)
         ->middleware('permission:dashboard.view')
         ->name('dashboard');
+
+    // In-app notifications (available to every authenticated user).
+    Route::prefix('notifications')->name('notifications.')->group(function () {
+        Route::get('/', [NotificationController::class, 'index'])->name('index');
+        Route::get('count', [NotificationController::class, 'count'])->name('count');
+        Route::post('read-all', [NotificationController::class, 'readAll'])->name('read-all');
+        Route::get('{id}', [NotificationController::class, 'read'])->name('read');
+    });
 
     Route::prefix('employees')->name('employees.')->group(function () {
         Route::get('/', [EmployeeManagementController::class, 'index'])

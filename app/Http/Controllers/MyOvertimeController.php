@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Attendance;
 use App\Models\Employee;
 use App\Models\OvertimeApproval;
+use App\Support\ApprovalNotifier;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
@@ -82,7 +83,7 @@ class MyOvertimeController extends Controller
             ->where('work_date', $data['work_date'])
             ->value('overtime_minutes') ?? 0);
 
-        OvertimeApproval::query()->create([
+        $overtime = OvertimeApproval::query()->create([
             'employee_id' => $employee->id,
             'supervisor_id' => $employee->manager_id,
             'work_date' => $data['work_date'],
@@ -95,6 +96,8 @@ class MyOvertimeController extends Controller
             'approved_minutes' => 0,
             'status' => OvertimeApproval::STATUS_PENDING,
         ]);
+
+        app(ApprovalNotifier::class)->overtimeRequested($overtime);
 
         return redirect()->route('my-overtime.index')->with('status', 'Pengajuan lembur berhasil dikirim ke atasan Anda.');
     }
@@ -125,6 +128,8 @@ class MyOvertimeController extends Controller
             'decided_at' => now(),
         ]);
 
+        app(ApprovalNotifier::class)->overtimeDecided($overtime);
+
         return redirect()->route('my-overtime.index')->with('status', 'Pengajuan lembur bawahan disetujui.');
     }
 
@@ -139,6 +144,8 @@ class MyOvertimeController extends Controller
             'decided_at' => now(),
             'notes' => $request->string('notes')->toString() ?: null,
         ]);
+
+        app(ApprovalNotifier::class)->overtimeDecided($overtime);
 
         return redirect()->route('my-overtime.index')->with('status', 'Pengajuan lembur bawahan ditolak.');
     }

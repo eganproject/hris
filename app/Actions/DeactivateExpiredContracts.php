@@ -3,6 +3,7 @@
 namespace App\Actions;
 
 use App\Models\Employee;
+use App\Support\ApprovalNotifier;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 
@@ -49,6 +50,8 @@ class DeactivateExpiredContracts
                             ['contract_number' => $contract->contract_number],
                         );
                     });
+
+                    app(ApprovalNotifier::class)->contractAutoDeactivated($employee, $contract);
 
                     $count++;
                 }

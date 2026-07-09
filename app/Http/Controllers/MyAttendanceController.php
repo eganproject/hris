@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Http\Requests\StoreAttendanceCorrectionRequest;
 use App\Models\AttendanceCorrection;
 use App\Models\Employee;
+use App\Support\ApprovalNotifier;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\View\View;
 
@@ -32,10 +33,12 @@ class MyAttendanceController extends Controller
 
     public function store(StoreAttendanceCorrectionRequest $request): RedirectResponse
     {
-        $this->employee()->attendanceCorrections()->create([
+        $correction = $this->employee()->attendanceCorrections()->create([
             ...$request->validated(),
             'status' => AttendanceCorrection::STATUS_PENDING,
         ]);
+
+        app(ApprovalNotifier::class)->correctionSubmitted($correction);
 
         return redirect()->route('my-attendance.index')->with('status', 'Pengajuan koreksi absensi terkirim.');
     }
