@@ -402,23 +402,41 @@ const syncFlatpickrYearDropdown = (instance) => {
     dropdown.value = String(instance.currentYear);
 };
 
-flatpickr('input[type="date"], [data-flatpickr-date]', {
+const dateBaseOptions = {
     allowInput: true,
     dateFormat: 'Y-m-d',
     disableMobile: true,
     onReady: (selectedDates, dateStr, instance) => syncFlatpickrYearDropdown(instance),
     onYearChange: (selectedDates, dateStr, instance) => syncFlatpickrYearDropdown(instance),
     onMonthChange: (selectedDates, dateStr, instance) => syncFlatpickrYearDropdown(instance),
-});
+};
 
-flatpickr('input[type="time"], [data-flatpickr-time]', {
+const timeBaseOptions = {
     allowInput: true,
     dateFormat: 'H:i',
     disableMobile: true,
     enableTime: true,
     noCalendar: true,
     time_24hr: true,
-});
+};
+
+// A native <dialog> opened with showModal() renders in the browser's top
+// layer, above everything else regardless of z-index. flatpickr's default
+// calendar is appended to <body> (outside the top layer), so inside a dialog
+// it would be painted *behind* the modal. `static: true` renders the calendar
+// inline within the field's wrapper — i.e. inside the dialog — so it stacks
+// above the modal. Fields outside a dialog keep the default floating calendar.
+const initFlatpickr = (selector, baseOptions) => {
+    document.querySelectorAll(selector).forEach((element) => {
+        flatpickr(element, {
+            ...baseOptions,
+            static: Boolean(element.closest('dialog')),
+        });
+    });
+};
+
+initFlatpickr('input[type="date"], [data-flatpickr-date]', dateBaseOptions);
+initFlatpickr('input[type="time"], [data-flatpickr-time]', timeBaseOptions);
 
 if (typeof $.fn.select2 === 'function') {
     $('select').filter(function () {
@@ -435,9 +453,16 @@ if (typeof $.fn.select2 === 'function') {
             return;
         }
 
+        // A native <dialog> opened with showModal() renders in the browser's
+        // top layer. select2's default body-level dropdown is painted *behind*
+        // the dialog there, so render the dropdown inside the dialog instead —
+        // that keeps it within the top layer and above the modal.
+        const dialog = this.closest('dialog');
+
         $select.select2({
             allowClear: !$select.prop('required'),
             dropdownAutoWidth: false,
+            dropdownParent: dialog ? $(dialog) : $(document.body),
             placeholder: $select.find('option:first').text() || 'Pilih',
             width: '100%',
         });

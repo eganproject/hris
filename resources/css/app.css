@@ -809,6 +809,15 @@
         background: #f3f4f6;
     }
 
+    /* Native <dialog> modals render in the browser's top layer. Tailwind's
+       preflight resets `margin: 0` on every element, which strips the UA
+       `margin: auto` that centers an open modal dialog — so it snaps to the
+       top-left. Restore centering. Overflow stays visible so an in-dialog
+       select2 dropdown / flatpickr calendar isn't clipped. */
+    dialog[open] {
+        margin: auto;
+    }
+
     @media (min-width: 64rem) {
         .admin-shell {
             --sidebar-width: 232px;
