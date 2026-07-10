@@ -9,6 +9,10 @@ Artisan::command('inspire', function () {
     $this->comment(Inspiring::quote());
 })->purpose('Display an inspiring quote');
 
+// Tutup absensi H-1 tiap dini hari: tandai Alfa/Cuti/Libur untuk karyawan tanpa
+// punch (karyawan yang nge-punch sudah otomatis ter-resolve real-time oleh mesin).
+Schedule::command('attendance:process-day')->dailyAt('01:30');
+
 // Nonaktifkan otomatis karyawan yang masa kontraknya sudah berakhir, setiap hari.
 Schedule::command('employees:deactivate-expired')->dailyAt('00:05');
 

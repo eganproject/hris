@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Actions\ProcessDayAttendance;
 use App\Enums\AttendanceStatus;
 use App\Http\Requests\AttendancePunchRequest;
 use App\Models\Attendance;
@@ -16,9 +17,10 @@ use Illuminate\View\View;
 
 class AttendanceController extends Controller
 {
-    public function __construct(private readonly AttendanceResolver $resolver)
-    {
-    }
+    public function __construct(
+        private readonly AttendanceResolver $resolver,
+        private readonly ProcessDayAttendance $processDay,
+    ) {}
 
     /**
      * Daily attendance board: every active employee's resolved status for a date,
@@ -67,18 +69,11 @@ class AttendanceController extends Controller
         $date = $this->resolveDate($request->input('date'));
         $branchId = $request->integer('branch_id') ?: null;
 
-        $employees = Employee::query()
-            ->active()
-            ->when($branchId, fn ($query) => $query->where('branch_id', $branchId))
-            ->get();
-
-        foreach ($employees as $employee) {
-            $this->resolver->reprocess($employee, $date);
-        }
+        $count = $this->processDay->handle($date, $branchId);
 
         return redirect()
             ->route('attendance.daily.index', $request->only('date', 'branch_id'))
-            ->with('status', "Absensi {$date->translatedFormat('d M Y')} diproses ({$employees->count()} karyawan).");
+            ->with('status', "Absensi {$date->translatedFormat('d M Y')} diproses ({$count} karyawan).");
     }
 
     /**
