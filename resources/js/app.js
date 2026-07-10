@@ -288,6 +288,29 @@ document.querySelectorAll('[data-sidebar-toggle]').forEach((button) => {
     });
 });
 
+// Mobile navigation drawer: the hamburger opens the sidebar; tapping the overlay,
+// a menu link, Escape, or resizing to desktop closes it.
+(() => {
+    const openNav = () => document.body.setAttribute('data-mobile-nav', 'open');
+    const closeNav = () => document.body.removeAttribute('data-mobile-nav');
+
+    document.querySelectorAll('[data-mobile-nav-toggle]').forEach((button) => button.addEventListener('click', openNav));
+    document.querySelectorAll('[data-mobile-nav-overlay]').forEach((overlay) => overlay.addEventListener('click', closeNav));
+    document.querySelectorAll('.admin-sidebar a').forEach((link) => link.addEventListener('click', closeNav));
+
+    document.addEventListener('keydown', (event) => {
+        if (event.key === 'Escape') {
+            closeNav();
+        }
+    });
+
+    window.addEventListener('resize', () => {
+        if (window.innerWidth >= 1024) {
+            closeNav();
+        }
+    });
+})();
+
 // Generic dropdown menus (e.g. row action menus). The panel is positioned with
 // `fixed` so it is never clipped by a table's horizontal-scroll container.
 const closeAllDropdowns = (except = null) => {

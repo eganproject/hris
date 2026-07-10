@@ -818,7 +818,41 @@
         margin: auto;
     }
 
+    /* Mobile navigation: the sidebar becomes a slide-in drawer below the lg
+       breakpoint (it's a fixed desktop rail at lg and up). Toggled by the topbar
+       hamburger via body[data-mobile-nav="open"]. */
+    .admin-sidebar {
+        position: fixed;
+        inset: 0 auto 0 0;
+        z-index: 50;
+        width: 250px;
+        max-width: 82vw;
+        height: 100dvh;
+        transform: translateX(-100%);
+        transition: transform 200ms ease;
+    }
+
+    body[data-mobile-nav='open'] .admin-sidebar {
+        transform: translateX(0);
+        box-shadow: 0 10px 40px rgb(2 6 23 / 0.25);
+    }
+
+    .mobile-nav-overlay {
+        position: fixed;
+        inset: 0;
+        z-index: 40;
+        background: rgb(2 6 23 / 0.4);
+    }
+
+    body:not([data-mobile-nav='open']) .mobile-nav-overlay {
+        display: none;
+    }
+
     @media (min-width: 64rem) {
+        .mobile-nav-overlay {
+            display: none !important;
+        }
+
         .admin-shell {
             --sidebar-width: 232px;
             min-height: 100vh;
@@ -831,6 +865,8 @@
             width: var(--sidebar-width);
             height: 100dvh;
             min-height: 0;
+            max-width: none;
+            transform: none;
             transition: width 180ms ease;
         }
 

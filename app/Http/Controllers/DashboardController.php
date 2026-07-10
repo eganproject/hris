@@ -2,17 +2,26 @@
 
 namespace App\Http\Controllers;
 
+use App\Enums\LeaveRequestStatus;
+use App\Models\AttendanceCorrection;
 use App\Models\AttendanceRecord;
 use App\Models\Branch;
 use App\Models\Department;
 use App\Models\Employee;
 use App\Models\EmployeeContract;
 use App\Models\JobPosition;
+use App\Models\LeaveRequest;
+use App\Models\LeaveType;
+use App\Models\OvertimeApproval;
 use App\Models\Shift;
+use App\Models\ShiftSwapRequest;
+use App\Services\LeaveBalanceService;
 use Illuminate\View\View;
 
 class DashboardController extends Controller
 {
+    public function __construct(private readonly LeaveBalanceService $balances) {}
+
     public function __invoke(): View
     {
         $user = auth()->user();
@@ -32,6 +41,45 @@ class DashboardController extends Controller
                 ['name' => 'Job Position', 'description' => 'Roles, levels, and position catalog.', 'count' => JobPosition::query()->count(), 'permission' => 'organization.view', 'route' => 'organization.job-positions.index'],
                 ['name' => 'Attendance', 'description' => 'Daily clock activity and attendance history.', 'count' => AttendanceRecord::query()->count(), 'permission' => 'attendance.view', 'route' => null],
             ])->filter(fn (array $module) => $user?->can($module['permission']))->values(),
+            'personal' => $user?->employee ? $this->personalData($user->employee) : null,
         ]);
+    }
+
+    /**
+     * Self-service snapshot for an employee: leave balances, upcoming schedule, and
+     * how many requests are in flight or waiting on them as a supervisor.
+     *
+     * @return array<string, mixed>
+     */
+    private function personalData(Employee $employee): array
+    {
+        $year = (int) now()->year;
+        $employee->loadMissing(['department', 'jobPosition']);
+
+        return [
+            'employee' => $employee,
+            'balances' => LeaveType::query()
+                ->where('is_active', true)
+                ->where('counts_against_balance', true)
+                ->orderBy('name')
+                ->get()
+                ->map(fn (LeaveType $type) => [
+                    'name' => $type->name,
+                    'remaining' => $this->balances->remaining($employee, $type, $year),
+                ]),
+            'schedule' => $employee->schedules()
+                ->whereBetween('work_date', [now()->toDateString(), now()->addDays(6)->toDateString()])
+                ->with('shift')
+                ->orderBy('work_date')
+                ->get(),
+            'myPending' => LeaveRequest::query()->where('employee_id', $employee->id)
+                ->whereIn('status', [LeaveRequestStatus::PendingSupervisor->value, LeaveRequestStatus::PendingHr->value])->count()
+                + OvertimeApproval::query()->where('employee_id', $employee->id)->where('status', OvertimeApproval::STATUS_PENDING)->count()
+                + $employee->swapRequests()->whereIn('status', [ShiftSwapRequest::STATUS_PENDING_PARTNER, ShiftSwapRequest::STATUS_PENDING_HR])->count()
+                + $employee->attendanceCorrections()->where('status', AttendanceCorrection::STATUS_PENDING)->count(),
+            'needApproval' => LeaveRequest::query()->where('supervisor_id', $employee->id)->where('status', LeaveRequestStatus::PendingSupervisor->value)->count()
+                + OvertimeApproval::query()->where('supervisor_id', $employee->id)->where('status', OvertimeApproval::STATUS_PENDING)->count()
+                + $employee->swapRequestsAsPartner()->where('status', ShiftSwapRequest::STATUS_PENDING_PARTNER)->count(),
+        ];
     }
 }

@@ -27,7 +27,8 @@
         </div>
 
         <div class="admin-shell min-h-screen">
-            <aside class="admin-sidebar hidden border-r border-[#e5e7eb] bg-[#f8fafc] lg:flex lg:flex-col">
+            <div class="mobile-nav-overlay" data-mobile-nav-overlay aria-hidden="true"></div>
+            <aside class="admin-sidebar flex flex-col border-r border-[#e5e7eb] bg-[#f8fafc]">
                 <div class="sidebar-brand flex h-[52px] shrink-0 items-center gap-2.5 border-b border-[#e5e7eb] px-4">
                     <div class="flex size-7 shrink-0 items-center justify-center rounded bg-primary text-[10px] font-semibold text-white">
                         CO
@@ -209,7 +210,7 @@
                 </nav>
 
                 <div class="sidebar-footer shrink-0 space-y-2 border-t border-gray-200 bg-[#f8fafc] p-3">
-                    <button type="button" data-sidebar-toggle class="flex w-full items-center justify-center gap-2 rounded border border-gray-200 bg-white px-2.5 py-1.5 text-[12px] font-medium text-gray-700 shadow-xs transition hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-primary/20" aria-label="Toggle sidebar" aria-pressed="false">
+                    <button type="button" data-sidebar-toggle class="hidden w-full items-center justify-center gap-2 rounded border border-gray-200 bg-white px-2.5 py-1.5 text-[12px] font-medium text-gray-700 shadow-xs transition hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-primary/20 lg:flex" aria-label="Toggle sidebar" aria-pressed="false">
                         <svg class="sidebar-toggle-icon size-4 shrink-0 transition-transform" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                             <path d="M4 5h16M4 12h16M4 19h16"></path>
                             <path d="m15 9-3 3 3 3"></path>
@@ -232,9 +233,9 @@
             <div class="admin-content min-w-0">
                 <header class="sticky top-0 z-10 flex h-[52px] items-center justify-between border-b border-gray-200 bg-white/90 px-4 backdrop-blur sm:px-5">
                     <div class="flex min-w-0 items-center gap-3">
-                        <div class="flex size-8 items-center justify-center rounded bg-primary text-[11px] font-semibold text-white lg:hidden">
-                            CO
-                        </div>
+                        <button type="button" data-mobile-nav-toggle class="flex size-9 shrink-0 items-center justify-center rounded-md border border-gray-200 bg-white text-gray-700 transition hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-primary/20 lg:hidden" aria-label="Buka menu">
+                            <svg class="size-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18M3 12h18M3 18h18"></path></svg>
+                        </button>
                         <div class="min-w-0">
                             <p class="truncate text-[13px] font-semibold text-gray-900">{{ $heading ?? 'Dashboard' }}</p>
                             <x-breadcrumbs />
