@@ -268,10 +268,13 @@
                                 <a href="{{ route('notifications.index') }}" class="block border-t border-gray-100 px-4 py-2.5 text-center text-xs font-medium text-gray-600 hover:bg-gray-50">Lihat semua notifikasi</a>
                             </div>
                         </div>
-                        <div class="hidden text-right sm:block">
-                            <p class="text-[12px] font-medium text-gray-900">{{ auth()->user()->name }}</p>
-                            <p class="text-[11px] text-gray-500">Signed in</p>
-                        </div>
+                        <a href="{{ route('profile.edit') }}" class="flex items-center gap-2 rounded-md px-1.5 py-1 transition hover:bg-gray-50" title="Profil Saya">
+                            <span class="flex size-8 items-center justify-center rounded-full bg-primary-soft text-[11px] font-semibold text-gray-700">{{ strtoupper(mb_substr(auth()->user()->name, 0, 1)) }}</span>
+                            <span class="hidden text-right sm:block">
+                                <span class="block text-[12px] font-medium text-gray-900">{{ auth()->user()->name }}</span>
+                                <span class="block text-[11px] text-gray-500">Profil Saya</span>
+                            </span>
+                        </a>
                         <form method="POST" action="{{ route('logout') }}">
                             @csrf
                             <button type="submit" class="rounded border border-gray-200 bg-white px-2.5 py-1.5 text-[12px] font-medium text-gray-700 shadow-xs transition hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-primary/20">

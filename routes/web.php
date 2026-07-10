@@ -22,6 +22,7 @@ use App\Http\Controllers\MyScheduleController;
 use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\OrganizationController;
 use App\Http\Controllers\OvertimeController;
+use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\PunchController;
 use App\Http\Controllers\ReportController;
 use App\Http\Controllers\ScheduleController;
@@ -53,6 +54,11 @@ Route::middleware('auth')->group(function () {
     Route::get('dashboard', DashboardController::class)
         ->middleware('permission:dashboard.view')
         ->name('dashboard');
+
+    // Self-service account & profile (available to every authenticated user).
+    Route::get('profile', [ProfileController::class, 'edit'])->name('profile.edit');
+    Route::patch('profile', [ProfileController::class, 'update'])->name('profile.update');
+    Route::put('profile/password', [ProfileController::class, 'updatePassword'])->name('profile.password');
 
     // In-app notifications (available to every authenticated user).
     Route::prefix('notifications')->name('notifications.')->group(function () {
