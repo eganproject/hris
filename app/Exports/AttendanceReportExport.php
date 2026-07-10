@@ -38,7 +38,7 @@ class AttendanceReportExport implements FromCollection, ShouldAutoSize, WithHead
         return [
             'No. Karyawan', 'Nama', 'Lokasi', 'Divisi', 'Jabatan',
             'Total Hari', 'Hadir', 'Terlambat', 'Pulang Cepat', 'Alfa', 'Cuti', 'Sakit',
-            'Total Terlambat (menit)', 'Total Jam Kerja', 'Total Lembur',
+            'Total Terlambat (menit)', 'Total Jam Kerja', 'Total Lembur Disetujui',
         ];
     }
 

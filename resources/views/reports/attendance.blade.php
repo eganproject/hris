@@ -55,7 +55,7 @@
                             <th class="text-center">Sakit</th>
                             <th class="text-right">Total Telat</th>
                             <th class="text-right">Jam Kerja</th>
-                            <th class="text-right">Lembur</th>
+                            <th class="text-right">Lembur Disetujui</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -84,5 +84,7 @@
                 </table>
             </div>
         </section>
+
+        <p class="text-xs text-gray-400">"Lembur Disetujui" = total lembur yang telah diajukan karyawan & disetujui atasan (angka resmi untuk penggajian), bukan hitungan otomatis dari absensi.</p>
     </div>
 </x-layouts.app>

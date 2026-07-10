@@ -4,6 +4,7 @@ namespace App\Support;
 
 use App\Models\Attendance;
 use App\Models\Employee;
+use App\Models\OvertimeApproval;
 use Illuminate\Support\Collection;
 
 /**
@@ -39,7 +40,6 @@ class AttendanceReport
                 SUM(CASE WHEN status = 'sick' THEN 1 ELSE 0 END) as sakit,
                 COALESCE(SUM(late_minutes), 0) as terlambat_menit,
                 COALESCE(SUM(work_minutes), 0) as kerja_menit,
-                COALESCE(SUM(overtime_minutes), 0) as lembur_menit,
                 COUNT(*) as total_hari
                 SQL)
             ->groupBy('employee_id')
@@ -50,12 +50,23 @@ class AttendanceReport
             return collect();
         }
 
+        // Overtime shown in reports is the *approved* overtime (employee-submitted,
+        // supervisor-approved) — the authoritative figure for payroll — not the raw
+        // minutes the resolver detects from punches.
+        $approvedOvertime = OvertimeApproval::query()
+            ->approved()
+            ->whereBetween('work_date', [$from, $to])
+            ->whereIn('employee_id', $stats->keys())
+            ->groupBy('employee_id')
+            ->selectRaw('employee_id, COALESCE(SUM(approved_minutes), 0) as menit')
+            ->pluck('menit', 'employee_id');
+
         return Employee::query()
             ->whereIn('id', $stats->keys())
             ->with(['branch', 'department', 'jobPosition'])
             ->orderBy('full_name')
             ->get()
-            ->map(function (Employee $employee) use ($stats) {
+            ->map(function (Employee $employee) use ($stats, $approvedOvertime) {
                 $s = $stats[$employee->id];
 
                 return [
@@ -69,7 +80,7 @@ class AttendanceReport
                     'sakit' => (int) $s->sakit,
                     'terlambat_menit' => (int) $s->terlambat_menit,
                     'kerja_menit' => (int) $s->kerja_menit,
-                    'lembur_menit' => (int) $s->lembur_menit,
+                    'lembur_menit' => (int) ($approvedOvertime[$employee->id] ?? 0),
                 ];
             });
     }

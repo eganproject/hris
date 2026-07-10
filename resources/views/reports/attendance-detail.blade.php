@@ -20,7 +20,7 @@
             <x-stat-card label="Alfa" :value="$summary['alfa']" tone="rose"><x-icon name="user-x" class="size-5"/></x-stat-card>
             <x-stat-card label="Total Telat" :value="$summary['terlambat_menit'].' m'" tone="sky"><x-icon name="clock" class="size-5"/></x-stat-card>
             <x-stat-card label="Jam Kerja" :value="intdiv($summary['kerja_menit'],60).'j '.($summary['kerja_menit']%60).'m'" tone="primary"><x-icon name="briefcase" class="size-5"/></x-stat-card>
-            <x-stat-card label="Lembur" :value="intdiv($summary['lembur_menit'],60).'j '.($summary['lembur_menit']%60).'m'" tone="primary"><x-icon name="clock" class="size-5"/></x-stat-card>
+            <x-stat-card label="Lembur Disetujui" :value="intdiv($summary['lembur_menit'],60).'j '.($summary['lembur_menit']%60).'m'" tone="primary"><x-icon name="clock" class="size-5"/></x-stat-card>
         </section>
 
         <section class="overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm">
@@ -31,7 +31,7 @@
                             <th>Tanggal</th><th>Shift</th><th>Status</th>
                             <th class="text-center">Masuk</th><th class="text-center">Pulang</th>
                             <th class="text-right">Telat</th><th class="text-right">Plg Cepat</th>
-                            <th class="text-right">Jam Kerja</th><th class="text-right">Lembur</th>
+                            <th class="text-right">Jam Kerja</th><th class="text-right">Lembur Disetujui</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -45,7 +45,8 @@
                                 <td class="text-right text-sm {{ $record->late_minutes > 0 ? 'font-medium text-amber-600' : 'text-gray-400' }}">{{ $record->late_minutes }} m</td>
                                 <td class="text-right text-sm {{ $record->early_leave_minutes > 0 ? 'font-medium text-amber-600' : 'text-gray-400' }}">{{ $record->early_leave_minutes }} m</td>
                                 <td class="text-right text-sm text-gray-700">{{ intdiv($record->work_minutes, 60) }}j {{ $record->work_minutes % 60 }}m</td>
-                                <td class="text-right text-sm font-medium text-gray-800">{{ intdiv($record->overtime_minutes, 60) }}j {{ $record->overtime_minutes % 60 }}m</td>
+                                @php $otMenit = (int) ($approvedOvertime[$record->work_date->toDateString()] ?? 0); @endphp
+                                <td class="text-right text-sm {{ $otMenit > 0 ? 'font-medium text-gray-800' : 'text-gray-400' }}">{{ intdiv($otMenit, 60) }}j {{ $otMenit % 60 }}m</td>
                             </tr>
                         @empty
                             <tr><td colspan="9" class="cell-empty">Belum ada data kehadiran pada bulan ini.</td></tr>

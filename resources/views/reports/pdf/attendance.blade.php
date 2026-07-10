@@ -32,7 +32,7 @@
                 <th class="l">Karyawan</th>
                 <th>Hari</th><th>Hadir</th><th>Telat</th><th>Plg Cepat</th>
                 <th>Alfa</th><th>Cuti</th><th>Sakit</th>
-                <th>Total Telat</th><th>Jam Kerja</th><th>Lembur</th>
+                <th>Total Telat</th><th>Jam Kerja</th><th>Lembur Disetujui</th>
             </tr>
         </thead>
         <tbody>

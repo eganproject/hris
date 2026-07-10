@@ -16,6 +16,7 @@ use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
 use Maatwebsite\Excel\Facades\Excel;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
@@ -89,9 +90,17 @@ class ReportController extends Controller
             ->orderBy('work_date')
             ->get();
 
+        // Approved overtime per date (authoritative figure), keyed by Y-m-d.
+        $approvedOvertime = DB::table('overtime_approvals')
+            ->where('employee_id', $employee->id)
+            ->where('status', 'approved')
+            ->whereBetween('work_date', [$from, $to])
+            ->pluck('approved_minutes', 'work_date');
+
         return view('reports.attendance-detail', [
             'employee' => $employee->load(['branch', 'department', 'jobPosition']),
             'records' => $records,
+            'approvedOvertime' => $approvedOvertime,
             'month' => $month,
             'prevMonth' => $month->copy()->subMonth()->format('Y-m'),
             'nextMonth' => $month->copy()->addMonth()->format('Y-m'),
@@ -102,7 +111,7 @@ class ReportController extends Controller
                 'alfa' => $records->filter(fn ($r) => $r->status?->value === 'absent')->count(),
                 'terlambat_menit' => (int) $records->sum('late_minutes'),
                 'kerja_menit' => (int) $records->sum('work_minutes'),
-                'lembur_menit' => (int) $records->sum('overtime_minutes'),
+                'lembur_menit' => (int) $approvedOvertime->sum(),
             ],
         ]);
     }
