@@ -139,6 +139,18 @@
                         </div>
                     @endcan
 
+                    @can('attendance.view')
+                        <div>
+                            <p class="sidebar-section-label px-2.5 text-[10px] font-semibold uppercase text-gray-400">Laporan</p>
+                            <div class="mt-1.5 space-y-0.5">
+                                <a href="{{ route('reports.index') }}" @class(['sidebar-nav-link flex items-center gap-2.5 rounded px-2.5 py-1.5 text-[13px] font-medium transition', 'bg-white text-gray-950 shadow-xs ring-1 ring-gray-200' => request()->routeIs('reports.*'), 'text-gray-600 hover:bg-white hover:text-gray-950' => ! request()->routeIs('reports.*')]) title="Laporan">
+                                    <svg class="size-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 3v18h18"></path><rect x="7" y="10" width="3" height="7"></rect><rect x="12" y="6" width="3" height="11"></rect><rect x="17" y="13" width="3" height="4"></rect></svg>
+                                    <span class="sidebar-label truncate">Laporan</span>
+                                </a>
+                            </div>
+                        </div>
+                    @endcan
+
                     @canany(['leave.request', 'attendance.correction', 'schedule.swap', 'overtime.request'])
                         <div>
                             <p class="sidebar-section-label px-2.5 text-[10px] font-semibold uppercase text-gray-400">Self-service</p>

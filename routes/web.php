@@ -21,6 +21,7 @@ use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\OrganizationController;
 use App\Http\Controllers\OvertimeController;
 use App\Http\Controllers\PunchController;
+use App\Http\Controllers\ReportController;
 use App\Http\Controllers\ScheduleController;
 use App\Http\Controllers\SchedulePatternController;
 use App\Http\Controllers\ShiftController;
@@ -57,6 +58,22 @@ Route::middleware('auth')->group(function () {
         Route::get('count', [NotificationController::class, 'count'])->name('count');
         Route::post('read-all', [NotificationController::class, 'readAll'])->name('read-all');
         Route::get('{id}', [NotificationController::class, 'read'])->name('read');
+    });
+
+    // Reports (HR/management). Gated by attendance.view since the data is drawn from
+    // attendance records.
+    Route::prefix('reports')->name('reports.')->middleware('permission:attendance.view')->group(function () {
+        Route::get('/', [ReportController::class, 'index'])->name('index');
+
+        Route::get('attendance', [ReportController::class, 'attendance'])->name('attendance');
+        Route::get('attendance/export', [ReportController::class, 'attendanceExport'])->name('attendance.export');
+        Route::get('attendance/pdf', [ReportController::class, 'attendancePdf'])->name('attendance.pdf');
+        Route::get('attendance/{employee}', [ReportController::class, 'employeeAttendance'])->name('attendance.detail');
+
+        Route::get('leave', [ReportController::class, 'leave'])->name('leave');
+        Route::get('leave/export', [ReportController::class, 'leaveExport'])->name('leave.export');
+        Route::get('leave/pdf', [ReportController::class, 'leavePdf'])->name('leave.pdf');
+        Route::get('leave/{employee}', [ReportController::class, 'employeeLeave'])->name('leave.detail');
     });
 
     Route::prefix('employees')->name('employees.')->group(function () {
