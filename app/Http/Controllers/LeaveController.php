@@ -14,9 +14,7 @@ use Illuminate\View\View;
 
 class LeaveController extends Controller
 {
-    public function __construct(private readonly LeaveWorkflow $workflow)
-    {
-    }
+    public function __construct(private readonly LeaveWorkflow $workflow) {}
 
     public function index(Request $request): View
     {
@@ -82,7 +80,15 @@ class LeaveController extends Controller
 
     public function destroy(LeaveRequest $leaveRequest): RedirectResponse
     {
+        $wasApproved = $leaveRequest->status === LeaveRequestStatus::Approved;
+
         $leaveRequest->delete();
+
+        // If an approved leave is removed, re-resolve those days so the attendance
+        // reverts from "Cuti" to its punch-based status.
+        if ($wasApproved) {
+            $this->workflow->syncAttendance($leaveRequest);
+        }
 
         return redirect()->route('attendance.leave.index')->with('status', 'Pengajuan dihapus.');
     }

@@ -7,6 +7,8 @@ use App\Models\Employee;
 use App\Models\LeaveRequest;
 use App\Models\User;
 use App\Support\ApprovalNotifier;
+use Carbon\CarbonPeriod;
+use Illuminate\Support\Carbon;
 
 /**
  * Two-level leave approval: employee → direct supervisor → HR.
@@ -14,6 +16,8 @@ use App\Support\ApprovalNotifier;
  */
 class LeaveWorkflow
 {
+    public function __construct(private readonly AttendanceResolver $resolver) {}
+
     /**
      * @param  array{leave_type_id:int, start_date:string, end_date:string, reason?:?string}  $data
      */
@@ -57,7 +61,35 @@ class LeaveWorkflow
             'decided_at' => now(),
         ]);
 
+        $this->syncAttendance($request);
+
         app(ApprovalNotifier::class)->leaveDecided($request);
+    }
+
+    /**
+     * Re-resolve the employee's attendance for each day the leave covers, so an
+     * approved leave immediately shows as "Cuti" (and, when the leave is later
+     * removed, reverts to the punch-based status). Only days up to today are
+     * touched — future leave days are picked up by the nightly close-out on their
+     * own date, so we don't create premature records.
+     */
+    public function syncAttendance(LeaveRequest $leave): void
+    {
+        $leave->loadMissing('employee');
+
+        if (! $leave->employee || ! $leave->start_date || ! $leave->end_date) {
+            return;
+        }
+
+        $today = Carbon::today();
+
+        foreach (CarbonPeriod::create($leave->start_date, $leave->end_date) as $date) {
+            if ($date->greaterThan($today)) {
+                continue;
+            }
+
+            $this->resolver->reprocess($leave->employee, $date);
+        }
     }
 
     public function reject(LeaveRequest $request, User $actor, ?string $notes = null): void
