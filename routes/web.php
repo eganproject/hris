@@ -12,7 +12,9 @@ use App\Http\Controllers\EmployeeManagementController;
 use App\Http\Controllers\HolidayController;
 use App\Http\Controllers\IclockController;
 use App\Http\Controllers\JobPositionController;
+use App\Http\Controllers\LeaveBalanceController;
 use App\Http\Controllers\LeaveController;
+use App\Http\Controllers\LeaveTypeController;
 use App\Http\Controllers\MyAttendanceController;
 use App\Http\Controllers\MyLeaveController;
 use App\Http\Controllers\MyOvertimeController;
@@ -211,6 +213,17 @@ Route::middleware('auth')->group(function () {
         Route::patch('leave/{leaveRequest}/approve', [LeaveController::class, 'approve'])->middleware('permission:attendance.update')->name('leave.approve');
         Route::patch('leave/{leaveRequest}/reject', [LeaveController::class, 'reject'])->middleware('permission:attendance.update')->name('leave.reject');
         Route::delete('leave/{leaveRequest}', [LeaveController::class, 'destroy'])->middleware('permission:attendance.delete')->name('leave.destroy');
+
+        // Master data cuti: jenis cuti + kuota per karyawan. Rute literal
+        // (create, leave-balances) dideklarasikan sebelum wildcard {leaveType}.
+        Route::get('leave-types', [LeaveTypeController::class, 'index'])->middleware('permission:attendance.view')->name('leave-types.index');
+        Route::get('leave-types/create', [LeaveTypeController::class, 'create'])->middleware('permission:attendance.create')->name('leave-types.create');
+        Route::post('leave-types', [LeaveTypeController::class, 'store'])->middleware('permission:attendance.create')->name('leave-types.store');
+        Route::get('leave-balances', [LeaveBalanceController::class, 'index'])->middleware('permission:attendance.view')->name('leave-balances.index');
+        Route::put('leave-balances', [LeaveBalanceController::class, 'update'])->middleware('permission:attendance.update')->name('leave-balances.update');
+        Route::get('leave-types/{leaveType}/edit', [LeaveTypeController::class, 'edit'])->middleware('permission:attendance.update')->name('leave-types.edit');
+        Route::put('leave-types/{leaveType}', [LeaveTypeController::class, 'update'])->middleware('permission:attendance.update')->name('leave-types.update');
+        Route::delete('leave-types/{leaveType}', [LeaveTypeController::class, 'destroy'])->middleware('permission:attendance.delete')->name('leave-types.destroy');
     });
 
     // Employee self-service: request own leave, and (as a supervisor) approve subordinates.
