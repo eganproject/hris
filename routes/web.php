@@ -23,6 +23,7 @@ use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\OrganizationController;
 use App\Http\Controllers\OvertimeController;
 use App\Http\Controllers\ProfileController;
+use App\Http\Controllers\SettingsController;
 use App\Http\Controllers\PunchController;
 use App\Http\Controllers\ReportController;
 use App\Http\Controllers\ScheduleController;
@@ -59,6 +60,10 @@ Route::middleware('auth')->group(function () {
     Route::get('profile', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::patch('profile', [ProfileController::class, 'update'])->name('profile.update');
     Route::put('profile/password', [ProfileController::class, 'updatePassword'])->name('profile.password');
+
+    // App settings (HR/admin toggles).
+    Route::get('settings', [SettingsController::class, 'index'])->middleware('permission:attendance.update')->name('settings.index');
+    Route::put('settings', [SettingsController::class, 'update'])->middleware('permission:attendance.update')->name('settings.update');
 
     // In-app notifications (available to every authenticated user).
     Route::prefix('notifications')->name('notifications.')->group(function () {

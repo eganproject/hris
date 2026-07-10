@@ -187,17 +187,25 @@
                         </div>
                     @endcanany
 
-                    @can('access-control.view')
+                    @canany(['access-control.view', 'attendance.update'])
                         <div>
                             <p class="sidebar-section-label px-2.5 text-[10px] font-semibold uppercase text-gray-400">System</p>
-                            <div class="mt-1.5">
-                                <a href="{{ route('access-control.index') }}" @class(['sidebar-nav-link flex items-center gap-2.5 rounded px-2.5 py-1.5 text-[13px] font-medium transition', 'bg-white text-gray-950 shadow-xs ring-1 ring-gray-200' => request()->routeIs('access-control.*'), 'text-gray-600 hover:bg-white hover:text-gray-950' => ! request()->routeIs('access-control.*')]) title="Pengaturan Akses">
-                                    <svg class="size-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3 5 6v6c0 4.5 3 7.5 7 9 4-1.5 7-4.5 7-9V6l-7-3Z"></path><path d="m9.5 12 1.8 1.8L15 10"></path></svg>
-                                    <span class="sidebar-label truncate">Pengaturan Akses</span>
-                                </a>
+                            <div class="mt-1.5 space-y-0.5">
+                                @can('attendance.update')
+                                    <a href="{{ route('settings.index') }}" @class(['sidebar-nav-link flex items-center gap-2.5 rounded px-2.5 py-1.5 text-[13px] font-medium transition', 'bg-white text-gray-950 shadow-xs ring-1 ring-gray-200' => request()->routeIs('settings.*'), 'text-gray-600 hover:bg-white hover:text-gray-950' => ! request()->routeIs('settings.*')]) title="Pengaturan">
+                                        <svg class="size-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z"></path></svg>
+                                        <span class="sidebar-label truncate">Pengaturan</span>
+                                    </a>
+                                @endcan
+                                @can('access-control.view')
+                                    <a href="{{ route('access-control.index') }}" @class(['sidebar-nav-link flex items-center gap-2.5 rounded px-2.5 py-1.5 text-[13px] font-medium transition', 'bg-white text-gray-950 shadow-xs ring-1 ring-gray-200' => request()->routeIs('access-control.*'), 'text-gray-600 hover:bg-white hover:text-gray-950' => ! request()->routeIs('access-control.*')]) title="Pengaturan Akses">
+                                        <svg class="size-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3 5 6v6c0 4.5 3 7.5 7 9 4-1.5 7-4.5 7-9V6l-7-3Z"></path><path d="m9.5 12 1.8 1.8L15 10"></path></svg>
+                                        <span class="sidebar-label truncate">Pengaturan Akses</span>
+                                    </a>
+                                @endcan
                             </div>
                         </div>
-                    @endcan
+                    @endcanany
                 </nav>
 
                 <div class="sidebar-footer shrink-0 space-y-2 border-t border-gray-200 bg-[#f8fafc] p-3">

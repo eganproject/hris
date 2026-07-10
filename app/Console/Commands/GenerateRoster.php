@@ -3,6 +3,7 @@
 namespace App\Console\Commands;
 
 use App\Models\Employee;
+use App\Models\Setting;
 use App\Services\ScheduleGenerator;
 use Illuminate\Console\Command;
 use Illuminate\Support\Carbon;
@@ -22,6 +23,14 @@ class GenerateRoster extends Command
 
     public function handle(ScheduleGenerator $generator): int
     {
+        // Respect the on/off toggle in Pengaturan (default on). The manual
+        // "Generate Roster" button stays available regardless of this setting.
+        if (! Setting::getBool('roster_autogenerate', true)) {
+            $this->info('Auto-generate roster dinonaktifkan di Pengaturan — dilewati.');
+
+            return self::SUCCESS;
+        }
+
         $from = Carbon::today();
         $to = $from->copy()->addDays(max(1, (int) $this->option('days')));
         $written = 0;
