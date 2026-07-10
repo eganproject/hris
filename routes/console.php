@@ -9,6 +9,10 @@ Artisan::command('inspire', function () {
     $this->comment(Inspiring::quote());
 })->purpose('Display an inspiring quote');
 
+// Perpanjang roster ke depan dari pola/assignment aktif, agar tak perlu generate
+// manual tiap bulan (karyawan jam kantor cukup di-assign sekali).
+Schedule::command('schedule:generate-roster')->dailyAt('00:20');
+
 // Tutup absensi H-1 tiap dini hari: tandai Alfa/Cuti/Libur untuk karyawan tanpa
 // punch (karyawan yang nge-punch sudah otomatis ter-resolve real-time oleh mesin).
 Schedule::command('attendance:process-day')->dailyAt('01:30');
