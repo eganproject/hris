@@ -79,6 +79,8 @@ class EmployeeRequest extends FormRequest
             'exit_notes' => ['nullable', 'string', 'max:1000'],
             'login_password' => [Rule::requiredIf($requiresLoginPassword), 'nullable', 'string', 'min:8'],
             'login_role_id' => ['nullable', 'integer', Rule::exists('roles', 'id')->where('guard_name', 'web')],
+            'leave_balance' => ['nullable', 'array'],
+            'leave_balance.*' => ['nullable', 'integer', 'min:0', 'max:365'],
         ];
     }
 

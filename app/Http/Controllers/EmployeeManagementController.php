@@ -15,6 +15,7 @@ use App\Models\Device;
 use App\Models\Employee;
 use App\Models\EmployeeContract;
 use App\Models\JobPosition;
+use App\Models\LeaveType;
 use App\Models\User;
 use App\Services\PunchIngestionService;
 use Illuminate\Database\Eloquent\Builder;
@@ -37,7 +38,7 @@ class EmployeeManagementController extends Controller
     {
         $this->deactivateExpiredContractsDaily();
 
-        $filters = $request->only(['branch_id', 'department_id', 'status', 'exit_reason', 'search']);
+        $filters = $request->only(['branch_id', 'department_id', 'status', 'exit_reason', 'search', 'contract']);
         $perPage = min(max((int) $request->input('per_page', 15), 10), 100);
 
         // Shared filtering so the summary cards always reflect the same dataset the
@@ -47,6 +48,7 @@ class EmployeeManagementController extends Controller
             ->byDepartment($filters['department_id'] ?? null)
             ->when($filters['status'] ?? null, fn ($query, string $status) => $query->where('employment_status', $status))
             ->when($filters['exit_reason'] ?? null, fn ($query, string $exitReason) => $query->where('exit_reason', $exitReason))
+            ->when(($filters['contract'] ?? null) === 'expiring', fn ($query) => $query->whereHas('contracts', fn ($c) => $c->expiringWithin(30)))
             ->when($filters['search'] ?? null, function ($query, string $search) {
                 $query->where(function ($query) use ($search) {
                     $query
@@ -94,6 +96,7 @@ class EmployeeManagementController extends Controller
             $contract = $employee->contracts()->create($this->contractPayload($request));
             $this->syncLoginAccount($request, $employee);
             $this->syncMachinePins($employee, $request->validated('machine_pins', []));
+            $this->syncLeaveBalances($employee, $request->input('leave_balance', []));
 
             $employee->recordEvent('joined', 'Bergabung sebagai karyawan.', $employee->join_date);
             $employee->recordEvent(
@@ -244,7 +247,7 @@ class EmployeeManagementController extends Controller
 
     public function edit(Employee $employee): View
     {
-        $employee->load('currentContract', 'user.roles', 'deviceMappings.device');
+        $employee->load('currentContract', 'user.roles', 'deviceMappings.device', 'leaveBalances');
 
         return view('employees.edit', [
             'employee' => $employee,
@@ -275,6 +278,7 @@ class EmployeeManagementController extends Controller
 
             $this->syncLoginAccount($request, $employee);
             $this->syncMachinePins($employee, $request->validated('machine_pins', []));
+            $this->syncLeaveBalances($employee, $request->input('leave_balance', []));
 
             // The contract was closed during this edit: process the exit here so the
             // user does not have to go to the detail page. The contract state was
@@ -488,6 +492,7 @@ class EmployeeManagementController extends Controller
                 ]),
             ],
             'roles' => Role::query()->where('guard_name', 'web')->orderBy('name')->get(),
+            'leaveTypes' => LeaveType::query()->where('is_active', true)->where('counts_against_balance', true)->orderBy('name')->get(),
             'managers' => Employee::query()->active()->orderBy('full_name')->get(['id', 'full_name', 'employee_number']),
             'devices' => Device::query()->with('branch')->orderBy('name')->get(),
             'statuses' => Employee::workStatusLabels(),
@@ -529,6 +534,52 @@ class EmployeeManagementController extends Controller
             if (! in_array((int) $mapping->device_id.'|'.$mapping->machine_user_id, $kept, true)) {
                 $mapping->delete();
             }
+        }
+    }
+
+    /**
+     * Store this year's leave quota per leave type. Mirrors the bulk Leave Balances
+     * screen: an explicit row is kept only when it differs from the leave type's
+     * default; matching the default drops any override so the default is inherited.
+     *
+     * @param  array<int|string, mixed>  $balances  leaveTypeId => quota
+     */
+    private function syncLeaveBalances(Employee $employee, array $balances): void
+    {
+        if ($balances === []) {
+            return;
+        }
+
+        $year = (int) now()->year;
+
+        $types = LeaveType::query()
+            ->where('counts_against_balance', true)
+            ->get()
+            ->keyBy('id');
+
+        foreach ($balances as $typeId => $value) {
+            $type = $types->get((int) $typeId);
+
+            if (! $type) {
+                continue;
+            }
+
+            $default = (int) ($type->default_quota_days ?? 0);
+            $entered = ($value === '' || $value === null) ? $default : (int) $value;
+            $entered = max(0, min(365, $entered));
+
+            if ($entered === $default) {
+                $employee->leaveBalances()
+                    ->where(['leave_type_id' => $type->id, 'year' => $year])
+                    ->delete();
+
+                continue;
+            }
+
+            $employee->leaveBalances()->updateOrCreate(
+                ['leave_type_id' => $type->id, 'year' => $year],
+                ['quota_days' => $entered],
+            );
         }
     }
 

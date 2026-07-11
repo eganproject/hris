@@ -12,7 +12,7 @@
     data-reactivate-active="{{ $employee->exists && $employee->isInactive() ? 'true' : 'false' }}"
     data-reactivate-closing-statuses='@json($closingContractStatuses ?? [])'>
     <section class="rounded-lg border border-gray-200 bg-white p-3 shadow-sm">
-        <div class="grid grid-cols-2 gap-2 lg:grid-cols-4" role="tablist" aria-label="Tahapan form karyawan">
+        <div class="grid grid-cols-2 gap-2 lg:grid-cols-5" role="tablist" aria-label="Tahapan form karyawan">
             <button type="button" role="tab" data-stepper-button="0" class="rounded-md px-3 py-2 text-left text-sm font-semibold text-gray-600 transition hover:bg-gray-50">
                 <span class="block text-xs font-medium text-gray-400">01</span>
                 Informasi
@@ -27,6 +27,10 @@
             </button>
             <button type="button" role="tab" data-stepper-button="3" class="rounded-md px-3 py-2 text-left text-sm font-semibold text-gray-600 transition hover:bg-gray-50">
                 <span class="block text-xs font-medium text-gray-400">04</span>
+                Saldo Cuti
+            </button>
+            <button type="button" role="tab" data-stepper-button="4" class="rounded-md px-3 py-2 text-left text-sm font-semibold text-gray-600 transition hover:bg-gray-50">
+                <span class="block text-xs font-medium text-gray-400">05</span>
                 Akun Login
             </button>
         </div>
@@ -273,6 +277,41 @@
     </section>
 
     <section class="rounded-lg border border-gray-200 bg-white p-6 shadow-sm" role="tabpanel" data-stepper-panel="3" hidden>
+        <h2 class="text-base font-semibold text-gray-950">Saldo Cuti</h2>
+        <p class="mt-1 text-sm text-gray-500">Kuota cuti untuk tahun {{ now()->year }}. Kosongkan sebuah kolom untuk memakai kuota default jenis cuti tersebut.</p>
+        @php
+            $leaveYear = now()->year;
+            $balanceOverrides = $employee->exists
+                ? $employee->leaveBalances->where('year', $leaveYear)->keyBy('leave_type_id')
+                : collect();
+        @endphp
+        @if ($leaveTypes->isEmpty())
+            <div class="mt-4 rounded-md border border-gray-200 bg-gray-50 px-3 py-2.5 text-sm text-gray-500">
+                Belum ada jenis cuti yang memakai kuota. Tambahkan lebih dulu di menu <span class="font-medium">Jenis Cuti</span>.
+            </div>
+        @else
+            <div class="mt-5 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
+                @foreach ($leaveTypes as $type)
+                    @php
+                        $default = (int) ($type->default_quota_days ?? 0);
+                        $current = old("leave_balance.{$type->id}", optional($balanceOverrides->get($type->id))->quota_days ?? $default);
+                    @endphp
+                    <div>
+                        <label for="leave_balance_{{ $type->id }}" class="block text-sm font-medium text-gray-700">{{ $type->name }}</label>
+                        <div class="mt-2 flex items-center gap-2">
+                            <input id="leave_balance_{{ $type->id }}" name="leave_balance[{{ $type->id }}]" type="number" min="0" max="365" inputmode="numeric" value="{{ $current }}" class="block w-full rounded-md border border-gray-300 px-3 py-2.5 text-sm shadow-xs outline-none focus:border-primary focus:ring-2 focus:ring-primary/20">
+                            <span class="shrink-0 text-sm text-gray-500">hari</span>
+                        </div>
+                        <p class="mt-1.5 text-xs text-gray-400">Default: {{ $default }} hari / tahun.</p>
+                        @error("leave_balance.{$type->id}")<p class="mt-2 text-sm text-red-600">{{ $message }}</p>@enderror
+                    </div>
+                @endforeach
+            </div>
+            <p class="mt-4 text-xs text-gray-400">Kuota per tahun lainnya dapat dikelola massal di menu <span class="font-medium">Kuota Cuti</span>.</p>
+        @endif
+    </section>
+
+    <section class="rounded-lg border border-gray-200 bg-white p-6 shadow-sm" role="tabpanel" data-stepper-panel="4" hidden>
         <h2 class="text-base font-semibold text-gray-950">Akun Login</h2>
         <div class="mt-5 grid grid-cols-1 gap-5 md:grid-cols-3">
                 <div>

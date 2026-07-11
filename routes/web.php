@@ -18,6 +18,7 @@ use App\Http\Controllers\LeaveTypeController;
 use App\Http\Controllers\MyAttendanceController;
 use App\Http\Controllers\MyLeaveController;
 use App\Http\Controllers\MyOvertimeController;
+use App\Http\Controllers\MyRosterController;
 use App\Http\Controllers\MyScheduleController;
 use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\OrganizationController;
@@ -60,6 +61,9 @@ Route::middleware('auth')->group(function () {
     Route::get('profile', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::patch('profile', [ProfileController::class, 'update'])->name('profile.update');
     Route::put('profile/password', [ProfileController::class, 'updatePassword'])->name('profile.password');
+
+    // Self-service: check own work schedule (read-only, no special permission).
+    Route::get('jadwal-saya', [MyRosterController::class, 'index'])->name('my-roster.index');
 
     // App settings (HR/admin toggles).
     Route::get('settings', [SettingsController::class, 'index'])->middleware('permission:attendance.update')->name('settings.index');

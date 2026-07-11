@@ -23,20 +23,43 @@
             </div>
         </section>
 
+        @php
+            $statusFilter = $filters['status'] ?? '';
+            $contractFilter = $filters['contract'] ?? '';
+            // Preserve the other active filters (lokasi/divisi/cari), only swap the
+            // drill-down dimension the card represents, and reset pagination.
+            $cardUrl = fn (array $params) => request()->fullUrlWithQuery($params + ['page' => null]);
+        @endphp
+
         <section class="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-5">
-            <x-stat-card label="Total Karyawan" :value="number_format($summary['total'])" tone="primary">
+            <x-stat-card label="Total Karyawan" :value="number_format($summary['total'])" tone="primary"
+                :href="$cardUrl(['status' => null, 'contract' => null])"
+                :active="$statusFilter === '' && $contractFilter === ''"
+                hint="Lihat semua">
                 <x-icon name="users" class="size-5"/>
             </x-stat-card>
-            <x-stat-card label="Karyawan Aktif" :value="number_format($summary['active'])" tone="emerald">
+            <x-stat-card label="Karyawan Aktif" :value="number_format($summary['active'])" tone="emerald"
+                :href="$cardUrl(['status' => 'active', 'contract' => null])"
+                :active="$statusFilter === 'active'"
+                hint="Filter status aktif">
                 <x-icon name="user-check" class="size-5"/>
             </x-stat-card>
-            <x-stat-card label="Tidak Bekerja" :value="number_format($summary['inactive'])" tone="rose">
+            <x-stat-card label="Tidak Bekerja" :value="number_format($summary['inactive'])" tone="rose"
+                :href="$cardUrl(['status' => 'inactive', 'contract' => null])"
+                :active="$statusFilter === 'inactive'"
+                hint="Filter tidak bekerja">
                 <x-icon name="user-x" class="size-5"/>
             </x-stat-card>
-            <x-stat-card label="Lokasi Aktif" :value="number_format($summary['locations'])" tone="sky">
+            @php $canViewOrg = auth()->user()?->can('organization.view'); @endphp
+            <x-stat-card label="Lokasi Aktif" :value="number_format($summary['locations'])" tone="sky"
+                :href="$canViewOrg ? route('organization.branches.index') : null"
+                :hint="$canViewOrg ? 'Kelola lokasi' : null">
                 <x-icon name="map-pin" class="size-5"/>
             </x-stat-card>
-            <x-stat-card label="Kontrak Habis 30 Hari" :value="number_format($summary['expiring_contracts'])" tone="amber">
+            <x-stat-card label="Kontrak Habis 30 Hari" :value="number_format($summary['expiring_contracts'])" tone="amber"
+                :href="$cardUrl(['contract' => 'expiring', 'status' => null])"
+                :active="$contractFilter === 'expiring'"
+                hint="Filter kontrak berakhir">
                 <x-icon name="calendar-clock" class="size-5"/>
             </x-stat-card>
         </section>

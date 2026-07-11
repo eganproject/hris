@@ -160,6 +160,11 @@ class Employee extends Model
         return $this->hasMany(EmployeeEvent::class);
     }
 
+    public function leaveBalances(): HasMany
+    {
+        return $this->hasMany(LeaveBalance::class);
+    }
+
     public function currentContract(): HasOne
     {
         return $this->hasOne(EmployeeContract::class)

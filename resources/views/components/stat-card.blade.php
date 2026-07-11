@@ -3,6 +3,8 @@
     'value',
     'tone' => 'gray',
     'hint' => null,
+    'href' => null,
+    'active' => false,
 ])
 
 @php
@@ -16,9 +18,16 @@
         'violet' => 'bg-violet-50 text-violet-600',
     ];
     $iconClass = $tones[$tone] ?? $tones['gray'];
+
+    $tag = $href ? 'a' : 'article';
+    $border = $active ? 'border-primary ring-1 ring-primary/30' : 'border-gray-200';
+    $interactive = $href
+        ? 'cursor-pointer transition hover:border-gray-300 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2'
+        : '';
+    $classes = trim("block rounded-lg border {$border} bg-white p-5 shadow-sm {$interactive}");
 @endphp
 
-<article class="rounded-lg border border-gray-200 bg-white p-5 shadow-sm">
+<{{ $tag }} @if ($href) href="{{ $href }}" @endif class="{{ $classes }}">
     <div class="flex items-center justify-between gap-3">
         <div class="min-w-0">
             <p class="text-sm leading-snug text-gray-500">{{ $label }}</p>
@@ -31,4 +40,4 @@
             {{ $slot }}
         </span>
     </div>
-</article>
+</{{ $tag }}>

@@ -156,10 +156,17 @@
                         </div>
                     @endcan
 
-                    @canany(['leave.request', 'attendance.correction', 'schedule.swap', 'overtime.request'])
+                    @php $selfServiceEmployee = auth()->user()?->employee; @endphp
+                    @if ($selfServiceEmployee || auth()->user()?->canAny(['leave.request', 'attendance.correction', 'schedule.swap', 'overtime.request']))
                         <div>
                             <p class="sidebar-section-label px-2.5 text-[10px] font-semibold uppercase text-gray-400">Self-service</p>
                             <div class="mt-1.5 space-y-0.5">
+                                @if ($selfServiceEmployee)
+                                    <a href="{{ route('my-roster.index') }}" @class(['sidebar-nav-link flex items-center gap-2.5 rounded px-2.5 py-1.5 text-[13px] font-medium transition', 'bg-white text-gray-950 shadow-xs ring-1 ring-gray-200' => request()->routeIs('my-roster.*'), 'text-gray-600 hover:bg-white hover:text-gray-950' => ! request()->routeIs('my-roster.*')]) title="Jadwal Saya">
+                                        <svg class="size-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"></rect><path d="M3 9h18M8 4v3M16 4v3"></path><path d="M8 14h.01M12 14h.01M16 14h.01"></path></svg>
+                                        <span class="sidebar-label truncate">Jadwal Saya</span>
+                                    </a>
+                                @endif
                                 @can('leave.request')
                                     <a href="{{ route('my-leave.index') }}" @class(['sidebar-nav-link flex items-center gap-2.5 rounded px-2.5 py-1.5 text-[13px] font-medium transition', 'bg-white text-gray-950 shadow-xs ring-1 ring-gray-200' => request()->routeIs('my-leave.*'), 'text-gray-600 hover:bg-white hover:text-gray-950' => ! request()->routeIs('my-leave.*')]) title="Cuti Saya">
                                         <svg class="size-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 2v4M16 2v4M3 10h18"></path><rect x="3" y="4" width="18" height="18" rx="2"></rect><path d="M8 14h.01M12 14h.01M16 14h.01"></path></svg>
@@ -186,7 +193,7 @@
                                 @endcan
                             </div>
                         </div>
-                    @endcanany
+                    @endif
 
                     @canany(['access-control.view', 'attendance.update'])
                         <div>
