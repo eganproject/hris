@@ -17,6 +17,7 @@ use App\Models\EmployeeContract;
 use App\Models\JobPosition;
 use App\Models\User;
 use App\Services\PunchIngestionService;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
@@ -39,8 +40,9 @@ class EmployeeManagementController extends Controller
         $filters = $request->only(['branch_id', 'department_id', 'status', 'exit_reason', 'search']);
         $perPage = min(max((int) $request->input('per_page', 15), 10), 100);
 
-        $employees = Employee::query()
-            ->with(['branch', 'department', 'jobPosition', 'currentContract'])
+        // Shared filtering so the summary cards always reflect the same dataset the
+        // table shows. Applied to a fresh query for each card count.
+        $applyFilters = fn (Builder $query): Builder => $query
             ->byBranch($filters['branch_id'] ?? null)
             ->byDepartment($filters['department_id'] ?? null)
             ->when($filters['status'] ?? null, fn ($query, string $status) => $query->where('employment_status', $status))
@@ -52,7 +54,9 @@ class EmployeeManagementController extends Controller
                         ->orWhere('full_name', 'like', "%{$search}%")
                         ->orWhere('email', 'like', "%{$search}%");
                 });
-            })
+            });
+
+        $employees = $applyFilters(Employee::query()->with(['branch', 'department', 'jobPosition', 'currentContract']))
             ->latest('join_date')
             ->paginate($perPage)
             ->withQueryString();
@@ -62,11 +66,12 @@ class EmployeeManagementController extends Controller
             'branches' => Branch::query()->where('is_active', true)->orderBy('city')->orderBy('name')->get(),
             'departments' => Department::query()->where('is_active', true)->orderBy('name')->get(),
             'summary' => [
-                'total' => Employee::query()->count(),
-                'active' => Employee::query()->active()->count(),
-                'inactive' => Employee::query()->where('employment_status', 'inactive')->count(),
-                'locations' => Branch::query()->where('is_active', true)->count(),
-                'expiring_contracts' => EmployeeContract::query()->expiringWithin(30)->count(),
+                'total' => $applyFilters(Employee::query())->count(),
+                'active' => $applyFilters(Employee::query())->active()->count(),
+                'inactive' => $applyFilters(Employee::query())->where('employment_status', 'inactive')->count(),
+                'locations' => (int) $applyFilters(Employee::query())->whereNotNull('branch_id')->distinct()->count('branch_id'),
+                'expiring_contracts' => EmployeeContract::query()->expiringWithin(30)
+                    ->whereIn('employee_id', $applyFilters(Employee::query())->select('id'))->count(),
             ],
             'filters' => $filters,
             'perPage' => $perPage,
