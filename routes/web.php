@@ -117,6 +117,14 @@ Route::middleware('auth')->group(function () {
         Route::get('export', [EmployeeManagementController::class, 'export'])
             ->middleware('permission:employees.view')
             ->name('export');
+        // Bulk actions on selected rows (checklist): declared before the "{employee}"
+        // wildcard so the literal segments are not captured as an employee.
+        Route::post('bulk/exit', [EmployeeManagementController::class, 'bulkExit'])
+            ->middleware('permission:employees.update')
+            ->name('bulk.exit');
+        Route::post('bulk/renew', [EmployeeManagementController::class, 'bulkRenew'])
+            ->middleware('permission:employees.update')
+            ->name('bulk.renew');
         Route::get('{employee}', [EmployeeManagementController::class, 'show'])
             ->middleware('permission:employees.view')
             ->name('show');

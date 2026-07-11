@@ -441,6 +441,165 @@ class EmployeeManagementController extends Controller
     }
 
     /**
+     * Bulk "proses keluar" for the rows checklisted on the list page. Shared exit
+     * reason/date/notes are applied to every selected employee that is still active;
+     * already-exited rows (or an exit date before their join date) are skipped.
+     */
+    public function bulkExit(Request $request): RedirectResponse
+    {
+        $validator = Validator::make($request->all(), [
+            'employee_ids' => ['required', 'array'],
+            'employee_ids.*' => ['integer', 'exists:employees,id'],
+            'exit_reason' => ['required', 'string', Rule::in(array_keys(Employee::exitReasonLabels()))],
+            'exit_date' => ['required', 'date', 'before_or_equal:today'],
+            'exit_notes' => ['nullable', 'string', 'max:1000'],
+        ], [], ['employee_ids' => 'karyawan terpilih']);
+
+        if ($validator->fails()) {
+            return back()->with('bulk_error', $validator->errors()->first());
+        }
+
+        $data = $validator->validated();
+        $exitDate = \Illuminate\Support\Carbon::parse($data['exit_date'])->startOfDay();
+
+        $employees = Employee::query()->whereIn('id', $data['employee_ids'])->get();
+        $processed = 0;
+        $skipped = 0;
+
+        DB::transaction(function () use ($employees, $data, $exitDate, &$processed, &$skipped) {
+            foreach ($employees as $employee) {
+                if ($employee->isInactive() || ($employee->join_date && $exitDate->lt($employee->join_date))) {
+                    $skipped++;
+
+                    continue;
+                }
+
+                $employee->loadMissing('currentContract', 'user');
+                $employee->markAsExited($data['exit_reason'], $exitDate, $data['exit_notes'] ?? null);
+
+                $employee->recordEvent(
+                    'exited',
+                    'Diproses keluar (massal) — '.($employee->exit_reason_label ?? $employee->exit_reason).'.',
+                    $exitDate,
+                    ['exit_reason' => $employee->exit_reason],
+                );
+
+                $processed++;
+            }
+        });
+
+        return redirect()
+            ->route('employees.index')
+            ->with('status', "Proses keluar massal: {$processed} karyawan diproses"
+                .($skipped > 0 ? ", {$skipped} dilewati (sudah keluar / tanggal tidak valid)" : '').'.');
+    }
+
+    /**
+     * Bulk "perpanjang kontrak" for the checklisted rows. Because each contract
+     * number must be unique, the number is generated per employee from a pattern
+     * that must contain {nik}; {tahun}/{bulan} tokens are also supported. Employees
+     * who have left are reactivated (rehired), mirroring the single-row flow.
+     */
+    public function bulkRenew(Request $request): RedirectResponse
+    {
+        $validator = Validator::make($request->all(), [
+            'employee_ids' => ['required', 'array'],
+            'employee_ids.*' => ['integer', 'exists:employees,id'],
+            'contract_number_pattern' => ['required', 'string', 'max:100', function ($attribute, $value, $fail) {
+                if (! str_contains((string) $value, '{nik}')) {
+                    $fail('Pola Nomor Kontrak harus memuat {nik} agar setiap karyawan mendapat nomor unik.');
+                }
+            }],
+            'contract_type' => ['required', 'string', Rule::in(['PKWT', 'PKWTT', 'Probation', 'Internship'])],
+            'start_date' => ['required', 'date'],
+            'end_date' => [Rule::requiredIf(fn () => $request->input('contract_type') !== 'PKWTT'), 'nullable', 'date', 'after_or_equal:start_date'],
+            'notes' => ['nullable', 'string', 'max:1000'],
+        ], [
+            'end_date.required' => 'Tanggal selesai kontrak wajib diisi untuk jenis kontrak selain PKWTT.',
+        ], ['employee_ids' => 'karyawan terpilih']);
+
+        if ($validator->fails()) {
+            return back()->with('bulk_error', $validator->errors()->first());
+        }
+
+        $data = $validator->validated();
+        $type = $data['contract_type'];
+        $start = \Illuminate\Support\Carbon::parse($data['start_date']);
+
+        $employees = Employee::query()->whereIn('id', $data['employee_ids'])->get();
+
+        // Generate each number and make sure the whole batch is unique — both within
+        // itself and against contracts already on record — before touching anything.
+        $numbers = [];
+        foreach ($employees as $employee) {
+            $numbers[$employee->id] = $this->expandContractPattern($data['contract_number_pattern'], $employee, $start);
+        }
+
+        $duplicates = collect($numbers)->duplicates();
+        $existing = EmployeeContract::query()->whereIn('contract_number', array_values($numbers))->pluck('contract_number');
+
+        if ($duplicates->isNotEmpty() || $existing->isNotEmpty()) {
+            $clash = $duplicates->first() ?? $existing->first();
+
+            return back()->with('bulk_error', "Nomor kontrak \"{$clash}\" tidak unik. Sesuaikan pola (pastikan memuat {nik}) atau periksa kontrak yang sudah ada.");
+        }
+
+        DB::transaction(function () use ($employees, $data, $type, $numbers) {
+            foreach ($employees as $employee) {
+                $wasInactive = $employee->isInactive();
+                $employee->loadMissing('currentContract');
+
+                if ($wasInactive) {
+                    $employee->reactivate();
+                }
+
+                $previous = $employee->currentContract;
+
+                if ($previous) {
+                    $previous->forceFill(['status' => 'renewed'])->save();
+                }
+
+                $new = $employee->contracts()->create([
+                    'contract_number' => $numbers[$employee->id],
+                    'contract_type' => $type,
+                    'start_date' => $data['start_date'],
+                    'end_date' => $type === 'PKWTT' ? null : ($data['end_date'] ?? null),
+                    'status' => 'active',
+                    'notes' => $data['notes'] ?? null,
+                ]);
+
+                $employee->recordEvent(
+                    $wasInactive ? 'reactivated' : 'contract_renewed',
+                    $wasInactive
+                        ? "Diaktifkan kembali dengan kontrak baru {$new->contract_number} (massal)."
+                        : ($previous
+                            ? "Kontrak diperpanjang dari {$previous->contract_number} ke {$new->contract_number} (massal)."
+                            : "Kontrak {$new->contract_number} dibuat (massal)."),
+                    $new->start_date,
+                    ['from' => $previous?->contract_number, 'to' => $new->contract_number],
+                );
+            }
+        });
+
+        return redirect()
+            ->route('employees.index')
+            ->with('status', 'Perpanjang kontrak massal: '.$employees->count().' karyawan diproses.');
+    }
+
+    /**
+     * Expand a bulk contract-number pattern for one employee. Supported tokens:
+     * {nik} (employee number), {tahun} (start year), {bulan} (start month).
+     */
+    private function expandContractPattern(string $pattern, Employee $employee, \Illuminate\Support\Carbon $start): string
+    {
+        return str_replace(
+            ['{nik}', '{tahun}', '{bulan}'],
+            [(string) $employee->employee_number, $start->format('Y'), $start->format('m')],
+            $pattern,
+        );
+    }
+
+    /**
      * Auto-deactivate employees with an expired contract, at most once per day so it
      * runs during normal usage even when no scheduler/cron is configured.
      */

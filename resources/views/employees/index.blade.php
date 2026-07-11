@@ -129,16 +129,40 @@
             </form>
         </section>
 
+        @can('employees.update')
+            @if ($bulkError = session('bulk_error'))
+                <div class="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{{ $bulkError }}</div>
+            @endif
+        @endcan
+
         <section class="overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm">
             <div class="border-b border-gray-200 px-5 py-4">
                 <h2 class="text-base font-semibold text-gray-950">Daftar Karyawan</h2>
                 <p class="mt-1 text-sm text-gray-500">Informasi lokasi, posisi, status aktif, dan kontrak berjalan.</p>
             </div>
 
+            @can('employees.update')
+                <div data-bulk-bar hidden class="flex flex-col gap-3 border-b border-primary/20 bg-primary-soft px-5 py-3 sm:flex-row sm:items-center sm:justify-between">
+                    <p class="text-sm font-medium text-gray-800"><span data-bulk-count>0</span> karyawan dipilih</p>
+                    <div class="flex flex-wrap items-center gap-2">
+                        <button type="button" data-bulk-open="renew" class="inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-2 text-sm font-semibold text-white shadow-xs transition hover:bg-primary-hover">
+                            <x-icon name="refresh" class="size-4"/> Perpanjang Kontrak
+                        </button>
+                        <button type="button" data-bulk-open="exit" class="inline-flex items-center gap-1.5 rounded-md border border-red-200 bg-white px-3 py-2 text-sm font-semibold text-red-700 transition hover:bg-red-50">
+                            <x-icon name="user-x" class="size-4"/> Proses Keluar
+                        </button>
+                        <button type="button" data-bulk-clear class="rounded-md border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-gray-600 transition hover:bg-gray-50">Batalkan</button>
+                    </div>
+                </div>
+            @endcan
+
             <div class="overflow-x-auto">
                 <table class="data-table">
                     <thead>
                         <tr>
+                            @can('employees.update')
+                                <th class="w-10"><input type="checkbox" data-bulk-all aria-label="Pilih semua" class="size-4 rounded border-gray-300 text-primary focus:ring-primary/30"></th>
+                            @endcan
                             <th>Karyawan</th>
                             <th>Lokasi</th>
                             <th>Jabatan</th>
@@ -149,7 +173,12 @@
                     </thead>
                     <tbody>
                         @forelse ($employees as $employee)
-                            <tr>
+                            <tr data-employee-row>
+                                @can('employees.update')
+                                    <td class="w-10">
+                                        <input type="checkbox" data-bulk-checkbox value="{{ $employee->id }}" data-name="{{ $employee->full_name }}" data-inactive="{{ $employee->isInactive() ? '1' : '0' }}" aria-label="Pilih {{ $employee->full_name }}" class="size-4 rounded border-gray-300 text-primary focus:ring-primary/30">
+                                    </td>
+                                @endcan
                                 <td>
                                     <div class="flex items-center gap-3">
                                         @if ($employee->photo_url)
@@ -228,7 +257,7 @@
                             </tr>
                         @empty
                             <tr>
-                                <td colspan="6" class="cell-empty">Belum ada data karyawan.</td>
+                                <td colspan="{{ auth()->user()?->can('employees.update') ? 7 : 6 }}" class="cell-empty">Belum ada data karyawan.</td>
                             </tr>
                         @endforelse
                     </tbody>
@@ -331,6 +360,151 @@
                     </form>
                 </div>
             </div>
+
+            {{-- Bulk: Perpanjang Kontrak untuk baris terpilih --}}
+            <div data-bulk-modal="renew" hidden class="fixed inset-0 z-50 flex items-center justify-center bg-gray-950/50 p-4">
+                <div class="w-full max-w-md rounded-lg border border-gray-200 bg-white p-6 shadow-xl" role="dialog" aria-modal="true">
+                    <h2 class="text-base font-semibold text-gray-950">Perpanjang Kontrak Massal</h2>
+                    <p class="mt-1 text-sm text-gray-500"><span data-bulk-modal-count>0</span> karyawan terpilih. Kontrak baru dibuat aktif; kontrak lama ditandai “Diperpanjang”. Karyawan yang sudah keluar akan diaktifkan kembali.</p>
+                    <form method="POST" action="{{ route('employees.bulk.renew') }}" data-no-confirm="true" class="mt-5 space-y-4">
+                        @csrf
+                        <div data-bulk-ids></div>
+                        <div>
+                            <label for="bulk_renew_pattern" class="block text-sm font-medium text-gray-700">Pola Nomor Kontrak <span class="field-requirement is-required" aria-label="Wajib diisi">*</span></label>
+                            <input id="bulk_renew_pattern" name="contract_number_pattern" value="{{ old('contract_number_pattern', 'KTR-{tahun}-{nik}') }}" required class="mt-2 block w-full rounded-md border border-gray-300 px-3 py-2.5 text-sm shadow-xs outline-none focus:border-primary focus:ring-2 focus:ring-primary/20">
+                            <p class="mt-1.5 text-xs text-gray-500">Token: <code class="rounded bg-gray-100 px-1 py-0.5 text-[11px]">{nik}</code> (nomor karyawan, wajib), <code class="rounded bg-gray-100 px-1 py-0.5 text-[11px]">{tahun}</code>, <code class="rounded bg-gray-100 px-1 py-0.5 text-[11px]">{bulan}</code>. Nomor dibuat unik per karyawan.</p>
+                        </div>
+                        <div>
+                            <label for="bulk_renew_type" class="block text-sm font-medium text-gray-700">Jenis Kontrak <span class="field-requirement is-required" aria-label="Wajib diisi">*</span></label>
+                            <select id="bulk_renew_type" name="contract_type" required data-contract-type-toggle="#bulk_renew_end" class="mt-2 block w-full rounded-md border border-gray-300 px-3 py-2.5 text-sm shadow-xs outline-none focus:border-primary focus:ring-2 focus:ring-primary/20">
+                                @foreach ($contractTypes as $type)
+                                    <option value="{{ $type }}" @selected(old('contract_type', 'PKWT') === $type)>{{ $type }}</option>
+                                @endforeach
+                            </select>
+                        </div>
+                        <div class="grid grid-cols-2 gap-3">
+                            <div>
+                                <label for="bulk_renew_start" class="block text-sm font-medium text-gray-700">Mulai <span class="field-requirement is-required" aria-label="Wajib diisi">*</span></label>
+                                <input id="bulk_renew_start" name="start_date" type="date" value="{{ old('start_date', now()->format('Y-m-d')) }}" required class="mt-2 block w-full rounded-md border border-gray-300 px-3 py-2.5 text-sm shadow-xs outline-none focus:border-primary focus:ring-2 focus:ring-primary/20">
+                            </div>
+                            <div>
+                                <label for="bulk_renew_end" class="block text-sm font-medium text-gray-700">Selesai</label>
+                                <input id="bulk_renew_end" name="end_date" type="date" value="{{ old('end_date') }}" class="mt-2 block w-full rounded-md border border-gray-300 px-3 py-2.5 text-sm shadow-xs outline-none focus:border-primary focus:ring-2 focus:ring-primary/20">
+                            </div>
+                        </div>
+                        <div>
+                            <label for="bulk_renew_notes" class="block text-sm font-medium text-gray-700">Catatan</label>
+                            <textarea id="bulk_renew_notes" name="notes" rows="2" class="mt-2 block w-full rounded-md border border-gray-300 px-3 py-2.5 text-sm shadow-xs outline-none focus:border-primary focus:ring-2 focus:ring-primary/20">{{ old('notes') }}</textarea>
+                        </div>
+                        <div class="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+                            <button type="button" data-bulk-modal-close class="rounded-md border border-gray-200 px-4 py-2.5 text-sm font-medium text-gray-700 transition hover:bg-gray-50">Batal</button>
+                            <button type="submit" class="rounded-md bg-primary px-4 py-2.5 text-sm font-semibold text-white shadow-xs transition hover:bg-primary-hover">Perpanjang Kontrak</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            {{-- Bulk: Proses Keluar untuk baris terpilih --}}
+            <div data-bulk-modal="exit" hidden class="fixed inset-0 z-50 flex items-center justify-center bg-gray-950/50 p-4">
+                <div class="w-full max-w-md rounded-lg border border-gray-200 bg-white p-6 shadow-xl" role="dialog" aria-modal="true">
+                    <h2 class="text-base font-semibold text-gray-950">Proses Keluar Massal</h2>
+                    <p class="mt-1 text-sm text-gray-500"><span data-bulk-modal-count>0</span> karyawan terpilih. Semua akan dinonaktifkan &amp; akun login dimatikan. Karyawan yang sudah keluar akan dilewati.</p>
+                    <form method="POST" action="{{ route('employees.bulk.exit') }}" data-no-confirm="true" class="mt-5 space-y-4">
+                        @csrf
+                        <div data-bulk-ids></div>
+                        <div>
+                            <label for="bulk_exit_reason" class="block text-sm font-medium text-gray-700">Alasan Keluar <span class="field-requirement is-required" aria-label="Wajib diisi">*</span></label>
+                            <select id="bulk_exit_reason" name="exit_reason" required class="mt-2 block w-full rounded-md border border-gray-300 px-3 py-2.5 text-sm shadow-xs outline-none focus:border-primary focus:ring-2 focus:ring-primary/20">
+                                @foreach ($exitReasons as $reason => $label)
+                                    <option value="{{ $reason }}" @selected(old('exit_reason', 'resigned') === $reason)>{{ $label }}</option>
+                                @endforeach
+                            </select>
+                        </div>
+                        <div>
+                            <label for="bulk_exit_date" class="block text-sm font-medium text-gray-700">Tanggal Keluar <span class="field-requirement is-required" aria-label="Wajib diisi">*</span></label>
+                            <input id="bulk_exit_date" name="exit_date" type="date" value="{{ old('exit_date', now()->format('Y-m-d')) }}" required class="mt-2 block w-full rounded-md border border-gray-300 px-3 py-2.5 text-sm shadow-xs outline-none focus:border-primary focus:ring-2 focus:ring-primary/20">
+                        </div>
+                        <div>
+                            <label for="bulk_exit_notes" class="block text-sm font-medium text-gray-700">Catatan Keluar</label>
+                            <textarea id="bulk_exit_notes" name="exit_notes" rows="2" class="mt-2 block w-full rounded-md border border-gray-300 px-3 py-2.5 text-sm shadow-xs outline-none focus:border-primary focus:ring-2 focus:ring-primary/20">{{ old('exit_notes') }}</textarea>
+                        </div>
+                        <div class="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+                            <button type="button" data-bulk-modal-close class="rounded-md border border-gray-200 px-4 py-2.5 text-sm font-medium text-gray-700 transition hover:bg-gray-50">Batal</button>
+                            <button type="submit" class="rounded-md border border-red-200 bg-red-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-red-700">Proses Keluar</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            @push('scripts')
+            <script>
+                (function () {
+                    const selectAll = document.querySelector('[data-bulk-all]');
+                    const bar = document.querySelector('[data-bulk-bar]');
+                    if (!selectAll || !bar) return;
+
+                    const boxes = () => [...document.querySelectorAll('[data-bulk-checkbox]')];
+                    const checked = () => boxes().filter((b) => b.checked);
+
+                    const sync = () => {
+                        const total = boxes().length;
+                        const n = checked().length;
+                        document.querySelectorAll('[data-bulk-count]').forEach((el) => el.textContent = n);
+                        bar.hidden = n === 0;
+                        selectAll.checked = n > 0 && n === total;
+                        selectAll.indeterminate = n > 0 && n < total;
+                    };
+
+                    selectAll.addEventListener('change', () => {
+                        boxes().forEach((b) => { b.checked = selectAll.checked; });
+                        sync();
+                    });
+                    boxes().forEach((b) => b.addEventListener('change', sync));
+                    document.querySelector('[data-bulk-clear]')?.addEventListener('click', () => {
+                        boxes().forEach((b) => { b.checked = false; });
+                        sync();
+                    });
+
+                    const modals = {
+                        renew: document.querySelector('[data-bulk-modal="renew"]'),
+                        exit: document.querySelector('[data-bulk-modal="exit"]'),
+                    };
+
+                    const openBulk = (key) => {
+                        const modal = modals[key];
+                        const ids = checked().map((b) => b.value);
+                        if (!modal || ids.length === 0) return;
+
+                        const holder = modal.querySelector('[data-bulk-ids]');
+                        holder.innerHTML = '';
+                        ids.forEach((id) => {
+                            const input = document.createElement('input');
+                            input.type = 'hidden';
+                            input.name = 'employee_ids[]';
+                            input.value = id;
+                            holder.appendChild(input);
+                        });
+                        modal.querySelectorAll('[data-bulk-modal-count]').forEach((el) => el.textContent = ids.length);
+                        modal.hidden = false;
+                    };
+
+                    document.querySelectorAll('[data-bulk-open]').forEach((btn) => {
+                        btn.addEventListener('click', () => openBulk(btn.dataset.bulkOpen));
+                    });
+
+                    Object.values(modals).forEach((modal) => {
+                        if (!modal) return;
+                        modal.addEventListener('click', (e) => { if (e.target === modal) modal.hidden = true; });
+                        modal.querySelectorAll('[data-bulk-modal-close]').forEach((b) => b.addEventListener('click', () => { modal.hidden = true; }));
+                    });
+                    document.addEventListener('keydown', (e) => {
+                        if (e.key === 'Escape') Object.values(modals).forEach((m) => { if (m) m.hidden = true; });
+                    });
+
+                    sync();
+                })();
+            </script>
+            @endpush
         @endcan
 
         @can('employees.create')
