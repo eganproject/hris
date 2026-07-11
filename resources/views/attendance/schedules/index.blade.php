@@ -153,7 +153,7 @@
 
     @can('attendance.update')
         <dialog id="override-dialog" class="w-full max-w-md rounded-lg p-0 backdrop:bg-black/40">
-            <form method="POST" action="{{ route('attendance.schedules.override') }}" class="space-y-4 p-6">
+            <form method="POST" action="{{ route('attendance.schedules.override') }}" data-no-confirm="true" class="space-y-4 p-6">
                 @csrf
                 <input type="hidden" name="employee_id" id="ov-employee-id">
                 <input type="hidden" name="work_date" id="ov-work-date">
@@ -204,6 +204,8 @@
                 function syncOff() {
                     shiftWrap.style.display = dayOff.checked ? 'none' : '';
                     shift.disabled = dayOff.checked;
+                    // Shift wajib dipilih kecuali hari ini ditandai libur.
+                    shift.required = !dayOff.checked;
                 }
 
                 document.querySelectorAll('[data-cell]').forEach(function (cell) {
