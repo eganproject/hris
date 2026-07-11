@@ -8,6 +8,7 @@ use App\Exports\EmployeeTemplateExport;
 use App\Http\Requests\EmployeeRequest;
 use App\Http\Requests\ResignEmployeeRequest;
 use App\Imports\EmployeesImport;
+use App\Support\EmployeeImportErrorReport;
 use App\Models\Branch;
 use App\Models\Department;
 use App\Models\Device;
@@ -21,6 +22,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rule;
 use Illuminate\View\View;
@@ -145,12 +147,75 @@ class EmployeeManagementController extends Controller
         }
 
         if ($import->errors() !== []) {
-            return back()->with('import_errors', $import->errors());
+            $token = $this->storeImportErrorReport($request->file('file'), $import->rowErrors());
+
+            return back()
+                ->with('import_errors', $import->errors())
+                ->with('import_error_token', $token);
         }
 
         return redirect()
             ->route('employees.index')
             ->with('status', "Berhasil mengimpor {$import->imported()} data karyawan.");
+    }
+
+    /**
+     * Download a copy of the just-uploaded file annotated with the import errors:
+     * offending cells highlighted, a per-row "Kesalahan" column, plus a sheet
+     * listing every problem and the column it belongs to.
+     */
+    public function importErrors(string $token): BinaryFileResponse
+    {
+        abort_unless(Str::isUuid($token), 404);
+
+        $dir = 'import-error-reports';
+        $payloadPath = "{$dir}/{$token}.json";
+
+        abort_unless(Storage::exists($payloadPath), 404);
+
+        /** @var array{source: string, original_name: string, errors: list<array{row: ?int, column: ?string, message: string}>} $payload */
+        $payload = json_decode(Storage::get($payloadPath), true);
+
+        abort_unless(is_array($payload) && Storage::exists($payload['source']), 404);
+
+        $name = 'kesalahan-import-'.pathinfo($payload['original_name'], PATHINFO_FILENAME).'.xlsx';
+
+        return EmployeeImportErrorReport::download(
+            Storage::path($payload['source']),
+            $payload['errors'],
+            $name,
+        );
+    }
+
+    /**
+     * Persist the uploaded file plus its structured errors so they can be
+     * rebuilt into a downloadable report on a later request. Returns the token
+     * the download route resolves. Stale reports (older than a day) are pruned.
+     *
+     * @param  list<array{row: ?int, column: ?string, message: string}>  $errors
+     */
+    private function storeImportErrorReport(\Illuminate\Http\UploadedFile $file, array $errors): string
+    {
+        $dir = 'import-error-reports';
+        $token = (string) Str::uuid();
+
+        foreach (Storage::files($dir) as $old) {
+            if (Storage::lastModified($old) < now()->subDay()->getTimestamp()) {
+                Storage::delete($old);
+            }
+        }
+
+        $extension = strtolower($file->getClientOriginalExtension() ?: 'xlsx');
+        $source = "{$dir}/{$token}.{$extension}";
+        Storage::put($source, file_get_contents($file->getRealPath()));
+
+        Storage::put("{$dir}/{$token}.json", json_encode([
+            'source' => $source,
+            'original_name' => $file->getClientOriginalName(),
+            'errors' => $errors,
+        ]));
+
+        return $token;
     }
 
     public function show(Employee $employee): View

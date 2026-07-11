@@ -107,6 +107,9 @@ Route::middleware('auth')->group(function () {
         Route::post('import', [EmployeeManagementController::class, 'import'])
             ->middleware('permission:employees.create')
             ->name('import');
+        Route::get('import/errors/{token}', [EmployeeManagementController::class, 'importErrors'])
+            ->middleware('permission:employees.create')
+            ->name('import.errors');
         Route::get('export', [EmployeeManagementController::class, 'export'])
             ->middleware('permission:employees.view')
             ->name('export');
