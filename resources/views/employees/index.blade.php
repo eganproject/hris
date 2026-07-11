@@ -141,28 +141,35 @@
                 <p class="mt-1 text-sm text-gray-500">Informasi lokasi, posisi, status aktif, dan kontrak berjalan.</p>
             </div>
 
-            @can('employees.update')
+            @canany(['employees.update', 'employees.delete'])
                 <div data-bulk-bar hidden class="flex flex-col gap-3 border-b border-primary/20 bg-primary-soft px-5 py-3 sm:flex-row sm:items-center sm:justify-between">
                     <p class="text-sm font-medium text-gray-800"><span data-bulk-count>0</span> karyawan dipilih</p>
                     <div class="flex flex-wrap items-center gap-2">
-                        <button type="button" data-bulk-open="renew" class="inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-2 text-sm font-semibold text-white shadow-xs transition hover:bg-primary-hover">
-                            <x-icon name="refresh" class="size-4"/> Perpanjang Kontrak
-                        </button>
-                        <button type="button" data-bulk-open="exit" class="inline-flex items-center gap-1.5 rounded-md border border-red-200 bg-white px-3 py-2 text-sm font-semibold text-red-700 transition hover:bg-red-50">
-                            <x-icon name="user-x" class="size-4"/> Proses Keluar
-                        </button>
+                        @can('employees.update')
+                            <button type="button" data-bulk-open="renew" class="inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-2 text-sm font-semibold text-white shadow-xs transition hover:bg-primary-hover">
+                                <x-icon name="refresh" class="size-4"/> Perpanjang Kontrak
+                            </button>
+                            <button type="button" data-bulk-open="exit" class="inline-flex items-center gap-1.5 rounded-md border border-red-200 bg-white px-3 py-2 text-sm font-semibold text-red-700 transition hover:bg-red-50">
+                                <x-icon name="user-x" class="size-4"/> Proses Keluar
+                            </button>
+                        @endcan
+                        @can('employees.delete')
+                            <button type="button" data-bulk-delete class="inline-flex items-center gap-1.5 rounded-md border border-red-200 bg-white px-3 py-2 text-sm font-semibold text-red-700 transition hover:bg-red-50">
+                                <x-icon name="trash" class="size-4"/> Hapus
+                            </button>
+                        @endcan
                         <button type="button" data-bulk-clear class="rounded-md border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-gray-600 transition hover:bg-gray-50">Batalkan</button>
                     </div>
                 </div>
-            @endcan
+            @endcanany
 
             <div class="overflow-x-auto">
                 <table class="data-table">
                     <thead>
                         <tr>
-                            @can('employees.update')
+                            @canany(['employees.update', 'employees.delete'])
                                 <th class="w-10"><input type="checkbox" data-bulk-all aria-label="Pilih semua" class="size-4 rounded border-gray-300 text-primary focus:ring-primary/30"></th>
-                            @endcan
+                            @endcanany
                             <th>Karyawan</th>
                             <th>Lokasi</th>
                             <th>Jabatan</th>
@@ -174,11 +181,11 @@
                     <tbody>
                         @forelse ($employees as $employee)
                             <tr data-employee-row>
-                                @can('employees.update')
+                                @canany(['employees.update', 'employees.delete'])
                                     <td class="w-10">
-                                        <input type="checkbox" data-bulk-checkbox value="{{ $employee->id }}" data-name="{{ $employee->full_name }}" data-inactive="{{ $employee->isInactive() ? '1' : '0' }}" aria-label="Pilih {{ $employee->full_name }}" class="size-4 rounded border-gray-300 text-primary focus:ring-primary/30">
+                                        <input type="checkbox" data-bulk-checkbox value="{{ $employee->id }}" data-name="{{ $employee->full_name }}" data-number="{{ $employee->employee_number }}" data-inactive="{{ $employee->isInactive() ? '1' : '0' }}" aria-label="Pilih {{ $employee->full_name }}" class="size-4 rounded border-gray-300 text-primary focus:ring-primary/30">
                                     </td>
-                                @endcan
+                                @endcanany
                                 <td>
                                     <div class="flex items-center gap-3">
                                         @if ($employee->photo_url)
@@ -257,7 +264,7 @@
                             </tr>
                         @empty
                             <tr>
-                                <td colspan="{{ auth()->user()?->can('employees.update') ? 7 : 6 }}" class="cell-empty">Belum ada data karyawan.</td>
+                                <td colspan="{{ auth()->user()?->canAny(['employees.update', 'employees.delete']) ? 7 : 6 }}" class="cell-empty">Belum ada data karyawan.</td>
                             </tr>
                         @endforelse
                     </tbody>
@@ -361,80 +368,110 @@
                 </div>
             </div>
 
-            {{-- Bulk: Perpanjang Kontrak untuk baris terpilih --}}
-            <div data-bulk-modal="renew" hidden class="fixed inset-0 z-50 flex items-center justify-center bg-gray-950/50 p-4">
-                <div class="w-full max-w-md rounded-lg border border-gray-200 bg-white p-6 shadow-xl" role="dialog" aria-modal="true">
-                    <h2 class="text-base font-semibold text-gray-950">Perpanjang Kontrak Massal</h2>
-                    <p class="mt-1 text-sm text-gray-500"><span data-bulk-modal-count>0</span> karyawan terpilih. Kontrak baru dibuat aktif; kontrak lama ditandai “Diperpanjang”. Karyawan yang sudah keluar akan diaktifkan kembali.</p>
-                    <form method="POST" action="{{ route('employees.bulk.renew') }}" data-no-confirm="true" class="mt-5 space-y-4">
-                        @csrf
-                        <div data-bulk-ids></div>
-                        <div>
-                            <label for="bulk_renew_pattern" class="block text-sm font-medium text-gray-700">Pola Nomor Kontrak <span class="field-requirement is-required" aria-label="Wajib diisi">*</span></label>
-                            <input id="bulk_renew_pattern" name="contract_number_pattern" value="{{ old('contract_number_pattern', 'KTR-{tahun}-{nik}') }}" required class="mt-2 block w-full rounded-md border border-gray-300 px-3 py-2.5 text-sm shadow-xs outline-none focus:border-primary focus:ring-2 focus:ring-primary/20">
-                            <p class="mt-1.5 text-xs text-gray-500">Token: <code class="rounded bg-gray-100 px-1 py-0.5 text-[11px]">{nik}</code> (nomor karyawan, wajib), <code class="rounded bg-gray-100 px-1 py-0.5 text-[11px]">{tahun}</code>, <code class="rounded bg-gray-100 px-1 py-0.5 text-[11px]">{bulan}</code>. Nomor dibuat unik per karyawan.</p>
-                        </div>
-                        <div>
-                            <label for="bulk_renew_type" class="block text-sm font-medium text-gray-700">Jenis Kontrak <span class="field-requirement is-required" aria-label="Wajib diisi">*</span></label>
-                            <select id="bulk_renew_type" name="contract_type" required data-contract-type-toggle="#bulk_renew_end" class="mt-2 block w-full rounded-md border border-gray-300 px-3 py-2.5 text-sm shadow-xs outline-none focus:border-primary focus:ring-2 focus:ring-primary/20">
-                                @foreach ($contractTypes as $type)
-                                    <option value="{{ $type }}" @selected(old('contract_type', 'PKWT') === $type)>{{ $type }}</option>
-                                @endforeach
-                            </select>
-                        </div>
-                        <div class="grid grid-cols-2 gap-3">
-                            <div>
-                                <label for="bulk_renew_start" class="block text-sm font-medium text-gray-700">Mulai <span class="field-requirement is-required" aria-label="Wajib diisi">*</span></label>
-                                <input id="bulk_renew_start" name="start_date" type="date" value="{{ old('start_date', now()->format('Y-m-d')) }}" required class="mt-2 block w-full rounded-md border border-gray-300 px-3 py-2.5 text-sm shadow-xs outline-none focus:border-primary focus:ring-2 focus:ring-primary/20">
-                            </div>
-                            <div>
-                                <label for="bulk_renew_end" class="block text-sm font-medium text-gray-700">Selesai</label>
-                                <input id="bulk_renew_end" name="end_date" type="date" value="{{ old('end_date') }}" class="mt-2 block w-full rounded-md border border-gray-300 px-3 py-2.5 text-sm shadow-xs outline-none focus:border-primary focus:ring-2 focus:ring-primary/20">
-                            </div>
-                        </div>
-                        <div>
-                            <label for="bulk_renew_notes" class="block text-sm font-medium text-gray-700">Catatan</label>
-                            <textarea id="bulk_renew_notes" name="notes" rows="2" class="mt-2 block w-full rounded-md border border-gray-300 px-3 py-2.5 text-sm shadow-xs outline-none focus:border-primary focus:ring-2 focus:ring-primary/20">{{ old('notes') }}</textarea>
-                        </div>
-                        <div class="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-                            <button type="button" data-bulk-modal-close class="rounded-md border border-gray-200 px-4 py-2.5 text-sm font-medium text-gray-700 transition hover:bg-gray-50">Batal</button>
-                            <button type="submit" class="rounded-md bg-primary px-4 py-2.5 text-sm font-semibold text-white shadow-xs transition hover:bg-primary-hover">Perpanjang Kontrak</button>
-                        </div>
-                    </form>
-                </div>
-            </div>
+        @endcan
 
-            {{-- Bulk: Proses Keluar untuk baris terpilih --}}
-            <div data-bulk-modal="exit" hidden class="fixed inset-0 z-50 flex items-center justify-center bg-gray-950/50 p-4">
-                <div class="w-full max-w-md rounded-lg border border-gray-200 bg-white p-6 shadow-xl" role="dialog" aria-modal="true">
-                    <h2 class="text-base font-semibold text-gray-950">Proses Keluar Massal</h2>
-                    <p class="mt-1 text-sm text-gray-500"><span data-bulk-modal-count>0</span> karyawan terpilih. Semua akan dinonaktifkan &amp; akun login dimatikan. Karyawan yang sudah keluar akan dilewati.</p>
-                    <form method="POST" action="{{ route('employees.bulk.exit') }}" data-no-confirm="true" class="mt-5 space-y-4">
-                        @csrf
-                        <div data-bulk-ids></div>
-                        <div>
-                            <label for="bulk_exit_reason" class="block text-sm font-medium text-gray-700">Alasan Keluar <span class="field-requirement is-required" aria-label="Wajib diisi">*</span></label>
-                            <select id="bulk_exit_reason" name="exit_reason" required class="mt-2 block w-full rounded-md border border-gray-300 px-3 py-2.5 text-sm shadow-xs outline-none focus:border-primary focus:ring-2 focus:ring-primary/20">
-                                @foreach ($exitReasons as $reason => $label)
-                                    <option value="{{ $reason }}" @selected(old('exit_reason', 'resigned') === $reason)>{{ $label }}</option>
-                                @endforeach
-                            </select>
+        @canany(['employees.update', 'employees.delete'])
+            @can('employees.update')
+                {{-- Wizard: Perpanjang Kontrak, satu per satu per karyawan terpilih --}}
+                <div data-bulk-modal="renew" hidden class="fixed inset-0 z-50 flex items-center justify-center bg-gray-950/50 p-4">
+                    <div class="w-full max-w-md rounded-lg border border-gray-200 bg-white p-6 shadow-xl" role="dialog" aria-modal="true">
+                        <div class="flex items-start justify-between gap-3">
+                            <h2 class="text-base font-semibold text-gray-950">Perpanjang Kontrak</h2>
+                            <span data-bulk-step class="shrink-0 rounded-full bg-primary-soft px-2.5 py-0.5 text-xs font-medium text-gray-700"></span>
                         </div>
-                        <div>
-                            <label for="bulk_exit_date" class="block text-sm font-medium text-gray-700">Tanggal Keluar <span class="field-requirement is-required" aria-label="Wajib diisi">*</span></label>
-                            <input id="bulk_exit_date" name="exit_date" type="date" value="{{ old('exit_date', now()->format('Y-m-d')) }}" required class="mt-2 block w-full rounded-md border border-gray-300 px-3 py-2.5 text-sm shadow-xs outline-none focus:border-primary focus:ring-2 focus:ring-primary/20">
-                        </div>
-                        <div>
-                            <label for="bulk_exit_notes" class="block text-sm font-medium text-gray-700">Catatan Keluar</label>
-                            <textarea id="bulk_exit_notes" name="exit_notes" rows="2" class="mt-2 block w-full rounded-md border border-gray-300 px-3 py-2.5 text-sm shadow-xs outline-none focus:border-primary focus:ring-2 focus:ring-primary/20">{{ old('exit_notes') }}</textarea>
-                        </div>
-                        <div class="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-                            <button type="button" data-bulk-modal-close class="rounded-md border border-gray-200 px-4 py-2.5 text-sm font-medium text-gray-700 transition hover:bg-gray-50">Batal</button>
-                            <button type="submit" class="rounded-md border border-red-200 bg-red-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-red-700">Proses Keluar</button>
-                        </div>
-                    </form>
+                        <p class="mt-1 text-sm text-gray-500">Isi kontrak baru untuk <span data-bulk-emp class="font-medium text-gray-800"></span>. Kontrak lama ditandai “Diperpanjang”; karyawan yang sudah keluar akan diaktifkan kembali.</p>
+                        <form method="POST" action="{{ route('employees.bulk.renew') }}" data-no-confirm="true" data-bulk-form class="mt-5 space-y-4">
+                            @csrf
+                            <div data-bulk-entries></div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700">Nomor Kontrak <span class="field-requirement is-required" aria-label="Wajib diisi">*</span></label>
+                                <input type="text" data-field="contract_number" required maxlength="100" class="mt-2 block w-full rounded-md border border-gray-300 px-3 py-2.5 text-sm shadow-xs outline-none focus:border-primary focus:ring-2 focus:ring-primary/20">
+                                <p class="mt-1 text-xs text-gray-400">Harus unik untuk tiap karyawan.</p>
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700">Jenis Kontrak <span class="field-requirement is-required" aria-label="Wajib diisi">*</span></label>
+                                <select data-field="contract_type" required class="mt-2 block w-full rounded-md border border-gray-300 px-3 py-2.5 text-sm shadow-xs outline-none focus:border-primary focus:ring-2 focus:ring-primary/20">
+                                    @foreach ($contractTypes as $type)
+                                        <option value="{{ $type }}">{{ $type }}</option>
+                                    @endforeach
+                                </select>
+                            </div>
+                            <div class="grid grid-cols-2 gap-3">
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700">Mulai <span class="field-requirement is-required" aria-label="Wajib diisi">*</span></label>
+                                    <input type="date" data-field="start_date" required class="mt-2 block w-full rounded-md border border-gray-300 px-3 py-2.5 text-sm shadow-xs outline-none focus:border-primary focus:ring-2 focus:ring-primary/20">
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700">Selesai</label>
+                                    <input type="date" data-field="end_date" class="mt-2 block w-full rounded-md border border-gray-300 px-3 py-2.5 text-sm shadow-xs outline-none focus:border-primary focus:ring-2 focus:ring-primary/20">
+                                </div>
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700">Catatan</label>
+                                <textarea data-field="notes" rows="2" class="mt-2 block w-full rounded-md border border-gray-300 px-3 py-2.5 text-sm shadow-xs outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"></textarea>
+                            </div>
+                            <div class="flex flex-col-reverse gap-2 pt-1 sm:flex-row sm:items-center sm:justify-between">
+                                <div class="flex gap-2">
+                                    <button type="button" data-bulk-cancel class="rounded-md border border-gray-200 px-4 py-2.5 text-sm font-medium text-gray-700 transition hover:bg-gray-50">Batal</button>
+                                    <button type="button" data-bulk-skip class="rounded-md px-3 py-2.5 text-sm font-medium text-gray-500 transition hover:bg-gray-50">Lewati</button>
+                                </div>
+                                <div class="flex gap-2">
+                                    <button type="button" data-bulk-prev hidden class="rounded-md border border-gray-200 px-4 py-2.5 text-sm font-medium text-gray-700 transition hover:bg-gray-50">Sebelumnya</button>
+                                    <button type="button" data-bulk-next class="rounded-md bg-primary px-4 py-2.5 text-sm font-semibold text-white shadow-xs transition hover:bg-primary-hover">Berikutnya</button>
+                                </div>
+                            </div>
+                        </form>
+                    </div>
                 </div>
-            </div>
+
+                {{-- Wizard: Proses Keluar, satu per satu per karyawan terpilih --}}
+                <div data-bulk-modal="exit" hidden class="fixed inset-0 z-50 flex items-center justify-center bg-gray-950/50 p-4">
+                    <div class="w-full max-w-md rounded-lg border border-gray-200 bg-white p-6 shadow-xl" role="dialog" aria-modal="true">
+                        <div class="flex items-start justify-between gap-3">
+                            <h2 class="text-base font-semibold text-gray-950">Proses Keluar</h2>
+                            <span data-bulk-step class="shrink-0 rounded-full bg-primary-soft px-2.5 py-0.5 text-xs font-medium text-gray-700"></span>
+                        </div>
+                        <p class="mt-1 text-sm text-gray-500">Isi data keluar untuk <span data-bulk-emp class="font-medium text-gray-800"></span>. Karyawan dinonaktifkan &amp; akun login dimatikan; yang sudah keluar akan dilewati.</p>
+                        <form method="POST" action="{{ route('employees.bulk.exit') }}" data-no-confirm="true" data-bulk-form class="mt-5 space-y-4">
+                            @csrf
+                            <div data-bulk-entries></div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700">Alasan Keluar <span class="field-requirement is-required" aria-label="Wajib diisi">*</span></label>
+                                <select data-field="exit_reason" required class="mt-2 block w-full rounded-md border border-gray-300 px-3 py-2.5 text-sm shadow-xs outline-none focus:border-primary focus:ring-2 focus:ring-primary/20">
+                                    @foreach ($exitReasons as $reason => $label)
+                                        <option value="{{ $reason }}">{{ $label }}</option>
+                                    @endforeach
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700">Tanggal Keluar <span class="field-requirement is-required" aria-label="Wajib diisi">*</span></label>
+                                <input type="date" data-field="exit_date" required class="mt-2 block w-full rounded-md border border-gray-300 px-3 py-2.5 text-sm shadow-xs outline-none focus:border-primary focus:ring-2 focus:ring-primary/20">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700">Catatan Keluar</label>
+                                <textarea data-field="exit_notes" rows="2" class="mt-2 block w-full rounded-md border border-gray-300 px-3 py-2.5 text-sm shadow-xs outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"></textarea>
+                            </div>
+                            <div class="flex flex-col-reverse gap-2 pt-1 sm:flex-row sm:items-center sm:justify-between">
+                                <div class="flex gap-2">
+                                    <button type="button" data-bulk-cancel class="rounded-md border border-gray-200 px-4 py-2.5 text-sm font-medium text-gray-700 transition hover:bg-gray-50">Batal</button>
+                                    <button type="button" data-bulk-skip class="rounded-md px-3 py-2.5 text-sm font-medium text-gray-500 transition hover:bg-gray-50">Lewati</button>
+                                </div>
+                                <div class="flex gap-2">
+                                    <button type="button" data-bulk-prev hidden class="rounded-md border border-gray-200 px-4 py-2.5 text-sm font-medium text-gray-700 transition hover:bg-gray-50">Sebelumnya</button>
+                                    <button type="button" data-bulk-next class="rounded-md border border-red-200 bg-red-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-red-700">Berikutnya</button>
+                                </div>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            @endcan
+
+            @can('employees.delete')
+                <form data-bulk-delete-form method="POST" action="{{ route('employees.bulk.destroy') }}" data-no-confirm="true" class="hidden">
+                    @csrf
+                    <div data-bulk-ids></div>
+                </form>
+            @endcan
 
             @push('scripts')
             <script>
@@ -465,47 +502,141 @@
                         sync();
                     });
 
-                    const modals = {
-                        renew: document.querySelector('[data-bulk-modal="renew"]'),
-                        exit: document.querySelector('[data-bulk-modal="exit"]'),
-                    };
-
-                    const openBulk = (key) => {
-                        const modal = modals[key];
+                    // ---- Bulk delete ----
+                    const deleteForm = document.querySelector('[data-bulk-delete-form]');
+                    document.querySelector('[data-bulk-delete]')?.addEventListener('click', () => {
                         const ids = checked().map((b) => b.value);
-                        if (!modal || ids.length === 0) return;
-
-                        const holder = modal.querySelector('[data-bulk-ids]');
+                        if (!ids.length || !deleteForm) return;
+                        if (!window.confirm('Hapus ' + ids.length + ' karyawan terpilih? Tindakan ini tidak dapat dibatalkan.')) return;
+                        const holder = deleteForm.querySelector('[data-bulk-ids]');
                         holder.innerHTML = '';
                         ids.forEach((id) => {
                             const input = document.createElement('input');
-                            input.type = 'hidden';
-                            input.name = 'employee_ids[]';
-                            input.value = id;
+                            input.type = 'hidden'; input.name = 'employee_ids[]'; input.value = id;
                             holder.appendChild(input);
                         });
-                        modal.querySelectorAll('[data-bulk-modal-count]').forEach((el) => el.textContent = ids.length);
-                        modal.hidden = false;
+                        deleteForm.submit();
+                    });
+
+                    // ---- Sequential per-employee wizards (exit & renew) ----
+                    const FIELDS = {
+                        exit: ['exit_reason', 'exit_date', 'exit_notes'],
+                        renew: ['contract_number', 'contract_type', 'start_date', 'end_date', 'notes'],
+                    };
+                    const today = new Date().toISOString().slice(0, 10);
+                    const defaultsFor = (action, box) => action === 'exit'
+                        ? { exit_reason: 'resigned', exit_date: today, exit_notes: '' }
+                        : {
+                            contract_number: box && box.dataset.number ? ('KTR-' + new Date().getFullYear() + '-' + box.dataset.number) : '',
+                            contract_type: 'PKWT', start_date: today, end_date: '', notes: '',
+                        };
+
+                    const makeWizard = (action) => {
+                        const modal = document.querySelector('[data-bulk-modal="' + action + '"]');
+                        if (!modal) return null;
+                        const form = modal.querySelector('[data-bulk-form]');
+                        const fieldEl = (name) => modal.querySelector('[data-field="' + name + '"]');
+                        const stepEl = modal.querySelector('[data-bulk-step]');
+                        const empEl = modal.querySelector('[data-bulk-emp]');
+                        const prevBtn = modal.querySelector('[data-bulk-prev]');
+                        const nextBtn = modal.querySelector('[data-bulk-next]');
+                        let queue = [], idx = 0, collected = {};
+
+                        const syncEnd = () => {
+                            if (action !== 'renew') return;
+                            const end = fieldEl('end_date');
+                            end.required = fieldEl('contract_type').value !== 'PKWTT';
+                        };
+                        const readCurrent = () => {
+                            const o = {};
+                            FIELDS[action].forEach((f) => { const el = fieldEl(f); if (el) o[f] = el.value; });
+                            return o;
+                        };
+                        const writeFields = (vals) => {
+                            FIELDS[action].forEach((f) => { const el = fieldEl(f); if (el) el.value = vals[f] ?? ''; });
+                            syncEnd();
+                        };
+                        const render = () => {
+                            const cur = queue[idx];
+                            stepEl.textContent = 'Karyawan ' + (idx + 1) + ' dari ' + queue.length;
+                            empEl.textContent = cur.name;
+                            writeFields(collected[cur.id] ?? defaultsFor(action, cur.box));
+                            prevBtn.hidden = idx === 0;
+                            nextBtn.textContent = idx === queue.length - 1 ? 'Proses' : 'Berikutnya';
+                        };
+                        const validateCurrent = () => {
+                            syncEnd();
+                            for (const f of FIELDS[action]) {
+                                const el = fieldEl(f);
+                                if (el && !el.checkValidity()) { el.reportValidity(); return false; }
+                            }
+                            return true;
+                        };
+                        const finish = () => {
+                            const holder = form.querySelector('[data-bulk-entries]');
+                            holder.innerHTML = '';
+                            const ids = Object.keys(collected);
+                            if (!ids.length) { modal.hidden = true; return; }
+                            ids.forEach((id, i) => {
+                                const add = (name, val) => {
+                                    const inp = document.createElement('input');
+                                    inp.type = 'hidden';
+                                    inp.name = 'entries[' + i + '][' + name + ']';
+                                    inp.value = val ?? '';
+                                    holder.appendChild(inp);
+                                };
+                                add('employee_id', id);
+                                FIELDS[action].forEach((f) => add(f, collected[id][f]));
+                            });
+                            // Each collected entry was already validated per step; submit()
+                            // (vs requestSubmit) avoids re-validating the leftover visible fields.
+                            form.submit();
+                        };
+                        const next = () => {
+                            if (!validateCurrent()) return;
+                            collected[queue[idx].id] = readCurrent();
+                            if (idx < queue.length - 1) { idx++; render(); } else { finish(); }
+                        };
+                        const prev = () => {
+                            collected[queue[idx].id] = readCurrent();
+                            if (idx > 0) { idx--; render(); }
+                        };
+                        const skip = () => {
+                            delete collected[queue[idx].id];
+                            if (idx < queue.length - 1) { idx++; render(); } else { finish(); }
+                        };
+
+                        nextBtn.addEventListener('click', next);
+                        prevBtn.addEventListener('click', prev);
+                        modal.querySelector('[data-bulk-skip]')?.addEventListener('click', skip);
+                        modal.querySelector('[data-bulk-cancel]')?.addEventListener('click', () => { modal.hidden = true; });
+                        modal.addEventListener('click', (e) => { if (e.target === modal) modal.hidden = true; });
+                        if (action === 'renew') fieldEl('contract_type').addEventListener('change', syncEnd);
+
+                        return {
+                            start() {
+                                queue = checked().map((b) => ({ id: b.value, name: b.dataset.name, box: b }));
+                                if (!queue.length) return;
+                                idx = 0; collected = {};
+                                render();
+                                modal.hidden = false;
+                            },
+                        };
                     };
 
+                    const wizards = { renew: makeWizard('renew'), exit: makeWizard('exit') };
                     document.querySelectorAll('[data-bulk-open]').forEach((btn) => {
-                        btn.addEventListener('click', () => openBulk(btn.dataset.bulkOpen));
-                    });
-
-                    Object.values(modals).forEach((modal) => {
-                        if (!modal) return;
-                        modal.addEventListener('click', (e) => { if (e.target === modal) modal.hidden = true; });
-                        modal.querySelectorAll('[data-bulk-modal-close]').forEach((b) => b.addEventListener('click', () => { modal.hidden = true; }));
+                        btn.addEventListener('click', () => wizards[btn.dataset.bulkOpen]?.start());
                     });
                     document.addEventListener('keydown', (e) => {
-                        if (e.key === 'Escape') Object.values(modals).forEach((m) => { if (m) m.hidden = true; });
+                        if (e.key === 'Escape') document.querySelectorAll('[data-bulk-modal]').forEach((m) => { m.hidden = true; });
                     });
 
                     sync();
                 })();
             </script>
             @endpush
-        @endcan
+        @endcanany
 
         @can('employees.create')
             @php $importErrors = session('import_errors', []); @endphp

@@ -1,16 +1,16 @@
 @php
     $contract = old('contract_number') ? null : ($employee->currentContract ?? null);
-    $exitActive = $employee->exists && ! $employee->isInactive();
+    // Selecting "Nonaktif" runs the exit flow; that is possible whenever the employee
+    // is not already inactive (a new employee, or an active one being edited).
+    $canExit = ! ($employee->exists && $employee->isInactive());
     $exitModalOpen = $errors->hasAny(['exit_reason', 'exit_date', 'exit_notes']);
 @endphp
 
 <div class="space-y-4" data-employee-stepper data-placement-form data-placement-catalog='@json($placementCatalog)'
     data-exit-form
-    data-exit-active="{{ $exitActive ? 'true' : 'false' }}"
+    data-exit-active="{{ $canExit ? 'true' : 'false' }}"
     data-exit-open="{{ $exitModalOpen ? 'true' : 'false' }}"
-    data-exit-closing-statuses='@json($closingContractStatuses ?? [])'
-    data-reactivate-active="{{ $employee->exists && $employee->isInactive() ? 'true' : 'false' }}"
-    data-reactivate-closing-statuses='@json($closingContractStatuses ?? [])'>
+    data-reactivate-active="{{ $employee->exists && $employee->isInactive() ? 'true' : 'false' }}">
     <section class="rounded-lg border border-gray-200 bg-white p-3 shadow-sm">
         <div class="grid grid-cols-2 gap-2 lg:grid-cols-5" role="tablist" aria-label="Tahapan form karyawan">
             <button type="button" role="tab" data-stepper-button="0" class="rounded-md px-3 py-2 text-left text-sm font-semibold text-gray-600 transition hover:bg-gray-50">
@@ -97,21 +97,13 @@
                 @error('join_date')<p class="mt-2 text-sm text-red-600">{{ $message }}</p>@enderror
             </div>
             <div>
-                <label for="employment_status" class="block text-sm font-medium text-gray-700">Status Kepegawaian @unless ($employee->isInactive())<span class="field-requirement is-required" aria-label="Wajib diisi">*</span>@endunless</label>
-                @if ($employee->isInactive())
-                    {{-- Karyawan sudah keluar. Reaktivasi dilakukan dengan mengisi kontrak baru pada tab "Kontrak" dan menyimpan (status kontrak Aktif/Diperpanjang), atau lewat "Aktifkan Kembali" di halaman detail. --}}
-                    <input type="hidden" name="employment_status" value="inactive">
-                    <div class="mt-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2.5 text-sm text-amber-800">
-                        <span class="font-medium">Sudah Keluar.</span> Untuk mengaktifkan kembali, isi kontrak baru di tab <span class="font-medium">Kontrak</span> (status kontrak Aktif/Diperpanjang) lalu simpan.
-                    </div>
-                @else
-                    <select id="employment_status" name="employment_status" required class="mt-2 block w-full rounded-md border border-gray-300 px-3 py-2.5 text-sm shadow-xs outline-none focus:border-primary focus:ring-2 focus:ring-primary/20">
-                        @foreach ($statuses as $status => $label)
-                            <option value="{{ $status }}" @selected(old('employment_status', $employee->employment_status ?: 'active') === $status)>{{ $label }}</option>
-                        @endforeach
-                    </select>
-                    <p class="mt-2 text-xs text-gray-500">Untuk memproses karyawan berhenti/keluar, gunakan tombol "Proses Karyawan Keluar" di halaman detail.</p>
-                @endif
+                <label for="employment_status" class="block text-sm font-medium text-gray-700">Status Kepegawaian <span class="field-requirement is-required" aria-label="Wajib diisi">*</span></label>
+                <select id="employment_status" name="employment_status" required class="mt-2 block w-full rounded-md border border-gray-300 px-3 py-2.5 text-sm shadow-xs outline-none focus:border-primary focus:ring-2 focus:ring-primary/20">
+                    @foreach ($statuses as $status => $label)
+                        <option value="{{ $status }}" @selected(old('employment_status', $employee->employment_status ?: 'active') === $status)>{{ $label }}</option>
+                    @endforeach
+                </select>
+                <p class="mt-2 text-xs text-gray-500">Pilih <span class="font-medium">Nonaktif</span> untuk memproses karyawan keluar — Anda akan diminta mengisi alasan &amp; tanggal keluar saat menyimpan. Pilih <span class="font-medium">Aktif</span> pada karyawan yang sudah keluar untuk mengaktifkannya kembali.</p>
                 @error('employment_status')<p class="mt-2 text-sm text-red-600">{{ $message }}</p>@enderror
             </div>
             <div class="md:col-span-2">
@@ -356,12 +348,12 @@
         </div>
     </section>
 
-    @if ($exitActive)
-        {{-- Verifikasi keluar: muncul saat status kontrak diubah menjadi tidak aktif (Selesai/Diakhiri/Kedaluwarsa/Dibatalkan) lalu disimpan. --}}
+    @if ($canExit)
+        {{-- Verifikasi keluar: muncul saat Status Kepegawaian diubah menjadi "Nonaktif" lalu disimpan. --}}
         <div data-exit-modal @unless ($exitModalOpen) hidden @endunless class="fixed inset-0 z-50 flex items-center justify-center bg-gray-950/50 p-4">
             <div class="w-full max-w-md rounded-lg border border-gray-200 bg-white p-6 shadow-xl" role="dialog" aria-modal="true" aria-labelledby="exit-modal-title">
                 <h2 id="exit-modal-title" class="text-base font-semibold text-gray-950">Proses Karyawan Keluar</h2>
-                <p class="mt-1 text-sm text-gray-500">Status kontrak diubah menjadi tidak aktif, sehingga karyawan akan dinonaktifkan. Lengkapi data berikut untuk memproses status keluar.</p>
+                <p class="mt-1 text-sm text-gray-500">Status kepegawaian diubah menjadi <span class="font-medium">Nonaktif</span>, sehingga karyawan akan dinonaktifkan. Lengkapi data berikut untuk memproses status keluar.</p>
 
                 <div class="mt-5 space-y-4">
                     <div>

@@ -27,12 +27,12 @@ class EmployeeRequest extends FormRequest
         $userId = $employee?->user_id;
         $requiresLoginPassword = $this->isMethod('post') && $this->filled('email') && ! $userId;
 
-        // When an active employee's contract is closed during edit, the exit details
-        // (reason & date) become required so the exit can be processed inline.
-        $isClosingExit = $this->isMethod('put')
-            && $employee && ! $employee->isInactive()
-            && in_array($this->input('contract_status'), EmployeeContract::closingStatuses(), true);
-        $exitJoinDate = $employee?->join_date?->format('Y-m-d');
+        // Setting the status to "Nonaktif" (from a not-already-inactive state, or on
+        // a brand-new employee) triggers the exit flow, so the reason & date become
+        // required and are processed together with the save.
+        $isClosingExit = $this->input('employment_status') === 'inactive'
+            && (! $employee || ! $employee->isInactive());
+        $exitJoinDate = $employee?->join_date?->format('Y-m-d') ?: $this->input('join_date');
 
         return [
             'branch_id' => ['required', 'integer', 'exists:branches,id'],

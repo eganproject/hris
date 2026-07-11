@@ -61,7 +61,7 @@ class EmployeesImport implements SkipsEmptyRows, ToCollection, WithHeadingRow
             ['key' => 'nik', 'header' => 'NIK', 'required' => false, 'example' => '3201xxxxxxxxxxxx', 'desc' => 'Nomor identitas (KTP). Opsional.'],
             ['key' => 'tanggal_lahir', 'header' => 'Tanggal Lahir', 'required' => false, 'example' => '1995-04-17', 'desc' => 'Format YYYY-MM-DD. Opsional, harus sebelum hari ini.'],
             ['key' => 'tanggal_bergabung', 'header' => 'Tanggal Bergabung', 'required' => true, 'example' => '2024-01-05', 'desc' => 'Format YYYY-MM-DD. Wajib.'],
-            ['key' => 'status_kepegawaian', 'header' => 'Status Kepegawaian', 'required' => true, 'example' => 'Aktif', 'desc' => 'Salah satu: Aktif, Probation, Skorsing.'],
+            ['key' => 'status_kepegawaian', 'header' => 'Status Kepegawaian', 'required' => true, 'example' => 'Aktif', 'desc' => 'Salah satu: Aktif, Nonaktif. Umumnya "Aktif" untuk karyawan baru.'],
             ['key' => 'alamat', 'header' => 'Alamat', 'required' => false, 'example' => 'Jl. Melati No. 1', 'desc' => 'Opsional.'],
             ['key' => 'lokasi_kerja', 'header' => 'Lokasi Kerja', 'required' => true, 'example' => 'Kantor Pusat', 'desc' => 'Nama lokasi/cabang; harus sudah terdaftar dan aktif.'],
             ['key' => 'divisi', 'header' => 'Divisi', 'required' => true, 'example' => 'Operasional', 'desc' => 'Nama divisi; harus tersedia pada lokasi kerja tersebut.'],
@@ -248,7 +248,7 @@ class EmployeesImport implements SkipsEmptyRows, ToCollection, WithHeadingRow
 
         $employmentStatus = $this->normalizeEmploymentStatus($get('status_kepegawaian'));
         if ($employmentStatus === null) {
-            $add('Status Kepegawaian harus salah satu dari: Aktif, Probation, Skorsing.', 'Status Kepegawaian');
+            $add('Status Kepegawaian harus salah satu dari: Aktif, Nonaktif.', 'Status Kepegawaian');
         }
 
         if ($contractType !== '' && ! in_array($contractType, ['PKWT', 'PKWTT', 'Probation', 'Internship'], true)) {
@@ -535,8 +535,9 @@ class EmployeesImport implements SkipsEmptyRows, ToCollection, WithHeadingRow
     {
         return match (strtolower(trim($value))) {
             'aktif', 'active' => 'active',
-            'probation' => 'probation',
-            'skorsing', 'suspended', 'skorsing / ditangguhkan' => 'suspended',
+            'nonaktif', 'non-aktif', 'inactive', 'tidak aktif' => 'inactive',
+            // Legacy values from older templates fold into "Aktif".
+            'probation', 'skorsing', 'suspended', 'skorsing / ditangguhkan' => 'active',
             default => null,
         };
     }

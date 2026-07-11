@@ -34,22 +34,13 @@ class Employee extends Model
     'address',
     ];
 
+    /**
+     * Employment status is binary: a person either works here (Aktif) or has left
+     * (Nonaktif). Choosing Nonaktif on the form runs the exit flow (reason + date).
+     */
     public const EMPLOYMENT_STATUS_LABELS = [
         'active' => 'Aktif',
-        'probation' => 'Probation',
-        'suspended' => 'Skorsing / Ditangguhkan',
-        'inactive' => 'Tidak Aktif / Sudah Tidak Bekerja',
-    ];
-
-    /**
-     * Statuses that describe an employee who is still working. "inactive" (exited)
-     * is intentionally excluded: it may only be reached through the dedicated
-     * "Karyawan Keluar" flow, which captures the exit reason and date.
-     */
-    public const WORK_STATUS_LABELS = [
-        'active' => 'Aktif',
-        'probation' => 'Probation',
-        'suspended' => 'Skorsing / Ditangguhkan',
+        'inactive' => 'Nonaktif',
     ];
 
     public const EXIT_REASON_LABELS = [
@@ -336,9 +327,7 @@ class Employee extends Model
     {
         return match ($this->employment_status) {
             'active' => 'Aktif',
-            'probation' => 'Probation',
-            'suspended' => 'Skorsing',
-            'inactive' => 'Sudah Keluar',
+            'inactive' => 'Nonaktif',
             default => $this->employment_status_label,
         };
     }
@@ -347,8 +336,6 @@ class Employee extends Model
     {
         return match ($this->employment_status) {
             'active' => 'success',
-            'probation' => 'warning',
-            'suspended' => 'neutral',
             'inactive' => 'danger',
             default => 'neutral',
         };
@@ -370,14 +357,6 @@ class Employee extends Model
     public static function employmentStatusLabels(): array
     {
         return self::EMPLOYMENT_STATUS_LABELS;
-    }
-
-    /**
-     * @return array<string, string>
-     */
-    public static function workStatusLabels(): array
-    {
-        return self::WORK_STATUS_LABELS;
     }
 
     /**

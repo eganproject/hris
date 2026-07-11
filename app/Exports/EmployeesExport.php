@@ -103,9 +103,7 @@ class EmployeesExport implements FromQuery, ShouldAutoSize, WithHeadings, WithMa
     {
         return match ($status) {
             'active' => 'Aktif',
-            'probation' => 'Probation',
-            'suspended' => 'Skorsing',
-            'inactive' => 'Tidak Aktif',
+            'inactive' => 'Nonaktif',
             default => $status,
         };
     }
