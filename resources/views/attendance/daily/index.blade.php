@@ -95,7 +95,7 @@
 
     @can('attendance.update')
         <dialog id="punch-dialog" class="w-full max-w-md rounded-lg p-0 backdrop:bg-black/40">
-            <form method="POST" action="{{ route('attendance.daily.punch') }}" class="space-y-4 p-6">
+            <form method="POST" action="{{ route('attendance.daily.punch') }}" data-no-confirm="true" class="space-y-4 p-6">
                 @csrf
                 <input type="hidden" name="employee_id" id="pn-emp">
                 <input type="hidden" name="work_date" value="{{ $date->toDateString() }}">

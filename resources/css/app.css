@@ -871,6 +871,8 @@
         }
 
         .admin-content {
+            display: flex;
+            flex-direction: column;
             min-height: 100vh;
             margin-left: var(--sidebar-width);
             transition: margin-left 180ms ease;

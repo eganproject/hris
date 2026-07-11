@@ -87,7 +87,7 @@
     </div>
 
     <dialog id="swap-dialog" class="w-full max-w-md rounded-lg p-0 backdrop:bg-black/40">
-        <form method="POST" action="{{ route('my-schedule.swaps.store') }}" class="space-y-4 p-6">
+        <form method="POST" action="{{ route('my-schedule.swaps.store') }}" data-no-confirm="true" class="space-y-4 p-6">
             @csrf
             <div>
                 <h3 class="text-base font-semibold text-gray-950">Ajukan Tukar Jadwal</h3>

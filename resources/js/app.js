@@ -335,14 +335,24 @@ document.querySelectorAll('[data-dropdown]').forEach((dropdown) => {
     const openMenu = () => {
         closeAllDropdowns(menu);
 
-        const rect = trigger.getBoundingClientRect();
-
+        // Reveal first so the height can be measured, then decide the direction.
         menu.style.position = 'fixed';
-        menu.style.top = `${Math.round(rect.bottom + 6)}px`;
         menu.style.left = 'auto';
-        menu.style.right = `${Math.round(window.innerWidth - rect.right)}px`;
         menu.style.zIndex = '50';
         menu.hidden = false;
+
+        const rect = trigger.getBoundingClientRect();
+        const menuHeight = menu.offsetHeight;
+        const spaceBelow = window.innerHeight - rect.bottom;
+
+        // Flip upward when the menu would overflow below the viewport (e.g. the last
+        // row on a page that can't scroll further) and there is more room above.
+        const openUp = spaceBelow < menuHeight + 12 && rect.top > spaceBelow;
+
+        menu.style.top = openUp
+            ? `${Math.round(Math.max(6, rect.top - menuHeight - 6))}px`
+            : `${Math.round(rect.bottom + 6)}px`;
+        menu.style.right = `${Math.round(window.innerWidth - rect.right)}px`;
         trigger.setAttribute('aria-expanded', 'true');
     };
 
@@ -700,7 +710,10 @@ document.querySelectorAll('form').forEach((form) => {
     const method = (form.getAttribute('method') || 'GET').toUpperCase();
     const action = form.getAttribute('action') || '';
 
-    if (method === 'GET' || form.dataset.noConfirm === 'true' || action.includes('/login') || action.includes('/logout')) {
+    // Forms inside a native <dialog> are skipped: showModal() puts the dialog in the
+    // browser top layer, above the confirmation overlay, so the overlay would be
+    // hidden behind it. Modal forms are a deliberate action and don't need it anyway.
+    if (method === 'GET' || form.dataset.noConfirm === 'true' || form.closest('dialog') || action.includes('/login') || action.includes('/logout')) {
         return;
     }
 
@@ -1026,9 +1039,9 @@ document.querySelectorAll('[data-placement-form]').forEach((form) => {
     syncDepartments();
 });
 
-// Inline exit verification: when an active employee's contract status is changed to
-// a "closing" value and the form is saved, ask for the exit reason/date/notes in a
-// modal and process the exit together with the edit — no need to open the detail page.
+// Inline exit verification: when the "Status Kepegawaian" field is set to "Nonaktif"
+// and the form is saved, ask for the exit reason/date/notes in a modal and process
+// the exit together with the save — no need to open the detail page.
 document.querySelectorAll('[data-exit-form]').forEach((stepper) => {
     const form = stepper.closest('form');
     const modal = stepper.querySelector('[data-exit-modal]');
@@ -1037,8 +1050,7 @@ document.querySelectorAll('[data-exit-form]').forEach((stepper) => {
         return;
     }
 
-    const closingStatuses = JSON.parse(stepper.dataset.exitClosingStatuses || '[]');
-    const contractStatus = stepper.querySelector('#contract_status');
+    const statusSelect = stepper.querySelector('#employment_status');
     const reasonField = modal.querySelector('#exit_reason');
     const dateField = modal.querySelector('#exit_date');
     const confirmButton = modal.querySelector('[data-exit-confirm]');
@@ -1046,15 +1058,15 @@ document.querySelectorAll('[data-exit-form]').forEach((stepper) => {
 
     let exitConfirmed = false;
 
-    const isClosing = () => Boolean(contractStatus) && closingStatuses.includes(contractStatus.value);
+    const isExiting = () => Boolean(statusSelect) && statusSelect.value === 'inactive';
     const openModal = () => { modal.hidden = false; };
     const closeModal = () => { modal.hidden = true; };
 
     // Runs in the capture phase after the stepper's own validation handler, so all
-    // steps are validated first. If the contract is being closed, show the exit modal
-    // instead of submitting straight away.
+    // steps are validated first. If the status is being set to Nonaktif, show the
+    // exit modal instead of submitting straight away.
     form.addEventListener('submit', (event) => {
-        if (exitConfirmed || form.dataset.confirmed === 'true' || !isClosing()) {
+        if (exitConfirmed || form.dataset.confirmed === 'true' || !isExiting()) {
             return;
         }
 
@@ -1090,12 +1102,12 @@ document.querySelectorAll('[data-exit-form]').forEach((stepper) => {
         closeModal();
         exitConfirmed = false;
 
-        // Revert the contract status back to active so the user isn't forced to exit.
-        if (contractStatus) {
-            contractStatus.value = 'active';
+        // Revert the status back to Aktif so the user isn't forced to exit.
+        if (statusSelect) {
+            statusSelect.value = 'active';
 
             if (typeof $ === 'function') {
-                $(contractStatus).trigger('change.select2');
+                $(statusSelect).trigger('change.select2');
             }
         }
     });
@@ -1243,22 +1255,20 @@ document.querySelectorAll('[data-contract-type-toggle]').forEach((select) => {
     });
 })();
 
-// Editing an employee who has left: if the contract status is set to an active/
-// ongoing value, saving will reactivate them. Surface that in the confirmation
-// dialog so it's clear the save also brings the employee back to "Aktif".
+// Editing an employee who has left: if the status is set back to "Aktif", saving
+// will reactivate them. Surface that in the confirmation dialog so it's clear the
+// save also brings the employee back to "Aktif".
 document.querySelectorAll('[data-reactivate-active="true"]').forEach((stepper) => {
     const form = stepper.closest('form');
-    const contractStatus = stepper.querySelector('#contract_status');
+    const statusSelect = stepper.querySelector('#employment_status');
 
-    if (!form || !contractStatus) {
+    if (!form || !statusSelect) {
         return;
     }
 
-    const closingStatuses = JSON.parse(stepper.dataset.reactivateClosingStatuses || '[]');
-
     const syncConfirmMessage = () => {
-        if (! closingStatuses.includes(contractStatus.value)) {
-            form.dataset.confirmMessage = 'Aktifkan kembali karyawan ini? Status karyawan akan menjadi Aktif dan kontrak baru disimpan.';
+        if (statusSelect.value === 'active') {
+            form.dataset.confirmMessage = 'Aktifkan kembali karyawan ini? Status karyawan akan menjadi Aktif.';
             form.dataset.confirmApprove = 'Ya, aktifkan kembali';
         } else {
             delete form.dataset.confirmMessage;
@@ -1266,6 +1276,6 @@ document.querySelectorAll('[data-reactivate-active="true"]').forEach((stepper) =
         }
     };
 
-    contractStatus.addEventListener('change', syncConfirmMessage);
+    statusSelect.addEventListener('change', syncConfirmMessage);
     syncConfirmMessage();
 });

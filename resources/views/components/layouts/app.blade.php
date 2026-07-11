@@ -303,6 +303,13 @@
                 <main class="px-4 py-4 sm:px-5 lg:px-6">
                     {{ $slot }}
                 </main>
+
+                <footer class="mt-auto border-t border-gray-200 px-4 py-4 sm:px-5 lg:px-6">
+                    <div class="flex flex-col items-center justify-between gap-1 text-xs text-gray-500 sm:flex-row">
+                        <p>&copy; {{ date('Y') }} {{ config('app.name', 'HRIS') }}. Seluruh hak cipta dilindungi.</p>
+                        <p class="text-gray-400">Human Resource Information System</p>
+                    </div>
+                </footer>
             </div>
         </div>
 
