@@ -379,7 +379,15 @@
                             <h2 class="text-base font-semibold text-gray-950">Perpanjang Kontrak</h2>
                             <span data-bulk-step class="shrink-0 rounded-full bg-primary-soft px-2.5 py-0.5 text-xs font-medium text-gray-700"></span>
                         </div>
-                        <p class="mt-1 text-sm text-gray-500">Isi kontrak baru untuk <span data-bulk-emp class="font-medium text-gray-800"></span>. Kontrak lama ditandai “Diperpanjang”; karyawan yang sudah keluar akan diaktifkan kembali.</p>
+                        <p class="mt-1 text-sm text-gray-500">Kontrak baru dibuat aktif; kontrak lama ditandai “Diperpanjang”. Karyawan yang sudah keluar akan diaktifkan kembali.</p>
+                        <div class="mt-3 flex items-center gap-3 rounded-md border border-primary/20 bg-primary-soft px-3 py-2.5">
+                            <div class="flex size-9 shrink-0 items-center justify-center rounded-full bg-white text-sm font-semibold text-gray-600" data-bulk-emp-initial>K</div>
+                            <div class="min-w-0">
+                                <p class="text-[11px] font-medium uppercase tracking-wide text-gray-500">Untuk karyawan</p>
+                                <p class="truncate text-sm font-semibold text-gray-900" data-bulk-emp></p>
+                                <p class="truncate text-xs text-gray-500" data-bulk-emp-number></p>
+                            </div>
+                        </div>
                         <form method="POST" action="{{ route('employees.bulk.renew') }}" data-no-confirm="true" data-bulk-form class="mt-5 space-y-4">
                             @csrf
                             <div data-bulk-entries></div>
@@ -431,7 +439,15 @@
                             <h2 class="text-base font-semibold text-gray-950">Proses Keluar</h2>
                             <span data-bulk-step class="shrink-0 rounded-full bg-primary-soft px-2.5 py-0.5 text-xs font-medium text-gray-700"></span>
                         </div>
-                        <p class="mt-1 text-sm text-gray-500">Isi data keluar untuk <span data-bulk-emp class="font-medium text-gray-800"></span>. Karyawan dinonaktifkan &amp; akun login dimatikan; yang sudah keluar akan dilewati.</p>
+                        <p class="mt-1 text-sm text-gray-500">Karyawan dinonaktifkan &amp; akun login dimatikan; yang sudah keluar akan dilewati.</p>
+                        <div class="mt-3 flex items-center gap-3 rounded-md border border-red-100 bg-red-50 px-3 py-2.5">
+                            <div class="flex size-9 shrink-0 items-center justify-center rounded-full bg-white text-sm font-semibold text-gray-600" data-bulk-emp-initial>K</div>
+                            <div class="min-w-0">
+                                <p class="text-[11px] font-medium uppercase tracking-wide text-red-500">Proses keluar untuk</p>
+                                <p class="truncate text-sm font-semibold text-gray-900" data-bulk-emp></p>
+                                <p class="truncate text-xs text-gray-500" data-bulk-emp-number></p>
+                            </div>
+                        </div>
                         <form method="POST" action="{{ route('employees.bulk.exit') }}" data-no-confirm="true" data-bulk-form class="mt-5 space-y-4">
                             @csrf
                             <div data-bulk-entries></div>
@@ -538,6 +554,8 @@
                         const fieldEl = (name) => modal.querySelector('[data-field="' + name + '"]');
                         const stepEl = modal.querySelector('[data-bulk-step]');
                         const empEl = modal.querySelector('[data-bulk-emp]');
+                        const empNumberEl = modal.querySelector('[data-bulk-emp-number]');
+                        const empInitialEl = modal.querySelector('[data-bulk-emp-initial]');
                         const prevBtn = modal.querySelector('[data-bulk-prev]');
                         const nextBtn = modal.querySelector('[data-bulk-next]');
                         let queue = [], idx = 0, collected = {};
@@ -559,7 +577,9 @@
                         const render = () => {
                             const cur = queue[idx];
                             stepEl.textContent = 'Karyawan ' + (idx + 1) + ' dari ' + queue.length;
-                            empEl.textContent = cur.name;
+                            empEl.textContent = cur.name || 'Tanpa nama';
+                            if (empNumberEl) empNumberEl.textContent = cur.number ? 'NIK: ' + cur.number : 'NIK belum diisi';
+                            if (empInitialEl) empInitialEl.textContent = (cur.name || 'K').trim().charAt(0).toUpperCase();
                             writeFields(collected[cur.id] ?? defaultsFor(action, cur.box));
                             prevBtn.hidden = idx === 0;
                             nextBtn.textContent = idx === queue.length - 1 ? 'Proses' : 'Berikutnya';
@@ -615,7 +635,7 @@
 
                         return {
                             start() {
-                                queue = checked().map((b) => ({ id: b.value, name: b.dataset.name, box: b }));
+                                queue = checked().map((b) => ({ id: b.value, name: b.dataset.name, number: b.dataset.number, box: b }));
                                 if (!queue.length) return;
                                 idx = 0; collected = {};
                                 render();
