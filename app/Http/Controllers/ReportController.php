@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Enums\LeaveRequestStatus;
+use App\Exports\AttendanceLogExport;
 use App\Exports\AttendanceReportExport;
 use App\Exports\LeaveReportExport;
 use App\Models\Attendance;
@@ -73,6 +74,65 @@ class ReportController extends Controller
         ])->setPaper('a4', 'landscape');
 
         return $pdf->download('rekap-kehadiran-'.$month->format('Y-m').'.pdf');
+    }
+
+    /**
+     * Daily attendance log: one row per employee per day for the selected month,
+     * showing the actual clock-in / clock-out times (jam masuk/keluar).
+     */
+    public function attendanceLog(Request $request): View
+    {
+        [$month, $from, $to, $branchId, $departmentId] = $this->filters($request);
+
+        return view('reports.attendance-log', [
+            'rows' => $this->attendanceLogRows($from, $to, $branchId, $departmentId),
+            'month' => $month,
+            'prevMonth' => $month->copy()->subMonth()->format('Y-m'),
+            'nextMonth' => $month->copy()->addMonth()->format('Y-m'),
+            'branches' => Branch::query()->where('is_active', true)->orderBy('name')->get(),
+            'departments' => Department::query()->where('is_active', true)->orderBy('name')->get(),
+            'branchId' => $branchId,
+            'departmentId' => $departmentId,
+        ]);
+    }
+
+    public function attendanceLogExport(Request $request): BinaryFileResponse
+    {
+        [$month, $from, $to, $branchId, $departmentId] = $this->filters($request);
+
+        return Excel::download(
+            new AttendanceLogExport($this->attendanceLogRows($from, $to, $branchId, $departmentId)),
+            'log-absensi-'.$month->format('Y-m').'.xlsx',
+        );
+    }
+
+    public function attendanceLogPdf(Request $request): Response
+    {
+        [$month, $from, $to, $branchId, $departmentId] = $this->filters($request);
+
+        $pdf = Pdf::loadView('reports.pdf.attendance-log', [
+            'rows' => $this->attendanceLogRows($from, $to, $branchId, $departmentId),
+            'month' => $month,
+            'branchName' => $branchId ? Branch::find($branchId)?->name : null,
+            'departmentName' => $departmentId ? Department::find($departmentId)?->name : null,
+        ])->setPaper('a4', 'landscape');
+
+        return $pdf->download('log-absensi-'.$month->format('Y-m').'.pdf');
+    }
+
+    /**
+     * @return \Illuminate\Support\Collection<int, Attendance>
+     */
+    private function attendanceLogRows(string $from, string $to, ?int $branchId, ?int $departmentId): \Illuminate\Support\Collection
+    {
+        return Attendance::query()
+            ->whereBetween('work_date', [$from, $to])
+            ->when($branchId, fn ($q) => $q->whereHas('employee', fn ($e) => $e->where('branch_id', $branchId)))
+            ->when($departmentId, fn ($q) => $q->whereHas('employee', fn ($e) => $e->where('department_id', $departmentId)))
+            ->with(['employee.department', 'shift'])
+            ->get()
+            ->sortBy(fn (Attendance $r) => $r->work_date->format('Y-m-d').'|'.strtolower((string) $r->employee?->full_name))
+            ->values();
     }
 
     /**

@@ -85,6 +85,13 @@ Route::middleware('auth')->group(function () {
         Route::get('attendance', [ReportController::class, 'attendance'])->name('attendance');
         Route::get('attendance/export', [ReportController::class, 'attendanceExport'])->name('attendance.export');
         Route::get('attendance/pdf', [ReportController::class, 'attendancePdf'])->name('attendance.pdf');
+
+        // Daily attendance log with clock-in/out times (separate prefix so it isn't
+        // captured by the attendance/{employee} wildcard below).
+        Route::get('attendance-log', [ReportController::class, 'attendanceLog'])->name('attendance-log');
+        Route::get('attendance-log/export', [ReportController::class, 'attendanceLogExport'])->name('attendance-log.export');
+        Route::get('attendance-log/pdf', [ReportController::class, 'attendanceLogPdf'])->name('attendance-log.pdf');
+
         Route::get('attendance/{employee}', [ReportController::class, 'employeeAttendance'])->name('attendance.detail');
 
         Route::get('leave', [ReportController::class, 'leave'])->name('leave');

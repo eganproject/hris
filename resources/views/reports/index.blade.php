@@ -17,6 +17,16 @@
                 </div>
             </a>
 
+            <a href="{{ route('reports.attendance-log') }}" class="group flex items-start gap-4 rounded-lg border border-gray-200 bg-white p-5 shadow-sm transition hover:border-primary hover:shadow-md">
+                <span class="flex size-10 flex-none items-center justify-center rounded-md bg-primary-soft text-gray-700">
+                    <x-icon name="clock" class="size-5"/>
+                </span>
+                <div>
+                    <h2 class="text-sm font-semibold text-gray-950">Log Absensi</h2>
+                    <p class="mt-1 text-xs text-gray-500">Rincian harian per karyawan lengkap dengan jam masuk & jam keluar, terlambat, dan jam kerja.</p>
+                </div>
+            </a>
+
             <a href="{{ route('attendance.overtime.recap') }}" class="group flex items-start gap-4 rounded-lg border border-gray-200 bg-white p-5 shadow-sm transition hover:border-primary hover:shadow-md">
                 <span class="flex size-10 flex-none items-center justify-center rounded-md bg-primary-soft text-gray-700">
                     <x-icon name="clock" class="size-5"/>
