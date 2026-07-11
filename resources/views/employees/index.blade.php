@@ -212,14 +212,18 @@
                                     <p class="mt-0.5 text-xs text-gray-500">{{ $employee->department?->name ?? '-' }}</p>
                                 </td>
                                 <td>
-                                    @if ($employee->currentContract)
-                                        <p class="font-medium text-gray-800">{{ $employee->currentContract->contract_type }} · {{ $employee->currentContract->contract_number }}</p>
+                                    @php $ctr = $employee->latestContract; @endphp
+                                    @if ($ctr)
+                                        <p class="font-medium text-gray-800">{{ $ctr->contract_type }} · {{ $ctr->contract_number }}</p>
                                         <p class="mt-0.5 text-xs text-gray-500">
-                                            {{ $employee->currentContract->start_date?->format('d M Y') }} - {{ $employee->currentContract->end_date?->format('d M Y') ?? 'Tidak terbatas' }}
+                                            {{ $ctr->start_date?->format('d M Y') }} - {{ $ctr->end_date?->format('d M Y') ?? 'Tidak terbatas' }}
                                         </p>
+                                        <div class="mt-1.5">
+                                            <x-status-badge :tone="$ctr->effective_status_tone">{{ $ctr->status_label }}</x-status-badge>
+                                        </div>
                                         @if (! is_null($employee->remaining_contract_days))
                                             <p @class([
-                                                'mt-0.5 text-xs font-medium',
+                                                'mt-1 text-xs font-medium',
                                                 'text-red-600' => $employee->remaining_contract_days <= 30,
                                                 'text-gray-500' => $employee->remaining_contract_days > 30,
                                             ])>

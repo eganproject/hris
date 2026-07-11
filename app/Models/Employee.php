@@ -163,6 +163,15 @@ class Employee extends Model
             ->latestOfMany('start_date');
     }
 
+    /**
+     * The most recent contract regardless of status — used to show contract info
+     * (incl. its status) even for employees who have exited (no active contract).
+     */
+    public function latestContract(): HasOne
+    {
+        return $this->hasOne(EmployeeContract::class)->latestOfMany('start_date');
+    }
+
     public function scopeActive(Builder $query): void
     {
         $query->where('employment_status', 'active');

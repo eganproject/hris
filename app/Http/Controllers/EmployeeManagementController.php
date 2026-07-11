@@ -58,7 +58,7 @@ class EmployeeManagementController extends Controller
                 });
             });
 
-        $employees = $applyFilters(Employee::query()->with(['branch', 'department', 'jobPosition', 'currentContract']))
+        $employees = $applyFilters(Employee::query()->with(['branch', 'department', 'jobPosition', 'currentContract', 'latestContract']))
             ->latest('join_date')
             ->paginate($perPage)
             ->withQueryString();
