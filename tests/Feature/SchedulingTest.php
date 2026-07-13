@@ -2,7 +2,10 @@
 
 use App\Enums\ScheduleSource;
 use App\Enums\SchedulePatternType;
+use App\Models\Branch;
+use App\Models\Department;
 use App\Models\Employee;
+use App\Models\JobPosition;
 use App\Models\EmployeeSchedule;
 use App\Models\ScheduleAssignment;
 use App\Models\SchedulePattern;
@@ -179,6 +182,53 @@ test('a manual override can be set through the controller', function () {
     expect($row)->not->toBeNull()
         ->and($row->shift_id)->toBe($reg->id)
         ->and($row->source)->toBe(ScheduleSource::Manual);
+});
+
+test('the assign page shows each employee org info and their existing schedule period', function () {
+    $user = scheduleManager();
+    $reg = Shift::query()->create(['code' => 'REG', 'name' => 'Reguler', 'start_time' => '08:00', 'end_time' => '17:00', 'is_active' => true]);
+    $pattern = weeklyPattern($reg->id);
+
+    $branch = Branch::query()->create(['code' => 'HO', 'name' => 'Kantor Pusat', 'is_active' => true]);
+    $department = Department::query()->create(['code' => 'IT', 'name' => 'Teknologi', 'is_active' => true]);
+    $position = JobPosition::query()->create(['code' => 'STF', 'name' => 'Staff IT', 'is_active' => true]);
+
+    $employee = Employee::query()->create([
+        'full_name' => 'Budi', 'employment_status' => 'active',
+        'branch_id' => $branch->id, 'department_id' => $department->id, 'job_position_id' => $position->id,
+    ]);
+
+    // Still running today, so it must be visible on the picker.
+    ScheduleAssignment::query()->create([
+        'employee_id' => $employee->id, 'schedule_pattern_id' => $pattern->id,
+        'start_date' => now()->subMonth()->toDateString(), 'end_date' => null,
+    ]);
+
+    $this->actingAs($user)->get('/attendance/schedules/assign')
+        ->assertOk()
+        ->assertSee('Staff IT')
+        ->assertSee('Teknologi')
+        ->assertSee('Kantor Pusat')
+        ->assertSee('Weekly')
+        ->assertSee(now()->subMonth()->translatedFormat('d M Y'))
+        ->assertSee('seterusnya');
+});
+
+test('the assign page hides schedule periods that have already ended', function () {
+    $user = scheduleManager();
+    $reg = Shift::query()->create(['code' => 'REG', 'name' => 'Reguler', 'start_time' => '08:00', 'end_time' => '17:00', 'is_active' => true]);
+    $employee = Employee::query()->create(['full_name' => 'Budi', 'employment_status' => 'active']);
+    $pattern = weeklyPattern($reg->id);
+
+    ScheduleAssignment::query()->create([
+        'employee_id' => $employee->id, 'schedule_pattern_id' => $pattern->id,
+        'start_date' => now()->subYear()->toDateString(), 'end_date' => now()->subDay()->toDateString(),
+    ]);
+
+    $this->actingAs($user)->get('/attendance/schedules/assign')
+        ->assertOk()
+        ->assertDontSee(now()->subDay()->translatedFormat('d M Y'))
+        ->assertSee('Belum ada jadwal');
 });
 
 test('scheduling pages render', function () {

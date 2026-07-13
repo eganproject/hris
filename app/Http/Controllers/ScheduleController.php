@@ -76,8 +76,24 @@ class ScheduleController extends Controller
 
     public function create(Request $request): View
     {
+        // The picker shows each employee's still-running/upcoming assignments so the
+        // user can see which periods are already taken before choosing new dates.
+        $employees = Employee::query()
+            ->active()
+            ->with([
+                'jobPosition:id,name',
+                'department:id,name',
+                'branch:id,name',
+                'scheduleAssignments' => fn ($query) => $query
+                    ->where(fn ($q) => $q->whereNull('end_date')->orWhereDate('end_date', '>=', now()->toDateString()))
+                    ->with('pattern:id,name,type')
+                    ->orderBy('start_date'),
+            ])
+            ->orderBy('full_name')
+            ->get();
+
         return view('attendance.schedules.assign', [
-            'employees' => Employee::query()->active()->orderBy('full_name')->get(),
+            'employees' => $employees,
             'patterns' => SchedulePattern::query()->where('is_active', true)->orderBy('name')->get(),
             'defaultStart' => now()->startOfMonth()->toDateString(),
             'selectedEmployee' => $request->integer('employee_id') ?: null,
