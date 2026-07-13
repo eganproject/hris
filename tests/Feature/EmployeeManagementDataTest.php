@@ -78,7 +78,6 @@ test('employee index shows location and active contract information', function (
         'branch_id' => $branch->id,
         'department_id' => $department->id,
         'job_position_id' => $position->id,
-        'employee_number' => 'EMP-0100',
         'full_name' => 'Ari Wijaya',
         'email' => 'ari@example.test',
         'join_date' => now()->subMonths(6)->toDateString(),
@@ -103,6 +102,92 @@ test('employee index shows location and active contract information', function (
         ->assertSee('hari tersisa');
 });
 
+test('the employee code is generated from the join month, branch code and id', function () {
+    $user = employeeManager();
+    ['branch' => $branch, 'department' => $department, 'position' => $position] = hrMasterData();
+
+    $joinDate = '2026-07-05';
+
+    $this->actingAs($user)
+        ->post('/employees', [
+            'branch_id' => $branch->id,
+            'department_id' => $department->id,
+            'job_position_id' => $position->id,
+            'machine_pins' => [['device_id' => null, 'machine_user_id' => '1']],
+            'full_name' => 'Kode Otomatis',
+            'join_date' => $joinDate,
+            'employment_status' => 'active',
+            'contract_number' => 'CTR-KODE',
+            'contract_type' => 'PKWT',
+            'contract_start_date' => $joinDate,
+            'contract_end_date' => '2027-07-04',
+            'contract_status' => 'active',
+        ])
+        ->assertRedirect('/employees');
+
+    // Branch code "SBY-OFC-01" is stripped to SBYOFC01 so it cannot blur into the id.
+    $employee = Employee::query()->where('full_name', 'Kode Otomatis')->firstOrFail();
+
+    expect($employee->employee_number)->toBe(sprintf('COK0726-SBYOFC01%04d', $employee->id));
+});
+
+test('the employee form shows the code as read-only instead of asking for it', function () {
+    $user = employeeManager();
+    hrMasterData();
+
+    $this->actingAs($user)
+        ->get('/employees/create')
+        ->assertOk()
+        ->assertSee('Dibuat otomatis setelah disimpan')
+        ->assertDontSee('name="employee_number"', escape: false);
+});
+
+test('the employee code follows a change of join date or work location', function () {
+    $user = employeeManager();
+    ['branch' => $branch, 'department' => $department, 'position' => $position] = hrMasterData();
+
+    $jakarta = Branch::query()->create(['code' => 'JKT-OFC-01', 'name' => 'Jakarta Office', 'is_active' => true]);
+    $jakarta->departments()->attach($department->id, ['is_primary' => true, 'is_active' => true]);
+
+    $employee = Employee::query()->create([
+        'branch_id' => $branch->id,
+        'department_id' => $department->id,
+        'job_position_id' => $position->id,
+        'full_name' => 'Pindah Lokasi',
+        'join_date' => '2026-07-05',
+        'employment_status' => 'active',
+    ]);
+    $employee->contracts()->create([
+        'contract_number' => 'CTR-PINDAH',
+        'contract_type' => 'PKWT',
+        'start_date' => '2026-07-05',
+        'end_date' => '2027-07-04',
+        'status' => 'active',
+    ]);
+
+    expect($employee->employee_number)->toBe(sprintf('COK0726-SBYOFC01%04d', $employee->id));
+
+    $this->actingAs($user)
+        ->put("/employees/{$employee->id}", [
+            'branch_id' => $jakarta->id,
+            'department_id' => $department->id,
+            'job_position_id' => $position->id,
+            'machine_pins' => [['device_id' => null, 'machine_user_id' => '1']],
+            'full_name' => 'Pindah Lokasi',
+            'join_date' => '2026-09-01',
+            'employment_status' => 'active',
+            'contract_number' => 'CTR-PINDAH',
+            'contract_type' => 'PKWT',
+            'contract_start_date' => '2026-07-05',
+            'contract_end_date' => '2027-07-04',
+            'contract_status' => 'active',
+            'login_password' => '',
+        ])
+        ->assertRedirect('/employees');
+
+    expect($employee->fresh()->employee_number)->toBe(sprintf('COK0926-JKTOFC01%04d', $employee->id));
+});
+
 test('employee can be created with placement and contract data', function () {
     $user = employeeManager();
     ['branch' => $branch, 'department' => $department, 'position' => $position] = hrMasterData();
@@ -112,7 +197,6 @@ test('employee can be created with placement and contract data', function () {
             'branch_id' => $branch->id,
             'department_id' => $department->id,
             'job_position_id' => $position->id,
-            'employee_number' => 'EMP-0101',
             'machine_pins' => [['device_id' => null, 'machine_user_id' => '1']],
             'full_name' => 'Nina Kartika',
             'email' => 'nina@example.test',
@@ -133,7 +217,7 @@ test('employee can be created with placement and contract data', function () {
         ])
         ->assertRedirect('/employees');
 
-    $employee = Employee::query()->where('employee_number', 'EMP-0101')->first();
+    $employee = Employee::query()->where('full_name', 'Nina Kartika')->first();
 
     expect($employee)->not->toBeNull()
         ->and($employee->branch_id)->toBe($branch->id)
@@ -152,7 +236,6 @@ test('an employee can be given a global machine PIN from the form', function () 
             'branch_id' => $branch->id,
             'department_id' => $department->id,
             'job_position_id' => $position->id,
-            'employee_number' => 'EMP-PIN1',
             'full_name' => 'Rudi Absen',
             'join_date' => now()->format('Y-m-d'),
             'employment_status' => 'active',
@@ -165,7 +248,7 @@ test('an employee can be given a global machine PIN from the form', function () 
         ])
         ->assertRedirect('/employees');
 
-    $employee = Employee::query()->where('employee_number', 'EMP-PIN1')->firstOrFail();
+    $employee = Employee::query()->where('full_name', 'Rudi Absen')->firstOrFail();
 
     expect($employee->machine_user_id)->toBe('17')
         ->and($employee->deviceMappings()->whereNull('device_id')->where('machine_user_id', '17')->exists())->toBeTrue();
@@ -181,7 +264,6 @@ test('creating an employee without a machine PIN is rejected', function () {
             'branch_id' => $branch->id,
             'department_id' => $department->id,
             'job_position_id' => $position->id,
-            'employee_number' => 'EMP-NOPIN',
             'full_name' => 'Tanpa PIN',
             'join_date' => now()->format('Y-m-d'),
             'employment_status' => 'active',
@@ -194,7 +276,7 @@ test('creating an employee without a machine PIN is rejected', function () {
         ->assertRedirect('/employees/create')
         ->assertSessionHasErrors('machine_pins');
 
-    expect(Employee::query()->where('employee_number', 'EMP-NOPIN')->exists())->toBeFalse();
+    expect(Employee::query()->where('full_name', 'Tanpa PIN')->exists())->toBeFalse();
 });
 
 test('an employee can be given different PINs on specific machines', function () {
@@ -208,7 +290,6 @@ test('an employee can be given different PINs on specific machines', function ()
             'branch_id' => $branch->id,
             'department_id' => $department->id,
             'job_position_id' => $position->id,
-            'employee_number' => 'EMP-PIN9',
             'full_name' => 'Multi Mesin',
             'join_date' => now()->format('Y-m-d'),
             'employment_status' => 'active',
@@ -224,7 +305,7 @@ test('an employee can be given different PINs on specific machines', function ()
         ])
         ->assertRedirect('/employees');
 
-    $employee = Employee::query()->where('employee_number', 'EMP-PIN9')->firstOrFail();
+    $employee = Employee::query()->where('full_name', 'Multi Mesin')->firstOrFail();
 
     expect($employee->deviceMappings()->count())->toBe(2)
         ->and($employee->deviceMappings()->where('device_id', $lobby->id)->where('machine_user_id', '17')->exists())->toBeTrue()
@@ -248,10 +329,10 @@ test('two employees cannot share the same global machine PIN', function () {
         'contract_status' => 'active',
     ];
 
-    $this->actingAs($user)->post('/employees', [...$base, 'employee_number' => 'EMP-PIN2', 'full_name' => 'A', 'contract_number' => 'CTR-PIN2'])->assertRedirect('/employees');
+    $this->actingAs($user)->post('/employees', [...$base, 'full_name' => 'A', 'contract_number' => 'CTR-PIN2'])->assertRedirect('/employees');
 
     $this->actingAs($user)
-        ->post('/employees', [...$base, 'employee_number' => 'EMP-PIN3', 'full_name' => 'B', 'contract_number' => 'CTR-PIN3'])
+        ->post('/employees', [...$base, 'full_name' => 'B', 'contract_number' => 'CTR-PIN3'])
         ->assertSessionHasErrors('machine_pins.0.machine_user_id');
 });
 
@@ -266,7 +347,6 @@ test('employee photo can be uploaded and replaced', function () {
             'branch_id' => $branch->id,
             'department_id' => $department->id,
             'job_position_id' => $position->id,
-            'employee_number' => 'EMP-0105',
             'full_name' => 'Dian Pratama',
             'machine_pins' => [['device_id' => null, 'machine_user_id' => '1']],
             'email' => 'dian@example.test',
@@ -282,7 +362,7 @@ test('employee photo can be uploaded and replaced', function () {
         ])
         ->assertRedirect('/employees');
 
-    $employee = Employee::query()->where('employee_number', 'EMP-0105')->firstOrFail();
+    $employee = Employee::query()->where('full_name', 'Dian Pratama')->firstOrFail();
     $oldPhotoPath = $employee->photo_path;
 
     expect($oldPhotoPath)->not->toBeNull();
@@ -293,7 +373,6 @@ test('employee photo can be uploaded and replaced', function () {
             'branch_id' => $branch->id,
             'department_id' => $department->id,
             'job_position_id' => $position->id,
-            'employee_number' => 'EMP-0105',
             'full_name' => 'Dian Pratama Updated',
             'machine_pins' => [['device_id' => null, 'machine_user_id' => '1']],
             'email' => 'dian.updated@example.test',
@@ -328,7 +407,6 @@ test('employee photo must meet image constraints', function () {
             'branch_id' => $branch->id,
             'department_id' => $department->id,
             'job_position_id' => $position->id,
-            'employee_number' => 'EMP-0106',
             'full_name' => 'Eka Lestari',
             'email' => 'eka@example.test',
             'join_date' => now()->format('Y-m-d'),
@@ -361,7 +439,6 @@ test('employee placement must use department available at selected branch', func
             'branch_id' => $branch->id,
             'department_id' => $accounting->id,
             'job_position_id' => $position->id,
-            'employee_number' => 'EMP-0102',
             'full_name' => 'Raka Firmansyah',
             'email' => 'raka@example.test',
             'join_date' => now()->format('Y-m-d'),
@@ -392,7 +469,6 @@ test('employee with login account can be updated without changing password', fun
         'branch_id' => $branch->id,
         'department_id' => $department->id,
         'job_position_id' => $position->id,
-        'employee_number' => 'EMP-0103',
         'full_name' => 'Nina Kartika',
         'email' => 'nina@example.test',
         'join_date' => now()->subMonth()->format('Y-m-d'),
@@ -413,7 +489,6 @@ test('employee with login account can be updated without changing password', fun
             'branch_id' => $branch->id,
             'department_id' => $department->id,
             'job_position_id' => $position->id,
-            'employee_number' => 'EMP-0103',
             'full_name' => 'Nina Kartika Updated',
             'machine_pins' => [['device_id' => null, 'machine_user_id' => '1']],
             'email' => 'nina.updated@example.test',
@@ -452,7 +527,6 @@ test('employee can be resigned and login account is disabled', function () {
         'branch_id' => $branch->id,
         'department_id' => $department->id,
         'job_position_id' => $position->id,
-        'employee_number' => 'EMP-0104',
         'full_name' => 'Rini Santoso',
         'email' => 'rini@example.test',
         'join_date' => now()->subMonths(6)->format('Y-m-d'),
@@ -506,7 +580,6 @@ test('employee can be marked as terminated for reporting', function () {
         'branch_id' => $branch->id,
         'department_id' => $department->id,
         'job_position_id' => $position->id,
-        'employee_number' => 'EMP-0107',
         'full_name' => 'Tono Prasetyo',
         'join_date' => now()->subMonths(8)->format('Y-m-d'),
         'employment_status' => 'active',
@@ -564,7 +637,6 @@ test('employee with an expired contract is auto-deactivated', function () {
         'branch_id' => $branch->id,
         'department_id' => $department->id,
         'job_position_id' => $position->id,
-        'employee_number' => 'EMP-EXP',
         'full_name' => 'Kontrak Habis',
         'join_date' => now()->subYear()->toDateString(),
         'employment_status' => 'active',
@@ -584,7 +656,6 @@ test('employee with an expired contract is auto-deactivated', function () {
         'branch_id' => $branch->id,
         'department_id' => $department->id,
         'job_position_id' => $position->id,
-        'employee_number' => 'EMP-OK',
         'full_name' => 'Masih Aktif',
         'join_date' => now()->subMonths(2)->toDateString(),
         'employment_status' => 'active',
@@ -624,7 +695,6 @@ test('closing the contract during edit processes the employee exit inline', func
         'branch_id' => $branch->id,
         'department_id' => $department->id,
         'job_position_id' => $position->id,
-        'employee_number' => 'EMP-EDX',
         'full_name' => 'Edit Keluar',
         'email' => 'edit-exit@example.test',
         'join_date' => now()->subMonths(6)->toDateString(),
@@ -646,7 +716,6 @@ test('closing the contract during edit processes the employee exit inline', func
             'branch_id' => $branch->id,
             'department_id' => $department->id,
             'job_position_id' => $position->id,
-            'employee_number' => 'EMP-EDX',
             'full_name' => 'Edit Keluar',
             'email' => 'edit-exit@example.test',
             'join_date' => now()->subMonths(6)->format('Y-m-d'),
@@ -684,7 +753,6 @@ test('closing the contract during edit requires an exit reason', function () {
         'branch_id' => $branch->id,
         'department_id' => $department->id,
         'job_position_id' => $position->id,
-        'employee_number' => 'EMP-EDX2',
         'full_name' => 'Tanpa Alasan',
         'join_date' => now()->subMonths(6)->toDateString(),
         'employment_status' => 'active',
@@ -703,7 +771,6 @@ test('closing the contract during edit requires an exit reason', function () {
             'branch_id' => $branch->id,
             'department_id' => $department->id,
             'job_position_id' => $position->id,
-            'employee_number' => 'EMP-EDX2',
             'full_name' => 'Tanpa Alasan',
             'join_date' => now()->subMonths(6)->format('Y-m-d'),
             'employment_status' => 'active',
@@ -728,7 +795,6 @@ test('renewing a contract creates a new active contract and records history', fu
         'branch_id' => $branch->id,
         'department_id' => $department->id,
         'job_position_id' => $position->id,
-        'employee_number' => 'EMP-REN',
         'full_name' => 'Perpanjang Kontrak',
         'join_date' => now()->subYear()->toDateString(),
         'employment_status' => 'active',
@@ -769,7 +835,6 @@ test('renewing from the employee list redirects back to the list', function () {
         'branch_id' => $branch->id,
         'department_id' => $department->id,
         'job_position_id' => $position->id,
-        'employee_number' => 'EMP-LIST',
         'full_name' => 'Perpanjang Dari List',
         'join_date' => now()->subYear()->toDateString(),
         'employment_status' => 'active',
@@ -803,7 +868,6 @@ test('a failed renewal flashes the employee so the modal can re-open', function 
         'branch_id' => $branch->id,
         'department_id' => $department->id,
         'job_position_id' => $position->id,
-        'employee_number' => 'EMP-LISTF',
         'full_name' => 'Gagal Validasi',
         'join_date' => now()->subYear()->toDateString(),
         'employment_status' => 'active',
@@ -835,7 +899,6 @@ test('renewing a contract reactivates an employee who had left', function () {
         'branch_id' => $branch->id,
         'department_id' => $department->id,
         'job_position_id' => $position->id,
-        'employee_number' => 'EMP-REN2',
         'full_name' => 'Direkrut Ulang',
         'join_date' => now()->subYears(2)->toDateString(),
         'employment_status' => 'inactive',
@@ -883,7 +946,6 @@ test('editing a left employee with an active contract status reactivates them', 
         'branch_id' => $branch->id,
         'department_id' => $department->id,
         'job_position_id' => $position->id,
-        'employee_number' => 'EMP-REEDIT',
         'full_name' => 'Aktif Lewat Edit',
         'email' => 'reedit@example.test',
         'join_date' => now()->subYears(2)->toDateString(),
@@ -905,7 +967,6 @@ test('editing a left employee with an active contract status reactivates them', 
             'branch_id' => $branch->id,
             'department_id' => $department->id,
             'job_position_id' => $position->id,
-            'employee_number' => 'EMP-REEDIT',
             'full_name' => 'Aktif Lewat Edit',
             'email' => 'reedit@example.test',
             'join_date' => now()->subYears(2)->format('Y-m-d'),
@@ -949,17 +1010,17 @@ test('pkwtt contract does not require an end date but others do', function () {
     // PKWT without an end date must fail.
     $this->actingAs($user)
         ->from('/employees/create')
-        ->post('/employees', [...$basePayload, 'employee_number' => 'EMP-PKWT', 'contract_number' => 'CTR-PKWT', 'contract_type' => 'PKWT'])
+        ->post('/employees', [...$basePayload, 'contract_number' => 'CTR-PKWT', 'contract_type' => 'PKWT'])
         ->assertRedirect('/employees/create')
         ->assertSessionHasErrors('contract_end_date');
 
     // PKWTT without an end date must pass.
     $this->actingAs($user)
-        ->post('/employees', [...$basePayload, 'employee_number' => 'EMP-PKWTT', 'contract_number' => 'CTR-PKWTT', 'contract_type' => 'PKWTT'])
+        ->post('/employees', [...$basePayload, 'contract_number' => 'CTR-PKWTT', 'contract_type' => 'PKWTT'])
         ->assertRedirect('/employees')
         ->assertSessionHasNoErrors();
 
-    $employee = Employee::query()->where('employee_number', 'EMP-PKWTT')->firstOrFail();
+    $employee = Employee::query()->where('full_name', 'Karyawan Tetap')->firstOrFail();
 
     expect($employee->currentContract->contract_type)->toBe('PKWTT')
         ->and($employee->currentContract->end_date)->toBeNull();
@@ -974,7 +1035,6 @@ test('creating an employee records joined and contract events', function () {
             'branch_id' => $branch->id,
             'department_id' => $department->id,
             'job_position_id' => $position->id,
-            'employee_number' => 'EMP-EVT',
             'machine_pins' => [['device_id' => null, 'machine_user_id' => '1']],
             'full_name' => 'Riwayat Baru',
             'join_date' => now()->format('Y-m-d'),
@@ -987,7 +1047,7 @@ test('creating an employee records joined and contract events', function () {
         ])
         ->assertRedirect('/employees');
 
-    $employee = Employee::query()->where('employee_number', 'EMP-EVT')->firstOrFail();
+    $employee = Employee::query()->where('full_name', 'Riwayat Baru')->firstOrFail();
 
     expect($employee->events()->where('type', 'joined')->exists())->toBeTrue()
         ->and($employee->events()->where('type', 'contract_created')->exists())->toBeTrue();

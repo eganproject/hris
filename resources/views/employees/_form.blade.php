@@ -62,9 +62,11 @@
                 </div>
             </div>
             <div>
-                <label for="employee_number" class="block text-sm font-medium text-gray-700">NIK Karyawan <span class="field-requirement is-required" aria-label="Wajib diisi">*</span></label>
-                <input id="employee_number" name="employee_number" value="{{ old('employee_number', $employee->employee_number) }}" required class="mt-2 block w-full rounded-md border border-gray-300 px-3 py-2.5 text-sm shadow-xs outline-none focus:border-primary focus:ring-2 focus:ring-primary/20">
-                @error('employee_number')<p class="mt-2 text-sm text-red-600">{{ $message }}</p>@enderror
+                <label class="block text-sm font-medium text-gray-700">Kode Karyawan</label>
+                <p class="mt-2 block w-full rounded-md border border-gray-200 bg-gray-50 px-3 py-2.5 text-sm font-medium text-gray-700">
+                    {{ $employee->employee_number ?? 'Dibuat otomatis setelah disimpan' }}
+                </p>
+                <p class="mt-2 text-xs text-gray-500">Format otomatis <span class="font-medium">COK[bulan][tahun bergabung]-[kode lokasi][id]</span>, mis. <span class="font-medium">COK0726-HO0012</span>. Kode ikut menyesuaikan bila tanggal bergabung atau lokasi kerja diubah.</p>
             </div>
             <div>
                 <label for="full_name" class="block text-sm font-medium text-gray-700">Nama Lengkap <span class="field-requirement is-required" aria-label="Wajib diisi">*</span></label>

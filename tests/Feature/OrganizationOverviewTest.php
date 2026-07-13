@@ -61,7 +61,7 @@ test('organization page shows warehouse locations and departments', function () 
         'branch_id' => $warehouse->id,
         'department_id' => $akrilik->id,
         'job_position_id' => $position->id,
-        'employee_number' => 'EMP-0200',
+        
         'full_name' => 'Bagus Pratama',
         'join_date' => now()->toDateString(),
         'employment_status' => 'active',

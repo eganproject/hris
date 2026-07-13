@@ -68,7 +68,7 @@
             <form method="GET" action="{{ route('employees.index') }}" class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-7">
                 <div class="xl:col-span-2">
                     <label for="search" class="block text-sm font-medium text-gray-700">Cari</label>
-                    <input id="search" name="search" value="{{ $filters['search'] ?? '' }}" class="mt-2 block w-full rounded-md border border-gray-300 bg-white px-3 py-2.5 text-sm shadow-xs outline-none focus:border-primary focus:ring-2 focus:ring-primary/20" placeholder="Nama, NIK karyawan, email">
+                    <input id="search" name="search" value="{{ $filters['search'] ?? '' }}" class="mt-2 block w-full rounded-md border border-gray-300 bg-white px-3 py-2.5 text-sm shadow-xs outline-none focus:border-primary focus:ring-2 focus:ring-primary/20" placeholder="Nama, kode karyawan, email">
                 </div>
                 <div>
                     <label for="branch_id" class="block text-sm font-medium text-gray-700">Lokasi</label>
@@ -199,7 +199,7 @@
                                             <a href="{{ route('employees.show', $employee) }}" class="font-medium text-gray-950 hover:underline">
                                                 {{ $employee->full_name ?? 'Tanpa nama' }}
                                             </a>
-                                            <p class="mt-0.5 truncate text-xs text-gray-500">{{ $employee->employee_number ?? 'Belum ada NIK' }} · {{ $employee->email ?? '-' }}</p>
+                                            <p class="mt-0.5 truncate text-xs text-gray-500">{{ $employee->employee_number ?? 'Kode belum dibuat' }} · {{ $employee->email ?? '-' }}</p>
                                         </div>
                                     </div>
                                 </td>
@@ -582,7 +582,7 @@
                             const cur = queue[idx];
                             stepEl.textContent = 'Karyawan ' + (idx + 1) + ' dari ' + queue.length;
                             empEl.textContent = cur.name || 'Tanpa nama';
-                            if (empNumberEl) empNumberEl.textContent = cur.number ? 'NIK: ' + cur.number : 'NIK belum diisi';
+                            if (empNumberEl) empNumberEl.textContent = cur.number ? 'Kode: ' + cur.number : 'Kode belum dibuat';
                             if (empInitialEl) empInitialEl.textContent = (cur.name || 'K').trim().charAt(0).toUpperCase();
                             writeFields(collected[cur.id] ?? defaultsFor(action, cur.box));
                             prevBtn.hidden = idx === 0;

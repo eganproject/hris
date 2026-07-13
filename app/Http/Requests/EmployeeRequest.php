@@ -42,8 +42,8 @@ class EmployeeRequest extends FormRequest
             'machine_pins' => ['nullable', 'array'],
             'machine_pins.*.device_id' => ['nullable', 'integer', 'exists:devices,id'],
             'machine_pins.*.machine_user_id' => ['nullable', 'string', 'max:50'],
-            'employee_number' => ['required', 'string', 'max:50', Rule::unique('employees', 'employee_number')->ignore($employeeId)],
-            'photo' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:2048', 'dimensions:min_width=300,min_height=300,max_width=3000,max_height=3000'],
+            // employee_number is not accepted here: the system generates it (COK…).
+            'photo' =>['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:2048', 'dimensions:min_width=300,min_height=300,max_width=3000,max_height=3000'],
             'full_name' => ['required', 'string', 'max:255'],
             'email' => [
                 'nullable',

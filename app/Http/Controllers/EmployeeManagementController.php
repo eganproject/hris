@@ -790,7 +790,6 @@ class EmployeeManagementController extends Controller
             'department_id',
             'job_position_id',
             'manager_id',
-            'employee_number',
             'full_name',
             'email',
             'phone',

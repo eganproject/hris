@@ -45,7 +45,7 @@ test('every page renders without a server error', function () {
     // Employee linked to the acting user (needed for the self-service pages).
     $employee = Employee::query()->create([
         'user_id' => $user->id, 'branch_id' => $branch->id, 'department_id' => $department->id, 'job_position_id' => $position->id,
-        'employee_number' => 'EMP-SMOKE', 'full_name' => 'Smoke Test', 'join_date' => now()->subYear()->toDateString(), 'employment_status' => 'active',
+        'full_name' => 'Smoke Test', 'join_date' => now()->subYear()->toDateString(), 'employment_status' => 'active',
     ]);
     $employee->contracts()->create(['contract_number' => 'CTR-SMOKE', 'contract_type' => 'PKWT', 'start_date' => now()->subYear()->toDateString(), 'end_date' => now()->addMonths(2)->toDateString(), 'status' => 'active']);
 

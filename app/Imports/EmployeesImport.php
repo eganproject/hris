@@ -54,7 +54,7 @@ class EmployeesImport implements SkipsEmptyRows, ToCollection, WithHeadingRow
     public static function columns(): array
     {
         return [
-            ['key' => 'nomor_karyawan', 'header' => 'Nomor Karyawan', 'required' => true, 'example' => 'EMP-001', 'desc' => 'Nomor pegawai unik. Wajib, tidak boleh sama dengan karyawan lain atau baris lain.'],
+            ['key' => 'nomor_karyawan', 'header' => 'Nomor Karyawan', 'required' => false, 'example' => 'COK0724-SBYOFC010012', 'desc' => 'Dibuat otomatis oleh sistem saat karyawan disimpan (format COK[bulan][tahun bergabung]-[kode lokasi][id]). Kolom ini hanya untuk data hasil ekspor — isinya diabaikan saat impor.'],
             ['key' => 'nama_lengkap', 'header' => 'Nama Lengkap', 'required' => true, 'example' => 'Budi Santoso', 'desc' => 'Nama lengkap karyawan.'],
             ['key' => 'email', 'header' => 'Email', 'required' => false, 'example' => 'budi@contoh.com', 'desc' => 'Opsional. Jika diisi harus unik. Akun login TIDAK dibuat otomatis dari import.'],
             ['key' => 'telepon', 'header' => 'Telepon', 'required' => false, 'example' => '08123456789', 'desc' => 'Opsional.'],
@@ -66,7 +66,7 @@ class EmployeesImport implements SkipsEmptyRows, ToCollection, WithHeadingRow
             ['key' => 'lokasi_kerja', 'header' => 'Lokasi Kerja', 'required' => true, 'example' => 'Kantor Pusat', 'desc' => 'Nama lokasi/cabang; harus sudah terdaftar dan aktif.'],
             ['key' => 'divisi', 'header' => 'Divisi', 'required' => true, 'example' => 'Operasional', 'desc' => 'Nama divisi; harus tersedia pada lokasi kerja tersebut.'],
             ['key' => 'jabatan', 'header' => 'Jabatan', 'required' => true, 'example' => 'Staf', 'desc' => 'Nama jabatan; harus sesuai dengan divisi.'],
-            ['key' => 'nomor_karyawan_atasan', 'header' => 'Nomor Karyawan Atasan', 'required' => false, 'example' => 'EMP-000', 'desc' => 'Opsional. Nomor karyawan atasan langsung (harus sudah ada, atau ada di file ini).'],
+            ['key' => 'nomor_nama_atasan', 'header' => 'Nomor / Nama Atasan', 'required' => false, 'example' => 'Dewi Anggraeni', 'desc' => 'Opsional. Atasan langsung: isi kode karyawan (mis. COK0724-SBYOFC010012) untuk karyawan yang sudah terdaftar, atau nama lengkapnya — termasuk bila atasan tersebut baru dibuat lewat baris lain di file ini.'],
             ['key' => 'nomor_kontrak', 'header' => 'Nomor Kontrak', 'required' => true, 'example' => 'KTR-2024-001', 'desc' => 'Nomor kontrak unik. Wajib.'],
             ['key' => 'jenis_kontrak', 'header' => 'Jenis Kontrak', 'required' => true, 'example' => 'PKWT', 'desc' => 'Salah satu: PKWT, PKWTT, Probation, Internship.'],
             ['key' => 'tanggal_mulai_kontrak', 'header' => 'Tanggal Mulai Kontrak', 'required' => true, 'example' => '2024-01-05', 'desc' => 'Format YYYY-MM-DD. Wajib.'],
@@ -123,16 +123,15 @@ class EmployeesImport implements SkipsEmptyRows, ToCollection, WithHeadingRow
 
         $lookups = $this->buildLookups();
 
-        // Employee numbers that will exist after the import (existing + in-file),
-        // used to validate manager references that may point at a row in this file.
-        $fileEmployeeNumbers = $rows
-            ->map(fn ($row) => $this->normalize($row)->get('nomor_karyawan'))
-            ->map(fn ($value) => strtolower(trim((string) $value)))
+        // A manager may be referenced by code (only existing employees have one) or
+        // by full name — including the name of somebody created by another row here.
+        $fileNames = $rows
+            ->map(fn ($row) => strtolower(trim((string) $this->normalize($row)->get('nama_lengkap'))))
             ->filter()
             ->all();
-        $knownEmployeeNumbers = array_merge($lookups['employee_numbers'], $fileEmployeeNumbers);
+        $knownManagerRefs = array_merge($lookups['employee_numbers'], $lookups['names'], $fileNames);
 
-        $seen = ['nomor_karyawan' => [], 'nomor_kontrak' => [], 'email' => [], 'pin' => []];
+        $seen = ['nomor_kontrak' => [], 'email' => [], 'pin' => []];
 
         /** @var list<array<string, mixed>> $prepared */
         $prepared = [];
@@ -140,7 +139,7 @@ class EmployeesImport implements SkipsEmptyRows, ToCollection, WithHeadingRow
         foreach ($rows as $index => $rawRow) {
             $rowNumber = $index + 2; // heading is row 1, data starts at row 2
             $row = $this->normalize($rawRow);
-            $data = $this->validateRow($row, $rowNumber, $lookups, $knownEmployeeNumbers, $seen);
+            $data = $this->validateRow($row, $rowNumber, $lookups, $knownManagerRefs, $seen);
 
             if ($data !== null) {
                 $prepared[] = $data;
@@ -156,24 +155,23 @@ class EmployeesImport implements SkipsEmptyRows, ToCollection, WithHeadingRow
 
     /**
      * @param  array<string, list<string>|array<string, int>>  $lookups
-     * @param  list<string>  $knownEmployeeNumbers
+     * @param  list<string>  $knownManagerRefs
      * @param  array<string, array<string, bool>>  $seen
      * @return array<string, mixed>|null
      */
-    private function validateRow(Collection $row, int $rowNumber, array $lookups, array $knownEmployeeNumbers, array &$seen): ?array
+    private function validateRow(Collection $row, int $rowNumber, array $lookups, array $knownManagerRefs, array &$seen): ?array
     {
         $before = count($this->rowErrors);
         $add = fn (string $message, ?string $column = null) => $this->addError($rowNumber, $message, $column);
 
         $get = fn (string $key) => trim((string) ($row->get($key) ?? ''));
 
-        $employeeNumber = $get('nomor_karyawan');
         $fullName = $get('nama_lengkap');
         $email = $get('email');
         $branchName = $get('lokasi_kerja');
         $departmentName = $get('divisi');
         $positionName = $get('jabatan');
-        $managerNumber = $get('nomor_karyawan_atasan');
+        $managerRef = $get('nomor_nama_atasan');
         $contractNumber = $get('nomor_kontrak');
         $contractType = $get('jenis_kontrak');
         $pin = $get('pin_mesin_absensi');
@@ -183,15 +181,15 @@ class EmployeesImport implements SkipsEmptyRows, ToCollection, WithHeadingRow
 
         // Required, non-reference fields. Lokasi Kerja / Divisi / Jabatan are
         // required as text but auto-created on persist when they don't exist yet.
-        foreach (['nomor_karyawan' => 'Nomor Karyawan', 'nama_lengkap' => 'Nama Lengkap', 'tanggal_bergabung' => 'Tanggal Bergabung', 'lokasi_kerja' => 'Lokasi Kerja', 'divisi' => 'Divisi', 'jabatan' => 'Jabatan', 'nomor_kontrak' => 'Nomor Kontrak', 'jenis_kontrak' => 'Jenis Kontrak', 'tanggal_mulai_kontrak' => 'Tanggal Mulai Kontrak'] as $key => $label) {
+        foreach (['nama_lengkap' => 'Nama Lengkap', 'tanggal_bergabung' => 'Tanggal Bergabung', 'lokasi_kerja' => 'Lokasi Kerja', 'divisi' => 'Divisi', 'jabatan' => 'Jabatan', 'nomor_kontrak' => 'Nomor Kontrak', 'jenis_kontrak' => 'Jenis Kontrak', 'tanggal_mulai_kontrak' => 'Tanggal Mulai Kontrak'] as $key => $label) {
             if ($get($key) === '') {
                 $add("kolom \"{$label}\" wajib diisi.", $label);
             }
         }
 
         // Uniqueness within the file and against existing data (case-insensitive;
-        // the lookup lists are already lowercased).
-        $this->checkUnique(strtolower($employeeNumber), 'nomor_karyawan', $lookups['employee_numbers'], 'Nomor Karyawan', $seen, $add, $employeeNumber);
+        // the lookup lists are already lowercased). Nomor Karyawan is not checked:
+        // it is generated on save, so whatever the file says is ignored.
         $this->checkUnique(strtolower($contractNumber), 'nomor_kontrak', $lookups['contract_numbers'], 'Nomor Kontrak', $seen, $add, $contractNumber);
 
         if ($email !== '') {
@@ -223,8 +221,8 @@ class EmployeesImport implements SkipsEmptyRows, ToCollection, WithHeadingRow
             $this->checkUnique($deviceId.'|'.strtolower($pin), 'pin', $lookups['pins'], 'PIN Mesin Absensi', $seen, $add, $pin);
         }
 
-        if ($managerNumber !== '' && ! in_array(strtolower($managerNumber), $knownEmployeeNumbers, true)) {
-            $add("Nomor Karyawan Atasan \"{$managerNumber}\" tidak ditemukan.", 'Nomor Karyawan Atasan');
+        if ($managerRef !== '' && ! in_array(strtolower($managerRef), $knownManagerRefs, true)) {
+            $add("Atasan \"{$managerRef}\" tidak ditemukan, baik sebagai kode karyawan maupun sebagai nama karyawan.", 'Nomor / Nama Atasan');
         }
 
         // Login account. Created only when both Email and Password Login are given.
@@ -289,7 +287,6 @@ class EmployeesImport implements SkipsEmptyRows, ToCollection, WithHeadingRow
                 'position' => $positionName,
             ],
             'employee' => [
-                'employee_number' => $employeeNumber,
                 'full_name' => $fullName,
                 'email' => $email !== '' ? $email : null,
                 'phone' => $get('telepon') !== '' ? $get('telepon') : null,
@@ -312,7 +309,7 @@ class EmployeesImport implements SkipsEmptyRows, ToCollection, WithHeadingRow
             'login' => $loginPassword !== '' && $email !== ''
                 ? ['password' => $loginPassword, 'role_id' => $roleId]
                 : null,
-            'manager_number' => $managerNumber !== '' ? strtolower($managerNumber) : null,
+            'manager_ref' => $managerRef !== '' ? strtolower($managerRef) : null,
         ];
     }
 
@@ -324,10 +321,20 @@ class EmployeesImport implements SkipsEmptyRows, ToCollection, WithHeadingRow
         $ingestion = app(PunchIngestionService::class);
 
         DB::transaction(function () use ($prepared, $ingestion) {
+            // Managers are referenced by code or by name, so both maps are kept and
+            // grown as rows are created (a manager may be created by this very file).
             /** @var array<string, int> $numberToId */
             $numberToId = Employee::query()->pluck('id', 'employee_number')
                 ->mapWithKeys(fn ($id, $number) => [strtolower((string) $number) => $id])
                 ->all();
+
+            /** @var array<string, int> $nameToId */
+            $nameToId = [];
+
+            foreach (Employee::query()->orderBy('id')->get(['id', 'full_name']) as $existing) {
+                // First one wins: on duplicate names the oldest employee is assumed.
+                $nameToId[strtolower(trim($existing->full_name))] ??= $existing->id;
+            }
 
             // Case-insensitive name => id caches so a placement referenced by many
             // rows is created only once, seeded with everything already on record.
@@ -340,7 +347,7 @@ class EmployeesImport implements SkipsEmptyRows, ToCollection, WithHeadingRow
             $departmentPosition = DB::table('department_job_position')->get(['department_id', 'job_position_id'])
                 ->mapWithKeys(fn ($row) => [$row->department_id.'|'.$row->job_position_id => true])->all();
 
-            /** @var list<array{employee: Employee, manager_number: ?string}> $withManagers */
+            /** @var list<array{employee: Employee, manager_ref: ?string}> $withManagers */
             $withManagers = [];
 
             foreach ($prepared as $item) {
@@ -377,19 +384,20 @@ class EmployeesImport implements SkipsEmptyRows, ToCollection, WithHeadingRow
                 );
 
                 $numberToId[strtolower($employee->employee_number)] = $employee->id;
-                $withManagers[] = ['employee' => $employee, 'manager_number' => $item['manager_number']];
+                $nameToId[strtolower(trim($employee->full_name))] ??= $employee->id;
+                $withManagers[] = ['employee' => $employee, 'manager_ref' => $item['manager_ref']];
                 $this->imported++;
             }
 
             // Second pass: wire up managers now that every employee has an id.
             foreach ($withManagers as $entry) {
-                $managerNumber = $entry['manager_number'];
+                $managerRef = $entry['manager_ref'];
 
-                if ($managerNumber === null) {
+                if ($managerRef === null) {
                     continue;
                 }
 
-                $managerId = $numberToId[$managerNumber] ?? null;
+                $managerId = $numberToId[$managerRef] ?? $nameToId[$managerRef] ?? null;
 
                 if ($managerId && $managerId !== $entry['employee']->id) {
                     $entry['employee']->forceFill(['manager_id' => $managerId])->save();
@@ -413,7 +421,8 @@ class EmployeesImport implements SkipsEmptyRows, ToCollection, WithHeadingRow
 
     /**
      * Resolve a master record by name from the cache, creating (and caching) an
-     * active one when it does not exist yet.
+     * active one when it does not exist yet. A brand-new Lokasi Kerja also gets a
+     * code, because the employee code is built from it.
      *
      * @param  array<string, int>  $cache
      * @param  class-string<\Illuminate\Database\Eloquent\Model>  $model
@@ -426,10 +435,40 @@ class EmployeesImport implements SkipsEmptyRows, ToCollection, WithHeadingRow
             return $cache[$key];
         }
 
-        $id = $model::query()->create(['name' => trim($name), 'is_active' => true])->id;
+        $attributes = ['name' => trim($name), 'is_active' => true];
+
+        if ($model === Branch::class) {
+            $attributes['code'] = $this->branchCodeFor(trim($name));
+        }
+
+        $id = $model::query()->create($attributes)->id;
         $cache[$key] = $id;
 
         return $id;
+    }
+
+    /**
+     * A short, unique code for a location the file introduces: the initials of a
+     * multi-word name ("Kantor Pusat" => KP), otherwise its first three letters
+     * ("Gudang" => GUD), with a counter appended when that is already taken.
+     */
+    private function branchCodeFor(string $name): string
+    {
+        $words = preg_split('/\s+/', preg_replace('/[^A-Za-z0-9 ]/', ' ', $name) ?? '', -1, PREG_SPLIT_NO_EMPTY) ?: [];
+
+        $base = count($words) > 1
+            ? implode('', array_map(fn (string $word) => mb_substr($word, 0, 1), array_slice($words, 0, 4)))
+            : mb_substr($words[0] ?? '', 0, 3);
+
+        $base = strtoupper($base) ?: 'LOC';
+        $code = $base;
+        $suffix = 1;
+
+        while (Branch::query()->where('code', $code)->exists()) {
+            $code = $base.++$suffix;
+        }
+
+        return $code;
     }
 
     /**
@@ -593,6 +632,7 @@ class EmployeesImport implements SkipsEmptyRows, ToCollection, WithHeadingRow
      *     devices: array<string, int>,
      *     roles: array<string, int>,
      *     employee_numbers: list<string>,
+     *     names: list<string>,
      *     contract_numbers: list<string>,
      *     emails: list<string>,
      *     pins: list<string>,
@@ -612,7 +652,8 @@ class EmployeesImport implements SkipsEmptyRows, ToCollection, WithHeadingRow
             'devices' => $devices,
             'roles' => $roles,
             'employee_numbers' => Employee::query()->pluck('employee_number')->map(fn ($v) => strtolower((string) $v))->all(),
-            'contract_numbers' => EmployeeContract::query()->pluck('contract_number')->map(fn ($v) => strtolower((string) $v))->all(),
+            'names' => Employee::query()->pluck('full_name')->map(fn ($v) => strtolower(trim((string) $v)))->all(),
+            'contract_numbers' =>EmployeeContract::query()->pluck('contract_number')->map(fn ($v) => strtolower((string) $v))->all(),
             'emails' => Employee::query()->whereNotNull('email')->pluck('email')->map(fn ($v) => strtolower((string) $v))
                 ->merge(DB::table('users')->whereNotNull('email')->pluck('email')->map(fn ($v) => strtolower((string) $v)))
                 ->unique()->values()->all(),
