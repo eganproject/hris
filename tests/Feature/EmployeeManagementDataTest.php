@@ -606,7 +606,7 @@ test('employee can be marked as terminated for reporting', function () {
     $employee->refresh();
 
     expect($employee->employment_status)->toBe('inactive')
-        ->and($employee->employment_status_label)->toBe('Tidak Aktif / Sudah Tidak Bekerja')
+        ->and($employee->employment_status_label)->toBe('Nonaktif')
         ->and($employee->hr_status_label)->toBe('Tidak Aktif - PHK')
         ->and($employee->exit_reason)->toBe('terminated')
         ->and($employee->exit_reason_label)->toBe('PHK')
@@ -684,7 +684,7 @@ test('employee with an expired contract is auto-deactivated', function () {
         ->and($stillActive->employment_status)->toBe('active');
 });
 
-test('closing the contract during edit processes the employee exit inline', function () {
+test('setting the status to Nonaktif during edit processes the employee exit inline', function () {
     $user = employeeManager();
     ['branch' => $branch, 'department' => $department, 'position' => $position] = hrMasterData();
 
@@ -719,12 +719,13 @@ test('closing the contract during edit processes the employee exit inline', func
             'full_name' => 'Edit Keluar',
             'email' => 'edit-exit@example.test',
             'join_date' => now()->subMonths(6)->format('Y-m-d'),
-            'employment_status' => 'active',
+            // Status Kepegawaian drives the exit: the contract is closed for us.
+            'employment_status' => 'inactive',
             'contract_number' => 'CTR-EDX',
             'contract_type' => 'PKWT',
             'contract_start_date' => now()->subMonths(6)->format('Y-m-d'),
             'contract_end_date' => now()->addMonths(6)->format('Y-m-d'),
-            'contract_status' => 'completed',
+            'contract_status' => 'active',
             'machine_pins' => [['device_id' => null, 'machine_user_id' => '1']],
             'login_password' => '',
             'exit_reason' => 'contract_ended',
@@ -745,7 +746,7 @@ test('closing the contract during edit processes the employee exit inline', func
         ->and($loginUser->is_active)->toBeFalse();
 });
 
-test('closing the contract during edit requires an exit reason', function () {
+test('setting the status to Nonaktif during edit requires an exit reason', function () {
     $user = employeeManager();
     ['branch' => $branch, 'department' => $department, 'position' => $position] = hrMasterData();
 
@@ -773,12 +774,14 @@ test('closing the contract during edit requires an exit reason', function () {
             'job_position_id' => $position->id,
             'full_name' => 'Tanpa Alasan',
             'join_date' => now()->subMonths(6)->format('Y-m-d'),
-            'employment_status' => 'active',
+            // Nonaktif without an exit reason / date must not go through.
+            'employment_status' => 'inactive',
             'contract_number' => 'CTR-EDX2',
             'contract_type' => 'PKWT',
             'contract_start_date' => now()->subMonths(6)->format('Y-m-d'),
             'contract_end_date' => now()->addMonths(6)->format('Y-m-d'),
-            'contract_status' => 'ended_early',
+            'contract_status' => 'active',
+            'machine_pins' => [['device_id' => null, 'machine_user_id' => '1']],
             'login_password' => '',
         ])
         ->assertRedirect("/employees/{$employee->id}/edit")
@@ -934,7 +937,7 @@ test('renewing a contract reactivates an employee who had left', function () {
         ->and($employee->events()->where('type', 'reactivated')->exists())->toBeTrue();
 });
 
-test('editing a left employee with an active contract status reactivates them', function () {
+test('setting the status back to Aktif during edit reactivates a left employee', function () {
     $user = employeeManager();
     ['branch' => $branch, 'department' => $department, 'position' => $position] = hrMasterData();
 
@@ -970,7 +973,8 @@ test('editing a left employee with an active contract status reactivates them', 
             'full_name' => 'Aktif Lewat Edit',
             'email' => 'reedit@example.test',
             'join_date' => now()->subYears(2)->format('Y-m-d'),
-            'employment_status' => 'inactive',
+            // Back to Aktif: the employee is rehired on the contract entered here.
+            'employment_status' => 'active',
             'contract_number' => 'CTR-REEDIT-NEW',
             'machine_pins' => [['device_id' => null, 'machine_user_id' => '1']],
             'contract_type' => 'PKWT',

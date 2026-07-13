@@ -13,6 +13,7 @@ use App\Models\ShiftSwapRequest;
 use App\Models\User;
 use App\Notifications\ApprovalNotification;
 use Illuminate\Support\Facades\Auth;
+use Spatie\Permission\Exceptions\PermissionDoesNotExist;
 
 /**
  * Sends in-app notifications to the people who need to act on a request: the
@@ -248,12 +249,18 @@ class ApprovalNotifier
     /** Notify every user that holds a given permission (excluding the actor). */
     private function toPermission(string $permission, ApprovalNotification $notification): void
     {
-        User::query()
-            ->permission($permission)
-            ->when(Auth::id(), fn ($query) => $query->where('id', '!=', Auth::id()))
-            ->get()
-            ->each
-            ->notify($notification);
+        try {
+            $recipients = User::query()
+                ->permission($permission)
+                ->when(Auth::id(), fn ($query) => $query->where('id', '!=', Auth::id()))
+                ->get();
+        } catch (PermissionDoesNotExist) {
+            // The permission is not registered (yet), so nobody can hold it and there
+            // is nobody to notify. Never let that abort the action being notified.
+            return;
+        }
+
+        $recipients->each->notify($notification);
     }
 
     private function hm(int $minutes): string
