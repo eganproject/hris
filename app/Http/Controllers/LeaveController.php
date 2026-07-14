@@ -56,13 +56,17 @@ class LeaveController extends Controller
     }
 
     /**
-     * HR override: advance whichever step the request is currently on.
+     * HR override: advance whichever step the request is currently on. A request
+     * that already has a final decision is never touched again — two HR users with
+     * the list open at the same time must not both "decide" it.
      */
     public function approve(LeaveRequest $leaveRequest): RedirectResponse
     {
+        abort_unless($leaveRequest->status->isPending(), 403);
+
         if ($leaveRequest->status === LeaveRequestStatus::PendingSupervisor) {
             $this->workflow->supervisorApprove($leaveRequest, auth()->user());
-        } elseif ($leaveRequest->status === LeaveRequestStatus::PendingHr) {
+        } else {
             $this->workflow->hrApprove($leaveRequest, auth()->user());
         }
 
@@ -71,24 +75,36 @@ class LeaveController extends Controller
 
     public function reject(Request $request, LeaveRequest $leaveRequest): RedirectResponse
     {
-        if ($leaveRequest->status->isPending()) {
-            $this->workflow->reject($leaveRequest, auth()->user(), $request->string('decision_notes')->toString() ?: null);
-        }
+        abort_unless($leaveRequest->status->isPending(), 403);
+
+        $this->workflow->reject($leaveRequest, auth()->user(), $request->string('decision_notes')->toString() ?: null);
 
         return redirect()->route('attendance.leave.index')->with('status', 'Pengajuan ditolak.');
     }
 
+    /**
+     * Undo an approved leave without erasing it: the request stays on record as
+     * "Dibatalkan" (who approved it is still visible) and its days go back to the
+     * punch-based attendance status.
+     */
+    public function cancel(LeaveRequest $leaveRequest): RedirectResponse
+    {
+        abort_unless($leaveRequest->status === LeaveRequestStatus::Approved, 403);
+
+        $this->workflow->cancel($leaveRequest);
+
+        return redirect()->route('attendance.leave.index')->with('status', 'Cuti/izin yang sudah disetujui dibatalkan & absensi dikembalikan.');
+    }
+
+    /**
+     * Only requests that are not in effect can be erased. An approved leave must be
+     * cancelled instead, so the approval trail is never silently deleted.
+     */
     public function destroy(LeaveRequest $leaveRequest): RedirectResponse
     {
-        $wasApproved = $leaveRequest->status === LeaveRequestStatus::Approved;
+        abort_if($leaveRequest->status === LeaveRequestStatus::Approved, 403);
 
         $leaveRequest->delete();
-
-        // If an approved leave is removed, re-resolve those days so the attendance
-        // reverts from "Cuti" to its punch-based status.
-        if ($wasApproved) {
-            $this->workflow->syncAttendance($leaveRequest);
-        }
 
         return redirect()->route('attendance.leave.index')->with('status', 'Pengajuan dihapus.');
     }

@@ -157,6 +157,51 @@ test('an admin leave request for an employee with a manager needs two approvals'
         ->and(LeaveRequest::query()->approvedOn('2026-02-11')->exists())->toBeTrue();
 });
 
+test('an approved leave can only be cancelled, never deleted or decided again', function () {
+    $user = attendanceManager();
+    $employee = Employee::query()->create(['full_name' => 'Sudah Disetujui', 'employment_status' => 'active']);
+    $type = LeaveType::query()->create(['code' => 'IZ', 'name' => 'Izin', 'attendance_status' => 'leave', 'is_paid' => true, 'is_active' => true]);
+
+    $this->actingAs($user)->post('/attendance/leave', [
+        'employee_id' => $employee->id,
+        'leave_type_id' => $type->id,
+        'start_date' => '2026-02-10',
+        'end_date' => '2026-02-11',
+    ])->assertRedirect('/attendance/leave');
+
+    $leave = LeaveRequest::query()->firstOrFail();
+
+    // No manager, so a single approval finalises it.
+    $this->actingAs($user)->patch("/attendance/leave/{$leave->id}/approve")->assertRedirect('/attendance/leave');
+    expect($leave->refresh()->status)->toBe(LeaveRequestStatus::Approved);
+
+    // Deciding it again (two HR users with the list open) must not go through.
+    $this->actingAs($user)->patch("/attendance/leave/{$leave->id}/approve")->assertForbidden();
+    $this->actingAs($user)->patch("/attendance/leave/{$leave->id}/reject")->assertForbidden();
+
+    // Deleting an approved leave would erase the approval trail.
+    $this->actingAs($user)->delete("/attendance/leave/{$leave->id}")->assertForbidden();
+    expect(LeaveRequest::query()->whereKey($leave->id)->exists())->toBeTrue();
+
+    // The list must not even offer "Hapus" for it.
+    $this->actingAs($user)->get('/attendance/leave')
+        ->assertOk()
+        ->assertSee('Batalkan')
+        ->assertDontSee('data-delete-leave="'.$leave->id.'"', escape: false);
+
+    // Cancelling keeps the record (and who approved it) but takes it out of effect.
+    $this->actingAs($user)->patch("/attendance/leave/{$leave->id}/cancel")->assertRedirect('/attendance/leave');
+    $leave->refresh();
+
+    expect($leave->status)->toBe(LeaveRequestStatus::Cancelled)
+        ->and($leave->approved_by)->toBe($user->id)
+        ->and(LeaveRequest::query()->approvedOn('2026-02-10')->exists())->toBeFalse();
+
+    // Once cancelled it is no longer in effect, so it may be deleted.
+    $this->actingAs($user)->delete("/attendance/leave/{$leave->id}")->assertRedirect('/attendance/leave');
+    expect(LeaveRequest::query()->whereKey($leave->id)->exists())->toBeFalse();
+});
+
 test('a request for an employee without a manager starts at the HR step', function () {
     $user = attendanceManager();
     $employee = Employee::query()->create(['full_name' => 'Sendiri', 'employment_status' => 'active']);

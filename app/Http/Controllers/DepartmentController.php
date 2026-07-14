@@ -53,8 +53,16 @@ class DepartmentController extends Controller
         return redirect()->route('organization.departments.index')->with('status', 'Divisi berhasil diperbarui.');
     }
 
+    /** A division still holding employees cannot be deleted — see BranchController. */
     public function destroy(Department $department): RedirectResponse
     {
+        $employees = $department->employees()->count();
+
+        if ($employees > 0) {
+            return redirect()->route('organization.departments.index')
+                ->with('error', "Divisi \"{$department->name}\" masih dipakai {$employees} karyawan. Pindahkan karyawan tersebut ke divisi lain sebelum menghapusnya.");
+        }
+
         $department->delete();
 
         return redirect()->route('organization.departments.index')->with('status', 'Divisi berhasil dihapus.');

@@ -256,12 +256,18 @@
                                                 <button type="button" class="action-menu-item" data-open-exit data-url="{{ route('employees.resign', $employee) }}" data-name="{{ $employee->full_name }}"><x-icon name="user-x"/> Proses Keluar</button>
                                             @endif
                                         @endcan
+                                        {{-- Hapus hanya untuk data yang masih "kosong": begitu ada absensi,
+                                             jadwal atau cuti, riwayatnya harus tetap ada (pakai Proses Keluar). --}}
                                         @can('employees.delete')
-                                            <form method="POST" action="{{ route('employees.destroy', $employee) }}">
-                                                @csrf
-                                                @method('DELETE')
-                                                <button type="submit" class="action-menu-item action-menu-item-danger"><x-icon name="trash"/> Hapus</button>
-                                            </form>
+                                            @if ($employee->hasOperationalHistory())
+                                                <span class="action-menu-item cursor-not-allowed text-gray-400" title="Sudah punya riwayat absensi/jadwal/cuti — gunakan Proses Keluar (Nonaktif)."><x-icon name="trash"/> Hapus</span>
+                                            @else
+                                                <form method="POST" action="{{ route('employees.destroy', $employee) }}" data-delete-employee="{{ $employee->id }}">
+                                                    @csrf
+                                                    @method('DELETE')
+                                                    <button type="submit" class="action-menu-item action-menu-item-danger"><x-icon name="trash"/> Hapus</button>
+                                                </form>
+                                            @endif
                                         @endcan
                                     </x-action-menu>
                                 </td>

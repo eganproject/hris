@@ -58,7 +58,12 @@ class EmployeeManagementController extends Controller
                 });
             });
 
-        $employees = $applyFilters(Employee::query()->with(['branch', 'department', 'jobPosition', 'currentContract', 'latestContract']))
+        $employees = $applyFilters(
+            Employee::query()
+                ->with(['branch', 'department', 'jobPosition', 'currentContract', 'latestContract'])
+                // Lets each row decide whether "Hapus" may be offered at all.
+                ->withHistoryFlags()
+        )
             ->latest('join_date')
             ->paginate($perPage)
             ->withQueryString();
@@ -341,8 +346,20 @@ class EmployeeManagementController extends Controller
             });
     }
 
+    /**
+     * Deleting an employee cascades away their attendance, punches, schedules, leave
+     * and overtime — history that payroll and audits rely on. So it is only allowed
+     * while the record is still "empty"; anyone who has worked here is exited
+     * (Nonaktif) instead.
+     */
     public function destroy(Employee $employee): RedirectResponse
     {
+        if ($employee->hasOperationalHistory()) {
+            return redirect()
+                ->route('employees.index')
+                ->with('bulk_error', "{$employee->full_name} sudah memiliki riwayat absensi/jadwal/cuti, jadi tidak bisa dihapus. Gunakan Proses Keluar (Nonaktif) agar riwayatnya tetap tersimpan.");
+        }
+
         $employee->delete();
 
         return redirect()
@@ -609,7 +626,8 @@ class EmployeeManagementController extends Controller
     }
 
     /**
-     * Bulk delete the checklisted employees.
+     * Bulk delete the checklisted employees. Anyone who already has operational
+     * history is skipped rather than silently wiped — see destroy().
      */
     public function bulkDestroy(Request $request): RedirectResponse
     {
@@ -622,19 +640,35 @@ class EmployeeManagementController extends Controller
             return back()->with('bulk_error', $validator->errors()->first());
         }
 
-        $employees = Employee::query()->whereIn('id', $validator->validated()['employee_ids'])->get();
-        $count = 0;
+        $employees = Employee::query()
+            ->whereIn('id', $validator->validated()['employee_ids'])
+            ->withHistoryFlags()
+            ->get();
 
-        DB::transaction(function () use ($employees, &$count) {
+        $count = 0;
+        /** @var list<string> $skipped */
+        $skipped = [];
+
+        DB::transaction(function () use ($employees, &$count, &$skipped) {
             foreach ($employees as $employee) {
+                if ($employee->hasOperationalHistory()) {
+                    $skipped[] = $employee->full_name;
+
+                    continue;
+                }
+
                 $employee->delete();
                 $count++;
             }
         });
 
-        return redirect()
-            ->route('employees.index')
-            ->with('status', "{$count} karyawan berhasil dihapus.");
+        $redirect = redirect()->route('employees.index');
+
+        if ($skipped !== []) {
+            $redirect->with('bulk_error', count($skipped).' karyawan dilewati karena sudah punya riwayat absensi/jadwal/cuti ('.implode(', ', $skipped).'). Gunakan Proses Keluar (Nonaktif) untuk mereka.');
+        }
+
+        return $redirect->with('status', "{$count} karyawan berhasil dihapus.");
     }
 
     /**

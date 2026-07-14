@@ -249,6 +249,7 @@ Route::middleware('auth')->group(function () {
         Route::post('leave', [LeaveController::class, 'store'])->middleware('permission:attendance.create')->name('leave.store');
         Route::patch('leave/{leaveRequest}/approve', [LeaveController::class, 'approve'])->middleware('permission:attendance.update')->name('leave.approve');
         Route::patch('leave/{leaveRequest}/reject', [LeaveController::class, 'reject'])->middleware('permission:attendance.update')->name('leave.reject');
+        Route::patch('leave/{leaveRequest}/cancel', [LeaveController::class, 'cancel'])->middleware('permission:attendance.update')->name('leave.cancel');
         Route::delete('leave/{leaveRequest}', [LeaveController::class, 'destroy'])->middleware('permission:attendance.delete')->name('leave.destroy');
 
         // Master data cuti: jenis cuti + kuota per karyawan. Rute literal

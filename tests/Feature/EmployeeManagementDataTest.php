@@ -1,6 +1,7 @@
 <?php
 
 use App\Actions\DeactivateExpiredContracts;
+use App\Models\Attendance;
 use App\Models\Branch;
 use App\Models\Department;
 use App\Models\Device;
@@ -140,6 +141,65 @@ test('the employee form shows the code as read-only instead of asking for it', f
         ->assertOk()
         ->assertSee('Dibuat otomatis setelah disimpan')
         ->assertDontSee('name="employee_number"', escape: false);
+});
+
+test('an employee with operational history cannot be deleted, only exited', function () {
+    $user = employeeManager();
+    ['branch' => $branch, 'department' => $department, 'position' => $position] = hrMasterData();
+
+    $employee = Employee::query()->create([
+        'branch_id' => $branch->id,
+        'department_id' => $department->id,
+        'job_position_id' => $position->id,
+        'full_name' => 'Punya Riwayat',
+        'join_date' => now()->subYear()->toDateString(),
+        'employment_status' => 'active',
+    ]);
+
+    // One attendance row is enough: deleting the employee would cascade it away.
+    Attendance::query()->create([
+        'employee_id' => $employee->id,
+        'work_date' => now()->subDay()->toDateString(),
+        'status' => 'present',
+    ]);
+
+    $this->actingAs($user)->delete("/employees/{$employee->id}")
+        ->assertRedirect('/employees')
+        ->assertSessionHas('bulk_error');
+
+    expect(Employee::query()->whereKey($employee->id)->exists())->toBeTrue();
+
+    // The list offers no delete form for that row.
+    $this->actingAs($user)->get('/employees')
+        ->assertOk()
+        ->assertDontSee('data-delete-employee="'.$employee->id.'"', escape: false);
+
+    // Bulk delete skips them instead of wiping them.
+    $this->actingAs($user)->post('/employees/bulk/delete', ['employee_ids' => [$employee->id]])
+        ->assertRedirect('/employees')
+        ->assertSessionHas('bulk_error');
+
+    expect(Employee::query()->whereKey($employee->id)->exists())->toBeTrue();
+});
+
+test('an employee without any history can still be deleted', function () {
+    $user = employeeManager();
+    ['branch' => $branch, 'department' => $department, 'position' => $position] = hrMasterData();
+
+    $employee = Employee::query()->create([
+        'branch_id' => $branch->id,
+        'department_id' => $department->id,
+        'job_position_id' => $position->id,
+        'full_name' => 'Salah Input',
+        'join_date' => now()->toDateString(),
+        'employment_status' => 'active',
+    ]);
+
+    $this->actingAs($user)->delete("/employees/{$employee->id}")
+        ->assertRedirect('/employees')
+        ->assertSessionMissing('bulk_error');
+
+    expect(Employee::query()->whereKey($employee->id)->exists())->toBeFalse();
 });
 
 test('the password field can be revealed on both the create and the edit form', function () {

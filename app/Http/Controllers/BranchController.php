@@ -55,8 +55,20 @@ class BranchController extends Controller
         return redirect()->route('organization.branches.index')->with('status', 'Lokasi kerja berhasil diperbarui.');
     }
 
+    /**
+     * Employees point at their branch with a nullOnDelete foreign key, so deleting a
+     * branch that is still in use would quietly leave those people without a work
+     * location (and without the location code their employee code is built from).
+     */
     public function destroy(Branch $branch): RedirectResponse
     {
+        $employees = $branch->employees()->count();
+
+        if ($employees > 0) {
+            return redirect()->route('organization.branches.index')
+                ->with('error', "Lokasi kerja \"{$branch->name}\" masih dipakai {$employees} karyawan. Pindahkan karyawan tersebut ke lokasi lain sebelum menghapusnya.");
+        }
+
         $branch->delete();
 
         return redirect()->route('organization.branches.index')->with('status', 'Lokasi kerja berhasil dihapus.');

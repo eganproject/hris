@@ -61,8 +61,16 @@ class JobPositionController extends Controller
         return redirect()->route('organization.job-positions.index')->with('status', 'Jabatan berhasil diperbarui.');
     }
 
+    /** A position still held by employees cannot be deleted — see BranchController. */
     public function destroy(JobPosition $jobPosition): RedirectResponse
     {
+        $employees = $jobPosition->employees()->count();
+
+        if ($employees > 0) {
+            return redirect()->route('organization.job-positions.index')
+                ->with('error', "Jabatan \"{$jobPosition->name}\" masih dipakai {$employees} karyawan. Pindahkan karyawan tersebut ke jabatan lain sebelum menghapusnya.");
+        }
+
         $jobPosition->delete();
 
         return redirect()->route('organization.job-positions.index')->with('status', 'Jabatan berhasil dihapus.');

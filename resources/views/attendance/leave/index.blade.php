@@ -85,11 +85,23 @@
                                                     </form>
                                                 @endif
                                             @endcan
+                                            {{-- Approved leave is undone by cancelling it (the record and its
+                                                 approval trail stay), never by deleting it. --}}
+                                            @can('attendance.update')
+                                                @if ($leaveRequest->status === \App\Enums\LeaveRequestStatus::Approved)
+                                                    <form method="POST" action="{{ route('attendance.leave.cancel', $leaveRequest) }}" onsubmit="return confirm('Batalkan cuti/izin yang sudah disetujui ini? Absensi pada hari tersebut akan dikembalikan.')">
+                                                        @csrf @method('PATCH')
+                                                        <button type="submit" class="action-menu-item action-menu-item-danger"><x-icon name="user-x"/> Batalkan</button>
+                                                    </form>
+                                                @endif
+                                            @endcan
                                             @can('attendance.delete')
-                                                <form method="POST" action="{{ route('attendance.leave.destroy', $leaveRequest) }}">
-                                                    @csrf @method('DELETE')
-                                                    <button type="submit" class="action-menu-item action-menu-item-danger"><x-icon name="trash"/> Hapus</button>
-                                                </form>
+                                                @if ($leaveRequest->status !== \App\Enums\LeaveRequestStatus::Approved)
+                                                    <form method="POST" action="{{ route('attendance.leave.destroy', $leaveRequest) }}" data-delete-leave="{{ $leaveRequest->id }}">
+                                                        @csrf @method('DELETE')
+                                                        <button type="submit" class="action-menu-item action-menu-item-danger"><x-icon name="trash"/> Hapus</button>
+                                                    </form>
+                                                @endif
                                             @endcan
                                         </x-action-menu>
                                     @endcanany

@@ -152,6 +152,11 @@ class Employee extends Model
         return $this->hasMany(AttendanceCorrection::class);
     }
 
+    public function overtimeApprovals(): HasMany
+    {
+        return $this->hasMany(OvertimeApproval::class);
+    }
+
     public function swapRequests(): HasMany
     {
         return $this->hasMany(ShiftSwapRequest::class, 'requester_id');
@@ -202,6 +207,49 @@ class Employee extends Model
     public function latestContract(): HasOne
     {
         return $this->hasOne(EmployeeContract::class)->latestOfMany('start_date');
+    }
+
+    /**
+     * Rows that make an employee's record part of the operational history: deleting
+     * the employee would cascade these away (attendance, leave, schedules, …), so
+     * once any of them exists the record can only be exited, never deleted.
+     *
+     * @var list<string>
+     */
+    public const HISTORY_RELATIONS = [
+        'attendances',
+        'punches',
+        'schedules',
+        'leaveRequests',
+        'attendanceCorrections',
+        'overtimeApprovals',
+    ];
+
+    /** Flag every history relation in one query, so a list can hide "Hapus" per row. */
+    public function scopeWithHistoryFlags(Builder $query): void
+    {
+        $query->withExists(self::HISTORY_RELATIONS);
+    }
+
+    public function hasOperationalHistory(): bool
+    {
+        foreach (self::HISTORY_RELATIONS as $relation) {
+            $flag = str($relation)->snake()->toString().'_exists';
+
+            if (array_key_exists($flag, $this->attributes)) {
+                if ($this->attributes[$flag]) {
+                    return true;
+                }
+
+                continue; // flagged by withHistoryFlags(): no need to query
+            }
+
+            if ($this->{$relation}()->exists()) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     public function scopeActive(Builder $query): void

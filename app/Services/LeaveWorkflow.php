@@ -108,8 +108,19 @@ class LeaveWorkflow
         app(ApprovalNotifier::class)->leaveDecided($request);
     }
 
+    /**
+     * Cancelling keeps the request (and its decision trail) but takes it out of
+     * effect. An already-approved leave also gives its days back to attendance, so
+     * they revert from "Cuti" to the punch-based status.
+     */
     public function cancel(LeaveRequest $request): void
     {
+        $wasApproved = $request->status === LeaveRequestStatus::Approved;
+
         $request->update(['status' => LeaveRequestStatus::Cancelled]);
+
+        if ($wasApproved) {
+            $this->syncAttendance($request);
+        }
     }
 }

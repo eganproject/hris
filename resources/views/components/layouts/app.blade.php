@@ -16,6 +16,12 @@
             <div data-flash-notification data-type="success" data-message="{{ session('status') }}" hidden></div>
         @endif
 
+        {{-- Refusals (mis. hapus data yang masih dipakai) memakai flash "error"; tanpa ini
+             pesannya hanya tampil di halaman yang kebetulan merendernya sendiri. --}}
+        @if (session('error'))
+            <div data-flash-notification data-type="error" data-message="{{ session('error') }}" hidden></div>
+        @endif
+
         <div class="app-loading-overlay" data-loading-overlay hidden>
             <div class="app-loading-card" role="status" aria-live="polite">
                 <div class="app-loading-spinner" aria-hidden="true"></div>

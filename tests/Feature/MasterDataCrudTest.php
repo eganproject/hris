@@ -2,6 +2,7 @@
 
 use App\Models\Branch;
 use App\Models\Department;
+use App\Models\Employee;
 use App\Models\JobPosition;
 use App\Models\Shift;
 use App\Models\User;
@@ -143,6 +144,36 @@ test('admin can manage shift master data', function () {
     $this->actingAs($admin)->delete(route('attendance.shifts.destroy', $shift))->assertRedirect(route('attendance.shifts.index'));
 
     $this->assertDatabaseMissing('shifts', ['code' => 'MLM']);
+});
+
+test('master data still used by employees cannot be deleted', function () {
+    $admin = masterDataAdmin();
+
+    $branch = Branch::query()->create(['code' => 'SBY-OFC-01', 'name' => 'Surabaya Office', 'is_active' => true]);
+    $department = Department::query()->create(['code' => 'OPS', 'name' => 'Operasional', 'is_active' => true]);
+    $position = JobPosition::query()->create(['code' => 'STF', 'name' => 'Staf', 'is_active' => true]);
+
+    Employee::query()->create([
+        'branch_id' => $branch->id,
+        'department_id' => $department->id,
+        'job_position_id' => $position->id,
+        'full_name' => 'Masih Menempati',
+        'join_date' => now()->toDateString(),
+        'employment_status' => 'active',
+    ]);
+
+    foreach ([
+        route('organization.branches.destroy', $branch),
+        route('organization.departments.destroy', $department),
+        route('organization.job-positions.destroy', $position),
+    ] as $url) {
+        $this->actingAs($admin)->delete($url)->assertSessionHas('error');
+    }
+
+    // Nothing was removed, so no employee silently lost their placement.
+    expect(Branch::query()->whereKey($branch->id)->exists())->toBeTrue()
+        ->and(Department::query()->whereKey($department->id)->exists())->toBeTrue()
+        ->and(JobPosition::query()->whereKey($position->id)->exists())->toBeTrue();
 });
 
 test('master data pages are protected by permissions', function () {
