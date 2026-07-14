@@ -7,7 +7,7 @@
                 <p class="mt-1 text-sm text-gray-500">Status dihitung dari jadwal, hari libur, cuti disetujui, dan jam presensi.</p>
             </div>
             <div class="flex flex-wrap items-center gap-2">
-                @can('attendance.update')
+                @can('attendance-daily.update')
                     <form method="POST" action="{{ route('attendance.daily.process') }}">
                         @csrf
                         <input type="hidden" name="date" value="{{ $date->toDateString() }}">
@@ -81,7 +81,7 @@
                                     @endif
                                 </td>
                                 <td class="text-right">
-                                    @can('attendance.update')
+                                    @can('attendance-daily.update')
                                         <button type="button" data-punch
                                             data-emp="{{ $employee->id }}" data-emp-name="{{ $employee->full_name }}"
                                             data-in="{{ $att?->clock_in?->format('H:i') }}" data-out="{{ $att?->clock_out?->format('H:i') }}"
@@ -99,7 +99,7 @@
         </section>
     </div>
 
-    @can('attendance.update')
+    @can('attendance-daily.update')
         <dialog id="punch-dialog" class="w-full max-w-md rounded-lg p-0 backdrop:bg-black/40">
             <form method="POST" action="{{ route('attendance.daily.punch') }}" data-no-confirm="true" class="space-y-4 p-6">
                 @csrf

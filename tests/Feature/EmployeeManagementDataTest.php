@@ -29,6 +29,8 @@ function employeeManager(): User
         'employees.create',
         'employees.update',
         'employees.delete',
+        'employees.export',
+        'employees.import',
     ];
 
     foreach ($permissions as $permission) {

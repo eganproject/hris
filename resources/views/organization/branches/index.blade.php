@@ -5,7 +5,7 @@
                 <p class="text-sm font-medium text-gray-500">Master organisasi</p>
                 <h1 class="mt-1 text-2xl font-semibold text-gray-950">Lokasi Kerja</h1>
             </div>
-            @can('organization.create')
+            @can('branches.create')
                 <a href="{{ route('organization.branches.create') }}" class="rounded-md bg-primary px-4 py-2.5 text-sm font-semibold text-white shadow-xs transition hover:bg-primary-hover">Tambah Lokasi</a>
             @endcan
         </section>
@@ -54,12 +54,12 @@
                                 <td class="text-right">{{ number_format($branch->departments_count) }}</td>
                                 <td class="text-right">{{ number_format($branch->active_employees_count) }}</td>
                                 <td class="text-right">
-                                    @canany(['organization.update', 'organization.delete'])
+                                    @canany(['branches.update', 'branches.delete'])
                                         <x-action-menu>
-                                            @can('organization.update')
+                                            @can('branches.update')
                                                 <a href="{{ route('organization.branches.edit', $branch) }}" class="action-menu-item"><x-icon name="pencil"/> Edit</a>
                                             @endcan
-                                            @can('organization.delete')
+                                            @can('branches.delete')
                                                 <form method="POST" action="{{ route('organization.branches.destroy', $branch) }}">
                                                     @csrf
                                                     @method('DELETE')

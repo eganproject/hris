@@ -40,7 +40,7 @@
                                     @if ($req->reviewer)<p class="mt-1 text-xs text-gray-400">oleh {{ $req->reviewer->name }}</p>@endif
                                 </td>
                                 <td class="text-right">
-                                    @can('attendance.update')
+                                    @can('swaps.update')
                                         @if ($req->isPendingHr())
                                             <div class="flex justify-end gap-2">
                                                 <form method="POST" action="{{ route('attendance.swaps.approve', $req) }}" onsubmit="return confirm('Setujui & terapkan tukar jadwal?')">@csrf @method('PATCH')<button class="rounded-md bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-700">Setujui</button></form>

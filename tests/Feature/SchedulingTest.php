@@ -25,7 +25,7 @@ function scheduleManager(): User
 {
     app(PermissionRegistrar::class)->forgetCachedPermissions();
 
-    $permissions = ['attendance.view', 'attendance.view.all', 'attendance.create', 'attendance.update', 'attendance.delete'];
+    $permissions = [...attendanceMenuPermissions(), 'attendance.view.all'];
 
     foreach ($permissions as $permission) {
         Permission::findOrCreate($permission, 'web');

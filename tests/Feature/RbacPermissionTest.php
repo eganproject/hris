@@ -76,6 +76,8 @@ test('employee managers can see and access employee mutation actions', function 
         'employees.create',
         'employees.update',
         'employees.delete',
+        'employees.export',
+        'employees.import',
     ]);
 
     $this->actingAs($user)

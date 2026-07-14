@@ -7,12 +7,12 @@
             </div>
 
             <div class="flex flex-wrap items-center gap-2">
-                @can('employees.view')
+                @can('employees.export')
                     <a href="{{ route('employees.export', request()->query()) }}" class="inline-flex items-center justify-center gap-1.5 rounded-md border border-gray-200 bg-white px-4 py-2.5 text-sm font-semibold text-gray-700 shadow-xs transition hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2">
                         <x-icon name="download" class="size-4"/> Export Excel
                     </a>
                 @endcan
-                @can('employees.create')
+                @can('employees.import')
                     <button type="button" data-open-import class="inline-flex items-center justify-center gap-1.5 rounded-md border border-gray-200 bg-white px-4 py-2.5 text-sm font-semibold text-gray-700 shadow-xs transition hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2">
                         <x-icon name="upload" class="size-4"/> Import Excel
                     </button>

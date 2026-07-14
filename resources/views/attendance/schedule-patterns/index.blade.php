@@ -8,7 +8,7 @@
             </div>
             <div class="flex gap-2">
                 <a href="{{ route('attendance.schedules.index') }}" class="rounded-md border border-gray-200 px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50">Lihat Jadwal Kerja</a>
-                @can('attendance.create')<a href="{{ route('attendance.schedule-patterns.create') }}" class="rounded-md bg-primary px-4 py-2.5 text-sm font-semibold text-white shadow-xs hover:bg-primary-hover">Tambah Pola</a>@endcan
+                @can('schedule-patterns.create')<a href="{{ route('attendance.schedule-patterns.create') }}" class="rounded-md bg-primary px-4 py-2.5 text-sm font-semibold text-white shadow-xs hover:bg-primary-hover">Tambah Pola</a>@endcan
             </div>
         </section>
 
@@ -46,11 +46,11 @@
                                 <td class="text-sm text-gray-700">{{ $pattern->assignments_count }} karyawan</td>
                                 <td><x-status-badge :tone="$pattern->is_active ? 'success' : 'neutral'">{{ $pattern->is_active ? 'Aktif' : 'Nonaktif' }}</x-status-badge></td>
                                 <td class="text-right">
-                                    @canany(['attendance.update', 'attendance.delete', 'attendance.create'])
+                                    @canany(['schedule-patterns.update', 'schedule-patterns.delete', 'schedule-patterns.create'])
                                         <x-action-menu>
-                                            @can('attendance.create')<a href="{{ route('attendance.schedules.assign') }}" class="action-menu-item"><x-icon name="plus"/> Tugaskan</a>@endcan
-                                            @can('attendance.update')<a href="{{ route('attendance.schedule-patterns.edit', $pattern) }}" class="action-menu-item"><x-icon name="pencil"/> Edit</a>@endcan
-                                            @can('attendance.delete')<form method="POST" action="{{ route('attendance.schedule-patterns.destroy', $pattern) }}" onsubmit="return confirm('Hapus pola ini?')">@csrf @method('DELETE')<button type="submit" class="action-menu-item action-menu-item-danger"><x-icon name="trash"/> Hapus</button></form>@endcan
+                                            @can('schedules.create')<a href="{{ route('attendance.schedules.assign') }}" class="action-menu-item"><x-icon name="plus"/> Tugaskan</a>@endcan
+                                            @can('schedule-patterns.update')<a href="{{ route('attendance.schedule-patterns.edit', $pattern) }}" class="action-menu-item"><x-icon name="pencil"/> Edit</a>@endcan
+                                            @can('schedule-patterns.delete')<form method="POST" action="{{ route('attendance.schedule-patterns.destroy', $pattern) }}" onsubmit="return confirm('Hapus pola ini?')">@csrf @method('DELETE')<button type="submit" class="action-menu-item action-menu-item-danger"><x-icon name="trash"/> Hapus</button></form>@endcan
                                         </x-action-menu>
                                     @endcanany
                                 </td>

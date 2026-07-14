@@ -8,7 +8,7 @@
             </div>
             <div class="flex flex-wrap items-center gap-2">
                 <a href="{{ route('attendance.schedule-patterns.index') }}" class="rounded-md border border-gray-200 px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50">Pola Jadwal</a>
-                @can('attendance.update')
+                @can('schedules.update')
                     <form method="POST" action="{{ route('attendance.schedules.generate') }}">
                         @csrf
                         <input type="hidden" name="month" value="{{ $month->format('Y-m') }}">
@@ -16,7 +16,7 @@
                         <button type="submit" class="inline-flex items-center gap-1.5 rounded-md border border-gray-200 px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50"><x-icon name="refresh"/> Generate Ulang</button>
                     </form>
                 @endcan
-                @can('attendance.create')<a href="{{ route('attendance.schedules.assign') }}" class="rounded-md bg-primary px-4 py-2.5 text-sm font-semibold text-white shadow-xs hover:bg-primary-hover">Tugaskan Pola</a>@endcan
+                @can('schedules.create')<a href="{{ route('attendance.schedules.assign') }}" class="rounded-md bg-primary px-4 py-2.5 text-sm font-semibold text-white shadow-xs hover:bg-primary-hover">Tugaskan Pola</a>@endcan
             </div>
         </section>
 
@@ -97,7 +97,7 @@
                                     @endphp
                                     <td @class(['border-l border-gray-100 p-0.5', 'bg-red-50/60' => $hol, 'bg-gray-50/60' => ! $hol && $day->isWeekend()])>
                                         <button type="button"
-                                            @can('attendance.update') data-cell
+                                            @can('schedules.update') data-cell
                                                 data-emp="{{ $employee->id }}" data-emp-name="{{ $employee->full_name }}"
                                                 data-date="{{ $key }}" data-date-label="{{ $day->translatedFormat('l, d M Y') }}"
                                                 data-shift="{{ $sched && ! $sched->is_day_off ? $sched->shift_id : '' }}"
@@ -106,7 +106,7 @@
                                             @else disabled @endcan
                                             @class([
                                                 'flex h-9 w-full items-center justify-center rounded text-[11px] font-semibold transition',
-                                                'cursor-pointer hover:ring-2 hover:ring-primary/40' => auth()->user()->can('attendance.update'),
+                                                'cursor-pointer hover:ring-2 hover:ring-primary/40' => auth()->user()->can('schedules.update'),
                                                 'bg-amber-100 text-amber-800' => $leave,
                                                 'bg-primary/10 text-primary' => ! $leave && $sched && ! $sched->is_day_off,
                                                 'text-gray-300' => ! $leave && (! $sched || $sched->is_day_off),
@@ -155,7 +155,7 @@
                                 <td>{{ $assignment->pattern?->name }} <span class="text-xs text-gray-500">({{ $assignment->pattern?->type->label() }})</span></td>
                                 <td class="text-sm text-gray-600">{{ $assignment->start_date->translatedFormat('d M Y') }} – {{ $assignment->end_date ? $assignment->end_date->translatedFormat('d M Y') : 'seterusnya' }}</td>
                                 <td class="text-right">
-                                    @can('attendance.delete')
+                                    @can('schedules.delete')
                                         <form method="POST" action="{{ route('attendance.schedules.assignments.destroy', $assignment) }}" onsubmit="return confirm('Hapus penugasan ini? Jadwal yang sudah dibuat tetap tersimpan.')">
                                             @csrf @method('DELETE')
                                             <button type="submit" class="inline-flex items-center gap-1 text-sm text-red-600 hover:text-red-700"><x-icon name="trash"/> Hapus</button>
@@ -172,7 +172,7 @@
         </section>
     </div>
 
-    @can('attendance.update')
+    @can('schedules.update')
         <dialog id="override-dialog" class="w-full max-w-md rounded-lg p-0 backdrop:bg-black/40">
             <form method="POST" action="{{ route('attendance.schedules.override') }}" data-no-confirm="true" class="space-y-4 p-6">
                 @csrf

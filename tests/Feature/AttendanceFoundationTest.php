@@ -19,7 +19,7 @@ function attendanceManager(): User
 {
     app(PermissionRegistrar::class)->forgetCachedPermissions();
 
-    $permissions = ['dashboard.view', 'attendance.view', 'attendance.view.all', 'attendance.create', 'attendance.update', 'attendance.delete'];
+    $permissions = ['dashboard.view', ...attendanceMenuPermissions(), 'attendance.view.all'];
 
     foreach ($permissions as $permission) {
         Permission::findOrCreate($permission, 'web');

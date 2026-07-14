@@ -82,7 +82,7 @@
                                     <x-status-badge :tone="$tone">{{ ['matched' => 'Cocok', 'unmatched' => 'Belum cocok', 'ignored' => 'Diabaikan'][$punch->status] ?? $punch->status }}</x-status-badge>
                                 </td>
                                 <td class="text-right">
-                                    @can('attendance.update')
+                                    @can('punches.update')
                                         @if ($punch->status === 'unmatched')
                                             <form method="POST" action="{{ route('attendance.punches.ignore', $punch) }}">@csrf<button type="submit" class="text-xs text-gray-500 hover:text-gray-700">Abaikan</button></form>
                                         @endif

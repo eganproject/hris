@@ -29,17 +29,17 @@ class DashboardController extends Controller
         return view('dashboard', [
             'metrics' => collect([
                 ['label' => 'Karyawan Aktif', 'value' => Employee::query()->active()->count(), 'tone' => 'emerald', 'icon' => 'user-check', 'permission' => 'employees.view'],
-                ['label' => 'Departments', 'value' => Department::query()->count(), 'tone' => 'sky', 'icon' => 'layers', 'permission' => 'organization.view'],
-                ['label' => 'Lokasi Kerja', 'value' => Branch::query()->where('is_active', true)->count(), 'tone' => 'amber', 'icon' => 'map-pin', 'permission' => 'organization.view'],
+                ['label' => 'Departments', 'value' => Department::query()->count(), 'tone' => 'sky', 'icon' => 'layers', 'permission' => 'departments.view'],
+                ['label' => 'Lokasi Kerja', 'value' => Branch::query()->where('is_active', true)->count(), 'tone' => 'amber', 'icon' => 'map-pin', 'permission' => 'branches.view'],
                 ['label' => 'Kontrak Habis 30 Hari', 'value' => EmployeeContract::query()->expiringWithin(30)->count(), 'tone' => 'rose', 'icon' => 'calendar-clock', 'permission' => 'employees.view'],
             ])->filter(fn (array $metric) => $user?->can($metric['permission']))->values(),
             'modules' => collect([
                 ['name' => 'Employee', 'description' => 'People records, contracts, and assignments.', 'count' => Employee::query()->count(), 'permission' => 'employees.view', 'route' => 'employees.index'],
-                ['name' => 'Department', 'description' => 'Organization units and reporting groups.', 'count' => Department::query()->count(), 'permission' => 'organization.view', 'route' => 'organization.departments.index'],
-                ['name' => 'Branch', 'description' => 'Office locations, warehouses, and operational areas.', 'count' => Branch::query()->count(), 'permission' => 'organization.view', 'route' => 'organization.branches.index'],
-                ['name' => 'Shift', 'description' => 'Work schedules and shift templates.', 'count' => Shift::query()->count(), 'permission' => 'attendance.view', 'route' => 'attendance.shifts.index'],
-                ['name' => 'Job Position', 'description' => 'Roles, levels, and position catalog.', 'count' => JobPosition::query()->count(), 'permission' => 'organization.view', 'route' => 'organization.job-positions.index'],
-                ['name' => 'Attendance', 'description' => 'Daily clock activity and attendance history.', 'count' => AttendanceRecord::query()->count(), 'permission' => 'attendance.view', 'route' => null],
+                ['name' => 'Department', 'description' => 'Organization units and reporting groups.', 'count' => Department::query()->count(), 'permission' => 'departments.view', 'route' => 'organization.departments.index'],
+                ['name' => 'Branch', 'description' => 'Office locations, warehouses, and operational areas.', 'count' => Branch::query()->count(), 'permission' => 'branches.view', 'route' => 'organization.branches.index'],
+                ['name' => 'Shift', 'description' => 'Work schedules and shift templates.', 'count' => Shift::query()->count(), 'permission' => 'shifts.view', 'route' => 'attendance.shifts.index'],
+                ['name' => 'Job Position', 'description' => 'Roles, levels, and position catalog.', 'count' => JobPosition::query()->count(), 'permission' => 'job-positions.view', 'route' => 'organization.job-positions.index'],
+                ['name' => 'Attendance', 'description' => 'Daily clock activity and attendance history.', 'count' => AttendanceRecord::query()->count(), 'permission' => 'attendance-daily.view', 'route' => null],
             ])->filter(fn (array $module) => $user?->can($module['permission']))->values(),
             'personal' => $user?->employee ? $this->personalData($user->employee) : null,
         ]);

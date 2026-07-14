@@ -13,11 +13,13 @@ uses(RefreshDatabase::class);
 function overtimeHr(): User
 {
     app(PermissionRegistrar::class)->forgetCachedPermissions();
-    foreach (['attendance.view', 'attendance.view.all', 'attendance.update'] as $p) {
+    $permissions = [...attendanceMenuPermissions(['view', 'update']), 'attendance.view.all'];
+
+    foreach ($permissions as $p) {
         Permission::findOrCreate($p, 'web');
     }
     $user = User::factory()->create();
-    $user->givePermissionTo(['attendance.view', 'attendance.view.all', 'attendance.update']);
+    $user->givePermissionTo($permissions);
 
     return $user;
 }
@@ -31,16 +33,16 @@ function overtimeHr(): User
 function overtimeStaff(int $computedMinutes = 90): array
 {
     app(PermissionRegistrar::class)->forgetCachedPermissions();
-    Permission::findOrCreate('overtime.request', 'web');
+    Permission::findOrCreate('my-overtime.view', 'web');
 
     $supervisorUser = User::factory()->create();
-    $supervisorUser->givePermissionTo('overtime.request');
+    $supervisorUser->givePermissionTo('my-overtime.view');
     $supervisor = Employee::query()->create([
         'user_id' => $supervisorUser->id, 'full_name' => 'Sari Atasan', 'employment_status' => 'active',
     ]);
 
     $employeeUser = User::factory()->create();
-    $employeeUser->givePermissionTo('overtime.request');
+    $employeeUser->givePermissionTo('my-overtime.view');
     $employee = Employee::query()->create([
         'user_id' => $employeeUser->id, 'full_name' => 'Budi', 'employment_status' => 'active',
         'manager_id' => $supervisor->id,

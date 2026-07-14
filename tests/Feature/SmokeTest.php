@@ -14,6 +14,7 @@ use App\Models\ScheduleAssignment;
 use App\Models\SchedulePattern;
 use App\Models\Shift;
 use App\Models\User;
+use App\Support\MenuPermissions;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Spatie\Permission\Models\Permission;
 use Spatie\Permission\Models\Role;
@@ -28,11 +29,13 @@ uses(RefreshDatabase::class);
  */
 test('every page renders without a server error', function () {
     app(PermissionRegistrar::class)->forgetCachedPermissions();
-    foreach (config('rbac.permissions') as $permission) {
+
+    // Every permission the menu catalog knows about, so no page is skipped.
+    foreach (MenuPermissions::all() as $permission) {
         Permission::findOrCreate($permission, 'web');
     }
     $user = User::factory()->create();
-    $user->givePermissionTo(config('rbac.permissions'));
+    $user->givePermissionTo(MenuPermissions::all());
 
     // --- Master data -------------------------------------------------------
     $role = Role::findOrCreate('employee', 'web');

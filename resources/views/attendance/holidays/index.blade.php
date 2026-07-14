@@ -5,7 +5,7 @@
                 <p class="text-sm font-medium text-gray-500">Master attendance</p>
                 <h1 class="mt-1 text-2xl font-semibold text-gray-950">Hari Libur</h1>
             </div>
-            @can('attendance.create')
+            @can('holidays.create')
                 <a href="{{ route('attendance.holidays.create') }}" class="inline-flex items-center justify-center gap-1.5 rounded-md bg-primary px-4 py-2.5 text-sm font-semibold text-white shadow-xs transition hover:bg-primary-hover">
                     <x-icon name="plus" class="size-4"/> Tambah Libur
                 </a>
@@ -62,12 +62,12 @@
                                 </td>
                                 <td class="text-gray-500">{{ $holiday->notes ?? '-' }}</td>
                                 <td class="text-right">
-                                    @canany(['attendance.update', 'attendance.delete'])
+                                    @canany(['holidays.update', 'holidays.delete'])
                                         <x-action-menu>
-                                            @can('attendance.update')
+                                            @can('holidays.update')
                                                 <a href="{{ route('attendance.holidays.edit', $holiday) }}" class="action-menu-item"><x-icon name="pencil"/> Edit</a>
                                             @endcan
-                                            @can('attendance.delete')
+                                            @can('holidays.delete')
                                                 <form method="POST" action="{{ route('attendance.holidays.destroy', $holiday) }}">
                                                     @csrf @method('DELETE')
                                                     <button type="submit" class="action-menu-item action-menu-item-danger"><x-icon name="trash"/> Hapus</button>

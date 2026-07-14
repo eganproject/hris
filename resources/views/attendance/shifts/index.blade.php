@@ -2,7 +2,7 @@
     <div class="mx-auto max-w-7xl space-y-6">
         <section class="flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
             <div><p class="text-sm font-medium text-gray-500">Master attendance</p><h1 class="mt-1 text-2xl font-semibold text-gray-950">Shift Kerja</h1></div>
-            @can('attendance.create')<a href="{{ route('attendance.shifts.create') }}" class="rounded-md bg-primary px-4 py-2.5 text-sm font-semibold text-white shadow-xs hover:bg-primary-hover">Tambah Shift</a>@endcan
+            @can('shifts.create')<a href="{{ route('attendance.shifts.create') }}" class="rounded-md bg-primary px-4 py-2.5 text-sm font-semibold text-white shadow-xs hover:bg-primary-hover">Tambah Shift</a>@endcan
         </section>
         <section class="rounded-lg border border-gray-200 bg-white p-5 shadow-sm">
             <form method="GET" action="{{ route('attendance.shifts.index') }}" class="grid grid-cols-1 gap-3 md:grid-cols-[1fr_160px_auto_auto]">
@@ -44,10 +44,10 @@
                                     <x-status-badge :tone="$shift->is_active ? 'success' : 'neutral'">{{ $shift->is_active ? 'Aktif' : 'Nonaktif' }}</x-status-badge>
                                 </td>
                                 <td class="text-right">
-                                    @canany(['attendance.update', 'attendance.delete'])
+                                    @canany(['shifts.update', 'shifts.delete'])
                                         <x-action-menu>
-                                            @can('attendance.update')<a href="{{ route('attendance.shifts.edit', $shift) }}" class="action-menu-item"><x-icon name="pencil"/> Edit</a>@endcan
-                                            @can('attendance.delete')<form method="POST" action="{{ route('attendance.shifts.destroy', $shift) }}">@csrf @method('DELETE')<button type="submit" class="action-menu-item action-menu-item-danger"><x-icon name="trash"/> Hapus</button></form>@endcan
+                                            @can('shifts.update')<a href="{{ route('attendance.shifts.edit', $shift) }}" class="action-menu-item"><x-icon name="pencil"/> Edit</a>@endcan
+                                            @can('shifts.delete')<form method="POST" action="{{ route('attendance.shifts.destroy', $shift) }}">@csrf @method('DELETE')<button type="submit" class="action-menu-item action-menu-item-danger"><x-icon name="trash"/> Hapus</button></form>@endcan
                                         </x-action-menu>
                                     @endcanany
                                 </td>

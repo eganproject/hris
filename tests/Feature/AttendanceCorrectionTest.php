@@ -16,9 +16,9 @@ uses(RefreshDatabase::class);
 function correctionEmployee(): array
 {
     app(PermissionRegistrar::class)->forgetCachedPermissions();
-    Permission::findOrCreate('attendance.correction', 'web');
+    Permission::findOrCreate('my-attendance.view', 'web');
     $user = User::factory()->create();
-    $user->givePermissionTo('attendance.correction');
+    $user->givePermissionTo('my-attendance.view');
     $employee = Employee::query()->create(['user_id' => $user->id, 'full_name' => 'Budi', 'employment_status' => 'active']);
 
     return [$user, $employee];
@@ -27,11 +27,13 @@ function correctionEmployee(): array
 function correctionHr(): User
 {
     app(PermissionRegistrar::class)->forgetCachedPermissions();
-    foreach (['attendance.view', 'attendance.view.all', 'attendance.update'] as $p) {
+    $permissions = [...attendanceMenuPermissions(['view', 'update']), 'attendance.view.all'];
+
+    foreach ($permissions as $p) {
         Permission::findOrCreate($p, 'web');
     }
     $user = User::factory()->create();
-    $user->givePermissionTo(['attendance.view', 'attendance.view.all', 'attendance.update']);
+    $user->givePermissionTo($permissions);
 
     return $user;
 }

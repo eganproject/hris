@@ -17,9 +17,9 @@ uses(RefreshDatabase::class);
 function swapEmployee(string $name): array
 {
     app(PermissionRegistrar::class)->forgetCachedPermissions();
-    Permission::findOrCreate('schedule.swap', 'web');
+    Permission::findOrCreate('my-schedule.view', 'web');
     $user = User::factory()->create();
-    $user->givePermissionTo('schedule.swap');
+    $user->givePermissionTo('my-schedule.view');
     $employee = Employee::query()->create(['user_id' => $user->id, 'full_name' => $name, 'employment_status' => 'active']);
 
     return [$user, $employee];
@@ -28,11 +28,13 @@ function swapEmployee(string $name): array
 function swapHr(): User
 {
     app(PermissionRegistrar::class)->forgetCachedPermissions();
-    foreach (['attendance.view', 'attendance.view.all', 'attendance.update'] as $p) {
+    $permissions = [...attendanceMenuPermissions(['view', 'update']), 'attendance.view.all'];
+
+    foreach ($permissions as $p) {
         Permission::findOrCreate($p, 'web');
     }
     $user = User::factory()->create();
-    $user->givePermissionTo(['attendance.view', 'attendance.view.all', 'attendance.update']);
+    $user->givePermissionTo($permissions);
 
     return $user;
 }

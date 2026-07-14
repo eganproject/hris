@@ -5,7 +5,7 @@
                 <p class="text-sm font-medium text-gray-500">Master attendance</p>
                 <h1 class="mt-1 text-2xl font-semibold text-gray-950">Cuti & Izin</h1>
             </div>
-            @can('attendance.create')
+            @can('leave.create')
                 <a href="{{ route('attendance.leave.create') }}" class="inline-flex items-center justify-center gap-1.5 rounded-md bg-primary px-4 py-2.5 text-sm font-semibold text-white shadow-xs transition hover:bg-primary-hover">
                     <x-icon name="plus" class="size-4"/> Ajukan Cuti/Izin
                 </a>
@@ -71,9 +71,9 @@
                                     @endif
                                 </td>
                                 <td class="text-right">
-                                    @canany(['attendance.update', 'attendance.delete'])
+                                    @canany(['leave.update', 'leave.delete'])
                                         <x-action-menu>
-                                            @can('attendance.update')
+                                            @can('leave.update')
                                                 @if ($leaveRequest->status->isPending())
                                                     <form method="POST" action="{{ route('attendance.leave.approve', $leaveRequest) }}" data-no-confirm="true">
                                                         @csrf @method('PATCH')
@@ -87,7 +87,7 @@
                                             @endcan
                                             {{-- Approved leave is undone by cancelling it (the record and its
                                                  approval trail stay), never by deleting it. --}}
-                                            @can('attendance.update')
+                                            @can('leave.update')
                                                 @if ($leaveRequest->status === \App\Enums\LeaveRequestStatus::Approved)
                                                     <form method="POST" action="{{ route('attendance.leave.cancel', $leaveRequest) }}" onsubmit="return confirm('Batalkan cuti/izin yang sudah disetujui ini? Absensi pada hari tersebut akan dikembalikan.')">
                                                         @csrf @method('PATCH')
@@ -95,7 +95,7 @@
                                                     </form>
                                                 @endif
                                             @endcan
-                                            @can('attendance.delete')
+                                            @can('leave.delete')
                                                 @if ($leaveRequest->status !== \App\Enums\LeaveRequestStatus::Approved)
                                                     <form method="POST" action="{{ route('attendance.leave.destroy', $leaveRequest) }}" data-delete-leave="{{ $leaveRequest->id }}">
                                                         @csrf @method('DELETE')

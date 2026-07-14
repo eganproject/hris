@@ -15,11 +15,13 @@ uses(RefreshDatabase::class);
 function commandAdmin(): User
 {
     app(PermissionRegistrar::class)->forgetCachedPermissions();
-    foreach (['attendance.view', 'attendance.view.all', 'attendance.update'] as $p) {
+    $permissions = [...attendanceMenuPermissions(['view', 'update']), 'attendance.view.all'];
+
+    foreach ($permissions as $p) {
         Permission::findOrCreate($p, 'web');
     }
     $user = User::factory()->create();
-    $user->givePermissionTo(['attendance.view', 'attendance.view.all', 'attendance.update']);
+    $user->givePermissionTo($permissions);
 
     return $user;
 }

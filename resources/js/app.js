@@ -580,6 +580,36 @@ document.querySelectorAll('input:not([type="hidden"]):not([type="checkbox"]):not
     label.append(' ', marker);
 });
 
+// Role matrix (Kontrol Akses): the checkbox next to a menu name ticks/unticks every
+// action available on that row, and reflects whether the row is already complete.
+document.querySelectorAll('[data-role-matrix] [data-row-toggle]').forEach((toggle) => {
+    const row = toggle.closest('tr');
+
+    if (!row) {
+        return;
+    }
+
+    const cells = row.querySelectorAll('input[name="permissions[]"]');
+
+    const syncToggle = () => {
+        const checked = [...cells].filter((cell) => cell.checked).length;
+
+        toggle.checked = checked === cells.length && cells.length > 0;
+        toggle.indeterminate = checked > 0 && checked < cells.length;
+    };
+
+    toggle.addEventListener('change', () => {
+        cells.forEach((cell) => {
+            if (!cell.disabled) {
+                cell.checked = toggle.checked;
+            }
+        });
+    });
+
+    cells.forEach((cell) => cell.addEventListener('change', syncToggle));
+    syncToggle();
+});
+
 // Show/hide password: [data-password-toggle="<input id>"] flips that input between
 // password and text, so a typed password can be checked before saving.
 document.querySelectorAll('[data-password-toggle]').forEach((button) => {

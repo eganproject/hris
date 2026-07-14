@@ -37,7 +37,7 @@
                                     @if ($c->reviewer)<p class="mt-1 text-xs text-gray-400">oleh {{ $c->reviewer->name }}</p>@endif
                                 </td>
                                 <td class="text-right">
-                                    @can('attendance.update')
+                                    @can('corrections.update')
                                         @if ($c->isPending())
                                             <div class="flex justify-end gap-2">
                                                 <form method="POST" action="{{ route('attendance.corrections.approve', $c) }}" onsubmit="return confirm('Setujui koreksi & perbarui absensi?')">@csrf @method('PATCH')<button type="submit" class="rounded-md bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-700">Setujui</button></form>

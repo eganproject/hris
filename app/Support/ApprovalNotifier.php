@@ -22,8 +22,19 @@ use Spatie\Permission\Exceptions\PermissionDoesNotExist;
  */
 class ApprovalNotifier
 {
-    /** HR-level approvers = users allowed to decide attendance matters. */
-    public const HR_PERMISSION = 'attendance.update';
+    /**
+     * Who counts as "HR" depends on the menu the request lives in: only the people
+     * allowed to decide THAT kind of request are notified about it.
+     */
+    public const LEAVE_APPROVER = 'leave.update';
+
+    public const CORRECTION_APPROVER = 'corrections.update';
+
+    public const SWAP_APPROVER = 'swaps.update';
+
+    public const CONTRACT_MANAGER = 'employees.update';
+
+    public const DEVICE_MANAGER = 'devices.view';
 
     public function overtimeRequested(OvertimeApproval $overtime): void
     {
@@ -56,7 +67,7 @@ class ApprovalNotifier
             return;
         }
 
-        $this->toHr(new ApprovalNotification(
+        $this->toPermission(self::LEAVE_APPROVER, new ApprovalNotification(
             title: 'Pengajuan cuti menunggu HR',
             message: $who.' mengajukan '.($leave->leaveType?->name ?? 'cuti').' ('.$range.').',
             url: route('attendance.leave.index'),
@@ -68,7 +79,7 @@ class ApprovalNotifier
     {
         $leave->loadMissing('employee', 'leaveType');
 
-        $this->toHr(new ApprovalNotification(
+        $this->toPermission(self::LEAVE_APPROVER, new ApprovalNotification(
             title: 'Cuti menunggu persetujuan HR',
             message: $leave->employee?->full_name.' — disetujui atasan, menunggu keputusan HR.',
             url: route('attendance.leave.index'),
@@ -80,7 +91,7 @@ class ApprovalNotifier
     {
         $correction->loadMissing('employee');
 
-        $this->toHr(new ApprovalNotification(
+        $this->toPermission(self::CORRECTION_APPROVER, new ApprovalNotification(
             title: 'Koreksi absensi baru',
             message: $correction->employee?->full_name.' mengajukan koreksi absensi '.$correction->work_date->translatedFormat('D, d M').'.',
             url: route('attendance.corrections.index'),
@@ -104,7 +115,7 @@ class ApprovalNotifier
     {
         $swap->loadMissing('requester', 'partner');
 
-        $this->toHr(new ApprovalNotification(
+        $this->toPermission(self::SWAP_APPROVER, new ApprovalNotification(
             title: 'Tukar jadwal menunggu HR',
             message: $swap->requester?->full_name.' ⇄ '.$swap->partner?->full_name.' — rekan setuju, menunggu HR.',
             url: route('attendance.swaps.index'),
@@ -204,7 +215,7 @@ class ApprovalNotifier
 
     public function contractExpiring(Employee $employee, EmployeeContract $contract, int $daysLeft): void
     {
-        $this->toPermission('employees.update', new ApprovalNotification(
+        $this->toPermission(self::CONTRACT_MANAGER, new ApprovalNotification(
             title: 'Kontrak akan berakhir',
             message: 'Kontrak '.$contract->contract_number.' a.n. '.$employee->full_name.' berakhir dalam '.$daysLeft.' hari ('.$contract->end_date->translatedFormat('d M Y').'). Perpanjang atau proses keluar.',
             url: route('employees.show', $employee),
@@ -214,7 +225,7 @@ class ApprovalNotifier
 
     public function contractAutoDeactivated(Employee $employee, EmployeeContract $contract): void
     {
-        $this->toPermission('employees.update', new ApprovalNotification(
+        $this->toPermission(self::CONTRACT_MANAGER, new ApprovalNotification(
             title: 'Karyawan dinonaktifkan otomatis',
             message: $employee->full_name.' dinonaktifkan otomatis karena kontrak '.$contract->contract_number.' berakhir ('.$contract->end_date->translatedFormat('d M Y').').',
             url: route('employees.show', $employee),
@@ -224,7 +235,7 @@ class ApprovalNotifier
 
     public function deviceOffline(Device $device, int $minutesOffline): void
     {
-        $this->toPermission(self::HR_PERMISSION, new ApprovalNotification(
+        $this->toPermission(self::DEVICE_MANAGER, new ApprovalNotification(
             title: 'Mesin absensi offline',
             message: 'Mesin "'.$device->name.'" ('.$device->serial_number.') tidak mengirim data sejak '.($device->last_seen_at?->translatedFormat('d M H:i') ?? 'lama').' — sekitar '.$minutesOffline.' menit. Periksa koneksi perangkat.',
             url: route('attendance.devices.monitor'),
@@ -239,11 +250,6 @@ class ApprovalNotifier
         if ($user && $user->id !== Auth::id()) {
             $user->notify($notification);
         }
-    }
-
-    private function toHr(ApprovalNotification $notification, ?Employee $about = null): void
-    {
-        $this->toPermission(self::HR_PERMISSION, $notification, $about);
     }
 
     /**

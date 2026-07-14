@@ -9,7 +9,7 @@
             <div class="flex flex-wrap gap-2">
                 <a href="{{ route('attendance.devices.monitor') }}" class="rounded-md border border-gray-200 px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50">Monitor Mesin</a>
                 <a href="{{ route('attendance.punches.index') }}" class="rounded-md border border-gray-200 px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50">Log Punch</a>
-                @can('attendance.create')<a href="{{ route('attendance.devices.create') }}" class="rounded-md bg-primary px-4 py-2.5 text-sm font-semibold text-white shadow-xs hover:bg-primary-hover">Tambah Perangkat</a>@endcan
+                @can('devices.create')<a href="{{ route('attendance.devices.create') }}" class="rounded-md bg-primary px-4 py-2.5 text-sm font-semibold text-white shadow-xs hover:bg-primary-hover">Tambah Perangkat</a>@endcan
             </div>
         </section>
 
@@ -37,10 +37,10 @@
                                 <td class="text-sm text-gray-600">{{ $device->last_seen_at ? $device->last_seen_at->diffForHumans() : 'Belum pernah' }}</td>
                                 <td><x-status-badge :tone="$device->is_active ? 'success' : 'neutral'">{{ $device->is_active ? 'Aktif' : 'Nonaktif' }}</x-status-badge></td>
                                 <td class="text-right">
-                                    @canany(['attendance.update', 'attendance.delete'])
+                                    @canany(['devices.update', 'devices.delete'])
                                         <x-action-menu>
-                                            @can('attendance.update')<a href="{{ route('attendance.devices.edit', $device) }}" class="action-menu-item"><x-icon name="pencil"/> Edit &amp; PIN</a>@endcan
-                                            @can('attendance.delete')<form method="POST" action="{{ route('attendance.devices.destroy', $device) }}" onsubmit="return confirm('Hapus perangkat ini?')">@csrf @method('DELETE')<button type="submit" class="action-menu-item action-menu-item-danger"><x-icon name="trash"/> Hapus</button></form>@endcan
+                                            @can('devices.update')<a href="{{ route('attendance.devices.edit', $device) }}" class="action-menu-item"><x-icon name="pencil"/> Edit &amp; PIN</a>@endcan
+                                            @can('devices.delete')<form method="POST" action="{{ route('attendance.devices.destroy', $device) }}" onsubmit="return confirm('Hapus perangkat ini?')">@csrf @method('DELETE')<button type="submit" class="action-menu-item action-menu-item-danger"><x-icon name="trash"/> Hapus</button></form>@endcan
                                         </x-action-menu>
                                     @endcanany
                                 </td>

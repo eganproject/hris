@@ -2,6 +2,7 @@
 
 namespace Database\Seeders;
 
+use App\Support\MenuPermissions;
 use Illuminate\Database\Seeder;
 use Spatie\Permission\Models\Permission;
 use Spatie\Permission\Models\Role;
@@ -14,9 +15,11 @@ class RbacSeeder extends Seeder
         app(PermissionRegistrar::class)->forgetCachedPermissions();
 
         $guard = config('auth.defaults.guard', 'web');
-        $permissions = collect(config('rbac.permissions', []));
 
-        $permissions->each(fn (string $permission) => Permission::findOrCreate($permission, $guard));
+        // Permissions are derived from the menu catalog, so a new menu only has to be
+        // declared once (config/rbac.php) to exist everywhere.
+        collect(MenuPermissions::all())
+            ->each(fn (string $permission) => Permission::findOrCreate($permission, $guard));
 
         foreach (config('rbac.roles', []) as $roleName => $rolePermissions) {
             $role = Role::findOrCreate($roleName, $guard);

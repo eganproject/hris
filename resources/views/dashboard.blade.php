@@ -39,7 +39,7 @@
                 <div class="overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm">
                     <div class="flex items-center justify-between gap-4 border-b border-gray-200 px-5 py-3">
                         <h3 class="text-sm font-semibold text-gray-950">Jadwal 7 Hari ke Depan</h3>
-                        @can('schedule.swap')
+                        @can('my-schedule.view')
                             <a href="{{ route('my-schedule.index') }}" class="text-xs font-medium text-primary hover:underline">Lihat jadwal</a>
                         @endcan
                     </div>
@@ -113,13 +113,13 @@
                             @can('employees.create')
                                 <a href="{{ route('employees.create') }}" class="rounded-md border border-gray-200 px-3 py-3 text-sm font-medium text-gray-700 transition hover:bg-gray-50">Tambah Karyawan</a>
                             @endcan
-                            @can('attendance.view')
+                            @canany(['reports.attendance.view', 'reports.log.view', 'reports.leave.view'])
                                 <a href="{{ route('reports.index') }}" class="rounded-md border border-gray-200 px-3 py-3 text-sm font-medium text-gray-700 transition hover:bg-gray-50">Laporan</a>
-                            @endcan
-                            @can('attendance.view')
+                            @endcanany
+                            @can('attendance-daily.view')
                                 <a href="{{ route('attendance.daily.index') }}" class="rounded-md border border-gray-200 px-3 py-3 text-sm font-medium text-gray-700 transition hover:bg-gray-50">Absensi Harian</a>
                             @endcan
-                            @can('attendance.view')
+                            @can('schedules.view')
                                 <a href="{{ route('attendance.schedules.index') }}" class="rounded-md border border-gray-200 px-3 py-3 text-sm font-medium text-gray-700 transition hover:bg-gray-50">Jadwal Kerja</a>
                             @endcan
                         </div>

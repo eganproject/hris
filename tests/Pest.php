@@ -48,3 +48,42 @@ function something()
 {
     // ..
 }
+
+/**
+ * Permission untuk seluruh menu absensi/jadwal/cuti + laporan — pengganti
+ * "attendance.*" lama, yang dulu satu permission membuka semua menu itu sekaligus.
+ * Dipakai helper "HR pusat" di berbagai test.
+ *
+ * @param  list<string>  $actions
+ * @return list<string>
+ */
+function attendanceMenuPermissions(array $actions = ['view', 'create', 'update', 'delete']): array
+{
+    $menus = [
+        'attendance-daily', 'punches', 'corrections', 'overtime', 'swaps',
+        'devices', 'shifts', 'holidays', 'schedule-patterns', 'schedules',
+        'leave', 'leave-types', 'leave-balances',
+        'reports.attendance', 'reports.log', 'reports.leave',
+    ];
+
+    $catalog = collect(config('rbac.menus'))->collapse();
+    $permissions = [];
+
+    foreach ($menus as $menu) {
+        foreach ($catalog->get($menu)['actions'] ?? [] as $action) {
+            // "export" hanya relevan untuk laporan, dan ikut aksi "view" pemanggilnya.
+            $wanted = $action === 'export' ? 'view' : $action;
+
+            if (in_array($wanted, $actions, true)) {
+                $permissions[] = $menu.'.'.$action;
+            }
+        }
+    }
+
+    if (in_array('update', $actions, true)) {
+        $permissions[] = 'settings.view';
+        $permissions[] = 'settings.update';
+    }
+
+    return $permissions;
+}

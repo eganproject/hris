@@ -31,51 +31,89 @@
         <section data-tab-panel="roles" class="rounded-lg border border-gray-200 bg-white shadow-sm">
             <div class="border-b border-gray-200 px-5 py-4">
                 <h2 class="text-base font-semibold text-gray-950">Role & Permission Menu</h2>
-                <p class="mt-1 text-sm text-gray-500">Atur menu dan aksi yang boleh diakses oleh setiap role.</p>
+                <p class="mt-1 text-sm text-gray-500">Centang aksi yang boleh dilakukan tiap role pada tiap menu. Sel yang kosong berarti aksi itu memang tidak ada pada menu tersebut.</p>
             </div>
 
             <div class="divide-y divide-gray-100">
                 @foreach ($roles as $role)
-                    <form method="POST" action="{{ route('access-control.roles.update', $role) }}" class="grid grid-cols-1 gap-5 p-5 xl:grid-cols-[220px_1fr_auto]">
-                        @csrf
-                        @method('PUT')
+                    @php
+                        $locked = ! auth()->user()->can('access-control.update') || $role->name === 'superadmin';
+                        $held = $role->permissions->pluck('name')->all();
+                    @endphp
+                    <details class="group" @if ($loop->first) open @endif>
+                        <summary class="flex cursor-pointer items-center justify-between gap-4 px-5 py-4 hover:bg-gray-50">
+                            <div>
+                                <p class="font-medium text-gray-950">{{ $role->name }}</p>
+                                <p class="mt-0.5 text-xs text-gray-500">
+                                    {{ $role->users_count }} user · {{ count($held) }} akses
+                                    @if ($role->name === 'superadmin') · <span class="text-amber-700">akses penuh, tidak dapat diubah</span>@endif
+                                </p>
+                            </div>
+                            <span class="text-xs text-gray-400 group-open:hidden">Buka</span>
+                            <span class="hidden text-xs text-gray-400 group-open:inline">Tutup</span>
+                        </summary>
 
-                        <div>
-                            <p class="font-medium text-gray-950">{{ $role->name }}</p>
-                            <p class="mt-1 text-xs text-gray-500">{{ $role->users_count }} user</p>
-                        </div>
+                        <form method="POST" action="{{ route('access-control.roles.update', $role) }}" class="px-5 pb-5" data-role-matrix>
+                            @csrf
+                            @method('PUT')
 
-                        <div class="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
-                            @foreach ($permissions as $group => $items)
-                                <div class="rounded-lg border border-gray-200 p-4">
-                                    <p class="text-sm font-semibold text-gray-950">{{ str($group)->headline() }}</p>
-                                    <div class="mt-3 space-y-2">
-                                        @foreach ($items as $permission)
-                                            <label class="flex items-center gap-2 text-sm text-gray-600">
-                                                <input
-                                                    type="checkbox"
-                                                    name="permissions[]"
-                                                    value="{{ $permission->name }}"
-                                                    @checked($role->hasPermissionTo($permission->name))
-                                                    class="size-4 rounded border-gray-300 text-primary focus:ring-primary"
-                                                    @disabled(! auth()->user()->can('access-control.update') || $role->name === 'superadmin')
-                                                >
-                                                <span>{{ $permission->name }}</span>
-                                            </label>
+                            <div class="overflow-x-auto rounded-lg border border-gray-200">
+                                <table class="w-full text-sm">
+                                    <thead>
+                                        <tr class="bg-gray-50 text-xs text-gray-600">
+                                            <th class="px-4 py-2.5 text-left font-semibold">Menu</th>
+                                            @foreach ($actions as $action => $actionLabel)
+                                                <th class="px-3 py-2.5 text-center font-semibold">{{ $actionLabel }}</th>
+                                            @endforeach
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        @foreach ($matrix as $group => $rows)
+                                            <tr class="bg-gray-50/60">
+                                                <td colspan="{{ count($actions) + 1 }}" class="px-4 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-gray-500">{{ $group }}</td>
+                                            </tr>
+                                            @foreach ($rows as $row)
+                                                <tr class="border-t border-gray-100">
+                                                    <td class="px-4 py-2 text-gray-800">
+                                                        <label class="inline-flex items-center gap-2">
+                                                            <input type="checkbox" data-row-toggle class="size-3.5 rounded border-gray-300 text-primary focus:ring-primary" @disabled($locked)>
+                                                            {{ $row['label'] }}
+                                                        </label>
+                                                    </td>
+                                                    @foreach ($actions as $action => $actionLabel)
+                                                        @php $permission = $row['cells'][$action] ?? null; @endphp
+                                                        <td class="px-3 py-2 text-center">
+                                                            @if ($permission)
+                                                                <input
+                                                                    type="checkbox"
+                                                                    name="permissions[]"
+                                                                    value="{{ $permission }}"
+                                                                    title="{{ $permission }}"
+                                                                    @checked(in_array($permission, $held, true))
+                                                                    class="size-4 rounded border-gray-300 text-primary focus:ring-primary"
+                                                                    @disabled($locked)
+                                                                >
+                                                            @else
+                                                                <span class="text-gray-300">—</span>
+                                                            @endif
+                                                        </td>
+                                                    @endforeach
+                                                </tr>
+                                            @endforeach
                                         @endforeach
-                                    </div>
-                                </div>
-                            @endforeach
-                        </div>
+                                    </tbody>
+                                </table>
+                            </div>
 
-                        <div class="flex items-start justify-end">
                             @can('access-control.update')
-                                <button type="submit" @disabled($role->name === 'superadmin') class="rounded-md bg-primary px-4 py-2.5 text-sm font-semibold text-white shadow-xs transition hover:bg-primary-hover disabled:cursor-not-allowed disabled:bg-gray-300">
-                                    Simpan
-                                </button>
+                                <div class="mt-4 flex justify-end">
+                                    <button type="submit" @disabled($locked) class="rounded-md bg-primary px-4 py-2.5 text-sm font-semibold text-white shadow-xs transition hover:bg-primary-hover disabled:cursor-not-allowed disabled:bg-gray-300">
+                                        Simpan
+                                    </button>
+                                </div>
                             @endcan
-                        </div>
-                    </form>
+                        </form>
+                    </details>
                 @endforeach
             </div>
         </section>

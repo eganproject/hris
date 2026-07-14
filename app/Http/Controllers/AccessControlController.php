@@ -10,9 +10,9 @@ use App\Models\Branch;
 use App\Models\Department;
 use App\Models\JobPosition;
 use App\Models\User;
+use App\Support\MenuPermissions;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\View\View;
-use Spatie\Permission\Models\Permission;
 use Spatie\Permission\Models\Role;
 use Spatie\Permission\PermissionRegistrar;
 
@@ -32,11 +32,9 @@ class AccessControlController extends Controller
                 ->where('guard_name', 'web')
                 ->orderBy('name')
                 ->get(),
-            'permissions' => Permission::query()
-                ->where('guard_name', 'web')
-                ->orderBy('name')
-                ->get()
-                ->groupBy(fn (Permission $permission) => str($permission->name)->before('.')->toString()),
+            // Baris = menu, kolom = aksi (config/rbac.php).
+            'matrix' => MenuPermissions::matrix(),
+            'actions' => config('rbac.actions'),
             'jobPositions' => JobPosition::query()
                 ->with(['activeDepartments', 'defaultRole'])
                 ->orderBy('name')
@@ -56,6 +54,10 @@ class AccessControlController extends Controller
 
     public function updateRole(AccessControlRoleRequest $request, Role $role): RedirectResponse
     {
+        // Superadmin harus tetap punya akses penuh — kalau tidak, tidak ada lagi yang
+        // bisa memperbaiki hak akses yang terlanjur dicabut.
+        abort_if($role->name === 'superadmin', 403, 'Akses superadmin tidak dapat diubah.');
+
         $permissions = $request->validated('permissions', []);
 
         $role->syncPermissions($permissions);

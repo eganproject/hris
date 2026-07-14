@@ -30,6 +30,8 @@ function scopedHr(array $extraPermissions = []): User
         'employees.create',
         'employees.update',
         'employees.delete',
+        'employees.export',
+        'employees.import',
     ], $extraPermissions);
 
     foreach ($permissions as $permission) {
@@ -94,12 +96,7 @@ function scopedAttendanceHr(array $extraPermissions = []): User
 {
     app(PermissionRegistrar::class)->forgetCachedPermissions();
 
-    $permissions = array_merge([
-        'attendance.view',
-        'attendance.create',
-        'attendance.update',
-        'attendance.delete',
-    ], $extraPermissions);
+    $permissions = array_merge(attendanceMenuPermissions(), $extraPermissions);
 
     foreach ($permissions as $permission) {
         Permission::findOrCreate($permission, 'web');

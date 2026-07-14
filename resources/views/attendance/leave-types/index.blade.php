@@ -7,10 +7,10 @@
                 <p class="mt-1 text-sm text-gray-500">Kelola jenis cuti/izin, kuota default, dan status absensinya.</p>
             </div>
             <div class="flex flex-wrap items-center gap-2">
-                @can('attendance.update')
+                @can('leave-types.update')
                     <a href="{{ route('attendance.leave-balances.index') }}" class="inline-flex items-center justify-center rounded-md border border-gray-200 bg-white px-4 py-2.5 text-sm font-semibold text-gray-700 shadow-xs transition hover:bg-gray-50">Kuota per Karyawan</a>
                 @endcan
-                @can('attendance.create')
+                @can('leave-types.create')
                     <a href="{{ route('attendance.leave-types.create') }}" class="inline-flex items-center justify-center rounded-md bg-primary px-4 py-2.5 text-sm font-semibold text-white shadow-xs transition hover:bg-primary-hover">Tambah Jenis Cuti</a>
                 @endcan
             </div>
@@ -46,10 +46,10 @@
                                 </td>
                                 <td class="text-right">
                                     <div class="flex items-center justify-end gap-3">
-                                        @can('attendance.update')
+                                        @can('leave-types.update')
                                             <a href="{{ route('attendance.leave-types.edit', $type) }}" class="text-sm text-gray-600 hover:text-primary">Edit</a>
                                         @endcan
-                                        @can('attendance.delete')
+                                        @can('leave-types.delete')
                                             <form method="POST" action="{{ route('attendance.leave-types.destroy', $type) }}" onsubmit="return confirm('Hapus jenis cuti ini?')">
                                                 @csrf @method('DELETE')
                                                 <button type="submit" class="text-sm text-red-600 hover:text-red-700">Hapus</button>

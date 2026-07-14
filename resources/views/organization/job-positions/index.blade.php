@@ -2,7 +2,7 @@
     <div class="mx-auto max-w-7xl space-y-6">
         <section class="flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
             <div><p class="text-sm font-medium text-gray-500">Master organisasi</p><h1 class="mt-1 text-2xl font-semibold text-gray-950">Jabatan</h1></div>
-            @can('organization.create')<a href="{{ route('organization.job-positions.create') }}" class="rounded-md bg-primary px-4 py-2.5 text-sm font-semibold text-white shadow-xs hover:bg-primary-hover">Tambah Jabatan</a>@endcan
+            @can('job-positions.create')<a href="{{ route('organization.job-positions.create') }}" class="rounded-md bg-primary px-4 py-2.5 text-sm font-semibold text-white shadow-xs hover:bg-primary-hover">Tambah Jabatan</a>@endcan
         </section>
         <section class="rounded-lg border border-gray-200 bg-white p-5 shadow-sm">
             <form method="GET" action="{{ route('organization.job-positions.index') }}" class="grid grid-cols-1 gap-3 md:grid-cols-[1fr_160px_auto_auto]">
@@ -43,10 +43,10 @@
                                 <td>{{ $jobPosition->defaultRole?->name ?? '-' }}</td>
                                 <td class="text-right">{{ number_format($jobPosition->employees_count) }}</td>
                                 <td class="text-right">
-                                    @canany(['organization.update', 'organization.delete'])
+                                    @canany(['job-positions.update', 'job-positions.delete'])
                                         <x-action-menu>
-                                            @can('organization.update')<a href="{{ route('organization.job-positions.edit', $jobPosition) }}" class="action-menu-item"><x-icon name="pencil"/> Edit</a>@endcan
-                                            @can('organization.delete')<form method="POST" action="{{ route('organization.job-positions.destroy', $jobPosition) }}">@csrf @method('DELETE')<button type="submit" class="action-menu-item action-menu-item-danger"><x-icon name="trash"/> Hapus</button></form>@endcan
+                                            @can('job-positions.update')<a href="{{ route('organization.job-positions.edit', $jobPosition) }}" class="action-menu-item"><x-icon name="pencil"/> Edit</a>@endcan
+                                            @can('job-positions.delete')<form method="POST" action="{{ route('organization.job-positions.destroy', $jobPosition) }}">@csrf @method('DELETE')<button type="submit" class="action-menu-item action-menu-item-danger"><x-icon name="trash"/> Hapus</button></form>@endcan
                                         </x-action-menu>
                                     @endcanany
                                 </td>

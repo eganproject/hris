@@ -19,14 +19,11 @@ function masterDataAdmin(): User
     $permissions = [
         'dashboard.view',
         'organization.view',
-        'organization.create',
-        'organization.update',
-        'organization.delete',
-        'attendance.view',
+        'branches.view', 'branches.create', 'branches.update', 'branches.delete',
+        'departments.view', 'departments.create', 'departments.update', 'departments.delete',
+        'job-positions.view', 'job-positions.create', 'job-positions.update', 'job-positions.delete',
+        ...attendanceMenuPermissions(),
         'attendance.view.all',
-        'attendance.create',
-        'attendance.update',
-        'attendance.delete',
     ];
 
     foreach ($permissions as $permission) {

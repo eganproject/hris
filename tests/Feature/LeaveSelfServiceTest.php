@@ -17,10 +17,10 @@ uses(RefreshDatabase::class);
 function employeeAccount(?Employee $manager = null, string $name = 'Karyawan'): array
 {
     app(PermissionRegistrar::class)->forgetCachedPermissions();
-    Permission::findOrCreate('leave.request', 'web');
+    Permission::findOrCreate('my-leave.view', 'web');
 
     $user = User::factory()->create();
-    $user->givePermissionTo('leave.request');
+    $user->givePermissionTo('my-leave.view');
 
     $employee = Employee::query()->create([
         'user_id' => $user->id,
@@ -119,9 +119,9 @@ test('requesting more than the remaining quota is rejected', function () {
 
 test('an account not linked to an employee cannot use self-service', function () {
     app(PermissionRegistrar::class)->forgetCachedPermissions();
-    Permission::findOrCreate('leave.request', 'web');
+    Permission::findOrCreate('my-leave.view', 'web');
     $user = User::factory()->create();
-    $user->givePermissionTo('leave.request');
+    $user->givePermissionTo('my-leave.view');
 
     $type = LeaveType::query()->create(['code' => 'IZ', 'name' => 'Izin', 'attendance_status' => 'leave', 'is_paid' => true, 'is_active' => true]);
 
