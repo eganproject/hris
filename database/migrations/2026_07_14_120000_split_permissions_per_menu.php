@@ -2,6 +2,7 @@
 
 use App\Support\MenuPermissions;
 use Illuminate\Database\Migrations\Migration;
+use Illuminate\Support\Facades\DB;
 use Spatie\Permission\Models\Permission;
 use Spatie\Permission\Models\Role;
 use Spatie\Permission\PermissionRegistrar;
@@ -98,6 +99,11 @@ return new class extends Migration
             }
         }
 
+        // Selain lewat role, permission juga bisa ditempel langsung ke satu pengguna.
+        // Kalau tidak ikut dipindahkan, pengguna itu kehilangan aksesnya begitu
+        // permission lama dihapus.
+        $this->migrateDirectUserPermissions($map, $guard);
+
         // Permission lama tidak lagi dipakai di rute maupun tampilan.
         Permission::query()
             ->where('guard_name', $guard)
@@ -106,6 +112,43 @@ return new class extends Migration
             ->delete();
 
         app(PermissionRegistrar::class)->forgetCachedPermissions();
+    }
+
+    /**
+     * @param  array<string, list<string>>  $map
+     */
+    private function migrateDirectUserPermissions(array $map, string $guard): void
+    {
+        $permissionIds = Permission::query()
+            ->where('guard_name', $guard)
+            ->pluck('id', 'name');
+
+        $rows = DB::table('model_has_permissions')->get();
+        $insert = [];
+
+        foreach ($rows as $row) {
+            $old = $permissionIds->search($row->permission_id);
+
+            if ($old === false || ! isset($map[$old])) {
+                continue;
+            }
+
+            foreach ($map[$old] as $new) {
+                if (! isset($permissionIds[$new])) {
+                    continue;
+                }
+
+                $insert[] = [
+                    'permission_id' => $permissionIds[$new],
+                    'model_type' => $row->model_type,
+                    'model_id' => $row->model_id,
+                ];
+            }
+        }
+
+        foreach (array_chunk(array_values(array_unique($insert, SORT_REGULAR)), 100) as $chunk) {
+            DB::table('model_has_permissions')->insertOrIgnore($chunk);
+        }
     }
 
     public function down(): void
