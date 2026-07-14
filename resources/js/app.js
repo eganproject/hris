@@ -580,6 +580,37 @@ document.querySelectorAll('input:not([type="hidden"]):not([type="checkbox"]):not
     label.append(' ', marker);
 });
 
+// Show/hide password: [data-password-toggle="<input id>"] flips that input between
+// password and text, so a typed password can be checked before saving.
+document.querySelectorAll('[data-password-toggle]').forEach((button) => {
+    const input = document.getElementById(button.dataset.passwordToggle);
+
+    if (!input) {
+        return;
+    }
+
+    const eye = button.querySelector('[data-password-show]');
+    const eyeOff = button.querySelector('[data-password-hide]');
+
+    button.addEventListener('click', () => {
+        const revealed = input.type === 'text';
+
+        input.type = revealed ? 'password' : 'text';
+        button.setAttribute('aria-pressed', String(!revealed));
+        button.setAttribute('aria-label', revealed ? 'Tampilkan password' : 'Sembunyikan password');
+
+        if (eye) {
+            eye.hidden = !revealed;
+        }
+
+        if (eyeOff) {
+            eyeOff.hidden = revealed;
+        }
+
+        input.focus();
+    });
+});
+
 // Live image preview: when a file is chosen for an [data-image-input], show it in
 // the sibling [data-image-preview] and hide the [data-image-placeholder]. Clearing
 // the input restores the original photo (edit) or the placeholder (create).

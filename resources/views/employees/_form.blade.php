@@ -314,7 +314,13 @@
                 </div>
                 <div>
                     <label for="login_password" class="block text-sm font-medium text-gray-700">Password Login</label>
-                    <input id="login_password" name="login_password" type="password" placeholder="{{ $employee->user ? 'Kosongkan jika tidak diganti' : 'Minimal 8 karakter' }}" class="mt-2 block w-full rounded-md border border-gray-300 px-3 py-2.5 text-sm shadow-xs outline-none focus:border-primary focus:ring-2 focus:ring-primary/20">
+                    <div class="relative mt-2">
+                        <input id="login_password" name="login_password" type="password" placeholder="{{ $employee->user ? 'Kosongkan jika tidak diganti' : 'Minimal 8 karakter' }}" class="block w-full rounded-md border border-gray-300 py-2.5 pl-3 pr-10 text-sm shadow-xs outline-none focus:border-primary focus:ring-2 focus:ring-primary/20">
+                        <button type="button" data-password-toggle="login_password" aria-label="Tampilkan password" aria-pressed="false" class="absolute inset-y-0 right-0 flex items-center rounded-r-md px-3 text-gray-400 transition hover:text-gray-600 focus:text-gray-600 focus:outline-none">
+                            <x-icon name="eye" data-password-show/>
+                            <x-icon name="eye-off" data-password-hide hidden/>
+                        </button>
+                    </div>
                     @error('login_password')<p class="mt-2 text-sm text-red-600">{{ $message }}</p>@enderror
                 </div>
                 <div>

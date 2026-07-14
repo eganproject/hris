@@ -142,6 +142,27 @@ test('the employee form shows the code as read-only instead of asking for it', f
         ->assertDontSee('name="employee_number"', escape: false);
 });
 
+test('the password field can be revealed on both the create and the edit form', function () {
+    $user = employeeManager();
+    ['branch' => $branch, 'department' => $department, 'position' => $position] = hrMasterData();
+
+    $employee = Employee::query()->create([
+        'branch_id' => $branch->id,
+        'department_id' => $department->id,
+        'job_position_id' => $position->id,
+        'full_name' => 'Lihat Password',
+        'join_date' => now()->toDateString(),
+        'employment_status' => 'active',
+    ]);
+
+    foreach (['/employees/create', "/employees/{$employee->id}/edit"] as $url) {
+        $this->actingAs($user)->get($url)
+            ->assertOk()
+            ->assertSee('data-password-toggle="login_password"', escape: false)
+            ->assertSee('Tampilkan password');
+    }
+});
+
 test('the employee code follows a change of join date or work location', function () {
     $user = employeeManager();
     ['branch' => $branch, 'department' => $department, 'position' => $position] = hrMasterData();
