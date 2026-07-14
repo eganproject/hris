@@ -63,7 +63,7 @@ class LeaveWorkflow
 
         $this->syncAttendance($request);
 
-        app(ApprovalNotifier::class)->leaveDecided($request);
+        app(ApprovalNotifier::class)->leaveDecided($request, 'HR');
     }
 
     /**
@@ -105,7 +105,7 @@ class LeaveWorkflow
             'decided_at' => $atSupervisorStep ? $request->decided_at : now(),
         ]);
 
-        app(ApprovalNotifier::class)->leaveDecided($request);
+        app(ApprovalNotifier::class)->leaveDecided($request, $atSupervisorStep ? 'atasan' : 'HR');
     }
 
     /**
@@ -122,5 +122,7 @@ class LeaveWorkflow
         if ($wasApproved) {
             $this->syncAttendance($request);
         }
+
+        app(ApprovalNotifier::class)->leaveCancelled($request, $wasApproved);
     }
 }

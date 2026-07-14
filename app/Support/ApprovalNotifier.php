@@ -48,18 +48,40 @@ class ApprovalNotifier
         ));
     }
 
+    /** "Cuti Tahunan" / "Izin" / "Sakit" — jenis yang diajukan, bukan selalu "cuti". */
+    private function leaveType(LeaveRequest $leave): string
+    {
+        return $leave->leaveType?->name ?? 'Cuti/Izin';
+    }
+
+    /** "10 – 12 Feb 2026 (3 hari)" — periode lengkap dengan tahun & jumlah harinya. */
+    private function leavePeriod(LeaveRequest $leave): string
+    {
+        $start = $leave->start_date;
+        $end = $leave->end_date;
+
+        $range = $start->isSameDay($end)
+            ? $start->translatedFormat('d M Y')
+            : ($start->isSameMonth($end)
+                ? $start->translatedFormat('d').' – '.$end->translatedFormat('d M Y')
+                : $start->translatedFormat('d M').' – '.$end->translatedFormat('d M Y'));
+
+        return $range.' ('.$leave->days.' hari)';
+    }
+
     public function leaveSubmitted(LeaveRequest $leave): void
     {
         $leave->loadMissing('employee', 'supervisor', 'leaveType');
 
-        $range = $leave->start_date->translatedFormat('d M').' – '.$leave->end_date->translatedFormat('d M');
         $who = $leave->employee?->full_name;
+        $message = $who.' mengajukan '.$this->leaveType($leave).' — '.$this->leavePeriod($leave).'.'
+            .($leave->reason ? ' Alasan: '.$leave->reason : '');
 
         // With a supervisor the request waits for them; otherwise it goes straight to HR.
         if ($leave->supervisor) {
             $this->toEmployee($leave->supervisor, new ApprovalNotification(
-                title: 'Pengajuan cuti baru',
-                message: $who.' mengajukan '.($leave->leaveType?->name ?? 'cuti').' ('.$range.').',
+                title: 'Pengajuan '.$this->leaveType($leave).' baru',
+                message: $message,
                 url: route('my-leave.index'),
                 category: 'leave',
             ));
@@ -68,20 +90,39 @@ class ApprovalNotifier
         }
 
         $this->toPermission(self::LEAVE_APPROVER, new ApprovalNotification(
-            title: 'Pengajuan cuti menunggu HR',
-            message: $who.' mengajukan '.($leave->leaveType?->name ?? 'cuti').' ('.$range.').',
+            title: 'Pengajuan '.$this->leaveType($leave).' menunggu HR',
+            message: $message.' Karyawan ini belum punya atasan, jadi langsung ke HR.',
             url: route('attendance.leave.index'),
             category: 'leave',
         ), $leave->employee);
     }
 
-    public function leavePendingHr(LeaveRequest $leave): void
+    /**
+     * Diajukan HR untuk karyawan lain: yang bersangkutan perlu tahu ada pengajuan
+     * atas namanya, karena bukan dia yang membuatnya.
+     */
+    public function leaveFiledForEmployee(LeaveRequest $leave): void
     {
         $leave->loadMissing('employee', 'leaveType');
 
+        $this->toEmployee($leave->employee, new ApprovalNotification(
+            title: 'Pengajuan '.$this->leaveType($leave).' dibuat untuk Anda',
+            message: 'HR membuat pengajuan '.$this->leaveType($leave).' atas nama Anda — '.$this->leavePeriod($leave).'.',
+            url: route('my-leave.index'),
+            category: 'leave',
+        ));
+    }
+
+    public function leavePendingHr(LeaveRequest $leave): void
+    {
+        $leave->loadMissing('employee', 'leaveType', 'supervisorApprover');
+
+        $approver = $leave->supervisorApprover?->name;
+
         $this->toPermission(self::LEAVE_APPROVER, new ApprovalNotification(
-            title: 'Cuti menunggu persetujuan HR',
-            message: $leave->employee?->full_name.' — disetujui atasan, menunggu keputusan HR.',
+            title: $this->leaveType($leave).' menunggu persetujuan HR',
+            message: $leave->employee?->full_name.' — '.$this->leaveType($leave).' '.$this->leavePeriod($leave).'.'
+                .' Sudah disetujui atasan'.($approver ? ' ('.$approver.')' : '').', menunggu keputusan HR.',
             url: route('attendance.leave.index'),
             category: 'leave',
         ), $leave->employee);
@@ -142,17 +183,53 @@ class ApprovalNotifier
         ));
     }
 
-    public function leaveDecided(LeaveRequest $leave): void
+    /**
+     * @param  string|null  $decidedBy  "atasan" atau "HR" — tanpa ini karyawan tidak tahu
+     *                                  di tahap mana pengajuannya ditolak/disetujui.
+     */
+    public function leaveDecided(LeaveRequest $leave, ?string $decidedBy = null): void
     {
         $leave->loadMissing('employee', 'leaveType');
-        $range = $leave->start_date->translatedFormat('d M').' – '.$leave->end_date->translatedFormat('d M');
+
         $approved = $leave->status === LeaveRequestStatus::Approved;
+        $type = $this->leaveType($leave);
+        $by = $decidedBy ? ' oleh '.$decidedBy : '';
 
         $this->toEmployee($leave->employee, new ApprovalNotification(
-            title: $approved ? 'Cuti disetujui' : 'Cuti ditolak',
-            message: ($approved
-                ? 'Pengajuan '.($leave->leaveType?->name ?? 'cuti').' Anda ('.$range.') telah disetujui.'
-                : 'Pengajuan '.($leave->leaveType?->name ?? 'cuti').' Anda ('.$range.') ditolak.').($leave->decision_notes ? ' Catatan: '.$leave->decision_notes : ''),
+            title: $type.($approved ? ' disetujui' : ' ditolak'),
+            message: 'Pengajuan '.$type.' Anda — '.$this->leavePeriod($leave).' — '
+                .($approved ? 'disetujui' : 'ditolak').$by.'.'
+                .($leave->decision_notes ? ' Catatan: '.$leave->decision_notes : ''),
+            url: route('my-leave.index'),
+            category: 'leave',
+        ));
+    }
+
+    /**
+     * Dibatalkan: bisa oleh karyawannya sendiri (pengajuan yang masih menunggu) atau
+     * oleh HR (cuti yang sudah disetujui — absensinya ikut dikembalikan). Pihak lain
+     * yang terlibat harus tahu; pelakunya sendiri tidak dinotifikasi.
+     */
+    public function leaveCancelled(LeaveRequest $leave, bool $wasApproved): void
+    {
+        $leave->loadMissing('employee', 'leaveType', 'supervisor');
+
+        $type = $this->leaveType($leave);
+        $period = $this->leavePeriod($leave);
+
+        $this->toEmployee($leave->employee, new ApprovalNotification(
+            title: $type.' dibatalkan',
+            message: $wasApproved
+                ? $type.' Anda yang sudah disetujui — '.$period.' — dibatalkan oleh HR. Absensi pada hari tersebut dikembalikan.'
+                : 'Pengajuan '.$type.' Anda — '.$period.' — dibatalkan.',
+            url: route('my-leave.index'),
+            category: 'leave',
+        ));
+
+        // Atasan yang masih menunggu keputusan perlu tahu permintaannya sudah gugur.
+        $this->toEmployee($leave->supervisor, new ApprovalNotification(
+            title: 'Pengajuan '.$type.' dibatalkan',
+            message: ($leave->employee?->full_name ?? 'Karyawan').' membatalkan pengajuan '.$type.' — '.$period.'.',
             url: route('my-leave.index'),
             category: 'leave',
         ));

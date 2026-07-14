@@ -8,6 +8,7 @@ use App\Models\Employee;
 use App\Models\LeaveRequest;
 use App\Models\LeaveType;
 use App\Services\LeaveWorkflow;
+use App\Support\ApprovalNotifier;
 use App\Support\DataScope;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -55,7 +56,10 @@ class LeaveController extends Controller
         $employee = Employee::findOrFail($request->integer('employee_id'));
         DataScope::forAttendance($request->user())->authorize($employee);
 
-        $this->workflow->submit($employee, $request->validated());
+        $leave = $this->workflow->submit($employee, $request->validated());
+
+        // Diajukan HR, bukan oleh karyawannya sendiri — beri tahu yang bersangkutan.
+        app(ApprovalNotifier::class)->leaveFiledForEmployee($leave);
 
         return redirect()->route('attendance.leave.index')->with('status', 'Pengajuan cuti/izin berhasil dibuat.');
     }
