@@ -108,6 +108,9 @@ class MyOvertimeController extends Controller
 
         abort_unless($overtime->employee_id === $employee->id && $overtime->status === OvertimeApproval::STATUS_PENDING, 403);
 
+        // Atasan sedang menunggu keputusan: beri tahu sebelum datanya hilang.
+        app(ApprovalNotifier::class)->overtimeCancelled($overtime);
+
         $overtime->delete();
 
         return redirect()->route('my-overtime.index')->with('status', 'Pengajuan lembur dibatalkan.');

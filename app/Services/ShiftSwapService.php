@@ -166,7 +166,11 @@ class ShiftSwapService
 
     public function cancel(ShiftSwapRequest $request): void
     {
+        $wasPendingHr = $request->isPendingHr();
+
         $request->forceFill(['status' => ShiftSwapRequest::STATUS_CANCELLED])->save();
+
+        app(ApprovalNotifier::class)->swapCancelled($request, $wasPendingHr);
     }
 
     /**

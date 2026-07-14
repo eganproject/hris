@@ -47,6 +47,9 @@ class MyAttendanceController extends Controller
     {
         abort_unless($correction->employee_id === $this->employee()->id && $correction->isPending(), 403);
 
+        // HR tidak perlu lagi memutuskannya — beri tahu sebelum datanya hilang.
+        app(ApprovalNotifier::class)->correctionCancelled($correction);
+
         $correction->delete();
 
         return redirect()->route('my-attendance.index')->with('status', 'Pengajuan koreksi dibatalkan.');

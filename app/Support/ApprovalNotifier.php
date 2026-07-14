@@ -36,16 +36,47 @@ class ApprovalNotifier
 
     public const DEVICE_MANAGER = 'devices.view';
 
+    /** "Sen, 10 Feb 2026 (17:00–18:30, 1j 30m)" */
+    private function overtimePeriod(OvertimeApproval $overtime, ?int $minutes = null): string
+    {
+        $detail = array_filter([
+            $overtime->time_range_label,
+            $this->hm($minutes ?? $overtime->requested_minutes),
+        ]);
+
+        return $this->longDate($overtime->work_date).' ('.implode(', ', $detail).')';
+    }
+
     public function overtimeRequested(OvertimeApproval $overtime): void
     {
         $overtime->loadMissing('employee', 'supervisor');
 
         $this->toEmployee($overtime->supervisor, new ApprovalNotification(
             title: 'Pengajuan lembur baru',
-            message: $overtime->employee?->full_name.' mengajukan lembur '.$overtime->work_date->translatedFormat('D, d M').' ('.$this->hm($overtime->requested_minutes).').',
+            message: $overtime->employee?->full_name.' mengajukan lembur — '.$this->overtimePeriod($overtime).'.'
+                .($overtime->reason ? ' Alasan: '.$overtime->reason : ''),
             url: route('my-overtime.index'),
             category: 'overtime',
         ));
+    }
+
+    /** Dibatalkan karyawannya sendiri: atasan yang menunggu keputusan perlu tahu. */
+    public function overtimeCancelled(OvertimeApproval $overtime): void
+    {
+        $overtime->loadMissing('employee', 'supervisor');
+
+        $this->toEmployee($overtime->supervisor, new ApprovalNotification(
+            title: 'Pengajuan lembur dibatalkan',
+            message: ($overtime->employee?->full_name ?? 'Karyawan').' membatalkan pengajuan lembur — '.$this->overtimePeriod($overtime).'.',
+            url: route('my-overtime.index'),
+            category: 'overtime',
+        ));
+    }
+
+    /** "Sen, 10 Feb 2026" — selalu dengan tahun, agar tidak ambigu lintas tahun. */
+    private function longDate(\Carbon\CarbonInterface $date): string
+    {
+        return $date->translatedFormat('D, d M Y');
     }
 
     /** "Cuti Tahunan" / "Izin" / "Sakit" — jenis yang diajukan, bukan selalu "cuti". */
@@ -128,16 +159,53 @@ class ApprovalNotifier
         ), $leave->employee);
     }
 
+    /** "Sen, 10 Feb 2026 (masuk 08:00, keluar 17:00)" */
+    private function correctionPeriod(AttendanceCorrection $correction): string
+    {
+        $times = array_filter([
+            $correction->requested_clock_in ? 'masuk '.substr($correction->requested_clock_in, 0, 5) : null,
+            $correction->requested_clock_out ? 'keluar '.substr($correction->requested_clock_out, 0, 5) : null,
+        ]);
+
+        return $this->longDate($correction->work_date).($times !== [] ? ' ('.implode(', ', $times).')' : '');
+    }
+
     public function correctionSubmitted(AttendanceCorrection $correction): void
     {
         $correction->loadMissing('employee');
 
         $this->toPermission(self::CORRECTION_APPROVER, new ApprovalNotification(
             title: 'Koreksi absensi baru',
-            message: $correction->employee?->full_name.' mengajukan koreksi absensi '.$correction->work_date->translatedFormat('D, d M').'.',
+            message: $correction->employee?->full_name.' mengajukan koreksi absensi — '.$this->correctionPeriod($correction).'.'
+                .($correction->reason ? ' Alasan: '.$correction->reason : ''),
             url: route('attendance.corrections.index'),
             category: 'correction',
         ), $correction->employee);
+    }
+
+    /** Dibatalkan karyawannya sendiri: HR tidak perlu lagi memutuskannya. */
+    public function correctionCancelled(AttendanceCorrection $correction): void
+    {
+        $correction->loadMissing('employee');
+
+        $this->toPermission(self::CORRECTION_APPROVER, new ApprovalNotification(
+            title: 'Koreksi absensi dibatalkan',
+            message: ($correction->employee?->full_name ?? 'Karyawan').' membatalkan pengajuan koreksi absensi — '.$this->correctionPeriod($correction).'.',
+            url: route('attendance.corrections.index'),
+            category: 'correction',
+        ), $correction->employee);
+    }
+
+    /** "Sen, 10 Feb 2026 ⇄ Sel, 11 Feb 2026" — tanggal kedua belah pihak bila ada. */
+    private function swapPeriod(ShiftSwapRequest $swap): string
+    {
+        $period = $this->longDate($swap->requester_date);
+
+        if ($swap->partner_date) {
+            $period .= ' ⇄ '.$this->longDate($swap->partner_date);
+        }
+
+        return $period;
     }
 
     public function swapRequested(ShiftSwapRequest $swap): void
@@ -146,10 +214,39 @@ class ApprovalNotifier
 
         $this->toEmployee($swap->partner, new ApprovalNotification(
             title: 'Permintaan tukar jadwal',
-            message: $swap->requester?->full_name.' mengajukan '.$swap->type_label.' ('.$swap->requester_date->translatedFormat('D, d M').').',
+            message: $swap->requester?->full_name.' mengajukan '.$swap->type_label.' — '.$this->swapPeriod($swap).'.'
+                .($swap->reason ? ' Alasan: '.$swap->reason : ''),
             url: route('my-schedule.index'),
             category: 'swap',
         ));
+    }
+
+    /**
+     * Dibatalkan pengaju: rekan yang diminta (dan HR, bila sudah sampai tahap HR)
+     * tidak perlu lagi memutuskannya.
+     */
+    public function swapCancelled(ShiftSwapRequest $swap, bool $wasPendingHr): void
+    {
+        $swap->loadMissing('requester', 'partner');
+
+        $message = ($swap->requester?->full_name ?? 'Karyawan').' membatalkan permintaan '
+            .$swap->type_label.' — '.$this->swapPeriod($swap).'.';
+
+        $this->toEmployee($swap->partner, new ApprovalNotification(
+            title: 'Permintaan tukar jadwal dibatalkan',
+            message: $message,
+            url: route('my-schedule.index'),
+            category: 'swap',
+        ));
+
+        if ($wasPendingHr) {
+            $this->toPermission(self::SWAP_APPROVER, new ApprovalNotification(
+                title: 'Permintaan tukar jadwal dibatalkan',
+                message: $message,
+                url: route('attendance.swaps.index'),
+                category: 'swap',
+            ), $swap->requester);
+        }
     }
 
     public function swapPendingHr(ShiftSwapRequest $swap): void
@@ -158,7 +255,8 @@ class ApprovalNotifier
 
         $this->toPermission(self::SWAP_APPROVER, new ApprovalNotification(
             title: 'Tukar jadwal menunggu HR',
-            message: $swap->requester?->full_name.' ⇄ '.$swap->partner?->full_name.' — rekan setuju, menunggu HR.',
+            message: $swap->requester?->full_name.' ⇄ '.$swap->partner?->full_name.' — '.$swap->type_label.' '.$this->swapPeriod($swap).'.'
+                .' Rekan sudah setuju, menunggu keputusan HR.',
             url: route('attendance.swaps.index'),
             category: 'swap',
         ), $swap->requester);
@@ -166,18 +264,19 @@ class ApprovalNotifier
 
     // --- Result notifications back to the employee who submitted the request ---
 
-    public function overtimeDecided(OvertimeApproval $overtime): void
+    public function overtimeDecided(OvertimeApproval $overtime, string $decidedBy = 'atasan'): void
     {
         $overtime->loadMissing('employee');
-        $date = $overtime->work_date->translatedFormat('D, d M');
 
-        $message = $overtime->status === OvertimeApproval::STATUS_APPROVED
-            ? 'Lembur Anda '.$date.' disetujui atasan ('.$this->hm($overtime->approved_minutes).').'
-            : 'Lembur Anda '.$date.' ditolak atasan.'.($overtime->notes ? ' Catatan: '.$overtime->notes : '');
+        $approved = $overtime->status === OvertimeApproval::STATUS_APPROVED;
+        // Disetujui: yang berlaku adalah menit yang DISETUJUI, bukan yang diajukan
+        // (atasan boleh memotongnya) — jadi itu yang ditampilkan.
+        $period = $this->overtimePeriod($overtime, $approved ? $overtime->approved_minutes : null);
 
         $this->toEmployee($overtime->employee, new ApprovalNotification(
-            title: $overtime->status === OvertimeApproval::STATUS_APPROVED ? 'Lembur disetujui' : 'Lembur ditolak',
-            message: $message,
+            title: $approved ? 'Lembur disetujui' : 'Lembur ditolak',
+            message: 'Lembur Anda — '.$period.' — '.($approved ? 'disetujui' : 'ditolak').' oleh '.$decidedBy.'.'
+                .($overtime->notes ? ' Catatan: '.$overtime->notes : ''),
             url: route('my-overtime.index'),
             category: 'overtime',
         ));
@@ -235,17 +334,18 @@ class ApprovalNotifier
         ));
     }
 
-    public function correctionDecided(AttendanceCorrection $correction): void
+    public function correctionDecided(AttendanceCorrection $correction, string $decidedBy = 'HR'): void
     {
         $correction->loadMissing('employee');
+
         $approved = $correction->status === AttendanceCorrection::STATUS_APPROVED;
-        $date = $correction->work_date->translatedFormat('D, d M');
 
         $this->toEmployee($correction->employee, new ApprovalNotification(
             title: $approved ? 'Koreksi absensi disetujui' : 'Koreksi absensi ditolak',
-            message: ($approved
-                ? 'Koreksi absensi Anda '.$date.' disetujui & absensi diperbarui.'
-                : 'Koreksi absensi Anda '.$date.' ditolak.').($correction->decision_notes ? ' Catatan: '.$correction->decision_notes : ''),
+            message: 'Koreksi absensi Anda — '.$this->correctionPeriod($correction).' — '
+                .($approved ? 'disetujui' : 'ditolak').' oleh '.$decidedBy.'.'
+                .($approved ? ' Absensi hari itu sudah diperbarui.' : '')
+                .($correction->decision_notes ? ' Catatan: '.$correction->decision_notes : ''),
             url: route('my-attendance.index'),
             category: 'correction',
         ));
@@ -257,7 +357,8 @@ class ApprovalNotifier
 
         $this->toEmployee($swap->requester, new ApprovalNotification(
             title: 'Tukar jadwal ditolak',
-            message: ($swap->partner?->full_name ?? 'Rekan').' menolak permintaan tukar jadwal Anda.',
+            message: 'Permintaan '.$swap->type_label.' Anda — '.$this->swapPeriod($swap).' — ditolak oleh '
+                .($swap->partner?->full_name ?? 'rekan').'.',
             url: route('my-schedule.index'),
             category: 'swap',
         ));
@@ -268,11 +369,13 @@ class ApprovalNotifier
         $swap->loadMissing('requester', 'partner');
         $approved = $swap->status === ShiftSwapRequest::STATUS_APPROVED;
 
+        $period = $this->swapPeriod($swap);
+
         $this->toEmployee($swap->requester, new ApprovalNotification(
             title: $approved ? 'Tukar jadwal disetujui' : 'Tukar jadwal ditolak',
-            message: $approved
-                ? 'Tukar jadwal Anda dengan '.($swap->partner?->full_name ?? 'rekan').' disetujui HR. Jadwal telah diperbarui.'
-                : 'Tukar jadwal Anda ditolak HR.'.($swap->decision_notes ? ' Catatan: '.$swap->decision_notes : ''),
+            message: $swap->type_label.' Anda dengan '.($swap->partner?->full_name ?? 'rekan').' — '.$period.' — '
+                .($approved ? 'disetujui oleh HR. Jadwal Anda sudah diperbarui.' : 'ditolak oleh HR.')
+                .($swap->decision_notes ? ' Catatan: '.$swap->decision_notes : ''),
             url: route('my-schedule.index'),
             category: 'swap',
         ));
@@ -281,7 +384,8 @@ class ApprovalNotifier
         if ($approved) {
             $this->toEmployee($swap->partner, new ApprovalNotification(
                 title: 'Tukar jadwal disetujui',
-                message: 'Tukar jadwal dengan '.($swap->requester?->full_name ?? 'rekan').' disetujui HR. Jadwal Anda telah diperbarui.',
+                message: $swap->type_label.' dengan '.($swap->requester?->full_name ?? 'rekan').' — '.$period.' — '
+                    .'disetujui oleh HR. Jadwal Anda sudah diperbarui.',
                 url: route('my-schedule.index'),
                 category: 'swap',
             ));
