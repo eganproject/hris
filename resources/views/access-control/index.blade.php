@@ -8,10 +8,14 @@
         </section>
 
         <section class="rounded-lg border border-gray-200 bg-white p-2 shadow-sm">
-            <div class="grid grid-cols-1 gap-2 lg:grid-cols-3" role="tablist" aria-label="Pengaturan akses">
+            <div class="grid grid-cols-1 gap-2 lg:grid-cols-4" role="tablist" aria-label="Pengaturan akses">
                 <button type="button" data-tab-button="roles" class="rounded-md px-4 py-3 text-left text-sm font-medium text-gray-600 transition hover:bg-gray-50" role="tab">
                     Role & Permission
                     <span class="mt-1 block text-xs font-normal text-gray-500">Hak akses menu dan aksi.</span>
+                </button>
+                <button type="button" data-tab-button="scopes" class="rounded-md px-4 py-3 text-left text-sm font-medium text-gray-600 transition hover:bg-gray-50" role="tab">
+                    Cakupan Data
+                    <span class="mt-1 block text-xs font-normal text-gray-500">Lokasi & divisi yang boleh dilihat tiap pengguna.</span>
                 </button>
                 <button type="button" data-tab-button="positions" class="rounded-md px-4 py-3 text-left text-sm font-medium text-gray-600 transition hover:bg-gray-50" role="tab">
                     Role Jabatan
@@ -73,6 +77,74 @@
                         </div>
                     </form>
                 @endforeach
+            </div>
+        </section>
+
+        <section data-tab-panel="scopes" class="rounded-lg border border-gray-200 bg-white shadow-sm" hidden>
+            <div class="border-b border-gray-200 px-5 py-4">
+                <h2 class="text-base font-semibold text-gray-950">Cakupan Data Pengguna</h2>
+                <p class="mt-1 text-sm text-gray-500">
+                    Batasi data yang dilihat seorang pengguna: karyawan, absensi, jadwal, cuti, dan laporan hanya untuk lokasi kerja <span class="font-medium">dan</span> divisi yang dipilih.
+                    Lokasi kosong = semua lokasi; divisi kosong = semua divisi. Pengguna yang memegang permission <span class="font-medium">lihat semua</span> (mis. HR pusat) tidak dibatasi.
+                </p>
+            </div>
+            <div class="divide-y divide-gray-100">
+                @foreach ($users as $user)
+                    @php
+                        $seesAllEmployees = $user->seesAllData(\App\Models\User::SCOPE_BYPASS_EMPLOYEES);
+                        $seesAllAttendance = $user->seesAllData(\App\Models\User::SCOPE_BYPASS_ATTENDANCE);
+                        $selectedBranches = $user->accessBranches->pluck('id')->all();
+                        $selectedDepartments = $user->accessDepartments->pluck('id')->all();
+                    @endphp
+                    <form method="POST" action="{{ route('access-control.user-scope.update', $user) }}" class="grid grid-cols-1 gap-5 px-5 py-5 lg:grid-cols-[220px_1fr_1fr_auto]">
+                        @csrf
+                        @method('PUT')
+                        <div class="min-w-0">
+                            <p class="truncate text-sm font-semibold text-gray-900">{{ $user->name }}</p>
+                            <p class="truncate text-xs text-gray-500">{{ $user->email }}</p>
+                            <p class="mt-1 text-xs text-gray-500">{{ $user->roles->pluck('name')->join(', ') ?: 'Tanpa role' }}</p>
+                            @if ($seesAllEmployees && $seesAllAttendance)
+                                <p class="mt-2 inline-flex rounded-md bg-emerald-50 px-2 py-0.5 text-[11px] font-medium text-emerald-700">Lihat semua data</p>
+                            @elseif ($selectedBranches === [] && $selectedDepartments === [])
+                                <p class="mt-2 inline-flex rounded-md bg-amber-50 px-2 py-0.5 text-[11px] font-medium text-amber-800">Belum ada cakupan — tidak melihat data</p>
+                            @endif
+                        </div>
+                        <div>
+                            <p class="text-xs font-medium text-gray-700">Lokasi Kerja</p>
+                            <div class="mt-2 max-h-40 space-y-1.5 overflow-y-auto rounded-md border border-gray-200 p-2.5">
+                                @forelse ($branches as $branch)
+                                    <label class="flex items-center gap-2 text-xs text-gray-700">
+                                        <input type="checkbox" name="branches[]" value="{{ $branch->id }}" @checked(in_array($branch->id, $selectedBranches, true)) class="size-3.5 rounded border-gray-300 text-primary focus:ring-primary">
+                                        {{ $branch->name }}
+                                    </label>
+                                @empty
+                                    <p class="text-xs text-gray-400">Belum ada lokasi kerja.</p>
+                                @endforelse
+                            </div>
+                        </div>
+                        <div>
+                            <p class="text-xs font-medium text-gray-700">Divisi</p>
+                            <div class="mt-2 max-h-40 space-y-1.5 overflow-y-auto rounded-md border border-gray-200 p-2.5">
+                                @forelse ($departments as $department)
+                                    <label class="flex items-center gap-2 text-xs text-gray-700">
+                                        <input type="checkbox" name="departments[]" value="{{ $department->id }}" @checked(in_array($department->id, $selectedDepartments, true)) class="size-3.5 rounded border-gray-300 text-primary focus:ring-primary">
+                                        {{ $department->name }}
+                                    </label>
+                                @empty
+                                    <p class="text-xs text-gray-400">Belum ada divisi.</p>
+                                @endforelse
+                            </div>
+                        </div>
+                        <div class="flex items-start justify-end">
+                            @can('access-control.update')
+                                <button type="submit" class="rounded-md bg-primary px-4 py-2.5 text-sm font-semibold text-white shadow-xs transition hover:bg-primary-hover">Simpan</button>
+                            @endcan
+                        </div>
+                    </form>
+                @endforeach
+            </div>
+            <div class="border-t border-gray-200 px-5 py-3">
+                {{ $users->links() }}
             </div>
         </section>
 

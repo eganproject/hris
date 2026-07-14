@@ -5,9 +5,11 @@ namespace App\Http\Controllers;
 use App\Http\Requests\AccessControlRoleRequest;
 use App\Http\Requests\BranchDepartmentRequest;
 use App\Http\Requests\JobPositionAccessRequest;
+use App\Http\Requests\UserScopeRequest;
 use App\Models\Branch;
 use App\Models\Department;
 use App\Models\JobPosition;
+use App\Models\User;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\View\View;
 use Spatie\Permission\Models\Permission;
@@ -19,6 +21,11 @@ class AccessControlController extends Controller
     public function index(): View
     {
         return view('access-control.index', [
+            'users' => User::query()
+                ->with(['roles', 'accessBranches', 'accessDepartments'])
+                ->orderBy('name')
+                ->paginate(15)
+                ->withQueryString(),
             'roles' => Role::query()
                 ->with('permissions')
                 ->withCount('users')
@@ -66,6 +73,21 @@ class AccessControlController extends Controller
         return redirect()
             ->route('access-control.index')
             ->with('status', "Role default jabatan {$jobPosition->name} berhasil diperbarui.");
+    }
+
+    /**
+     * Set which work locations and divisions a user may see. Both lists may be empty
+     * ("semua" on that axis) — but a user with neither, and without a "lihat semua"
+     * permission, sees no data at all until one is set.
+     */
+    public function updateUserScope(UserScopeRequest $request, User $user): RedirectResponse
+    {
+        $user->accessBranches()->sync($request->validated('branches', []));
+        $user->accessDepartments()->sync($request->validated('departments', []));
+
+        return redirect()
+            ->route('access-control.index')
+            ->with('status', "Cakupan data {$user->name} berhasil diperbarui.");
     }
 
     public function updateBranchDepartments(BranchDepartmentRequest $request, Branch $branch): RedirectResponse

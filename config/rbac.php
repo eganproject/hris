@@ -4,6 +4,9 @@ return [
     'permissions' => [
         'dashboard.view',
         'employees.view',
+        // Lihat SEMUA lokasi & divisi (mengabaikan cakupan data user). Tanpa ini,
+        // pemegang employees.view / attendance.view hanya melihat cakupannya sendiri.
+        'employees.view.all',
         'employees.create',
         'employees.update',
         'employees.delete',
@@ -12,6 +15,7 @@ return [
         'schedule.swap',
         'overtime.request',
         'attendance.view',
+        'attendance.view.all',
         'attendance.create',
         'attendance.update',
         'attendance.delete',
@@ -26,9 +30,12 @@ return [
     'roles' => [
         'superadmin' => ['*'],
         'super-admin' => ['*'],
+        // HR pusat: melihat seluruh lokasi & divisi. Untuk HR cabang, buat role
+        // terpisah tanpa "*.view.all", lalu atur cakupannya di menu Kontrol Akses.
         'hr-manager' => [
             'dashboard.view',
             'employees.view',
+            'employees.view.all',
             'employees.create',
             'employees.update',
             'employees.delete',
@@ -37,6 +44,7 @@ return [
             'schedule.swap',
             'overtime.request',
             'attendance.view',
+            'attendance.view.all',
             'attendance.create',
             'attendance.update',
             'attendance.delete',

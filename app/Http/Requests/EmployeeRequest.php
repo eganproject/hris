@@ -4,6 +4,7 @@ namespace App\Http\Requests;
 
 use App\Models\Employee;
 use App\Models\EmployeeContract;
+use App\Models\User;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
@@ -153,6 +154,23 @@ class EmployeeRequest extends FormRequest
                 $branchId = $this->integer('branch_id');
                 $departmentId = $this->integer('department_id');
                 $jobPositionId = $this->integer('job_position_id');
+
+                // The placement must stay inside the user's data scope; the pickers
+                // already hide the rest, but a hand-crafted POST must fail too.
+                $user = $this->user();
+
+                if (! $user->seesAllData(User::SCOPE_BYPASS_EMPLOYEES)) {
+                    $allowedBranches = $user->accessBranchIds();
+                    $allowedDepartments = $user->accessDepartmentIds();
+
+                    if ($allowedBranches !== [] && ! in_array($branchId, $allowedBranches, true)) {
+                        $validator->errors()->add('branch_id', 'Lokasi kerja tersebut berada di luar cakupan akses Anda.');
+                    }
+
+                    if ($allowedDepartments !== [] && ! in_array($departmentId, $allowedDepartments, true)) {
+                        $validator->errors()->add('department_id', 'Divisi tersebut berada di luar cakupan akses Anda.');
+                    }
+                }
 
                 $isDepartmentAvailableAtBranch = DB::table('branch_department')
                     ->where('branch_id', $branchId)

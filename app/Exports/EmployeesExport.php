@@ -5,6 +5,7 @@ namespace App\Exports;
 use App\Imports\EmployeesImport;
 use App\Models\Employee;
 use App\Models\EmployeeContract;
+use App\Models\User;
 use Illuminate\Contracts\Database\Eloquent\Builder;
 use Maatwebsite\Excel\Concerns\FromQuery;
 use Maatwebsite\Excel\Concerns\ShouldAutoSize;
@@ -23,8 +24,9 @@ class EmployeesExport implements FromQuery, ShouldAutoSize, WithHeadings, WithMa
 {
     /**
      * @param  array<string, mixed>  $filters
+     * @param  User|null  $user  when given, the export is limited to that user's data scope
      */
-    public function __construct(private array $filters = []) {}
+    public function __construct(private array $filters = [], private ?User $user = null) {}
 
     public function title(): string
     {
@@ -36,6 +38,7 @@ class EmployeesExport implements FromQuery, ShouldAutoSize, WithHeadings, WithMa
     {
         return Employee::query()
             ->with(['branch', 'department', 'jobPosition', 'manager', 'currentContract', 'deviceMappings'])
+            ->when($this->user, fn ($q) => $q->visibleTo($this->user))
             ->byBranch($this->filters['branch_id'] ?? null)
             ->byDepartment($this->filters['department_id'] ?? null)
             ->when($this->filters['status'] ?? null, fn ($q, $status) => $q->where('employment_status', $status))

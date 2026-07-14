@@ -72,6 +72,7 @@ test('employee managers can see and access employee mutation actions', function 
     grantPermissions($user, [
         'dashboard.view',
         'employees.view',
+        'employees.view.all',
         'employees.create',
         'employees.update',
         'employees.delete',

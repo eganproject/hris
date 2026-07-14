@@ -312,6 +312,9 @@ Route::middleware('auth')->group(function () {
         Route::put('branches/{branch}/departments', [AccessControlController::class, 'updateBranchDepartments'])
             ->middleware('permission:access-control.update')
             ->name('branches.departments.update');
+        Route::put('users/{user}/scope', [AccessControlController::class, 'updateUserScope'])
+            ->middleware('permission:access-control.update')
+            ->name('user-scope.update');
     });
 
     Route::post('logout', [AuthenticatedSessionController::class, 'destroy'])->name('logout');

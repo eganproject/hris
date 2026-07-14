@@ -38,12 +38,15 @@ class EmployeeManagementController extends Controller
     {
         $this->deactivateExpiredContractsDaily();
 
+        $user = $request->user();
         $filters = $request->only(['branch_id', 'department_id', 'status', 'exit_reason', 'search', 'contract']);
         $perPage = min(max((int) $request->input('per_page', 15), 10), 100);
 
         // Shared filtering so the summary cards always reflect the same dataset the
-        // table shows. Applied to a fresh query for each card count.
+        // table shows. Applied to a fresh query for each card count. The scope comes
+        // first: the branch/department filters can only narrow it further, never widen it.
         $applyFilters = fn (Builder $query): Builder => $query
+            ->visibleTo($user)
             ->byBranch($filters['branch_id'] ?? null)
             ->byDepartment($filters['department_id'] ?? null)
             ->when($filters['status'] ?? null, fn ($query, string $status) => $query->where('employment_status', $status))
@@ -70,8 +73,9 @@ class EmployeeManagementController extends Controller
 
         return view('employees.index', [
             'employees' => $employees,
-            'branches' => Branch::query()->where('is_active', true)->orderBy('city')->orderBy('name')->get(),
-            'departments' => Department::query()->where('is_active', true)->orderBy('name')->get(),
+            'branches' => $this->scopedBranches($user),
+            'departments' => $this->scopedDepartments($user),
+            'hasNoScope' => $user->hasNoDataScope(User::SCOPE_BYPASS_EMPLOYEES),
             'summary' => [
                 'total' => $applyFilters(Employee::query())->count(),
                 'active' => $applyFilters(Employee::query())->active()->count(),
@@ -88,13 +92,68 @@ class EmployeeManagementController extends Controller
         ]);
     }
 
+    /**
+     * A user may only act on employees inside their data scope — route-model binding
+     * would otherwise hand them anyone whose id they can guess.
+     */
+    private function authorizeScope(Employee $employee): void
+    {
+        abort_unless($employee->isVisibleTo(auth()->user()), 403);
+    }
+
+    /**
+     * Someone with no scope at all sees nobody, so they also cannot add anybody —
+     * the record would land outside their own view.
+     */
+    private function abortIfNoScope(): void
+    {
+        abort_if(
+            auth()->user()->hasNoDataScope(User::SCOPE_BYPASS_EMPLOYEES),
+            403,
+            'Cakupan akses Anda belum diatur. Hubungi admin untuk menetapkan lokasi kerja / divisi Anda.',
+        );
+    }
+
+    /**
+     * @return \Illuminate\Database\Eloquent\Collection<int, Branch>
+     */
+    private function scopedBranches(User $user)
+    {
+        $branchIds = $user->seesAllData(User::SCOPE_BYPASS_EMPLOYEES) ? [] : $user->accessBranchIds();
+
+        return Branch::query()
+            ->where('is_active', true)
+            ->when($branchIds !== [], fn ($query) => $query->whereIn('id', $branchIds))
+            ->orderBy('city')
+            ->orderBy('name')
+            ->get();
+    }
+
+    /**
+     * @return \Illuminate\Database\Eloquent\Collection<int, Department>
+     */
+    private function scopedDepartments(User $user)
+    {
+        $departmentIds = $user->seesAllData(User::SCOPE_BYPASS_EMPLOYEES) ? [] : $user->accessDepartmentIds();
+
+        return Department::query()
+            ->where('is_active', true)
+            ->when($departmentIds !== [], fn ($query) => $query->whereIn('id', $departmentIds))
+            ->orderBy('name')
+            ->get();
+    }
+
     public function create(): View
     {
+        $this->abortIfNoScope();
+
         return view('employees.create', $this->formOptions());
     }
 
     public function store(EmployeeRequest $request): RedirectResponse
     {
+        $this->abortIfNoScope();
+
         DB::transaction(function () use ($request) {
             $employee = Employee::query()->create($this->employeePayload($request));
 
@@ -151,8 +210,9 @@ class EmployeeManagementController extends Controller
     {
         $filters = $request->only(['branch_id', 'department_id', 'status', 'exit_reason', 'search']);
 
+        // The export must never be a way around the scope the list applies.
         return Excel::download(
-            new EmployeesExport($filters),
+            new EmployeesExport($filters, $request->user()),
             'data-karyawan-'.now()->format('Y-m-d').'.xlsx',
         );
     }
@@ -168,7 +228,22 @@ class EmployeeManagementController extends Controller
             'file' => ['required', 'file', 'mimes:xlsx,xls,csv', 'max:10240'],
         ], [], ['file' => 'file Excel']);
 
-        $import = new EmployeesImport;
+        $this->abortIfNoScope();
+
+        $user = $request->user();
+        $unrestricted = $user->seesAllData(User::SCOPE_BYPASS_EMPLOYEES);
+
+        // A scoped importer can only file people into the locations/divisions they
+        // already have access to (and cannot create new ones through the import).
+        $allowedBranches = $unrestricted || $user->accessBranchIds() === []
+            ? null
+            : $this->scopedBranches($user)->map(fn (Branch $branch) => strtolower(trim($branch->name)))->values()->all();
+
+        $allowedDepartments = $unrestricted || $user->accessDepartmentIds() === []
+            ? null
+            : $this->scopedDepartments($user)->map(fn (Department $department) => strtolower(trim($department->name)))->values()->all();
+
+        $import = new EmployeesImport($allowedBranches, $allowedDepartments);
 
         try {
             Excel::import($import, $request->file('file'));
@@ -252,6 +327,8 @@ class EmployeeManagementController extends Controller
 
     public function show(Employee $employee): View
     {
+        $this->authorizeScope($employee);
+
         $employee->load([
             'branch',
             'department',
@@ -271,6 +348,8 @@ class EmployeeManagementController extends Controller
 
     public function edit(Employee $employee): View
     {
+        $this->authorizeScope($employee);
+
         $employee->load('currentContract', 'user.roles', 'deviceMappings.device', 'leaveBalances');
 
         return view('employees.edit', [
@@ -281,6 +360,8 @@ class EmployeeManagementController extends Controller
 
     public function update(EmployeeRequest $request, Employee $employee): RedirectResponse
     {
+        $this->authorizeScope($employee);
+
         $oldPhotoPath = $employee->photo_path;
         $wasActive = ! $employee->isInactive();
         $desiredStatus = $request->validated('employment_status');
@@ -354,6 +435,8 @@ class EmployeeManagementController extends Controller
      */
     public function destroy(Employee $employee): RedirectResponse
     {
+        $this->authorizeScope($employee);
+
         if ($employee->hasOperationalHistory()) {
             return redirect()
                 ->route('employees.index')
@@ -369,6 +452,8 @@ class EmployeeManagementController extends Controller
 
     public function resign(ResignEmployeeRequest $request, Employee $employee): RedirectResponse
     {
+        $this->authorizeScope($employee);
+
         DB::transaction(function () use ($request, $employee) {
             $employee->loadMissing('currentContract', 'user');
 
@@ -395,6 +480,8 @@ class EmployeeManagementController extends Controller
 
     public function renewContract(Request $request, Employee $employee): RedirectResponse
     {
+        $this->authorizeScope($employee);
+
         $wasInactive = $employee->isInactive();
 
         $validator = Validator::make($request->all(), [
@@ -492,7 +579,13 @@ class EmployeeManagementController extends Controller
         }
 
         $entries = $validator->validated()['entries'];
-        $employees = Employee::query()->whereIn('id', collect($entries)->pluck('employee_id'))->get()->keyBy('id');
+        // Out-of-scope ids simply do not resolve, so they are skipped like any other
+        // ineligible row instead of being acted on.
+        $employees = Employee::query()
+            ->whereIn('id', collect($entries)->pluck('employee_id'))
+            ->visibleTo($request->user())
+            ->get()
+            ->keyBy('id');
         $processed = 0;
         $skipped = 0;
 
@@ -571,7 +664,13 @@ class EmployeeManagementController extends Controller
             return back()->with('bulk_error', "Nomor kontrak \"{$clash}\" duplikat atau sudah dipakai. Pastikan setiap karyawan memakai nomor unik.");
         }
 
-        $employees = Employee::query()->whereIn('id', collect($entries)->pluck('employee_id'))->get()->keyBy('id');
+        // Out-of-scope ids simply do not resolve, so they are skipped like any other
+        // ineligible row instead of being acted on.
+        $employees = Employee::query()
+            ->whereIn('id', collect($entries)->pluck('employee_id'))
+            ->visibleTo($request->user())
+            ->get()
+            ->keyBy('id');
         $processed = 0;
 
         DB::transaction(function () use ($entries, $employees, &$processed) {
@@ -642,6 +741,7 @@ class EmployeeManagementController extends Controller
 
         $employees = Employee::query()
             ->whereIn('id', $validator->validated()['employee_ids'])
+            ->visibleTo($request->user())
             ->withHistoryFlags()
             ->get();
 
@@ -695,15 +795,24 @@ class EmployeeManagementController extends Controller
      */
     private function formOptions(): array
     {
+        $user = auth()->user();
+        $unrestricted = $user->seesAllData(User::SCOPE_BYPASS_EMPLOYEES);
+        $branchIds = $unrestricted ? [] : $user->accessBranchIds();
+        $departmentIds = $unrestricted ? [] : $user->accessDepartmentIds();
+
+        // The placement pickers only offer what the user is allowed to manage, so an
+        // employee can never be filed outside their scope by accident.
         $branches = Branch::query()
             ->with(['activeDepartments' => fn ($query) => $query->where('departments.is_active', true)->orderBy('name')])
             ->where('is_active', true)
+            ->when($branchIds !== [], fn ($query) => $query->whereIn('id', $branchIds))
             ->orderBy('city')
             ->orderBy('name')
             ->get();
         $departments = Department::query()
             ->with(['activeJobPositions' => fn ($query) => $query->where('job_positions.is_active', true)->orderBy('name')])
             ->where('is_active', true)
+            ->when($departmentIds !== [], fn ($query) => $query->whereIn('id', $departmentIds))
             ->orderBy('name')
             ->get();
 
@@ -724,7 +833,7 @@ class EmployeeManagementController extends Controller
             ],
             'roles' => Role::query()->where('guard_name', 'web')->orderBy('name')->get(),
             'leaveTypes' => LeaveType::query()->where('is_active', true)->where('counts_against_balance', true)->orderBy('name')->get(),
-            'managers' => Employee::query()->active()->orderBy('full_name')->get(['id', 'full_name', 'employee_number']),
+            'managers' => Employee::query()->active()->visibleTo($user)->orderBy('full_name')->get(['id', 'full_name', 'employee_number']),
             'devices' => Device::query()->with('branch')->orderBy('name')->get(),
             'statuses' => Employee::employmentStatusLabels(),
             'exitReasons' => Employee::exitReasonLabels(),

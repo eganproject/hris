@@ -46,6 +46,19 @@ class EmployeesImport implements SkipsEmptyRows, ToCollection, WithHeadingRow
     private int $imported = 0;
 
     /**
+     * The importer's data scope, lowercased. A null list means "no limit on this
+     * axis"; a list means every row must name one of those, and nothing new may be
+     * created there — an HR cabang cannot import people into another location.
+     *
+     * @param  list<string>|null  $allowedBranches
+     * @param  list<string>|null  $allowedDepartments
+     */
+    public function __construct(
+        private readonly ?array $allowedBranches = null,
+        private readonly ?array $allowedDepartments = null,
+    ) {}
+
+    /**
      * Column metadata, shared with the template/guide export so the header row,
      * the instructions sheet and this importer never drift apart.
      *
@@ -185,6 +198,16 @@ class EmployeesImport implements SkipsEmptyRows, ToCollection, WithHeadingRow
             if ($get($key) === '') {
                 $add("kolom \"{$label}\" wajib diisi.", $label);
             }
+        }
+
+        // The importer's own data scope: a row may not place someone in a location or
+        // division the importer is not allowed to see.
+        if ($this->allowedBranches !== null && $branchName !== '' && ! in_array(strtolower($branchName), $this->allowedBranches, true)) {
+            $add("Lokasi Kerja \"{$branchName}\" berada di luar cakupan akses Anda.", 'Lokasi Kerja');
+        }
+
+        if ($this->allowedDepartments !== null && $departmentName !== '' && ! in_array(strtolower($departmentName), $this->allowedDepartments, true)) {
+            $add("Divisi \"{$departmentName}\" berada di luar cakupan akses Anda.", 'Divisi');
         }
 
         // Uniqueness within the file and against existing data (case-insensitive;

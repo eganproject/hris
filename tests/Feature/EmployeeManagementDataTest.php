@@ -21,9 +21,11 @@ function employeeManager(): User
 {
     app(PermissionRegistrar::class)->forgetCachedPermissions();
 
+    // HR pusat: sees every location and division (see DataScopeTest for a scoped HR).
     $permissions = [
         'dashboard.view',
         'employees.view',
+        'employees.view.all',
         'employees.create',
         'employees.update',
         'employees.delete',

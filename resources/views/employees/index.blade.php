@@ -23,6 +23,12 @@
             </div>
         </section>
 
+        @if ($hasNoScope)
+            <div class="rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+                Cakupan akses Anda belum diatur, jadi belum ada data karyawan yang bisa ditampilkan. Minta admin menetapkan lokasi kerja / divisi Anda di menu <span class="font-medium">Kontrol Akses</span>.
+            </div>
+        @endif
+
         @php
             $statusFilter = $filters['status'] ?? '';
             $contractFilter = $filters['contract'] ?? '';

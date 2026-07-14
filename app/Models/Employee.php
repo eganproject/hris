@@ -252,6 +252,57 @@ class Employee extends Model
         return false;
     }
 
+    /**
+     * Narrow a query to the employees the given user is allowed to see: those in one
+     * of their work locations AND one of their divisions (an empty list on an axis
+     * means "semua" for that axis). Holding the bypass permission lifts the scope
+     * entirely; having neither the bypass nor any scope means seeing nobody — the
+     * scope has simply not been set up for that user yet, and failing closed is the
+     * only safe reading.
+     */
+    public function scopeVisibleTo(Builder $query, User $user, string $bypassPermission = User::SCOPE_BYPASS_EMPLOYEES): void
+    {
+        if ($user->seesAllData($bypassPermission)) {
+            return;
+        }
+
+        $branchIds = $user->accessBranchIds();
+        $departmentIds = $user->accessDepartmentIds();
+
+        if ($branchIds === [] && $departmentIds === []) {
+            $query->whereRaw('1 = 0');
+
+            return;
+        }
+
+        if ($branchIds !== []) {
+            $query->whereIn('branch_id', $branchIds);
+        }
+
+        if ($departmentIds !== []) {
+            $query->whereIn('department_id', $departmentIds);
+        }
+    }
+
+    public function isVisibleTo(User $user, string $bypassPermission = User::SCOPE_BYPASS_EMPLOYEES): bool
+    {
+        if ($user->seesAllData($bypassPermission)) {
+            return true;
+        }
+
+        $branchIds = $user->accessBranchIds();
+        $departmentIds = $user->accessDepartmentIds();
+
+        if ($branchIds === [] && $departmentIds === []) {
+            return false;
+        }
+
+        $inBranch = $branchIds === [] || in_array($this->branch_id, $branchIds, true);
+        $inDepartment = $departmentIds === [] || in_array($this->department_id, $departmentIds, true);
+
+        return $inBranch && $inDepartment;
+    }
+
     public function scopeActive(Builder $query): void
     {
         $query->where('employment_status', 'active');
