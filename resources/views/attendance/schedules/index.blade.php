@@ -67,10 +67,13 @@
                     </thead>
                     <tbody>
                         @forelse ($employees as $employee)
-                            @php $map = $employee->schedules->keyBy(fn ($s) => $s->work_date->toDateString()); @endphp
+                            @php
+                                $map = $employee->schedules->keyBy(fn ($s) => $s->work_date->toDateString());
+                                $employeeLeaves = $leaves[$employee->id] ?? collect();
+                            @endphp
                             <tr class="border-b border-gray-100 last:border-b-0">
                                 <td class="sticky left-0 z-10 border-r border-gray-200 bg-white px-3 py-1.5 text-left">
-                                    <p class="font-medium text-gray-900">{{ $employee->full_name }}</p>
+                                    <a href="{{ route('attendance.schedules.show', ['employee' => $employee, 'month' => $month->format('Y-m')]) }}" class="font-medium text-gray-900 hover:text-primary hover:underline">{{ $employee->full_name }}</a>
                                     <p class="text-[11px] text-gray-500">{{ $employee->employee_number }}</p>
                                 </td>
                                 @foreach ($days as $day)
@@ -78,7 +81,13 @@
                                         $key = $day->toDateString();
                                         $sched = $map[$key] ?? null;
                                         $hol = $holidays[$key] ?? null;
+                                        $leave = $employeeLeaves[$key] ?? null;
                                         $isManual = $sched && $sched->source === \App\Enums\ScheduleSource::Manual;
+                                        // Approved leave wins the cell: the shift may still be on the
+                                        // roster, but the person will not be at work that day.
+                                        $title = $leave
+                                            ? ($leave->leaveType?->name ?? 'Cuti').' (disetujui)'.($sched && ! $sched->is_day_off ? ' — jadwal '.$sched->shift?->name : '')
+                                            : ($sched && ! $sched->is_day_off ? $sched->shift?->name : ($sched && $sched->is_day_off ? 'Libur' : 'Belum dijadwalkan')).($isManual ? ' (manual)' : '');
                                     @endphp
                                     <td @class(['border-l border-gray-100 p-0.5', 'bg-red-50/60' => $hol, 'bg-gray-50/60' => ! $hol && $day->isWeekend()])>
                                         <button type="button"
@@ -87,16 +96,20 @@
                                                 data-date="{{ $key }}" data-date-label="{{ $day->translatedFormat('l, d M Y') }}"
                                                 data-shift="{{ $sched && ! $sched->is_day_off ? $sched->shift_id : '' }}"
                                                 data-off="{{ $sched && $sched->is_day_off ? 1 : 0 }}"
+                                                data-leave="{{ $leave ? ($leave->leaveType?->name ?? 'Cuti') : '' }}"
                                             @else disabled @endcan
                                             @class([
                                                 'flex h-9 w-full items-center justify-center rounded text-[11px] font-semibold transition',
                                                 'cursor-pointer hover:ring-2 hover:ring-primary/40' => auth()->user()->can('attendance.update'),
-                                                'bg-primary/10 text-primary' => $sched && ! $sched->is_day_off,
-                                                'text-gray-300' => ! $sched || $sched->is_day_off,
-                                                'ring-1 ring-blue-400' => $isManual,
+                                                'bg-amber-100 text-amber-800' => $leave,
+                                                'bg-primary/10 text-primary' => ! $leave && $sched && ! $sched->is_day_off,
+                                                'text-gray-300' => ! $leave && (! $sched || $sched->is_day_off),
+                                                'ring-1 ring-blue-400' => ! $leave && $isManual,
                                             ])
-                                            title="{{ $sched && ! $sched->is_day_off ? $sched->shift?->name : ($sched && $sched->is_day_off ? 'Libur' : 'Belum dijadwalkan') }}{{ $isManual ? ' (manual)' : '' }}">
-                                            @if ($sched && ! $sched->is_day_off)
+                                            title="{{ $title }}">
+                                            @if ($leave)
+                                                {{ $leave->leaveType?->code ?? 'C' }}
+                                            @elseif ($sched && ! $sched->is_day_off)
                                                 {{ $sched->shift?->code ?? '?' }}
                                             @elseif ($sched && $sched->is_day_off)
                                                 —
@@ -115,9 +128,11 @@
             </div>
             <div class="flex flex-wrap items-center gap-4 border-t border-gray-200 px-4 py-3 text-[11px] text-gray-500">
                 <span class="inline-flex items-center gap-1.5"><span class="inline-block size-3 rounded bg-primary/10 ring-1 ring-primary/20"></span> Ada shift (kode)</span>
+                <span class="inline-flex items-center gap-1.5"><span class="inline-block size-3 rounded bg-amber-100 ring-1 ring-amber-200"></span> Cuti/izin disetujui (kode jenis)</span>
                 <span class="inline-flex items-center gap-1.5"><span class="inline-block size-3 rounded text-gray-300">—</span> Libur</span>
                 <span class="inline-flex items-center gap-1.5"><span class="inline-block size-3 rounded ring-1 ring-blue-400"></span> Override manual</span>
                 <span class="inline-flex items-center gap-1.5"><span class="inline-block size-3 rounded bg-red-50"></span> Hari libur nasional</span>
+                <span class="ml-auto">Klik nama karyawan untuk melihat jadwal per karyawan.</span>
             </div>
         </section>
 
@@ -162,6 +177,7 @@
                 <div>
                     <h3 class="text-base font-semibold text-gray-950">Ubah Jadwal Harian</h3>
                     <p class="mt-1 text-sm text-gray-500"><span id="ov-emp-name" class="font-medium text-gray-700"></span> · <span id="ov-date-label"></span></p>
+                    <p id="ov-leave" hidden class="mt-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">Karyawan ini sudah disetujui <span id="ov-leave-type" class="font-semibold"></span> pada tanggal tersebut.</p>
                 </div>
                 <label class="flex items-center gap-2 text-sm font-medium text-gray-700">
                     <input type="checkbox" name="is_day_off" value="1" id="ov-day-off" class="size-4 rounded border-gray-300 text-primary focus:ring-primary">
@@ -200,6 +216,8 @@
                 const shift = document.getElementById('ov-shift');
                 const shiftWrap = document.getElementById('ov-shift-wrap');
                 const note = document.getElementById('ov-note');
+                const leaveBox = document.getElementById('ov-leave');
+                const leaveType = document.getElementById('ov-leave-type');
 
                 function syncOff() {
                     shiftWrap.style.display = dayOff.checked ? 'none' : '';
@@ -217,6 +235,9 @@
                         dayOff.checked = cell.dataset.off === '1';
                         shift.value = cell.dataset.shift || '';
                         note.value = '';
+                        // Warn before overriding a day the employee is already on leave for.
+                        leaveType.textContent = cell.dataset.leave || '';
+                        leaveBox.hidden = !cell.dataset.leave;
                         syncOff();
                         dialog.showModal();
                     });

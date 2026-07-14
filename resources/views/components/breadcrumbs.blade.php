@@ -43,6 +43,7 @@
 
         'attendance.schedules.index' => ['label' => 'Jadwal Kerja', 'parent' => 'dashboard'],
         'attendance.schedules.assign' => ['label' => 'Tugaskan Pola', 'parent' => 'attendance.schedules.index'],
+        'attendance.schedules.show' => ['label' => 'Jadwal Karyawan', 'parent' => 'attendance.schedules.index'],
 
         'attendance.leave.index' => ['label' => 'Cuti & Izin', 'parent' => 'dashboard'],
         'attendance.leave.create' => ['label' => 'Ajukan Cuti/Izin', 'parent' => 'attendance.leave.index'],

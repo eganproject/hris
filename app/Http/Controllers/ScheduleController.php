@@ -2,11 +2,13 @@
 
 namespace App\Http\Controllers;
 
+use App\Enums\LeaveRequestStatus;
 use App\Http\Requests\ScheduleAssignmentRequest;
 use App\Http\Requests\ScheduleOverrideRequest;
 use App\Models\Branch;
 use App\Models\Employee;
 use App\Models\Holiday;
+use App\Models\LeaveRequest;
 use App\Models\ScheduleAssignment;
 use App\Models\SchedulePattern;
 use App\Models\Shift;
@@ -14,6 +16,7 @@ use App\Services\ScheduleGenerator;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Collection;
 use Illuminate\View\View;
 use Carbon\CarbonPeriod;
 
@@ -63,6 +66,7 @@ class ScheduleController extends Controller
             'employees' => $employees,
             'days' => $days,
             'holidays' => $holidays,
+            'leaves' => $this->approvedLeaveByDate($from, $to, $branchId),
             'assignments' => $assignments,
             'month' => $month,
             'prevMonth' => $month->copy()->subMonth()->format('Y-m'),
@@ -72,6 +76,82 @@ class ScheduleController extends Controller
             'shifts' => Shift::query()->where('is_active', true)->orderBy('start_time')->get(),
             'patternCount' => SchedulePattern::query()->where('is_active', true)->count(),
         ]);
+    }
+
+    /**
+     * One employee's month: every day with its shift, the source (pola vs manual),
+     * public holidays and approved leave — the "why is this person not working"
+     * view that the roster grid can only hint at.
+     */
+    public function show(Request $request, Employee $employee): View
+    {
+        $month = $this->resolveMonth($request->input('month'));
+        $from = $month->copy()->startOfMonth();
+        $to = $month->copy()->endOfMonth();
+
+        $employee->load(['branch', 'department', 'jobPosition']);
+
+        $schedules = $employee->schedules()
+            ->whereBetween('work_date', [$from->toDateString(), $to->toDateString()])
+            ->with('shift')
+            ->get()
+            ->keyBy(fn ($schedule) => $schedule->work_date->toDateString());
+
+        $holidays = Holiday::query()
+            ->whereBetween('date', [$from->toDateString(), $to->toDateString()])
+            ->where(fn ($query) => $query->where('is_national', true)->orWhere('branch_id', $employee->branch_id))
+            ->get()
+            ->keyBy(fn (Holiday $holiday) => $holiday->date->toDateString());
+
+        $leaves = $this->approvedLeaveByDate($from, $to, null, $employee)->get($employee->id, collect());
+
+        $days = collect(CarbonPeriod::create($from, $to)->toArray());
+
+        return view('attendance.schedules.employee', [
+            'employee' => $employee,
+            'days' => $days,
+            'schedules' => $schedules,
+            'holidays' => $holidays,
+            'leaves' => $leaves,
+            'assignments' => $employee->scheduleAssignments()
+                ->with('pattern')
+                ->orderByDesc('start_date')
+                ->get(),
+            'month' => $month,
+            'prevMonth' => $month->copy()->subMonth()->format('Y-m'),
+            'nextMonth' => $month->copy()->addMonth()->format('Y-m'),
+        ]);
+    }
+
+    /**
+     * Approved leave expanded per day, so a roster cell can answer "is this person
+     * off on leave today?" with a single lookup.
+     *
+     * @return Collection<int, Collection<string, LeaveRequest>>  employee id => date => leave
+     */
+    private function approvedLeaveByDate(Carbon $from, Carbon $to, ?int $branchId = null, ?Employee $employee = null): Collection
+    {
+        $leaves = LeaveRequest::query()
+            ->where('status', LeaveRequestStatus::Approved->value)
+            ->whereDate('start_date', '<=', $to->toDateString())
+            ->whereDate('end_date', '>=', $from->toDateString())
+            ->when($employee, fn ($query) => $query->where('employee_id', $employee->id))
+            ->when($branchId, fn ($query) => $query->whereHas('employee', fn ($q) => $q->where('branch_id', $branchId)))
+            ->with('leaveType')
+            ->get();
+
+        $byEmployee = [];
+
+        foreach ($leaves as $leave) {
+            $start = $leave->start_date->greaterThan($from) ? $leave->start_date->copy() : $from->copy();
+            $end = $leave->end_date->lessThan($to) ? $leave->end_date->copy() : $to->copy();
+
+            foreach (CarbonPeriod::create($start, $end) as $day) {
+                $byEmployee[$leave->employee_id][$day->toDateString()] = $leave;
+            }
+        }
+
+        return collect($byEmployee)->map(fn (array $days) => collect($days));
     }
 
     public function create(Request $request): View

@@ -1,11 +1,14 @@
 <?php
 
+use App\Enums\LeaveRequestStatus;
 use App\Enums\ScheduleSource;
 use App\Enums\SchedulePatternType;
 use App\Models\Branch;
 use App\Models\Department;
 use App\Models\Employee;
 use App\Models\JobPosition;
+use App\Models\LeaveRequest;
+use App\Models\LeaveType;
 use App\Models\EmployeeSchedule;
 use App\Models\ScheduleAssignment;
 use App\Models\SchedulePattern;
@@ -182,6 +185,68 @@ test('a manual override can be set through the controller', function () {
     expect($row)->not->toBeNull()
         ->and($row->shift_id)->toBe($reg->id)
         ->and($row->source)->toBe(ScheduleSource::Manual);
+});
+
+test('approved leave shows on the roster and on the per-employee schedule', function () {
+    $user = scheduleManager();
+    $reg = Shift::query()->create(['code' => 'REG', 'name' => 'Reguler', 'start_time' => '08:00', 'end_time' => '17:00', 'is_active' => true]);
+    $pattern = weeklyPattern($reg->id);
+
+    $branch = Branch::query()->create(['code' => 'HO', 'name' => 'Kantor Pusat', 'is_active' => true]);
+    $department = Department::query()->create(['code' => 'IT', 'name' => 'Teknologi', 'is_active' => true]);
+    $position = JobPosition::query()->create(['code' => 'STF', 'name' => 'Staff IT', 'is_active' => true]);
+
+    $employee = Employee::query()->create([
+        'full_name' => 'Budi Cuti', 'employment_status' => 'active',
+        'branch_id' => $branch->id, 'department_id' => $department->id, 'job_position_id' => $position->id,
+    ]);
+
+    $assignment = ScheduleAssignment::query()->create([
+        'employee_id' => $employee->id, 'schedule_pattern_id' => $pattern->id,
+        'start_date' => now()->startOfMonth()->toDateString(), 'end_date' => now()->endOfMonth()->toDateString(),
+    ]);
+    app(ScheduleGenerator::class)->forAssignment($assignment);
+
+    $leaveType = LeaveType::query()->create([
+        'code' => 'CT', 'name' => 'Cuti Tahunan', 'attendance_status' => 'leave',
+        'is_paid' => true, 'counts_against_balance' => true, 'default_quota_days' => 12, 'is_active' => true,
+    ]);
+
+    LeaveRequest::query()->create([
+        'employee_id' => $employee->id, 'leave_type_id' => $leaveType->id,
+        'start_date' => now()->startOfMonth()->addDays(9)->toDateString(),
+        'end_date' => now()->startOfMonth()->addDays(11)->toDateString(),
+        'reason' => 'Liburan keluarga.', 'status' => LeaveRequestStatus::Approved->value,
+    ]);
+
+    // Still awaiting a decision: the roster must not treat this day as time off.
+    $pendingType = LeaveType::query()->create([
+        'code' => 'IZ', 'name' => 'Izin Khusus', 'attendance_status' => 'leave',
+        'is_paid' => false, 'counts_against_balance' => false, 'default_quota_days' => 0, 'is_active' => true,
+    ]);
+    LeaveRequest::query()->create([
+        'employee_id' => $employee->id, 'leave_type_id' => $pendingType->id,
+        'start_date' => now()->startOfMonth()->addDays(20)->toDateString(),
+        'end_date' => now()->startOfMonth()->addDays(20)->toDateString(),
+        'reason' => 'Urusan keluarga.', 'status' => LeaveRequestStatus::PendingSupervisor->value,
+    ]);
+
+    $month = now()->format('Y-m');
+
+    $this->actingAs($user)->get("/attendance/schedules?month={$month}")
+        ->assertOk()
+        ->assertSee('Cuti Tahunan (disetujui)')
+        ->assertSee('Cuti/izin disetujui', escape: false)
+        ->assertDontSee('Izin Khusus');
+
+    $this->actingAs($user)->get("/attendance/schedules/employees/{$employee->id}?month={$month}")
+        ->assertOk()
+        ->assertSee('Budi Cuti')
+        ->assertSee('Staff IT')
+        ->assertSee('Kantor Pusat')
+        ->assertSee('Cuti Tahunan disetujui')
+        ->assertSee('3</span> hari cuti/izin', escape: false)
+        ->assertDontSee('Izin Khusus');
 });
 
 test('the assign page shows each employee org info and their existing schedule period', function () {

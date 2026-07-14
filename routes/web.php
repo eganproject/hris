@@ -239,6 +239,7 @@ Route::middleware('auth')->group(function () {
         Route::get('schedules', [ScheduleController::class, 'index'])->middleware('permission:attendance.view')->name('schedules.index');
         Route::get('schedules/assign', [ScheduleController::class, 'create'])->middleware('permission:attendance.create')->name('schedules.assign');
         Route::post('schedules/assign', [ScheduleController::class, 'store'])->middleware('permission:attendance.create')->name('schedules.store');
+        Route::get('schedules/employees/{employee}', [ScheduleController::class, 'show'])->middleware('permission:attendance.view')->name('schedules.show');
         Route::post('schedules/generate', [ScheduleController::class, 'generate'])->middleware('permission:attendance.update')->name('schedules.generate');
         Route::post('schedules/override', [ScheduleController::class, 'override'])->middleware('permission:attendance.update')->name('schedules.override');
         Route::delete('schedules/assignments/{assignment}', [ScheduleController::class, 'destroyAssignment'])->middleware('permission:attendance.delete')->name('schedules.assignments.destroy');
