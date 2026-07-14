@@ -61,7 +61,7 @@ class ApprovalNotifier
             message: $who.' mengajukan '.($leave->leaveType?->name ?? 'cuti').' ('.$range.').',
             url: route('attendance.leave.index'),
             category: 'leave',
-        ));
+        ), $leave->employee);
     }
 
     public function leavePendingHr(LeaveRequest $leave): void
@@ -73,7 +73,7 @@ class ApprovalNotifier
             message: $leave->employee?->full_name.' — disetujui atasan, menunggu keputusan HR.',
             url: route('attendance.leave.index'),
             category: 'leave',
-        ));
+        ), $leave->employee);
     }
 
     public function correctionSubmitted(AttendanceCorrection $correction): void
@@ -85,7 +85,7 @@ class ApprovalNotifier
             message: $correction->employee?->full_name.' mengajukan koreksi absensi '.$correction->work_date->translatedFormat('D, d M').'.',
             url: route('attendance.corrections.index'),
             category: 'correction',
-        ));
+        ), $correction->employee);
     }
 
     public function swapRequested(ShiftSwapRequest $swap): void
@@ -109,7 +109,7 @@ class ApprovalNotifier
             message: $swap->requester?->full_name.' ⇄ '.$swap->partner?->full_name.' — rekan setuju, menunggu HR.',
             url: route('attendance.swaps.index'),
             category: 'swap',
-        ));
+        ), $swap->requester);
     }
 
     // --- Result notifications back to the employee who submitted the request ---
@@ -209,7 +209,7 @@ class ApprovalNotifier
             message: 'Kontrak '.$contract->contract_number.' a.n. '.$employee->full_name.' berakhir dalam '.$daysLeft.' hari ('.$contract->end_date->translatedFormat('d M Y').'). Perpanjang atau proses keluar.',
             url: route('employees.show', $employee),
             category: 'contract',
-        ));
+        ), $employee);
     }
 
     public function contractAutoDeactivated(Employee $employee, EmployeeContract $contract): void
@@ -219,7 +219,7 @@ class ApprovalNotifier
             message: $employee->full_name.' dinonaktifkan otomatis karena kontrak '.$contract->contract_number.' berakhir ('.$contract->end_date->translatedFormat('d M Y').').',
             url: route('employees.show', $employee),
             category: 'contract',
-        ));
+        ), $employee);
     }
 
     public function deviceOffline(Device $device, int $minutesOffline): void
@@ -241,13 +241,18 @@ class ApprovalNotifier
         }
     }
 
-    private function toHr(ApprovalNotification $notification): void
+    private function toHr(ApprovalNotification $notification, ?Employee $about = null): void
     {
-        $this->toPermission(self::HR_PERMISSION, $notification);
+        $this->toPermission(self::HR_PERMISSION, $notification, $about);
     }
 
-    /** Notify every user that holds a given permission (excluding the actor). */
-    private function toPermission(string $permission, ApprovalNotification $notification): void
+    /**
+     * Notify every user that holds a given permission (excluding the actor). When the
+     * notification is about a specific employee, only those whose data scope covers
+     * that employee are notified — an HR cabang must not be told about, and linked to,
+     * a request they are not allowed to open.
+     */
+    private function toPermission(string $permission, ApprovalNotification $notification, ?Employee $about = null): void
     {
         try {
             $recipients = User::query()
@@ -258,6 +263,14 @@ class ApprovalNotifier
             // The permission is not registered (yet), so nobody can hold it and there
             // is nobody to notify. Never let that abort the action being notified.
             return;
+        }
+
+        if ($about) {
+            $bypass = str_starts_with($permission, 'employees.')
+                ? User::SCOPE_BYPASS_EMPLOYEES
+                : User::SCOPE_BYPASS_ATTENDANCE;
+
+            $recipients = $recipients->filter(fn (User $user) => $about->isVisibleTo($user, $bypass));
         }
 
         $recipients->each->notify($notification);

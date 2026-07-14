@@ -2,9 +2,8 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Branch;
-use App\Models\Employee;
 use App\Models\OvertimeApproval;
+use App\Support\DataScope;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\View\View;
@@ -21,10 +20,12 @@ class OvertimeController extends Controller
         $month = $this->resolveMonth($request->input('month'));
         [$from, $to] = [$month->copy()->startOfMonth(), $month->copy()->endOfMonth()];
         $branchId = $request->integer('branch_id') ?: null;
+        $scope = DataScope::forAttendance($request->user());
 
         $requests = OvertimeApproval::query()
             ->whereBetween('work_date', [$from->toDateString(), $to->toDateString()])
             ->whereHas('employee', fn ($q) => $q->when($branchId, fn ($q) => $q->where('branch_id', $branchId)))
+            ->tap(fn ($query) => $scope->constrain($query))
             ->with(['employee', 'supervisor'])
             ->orderBy('work_date')
             ->get();
@@ -34,7 +35,7 @@ class OvertimeController extends Controller
             'month' => $month,
             'prevMonth' => $month->copy()->subMonth()->format('Y-m'),
             'nextMonth' => $month->copy()->addMonth()->format('Y-m'),
-            'branches' => Branch::query()->orderBy('name')->get(),
+            'branches' => $scope->branches(),
             'branchId' => $branchId,
             'pendingCount' => $requests->where('status', OvertimeApproval::STATUS_PENDING)->count(),
             'approvedMinutes' => (int) $requests->where('status', OvertimeApproval::STATUS_APPROVED)->sum('approved_minutes'),
@@ -49,16 +50,18 @@ class OvertimeController extends Controller
         $month = $this->resolveMonth($request->input('month'));
         [$from, $to] = [$month->copy()->startOfMonth(), $month->copy()->endOfMonth()];
         $branchId = $request->integer('branch_id') ?: null;
+        $scope = DataScope::forAttendance($request->user());
 
         $rows = OvertimeApproval::query()
             ->approved()
             ->whereBetween('work_date', [$from->toDateString(), $to->toDateString()])
             ->whereHas('employee', fn ($q) => $q->when($branchId, fn ($q) => $q->where('branch_id', $branchId)))
+            ->tap(fn ($query) => $scope->constrain($query))
             ->selectRaw('employee_id, count(*) as days, sum(approved_minutes) as minutes')
             ->groupBy('employee_id')
             ->get();
 
-        $employees = Employee::query()->whereIn('id', $rows->pluck('employee_id'))->orderBy('full_name')->get()->keyBy('id');
+        $employees = $scope->employees()->whereIn('id', $rows->pluck('employee_id'))->orderBy('full_name')->get()->keyBy('id');
 
         return view('attendance.overtime.recap', [
             'rows' => $rows->sortByDesc('minutes')->values(),
@@ -66,7 +69,7 @@ class OvertimeController extends Controller
             'month' => $month,
             'prevMonth' => $month->copy()->subMonth()->format('Y-m'),
             'nextMonth' => $month->copy()->addMonth()->format('Y-m'),
-            'branches' => Branch::query()->orderBy('name')->get(),
+            'branches' => $scope->branches(),
             'branchId' => $branchId,
             'totalMinutes' => (int) $rows->sum('minutes'),
         ]);

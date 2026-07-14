@@ -20,11 +20,11 @@ class LeaveReport
     /**
      * @return array{types: Collection<int, LeaveType>, rows: Collection<int, array<string, mixed>>}
      */
-    public function build(int $year, ?int $branchId = null, ?int $departmentId = null): array
+    public function build(int $year, ?int $branchId = null, ?int $departmentId = null, ?DataScope $scope = null): array
     {
         $types = LeaveType::query()->where('is_active', true)->orderBy('name')->get();
 
-        $employees = Employee::query()
+        $employees = ($scope?->employees() ?? Employee::query())
             ->when($branchId, fn ($q) => $q->where('branch_id', $branchId))
             ->when($departmentId, fn ($q) => $q->where('department_id', $departmentId))
             ->with(['branch', 'department'])

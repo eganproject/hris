@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\AttendanceCorrection;
 use App\Services\AttendanceResolver;
 use App\Support\ApprovalNotifier;
+use App\Support\DataScope;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
@@ -18,8 +19,11 @@ class AttendanceCorrectionController extends Controller
         $status = $request->string('status')->toString() ?: 'pending';
         $perPage = min(max((int) $request->input('per_page', 15), 10), 100);
 
+        $scope = DataScope::forAttendance($request->user());
+
         $corrections = AttendanceCorrection::query()
             ->with(['employee', 'reviewer'])
+            ->tap(fn ($query) => $scope->constrain($query))
             ->when($status !== 'all', fn ($query) => $query->where('status', $status))
             ->orderByRaw("status = 'pending' desc")
             ->latest('work_date')
@@ -29,15 +33,19 @@ class AttendanceCorrectionController extends Controller
         return view('attendance.corrections.index', [
             'corrections' => $corrections,
             'status' => $status,
-            'pendingCount' => AttendanceCorrection::query()->pending()->count(),
+            'pendingCount' => AttendanceCorrection::query()
+                ->pending()
+                ->tap(fn ($query) => $scope->constrain($query))
+                ->count(),
         ]);
     }
 
     /**
      * Approve: apply the requested times to the resolved attendance for that day.
      */
-    public function approve(AttendanceCorrection $correction): RedirectResponse
+    public function approve(Request $request, AttendanceCorrection $correction): RedirectResponse
     {
+        DataScope::forAttendance($request->user())->authorize($correction->employee);
         abort_unless($correction->isPending(), 403);
 
         $this->resolver->resolve(
@@ -61,6 +69,7 @@ class AttendanceCorrectionController extends Controller
 
     public function reject(Request $request, AttendanceCorrection $correction): RedirectResponse
     {
+        DataScope::forAttendance($request->user())->authorize($correction->employee);
         abort_unless($correction->isPending(), 403);
 
         $correction->forceFill([

@@ -1,9 +1,13 @@
 <?php
 
+use App\Enums\LeaveRequestStatus;
+use App\Models\Attendance;
 use App\Models\Branch;
 use App\Models\Department;
 use App\Models\Employee;
 use App\Models\JobPosition;
+use App\Models\LeaveRequest;
+use App\Models\LeaveType;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Spatie\Permission\Models\Permission;
@@ -81,6 +85,96 @@ function scopeFixture(): array
         'jktAcc' => $make($jakarta, $accounting, 'Jkt Accounting'),
     ];
 }
+
+/**
+ * The attendance-side counterpart of scopedHr(): attendance permissions, but no
+ * "attendance.view.all".
+ */
+function scopedAttendanceHr(array $extraPermissions = []): User
+{
+    app(PermissionRegistrar::class)->forgetCachedPermissions();
+
+    $permissions = array_merge([
+        'attendance.view',
+        'attendance.create',
+        'attendance.update',
+        'attendance.delete',
+    ], $extraPermissions);
+
+    foreach ($permissions as $permission) {
+        Permission::findOrCreate($permission, 'web');
+    }
+
+    Permission::findOrCreate(User::SCOPE_BYPASS_ATTENDANCE, 'web');
+
+    $user = User::factory()->create();
+    $user->givePermissionTo($permissions);
+
+    return $user;
+}
+
+test('attendance, roster and leave pages only show the scoped employees', function () {
+    $fixture = scopeFixture();
+    $user = scopedAttendanceHr();
+    $user->accessBranches()->sync([$fixture['surabaya']->id]);
+
+    $type = LeaveType::query()->create([
+        'code' => 'CT', 'name' => 'Cuti Tahunan', 'attendance_status' => 'leave',
+        'is_paid' => true, 'counts_against_balance' => true, 'default_quota_days' => 12, 'is_active' => true,
+    ]);
+
+    // One request on each side, so the leave list can show one and hide the other.
+    $outsiderLeave = LeaveRequest::query()->create([
+        'employee_id' => $fixture['jktAcc']->id, 'leave_type_id' => $type->id,
+        'start_date' => now()->toDateString(), 'end_date' => now()->addDay()->toDateString(),
+        'reason' => 'Keperluan keluarga.', 'status' => LeaveRequestStatus::PendingHr->value,
+    ]);
+
+    LeaveRequest::query()->create([
+        'employee_id' => $fixture['sbyAcc']->id, 'leave_type_id' => $type->id,
+        'start_date' => now()->toDateString(), 'end_date' => now()->addDay()->toDateString(),
+        'reason' => 'Keperluan keluarga.', 'status' => LeaveRequestStatus::PendingHr->value,
+    ]);
+
+    Attendance::query()->create([
+        'employee_id' => $fixture['jktAcc']->id, 'work_date' => now()->toDateString(), 'status' => 'present',
+    ]);
+    Attendance::query()->create([
+        'employee_id' => $fixture['sbyAcc']->id, 'work_date' => now()->toDateString(), 'status' => 'present',
+    ]);
+
+    foreach ([
+        '/attendance/daily',
+        '/attendance/schedules',
+        '/attendance/leave',
+        '/attendance/leave-balances',
+        '/reports/attendance',
+        '/reports/attendance-log',
+    ] as $url) {
+        $this->actingAs($user)->get($url)
+            ->assertOk()
+            ->assertSee('Sby Accounting')
+            ->assertDontSee('Jkt Accounting');
+    }
+
+    // And no decision may be made on an outsider's request.
+    $this->actingAs($user)->patch("/attendance/leave/{$outsiderLeave->id}/approve")->assertForbidden();
+    expect($outsiderLeave->fresh()->status)->toBe(LeaveRequestStatus::PendingHr);
+});
+
+test('the schedule and report detail of an employee outside the scope is forbidden', function () {
+    $fixture = scopeFixture();
+    $user = scopedAttendanceHr();
+    $user->accessBranches()->sync([$fixture['surabaya']->id]);
+
+    $inside = $fixture['sbyAcc'];
+    $outside = $fixture['jktAcc'];
+
+    $this->actingAs($user)->get("/attendance/schedules/employees/{$inside->id}")->assertOk();
+    $this->actingAs($user)->get("/attendance/schedules/employees/{$outside->id}")->assertForbidden();
+    $this->actingAs($user)->get("/reports/attendance/{$outside->id}")->assertForbidden();
+    $this->actingAs($user)->get("/reports/leave/{$outside->id}")->assertForbidden();
+});
 
 test('a user scoped to one location only sees that location', function () {
     $fixture = scopeFixture();

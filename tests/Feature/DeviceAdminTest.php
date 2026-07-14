@@ -14,11 +14,11 @@ uses(RefreshDatabase::class);
 function deviceAdmin(): User
 {
     app(PermissionRegistrar::class)->forgetCachedPermissions();
-    foreach (['attendance.view', 'attendance.create', 'attendance.update', 'attendance.delete'] as $p) {
+    foreach (['attendance.view', 'attendance.view.all', 'attendance.create', 'attendance.update', 'attendance.delete'] as $p) {
         Permission::findOrCreate($p, 'web');
     }
     $user = User::factory()->create();
-    $user->givePermissionTo(['attendance.view', 'attendance.create', 'attendance.update', 'attendance.delete']);
+    $user->givePermissionTo(['attendance.view', 'attendance.view.all', 'attendance.create', 'attendance.update', 'attendance.delete']);
 
     return $user;
 }

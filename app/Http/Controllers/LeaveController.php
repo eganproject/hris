@@ -8,6 +8,7 @@ use App\Models\Employee;
 use App\Models\LeaveRequest;
 use App\Models\LeaveType;
 use App\Services\LeaveWorkflow;
+use App\Support\DataScope;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
@@ -20,8 +21,11 @@ class LeaveController extends Controller
     {
         $perPage = min(max((int) $request->input('per_page', 15), 10), 100);
 
+        $scope = DataScope::forAttendance($request->user());
+
         $leaveRequests = LeaveRequest::query()
             ->with(['employee', 'leaveType', 'supervisor', 'approver'])
+            ->tap(fn ($query) => $scope->constrain($query))
             ->when($request->string('status')->toString(), fn ($query, string $status) => $query->where('status', $status))
             ->when($request->string('search')->toString(), function ($query, string $search): void {
                 $query->whereHas('employee', fn ($query) => $query->where('full_name', 'like', "%{$search}%"));
@@ -38,10 +42,10 @@ class LeaveController extends Controller
         ]);
     }
 
-    public function create(): View
+    public function create(Request $request): View
     {
         return view('attendance.leave.create', [
-            'employees' => Employee::query()->active()->orderBy('full_name')->get(),
+            'employees' => DataScope::forAttendance($request->user())->employees()->active()->orderBy('full_name')->get(),
             'leaveTypes' => LeaveType::query()->where('is_active', true)->orderBy('name')->get(),
         ]);
     }
@@ -49,6 +53,7 @@ class LeaveController extends Controller
     public function store(StoreLeaveRequest $request): RedirectResponse
     {
         $employee = Employee::findOrFail($request->integer('employee_id'));
+        DataScope::forAttendance($request->user())->authorize($employee);
 
         $this->workflow->submit($employee, $request->validated());
 
@@ -60,8 +65,9 @@ class LeaveController extends Controller
      * that already has a final decision is never touched again — two HR users with
      * the list open at the same time must not both "decide" it.
      */
-    public function approve(LeaveRequest $leaveRequest): RedirectResponse
+    public function approve(Request $request, LeaveRequest $leaveRequest): RedirectResponse
     {
+        DataScope::forAttendance($request->user())->authorize($leaveRequest->employee);
         abort_unless($leaveRequest->status->isPending(), 403);
 
         if ($leaveRequest->status === LeaveRequestStatus::PendingSupervisor) {
@@ -75,6 +81,7 @@ class LeaveController extends Controller
 
     public function reject(Request $request, LeaveRequest $leaveRequest): RedirectResponse
     {
+        DataScope::forAttendance($request->user())->authorize($leaveRequest->employee);
         abort_unless($leaveRequest->status->isPending(), 403);
 
         $this->workflow->reject($leaveRequest, auth()->user(), $request->string('decision_notes')->toString() ?: null);
@@ -87,8 +94,9 @@ class LeaveController extends Controller
      * "Dibatalkan" (who approved it is still visible) and its days go back to the
      * punch-based attendance status.
      */
-    public function cancel(LeaveRequest $leaveRequest): RedirectResponse
+    public function cancel(Request $request, LeaveRequest $leaveRequest): RedirectResponse
     {
+        DataScope::forAttendance($request->user())->authorize($leaveRequest->employee);
         abort_unless($leaveRequest->status === LeaveRequestStatus::Approved, 403);
 
         $this->workflow->cancel($leaveRequest);
@@ -100,8 +108,9 @@ class LeaveController extends Controller
      * Only requests that are not in effect can be erased. An approved leave must be
      * cancelled instead, so the approval trail is never silently deleted.
      */
-    public function destroy(LeaveRequest $leaveRequest): RedirectResponse
+    public function destroy(Request $request, LeaveRequest $leaveRequest): RedirectResponse
     {
+        DataScope::forAttendance($request->user())->authorize($leaveRequest->employee);
         abort_if($leaveRequest->status === LeaveRequestStatus::Approved, 403);
 
         $leaveRequest->delete();

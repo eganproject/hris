@@ -23,6 +23,7 @@ function masterDataAdmin(): User
         'organization.update',
         'organization.delete',
         'attendance.view',
+        'attendance.view.all',
         'attendance.create',
         'attendance.update',
         'attendance.delete',

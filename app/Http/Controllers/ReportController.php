@@ -12,6 +12,7 @@ use App\Models\Department;
 use App\Models\Employee;
 use App\Models\LeaveRequest;
 use App\Support\AttendanceReport;
+use App\Support\DataScope;
 use App\Support\LeaveReport;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
@@ -37,14 +38,15 @@ class ReportController extends Controller
     public function attendance(Request $request): View
     {
         [$month, $from, $to, $branchId, $departmentId] = $this->filters($request);
+        $scope = DataScope::forAttendance($request->user());
 
         return view('reports.attendance', [
-            'rows' => $this->attendanceReport->rows($from, $to, $branchId, $departmentId),
+            'rows' => $this->attendanceReport->rows($from, $to, $branchId, $departmentId, $scope),
             'month' => $month,
             'prevMonth' => $month->copy()->subMonth()->format('Y-m'),
             'nextMonth' => $month->copy()->addMonth()->format('Y-m'),
-            'branches' => Branch::query()->where('is_active', true)->orderBy('name')->get(),
-            'departments' => Department::query()->where('is_active', true)->orderBy('name')->get(),
+            'branches' => $scope->branches(),
+            'departments' => $scope->departments(),
             'branchId' => $branchId,
             'departmentId' => $departmentId,
         ]);
@@ -54,7 +56,7 @@ class ReportController extends Controller
     {
         [$month, $from, $to, $branchId, $departmentId] = $this->filters($request);
 
-        $rows = $this->attendanceReport->rows($from, $to, $branchId, $departmentId);
+        $rows = $this->attendanceReport->rows($from, $to, $branchId, $departmentId, DataScope::forAttendance($request->user()));
 
         return Excel::download(
             new AttendanceReportExport($rows),
@@ -67,7 +69,7 @@ class ReportController extends Controller
         [$month, $from, $to, $branchId, $departmentId] = $this->filters($request);
 
         $pdf = Pdf::loadView('reports.pdf.attendance', [
-            'rows' => $this->attendanceReport->rows($from, $to, $branchId, $departmentId),
+            'rows' => $this->attendanceReport->rows($from, $to, $branchId, $departmentId, DataScope::forAttendance($request->user())),
             'month' => $month,
             'branchName' => $branchId ? Branch::find($branchId)?->name : null,
             'departmentName' => $departmentId ? Department::find($departmentId)?->name : null,
@@ -83,14 +85,15 @@ class ReportController extends Controller
     public function attendanceLog(Request $request): View
     {
         [$month, $from, $to, $branchId, $departmentId] = $this->filters($request);
+        $scope = DataScope::forAttendance($request->user());
 
         return view('reports.attendance-log', [
-            'rows' => $this->attendanceLogRows($from, $to, $branchId, $departmentId),
+            'rows' => $this->attendanceLogRows($from, $to, $branchId, $departmentId, $scope),
             'month' => $month,
             'prevMonth' => $month->copy()->subMonth()->format('Y-m'),
             'nextMonth' => $month->copy()->addMonth()->format('Y-m'),
-            'branches' => Branch::query()->where('is_active', true)->orderBy('name')->get(),
-            'departments' => Department::query()->where('is_active', true)->orderBy('name')->get(),
+            'branches' => $scope->branches(),
+            'departments' => $scope->departments(),
             'branchId' => $branchId,
             'departmentId' => $departmentId,
         ]);
@@ -101,7 +104,7 @@ class ReportController extends Controller
         [$month, $from, $to, $branchId, $departmentId] = $this->filters($request);
 
         return Excel::download(
-            new AttendanceLogExport($this->attendanceLogRows($from, $to, $branchId, $departmentId)),
+            new AttendanceLogExport($this->attendanceLogRows($from, $to, $branchId, $departmentId, DataScope::forAttendance($request->user()))),
             'log-absensi-'.$month->format('Y-m').'.xlsx',
         );
     }
@@ -111,7 +114,7 @@ class ReportController extends Controller
         [$month, $from, $to, $branchId, $departmentId] = $this->filters($request);
 
         $pdf = Pdf::loadView('reports.pdf.attendance-log', [
-            'rows' => $this->attendanceLogRows($from, $to, $branchId, $departmentId),
+            'rows' => $this->attendanceLogRows($from, $to, $branchId, $departmentId, DataScope::forAttendance($request->user())),
             'month' => $month,
             'branchName' => $branchId ? Branch::find($branchId)?->name : null,
             'departmentName' => $departmentId ? Department::find($departmentId)?->name : null,
@@ -123,12 +126,13 @@ class ReportController extends Controller
     /**
      * @return \Illuminate\Support\Collection<int, Attendance>
      */
-    private function attendanceLogRows(string $from, string $to, ?int $branchId, ?int $departmentId): \Illuminate\Support\Collection
+    private function attendanceLogRows(string $from, string $to, ?int $branchId, ?int $departmentId, ?DataScope $scope = null): \Illuminate\Support\Collection
     {
         return Attendance::query()
             ->whereBetween('work_date', [$from, $to])
             ->when($branchId, fn ($q) => $q->whereHas('employee', fn ($e) => $e->where('branch_id', $branchId)))
             ->when($departmentId, fn ($q) => $q->whereHas('employee', fn ($e) => $e->where('department_id', $departmentId)))
+            ->when($scope, fn ($q) => $scope->constrain($q))
             ->with(['employee.department', 'shift'])
             ->get()
             ->sortBy(fn (Attendance $r) => $r->work_date->format('Y-m-d').'|'.strtolower((string) $r->employee?->full_name))
@@ -140,6 +144,8 @@ class ReportController extends Controller
      */
     public function employeeAttendance(Request $request, Employee $employee): View
     {
+        DataScope::forAttendance($request->user())->authorize($employee);
+
         $month = $this->resolveMonth($request->input('month'));
         [$from, $to] = [$month->copy()->startOfMonth()->toDateString(), $month->copy()->endOfMonth()->toDateString()];
 
@@ -181,15 +187,16 @@ class ReportController extends Controller
         $year = $this->resolveYear($request->input('year'));
         $branchId = $request->integer('branch_id') ?: null;
         $departmentId = $request->integer('department_id') ?: null;
+        $scope = DataScope::forAttendance($request->user());
 
-        $report = $this->leaveReport->build($year, $branchId, $departmentId);
+        $report = $this->leaveReport->build($year, $branchId, $departmentId, $scope);
 
         return view('reports.leave', [
             'types' => $report['types'],
             'rows' => $report['rows'],
             'year' => $year,
-            'branches' => Branch::query()->where('is_active', true)->orderBy('name')->get(),
-            'departments' => Department::query()->where('is_active', true)->orderBy('name')->get(),
+            'branches' => $scope->branches(),
+            'departments' => $scope->departments(),
             'branchId' => $branchId,
             'departmentId' => $departmentId,
         ]);
@@ -198,7 +205,7 @@ class ReportController extends Controller
     public function leaveExport(Request $request): BinaryFileResponse
     {
         $year = $this->resolveYear($request->input('year'));
-        $report = $this->leaveReport->build($year, $request->integer('branch_id') ?: null, $request->integer('department_id') ?: null);
+        $report = $this->leaveReport->build($year, $request->integer('branch_id') ?: null, $request->integer('department_id') ?: null, DataScope::forAttendance($request->user()));
 
         return Excel::download(
             new LeaveReportExport($report['rows'], $report['types']),
@@ -211,7 +218,7 @@ class ReportController extends Controller
         $year = $this->resolveYear($request->input('year'));
         $branchId = $request->integer('branch_id') ?: null;
         $departmentId = $request->integer('department_id') ?: null;
-        $report = $this->leaveReport->build($year, $branchId, $departmentId);
+        $report = $this->leaveReport->build($year, $branchId, $departmentId, DataScope::forAttendance($request->user()));
 
         $pdf = Pdf::loadView('reports.pdf.leave', [
             'rows' => $report['rows'],
@@ -229,6 +236,8 @@ class ReportController extends Controller
      */
     public function employeeLeave(Request $request, Employee $employee): View
     {
+        DataScope::forAttendance($request->user())->authorize($employee);
+
         $year = $this->resolveYear($request->input('year'));
 
         $requests = LeaveRequest::query()

@@ -22,7 +22,7 @@ class AttendanceReport
      *     terlambat_menit:int, kerja_menit:int, lembur_menit:int
      * }>
      */
-    public function rows(string $from, string $to, ?int $branchId = null, ?int $departmentId = null): Collection
+    public function rows(string $from, string $to, ?int $branchId = null, ?int $departmentId = null, ?DataScope $scope = null): Collection
     {
         $stats = Attendance::query()
             ->whereBetween('work_date', [$from, $to])
@@ -30,6 +30,7 @@ class AttendanceReport
                 $query->when($branchId, fn ($q) => $q->where('branch_id', $branchId))
                     ->when($departmentId, fn ($q) => $q->where('department_id', $departmentId));
             })
+            ->when($scope, fn ($query) => $scope->constrain($query))
             ->selectRaw(<<<'SQL'
                 employee_id,
                 SUM(CASE WHEN status IN ('present','late','early_leave','wfh','business_trip') THEN 1 ELSE 0 END) as hadir,

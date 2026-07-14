@@ -6,10 +6,10 @@ use App\Actions\ProcessDayAttendance;
 use App\Enums\AttendanceStatus;
 use App\Http\Requests\AttendancePunchRequest;
 use App\Models\Attendance;
-use App\Models\Branch;
 use App\Models\Employee;
 use App\Models\Shift;
 use App\Services\AttendanceResolver;
+use App\Support\DataScope;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
@@ -30,8 +30,9 @@ class AttendanceController extends Controller
     {
         $date = $this->resolveDate($request->input('date'));
         $branchId = $request->integer('branch_id') ?: null;
+        $scope = DataScope::forAttendance($request->user());
 
-        $employees = Employee::query()
+        $employees = $scope->employees()
             ->active()
             ->when($branchId, fn ($query) => $query->where('branch_id', $branchId))
             ->with([
@@ -53,8 +54,9 @@ class AttendanceController extends Controller
             'date' => $date,
             'prevDate' => $date->copy()->subDay()->toDateString(),
             'nextDate' => $date->copy()->addDay()->toDateString(),
-            'branches' => Branch::query()->orderBy('name')->get(),
+            'branches' => $scope->branches(),
             'branchId' => $branchId,
+            'hasNoScope' => $scope->isEmpty(),
             'shifts' => Shift::query()->where('is_active', true)->orderBy('start_time')->get(),
             'statuses' => AttendanceStatus::options(),
         ]);
@@ -69,7 +71,8 @@ class AttendanceController extends Controller
         $date = $this->resolveDate($request->input('date'));
         $branchId = $request->integer('branch_id') ?: null;
 
-        $count = $this->processDay->handle($date, $branchId);
+        // Only the employees this user may see get (re)processed.
+        $count = $this->processDay->handle($date, $branchId, $request->user());
 
         return redirect()
             ->route('attendance.daily.index', $request->only('date', 'branch_id'))
@@ -82,6 +85,8 @@ class AttendanceController extends Controller
     public function storePunch(AttendancePunchRequest $request): RedirectResponse
     {
         $employee = Employee::findOrFail($request->integer('employee_id'));
+        DataScope::forAttendance($request->user())->authorize($employee);
+
         $date = Carbon::parse($request->date('work_date'));
 
         $this->resolver->resolve(

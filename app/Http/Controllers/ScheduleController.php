@@ -5,7 +5,6 @@ namespace App\Http\Controllers;
 use App\Enums\LeaveRequestStatus;
 use App\Http\Requests\ScheduleAssignmentRequest;
 use App\Http\Requests\ScheduleOverrideRequest;
-use App\Models\Branch;
 use App\Models\Employee;
 use App\Models\Holiday;
 use App\Models\LeaveRequest;
@@ -13,6 +12,7 @@ use App\Models\ScheduleAssignment;
 use App\Models\SchedulePattern;
 use App\Models\Shift;
 use App\Services\ScheduleGenerator;
+use App\Support\DataScope;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
@@ -35,8 +35,9 @@ class ScheduleController extends Controller
         $from = $month->copy()->startOfMonth();
         $to = $month->copy()->endOfMonth();
         $branchId = $request->integer('branch_id') ?: null;
+        $scope = DataScope::forAttendance($request->user());
 
-        $employees = Employee::query()
+        $employees = $scope->employees()
             ->active()
             ->when($branchId, fn ($query) => $query->where('branch_id', $branchId))
             ->with(['schedules' => fn ($query) => $query
@@ -59,6 +60,7 @@ class ScheduleController extends Controller
             ->with(['employee', 'pattern'])
             ->overlapping($from, $to)
             ->when($branchId, fn ($query) => $query->whereHas('employee', fn ($q) => $q->where('branch_id', $branchId)))
+            ->tap(fn ($query) => $scope->constrain($query))
             ->orderByDesc('start_date')
             ->get();
 
@@ -66,13 +68,14 @@ class ScheduleController extends Controller
             'employees' => $employees,
             'days' => $days,
             'holidays' => $holidays,
-            'leaves' => $this->approvedLeaveByDate($from, $to, $branchId),
+            'leaves' => $this->approvedLeaveByDate($from, $to, $branchId, null, $scope),
             'assignments' => $assignments,
             'month' => $month,
             'prevMonth' => $month->copy()->subMonth()->format('Y-m'),
             'nextMonth' => $month->copy()->addMonth()->format('Y-m'),
-            'branches' => Branch::query()->orderBy('name')->get(),
+            'branches' => $scope->branches(),
             'branchId' => $branchId,
+            'hasNoScope' => $scope->isEmpty(),
             'shifts' => Shift::query()->where('is_active', true)->orderBy('start_time')->get(),
             'patternCount' => SchedulePattern::query()->where('is_active', true)->count(),
         ]);
@@ -85,6 +88,8 @@ class ScheduleController extends Controller
      */
     public function show(Request $request, Employee $employee): View
     {
+        DataScope::forAttendance($request->user())->authorize($employee);
+
         $month = $this->resolveMonth($request->input('month'));
         $from = $month->copy()->startOfMonth();
         $to = $month->copy()->endOfMonth();
@@ -129,7 +134,7 @@ class ScheduleController extends Controller
      *
      * @return Collection<int, Collection<string, LeaveRequest>>  employee id => date => leave
      */
-    private function approvedLeaveByDate(Carbon $from, Carbon $to, ?int $branchId = null, ?Employee $employee = null): Collection
+    private function approvedLeaveByDate(Carbon $from, Carbon $to, ?int $branchId = null, ?Employee $employee = null, ?DataScope $scope = null): Collection
     {
         $leaves = LeaveRequest::query()
             ->where('status', LeaveRequestStatus::Approved->value)
@@ -137,6 +142,7 @@ class ScheduleController extends Controller
             ->whereDate('end_date', '>=', $from->toDateString())
             ->when($employee, fn ($query) => $query->where('employee_id', $employee->id))
             ->when($branchId, fn ($query) => $query->whereHas('employee', fn ($q) => $q->where('branch_id', $branchId)))
+            ->when($scope, fn ($query) => $scope->constrain($query))
             ->with('leaveType')
             ->get();
 
@@ -158,7 +164,8 @@ class ScheduleController extends Controller
     {
         // The picker shows each employee's still-running/upcoming assignments so the
         // user can see which periods are already taken before choosing new dates.
-        $employees = Employee::query()
+        $employees = DataScope::forAttendance($request->user())
+            ->employees()
             ->active()
             ->with([
                 'jobPosition:id,name',
@@ -187,8 +194,11 @@ class ScheduleController extends Controller
         $end = $request->date('end_date') ? Carbon::parse($request->date('end_date')) : null;
 
         $days = 0;
+        $scope = DataScope::forAttendance($request->user());
 
         foreach ($request->input('employee_ids', []) as $employeeId) {
+            $scope->authorize(Employee::find($employeeId));
+
             $assignment = ScheduleAssignment::query()->create([
                 'employee_id' => $employeeId,
                 'schedule_pattern_id' => $patternId,
@@ -215,7 +225,9 @@ class ScheduleController extends Controller
         $to = $month->copy()->endOfMonth();
         $branchId = $request->integer('branch_id') ?: null;
 
-        $employees = Employee::query()
+        // Regenerating only touches the roster of the employees this user may see.
+        $employees = DataScope::forAttendance($request->user())
+            ->employees()
             ->active()
             ->when($branchId, fn ($query) => $query->where('branch_id', $branchId))
             ->get();
@@ -234,6 +246,8 @@ class ScheduleController extends Controller
     public function override(ScheduleOverrideRequest $request): RedirectResponse
     {
         $employee = Employee::findOrFail($request->integer('employee_id'));
+        DataScope::forAttendance($request->user())->authorize($employee);
+
         $date = Carbon::parse($request->date('work_date'));
 
         $this->generator->override(
@@ -249,8 +263,10 @@ class ScheduleController extends Controller
             ->with('status', 'Jadwal harian diperbarui.');
     }
 
-    public function destroyAssignment(ScheduleAssignment $assignment): RedirectResponse
+    public function destroyAssignment(Request $request, ScheduleAssignment $assignment): RedirectResponse
     {
+        DataScope::forAttendance($request->user())->authorize($assignment->employee);
+
         $month = Carbon::parse($assignment->start_date)->format('Y-m');
         $assignment->delete();
 

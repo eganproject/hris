@@ -3,6 +3,7 @@
 namespace App\Actions;
 
 use App\Models\Employee;
+use App\Models\User;
 use App\Services\AttendanceResolver;
 use Carbon\CarbonInterface;
 
@@ -20,11 +21,16 @@ class ProcessDayAttendance
 {
     public function __construct(private readonly AttendanceResolver $resolver) {}
 
-    public function handle(CarbonInterface $date, ?int $branchId = null): int
+    /**
+     * @param  User|null  $actor  when given, only that user's data scope is processed
+     *                            (the nightly command passes none: it runs for everyone)
+     */
+    public function handle(CarbonInterface $date, ?int $branchId = null, ?User $actor = null): int
     {
         $employees = Employee::query()
             ->active()
             ->when($branchId, fn ($query) => $query->where('branch_id', $branchId))
+            ->when($actor, fn ($query) => $query->visibleTo($actor, User::SCOPE_BYPASS_ATTENDANCE))
             ->get();
 
         foreach ($employees as $employee) {

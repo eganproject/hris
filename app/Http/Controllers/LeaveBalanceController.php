@@ -2,11 +2,9 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Branch;
-use App\Models\Department;
-use App\Models\Employee;
 use App\Models\LeaveBalance;
 use App\Models\LeaveType;
+use App\Support\DataScope;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
@@ -30,7 +28,9 @@ class LeaveBalanceController extends Controller
             ->orderBy('name')
             ->get();
 
-        $employees = Employee::query()
+        $scope = DataScope::forAttendance($request->user());
+
+        $employees = $scope->employees()
             ->active()
             ->when($branchId, fn ($q) => $q->where('branch_id', $branchId))
             ->when($departmentId, fn ($q) => $q->where('department_id', $departmentId))
@@ -50,8 +50,8 @@ class LeaveBalanceController extends Controller
             'employees' => $employees,
             'overrides' => $overrides,
             'year' => $year,
-            'branches' => Branch::query()->where('is_active', true)->orderBy('name')->get(),
-            'departments' => Department::query()->where('is_active', true)->orderBy('name')->get(),
+            'branches' => $scope->branches(),
+            'departments' => $scope->departments(),
             'branchId' => $branchId,
             'departmentId' => $departmentId,
         ]);
@@ -60,6 +60,10 @@ class LeaveBalanceController extends Controller
     public function update(Request $request): RedirectResponse
     {
         $year = $this->resolveYear($request->input('year'));
+
+        // Quotas may only be set for employees inside the user's scope.
+        $scope = DataScope::forAttendance($request->user());
+        $allowed = $scope->employees()->pluck('id')->all();
 
         $types = LeaveType::query()
             ->where('counts_against_balance', true)
@@ -70,6 +74,10 @@ class LeaveBalanceController extends Controller
         $quota = $request->input('quota', []);
 
         foreach ($quota as $employeeId => $perType) {
+            if (! in_array((int) $employeeId, $allowed, true)) {
+                continue;
+            }
+
             foreach ((array) $perType as $typeId => $value) {
                 $type = $types->get((int) $typeId);
 

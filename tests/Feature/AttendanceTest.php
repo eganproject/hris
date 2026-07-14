@@ -21,12 +21,12 @@ function attendanceActor(): User
 {
     app(PermissionRegistrar::class)->forgetCachedPermissions();
 
-    foreach (['attendance.view', 'attendance.update'] as $permission) {
+    foreach (['attendance.view', 'attendance.view.all', 'attendance.update'] as $permission) {
         Permission::findOrCreate($permission, 'web');
     }
 
     $user = User::factory()->create();
-    $user->givePermissionTo(['attendance.view', 'attendance.update']);
+    $user->givePermissionTo(['attendance.view', 'attendance.view.all', 'attendance.update']);
 
     return $user;
 }
