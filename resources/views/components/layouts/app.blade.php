@@ -66,6 +66,10 @@
                                     <svg class="size-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H7a4 4 0 0 0-4 4v2"></path><circle cx="9.5" cy="7" r="4"></circle><path d="M22 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
                                     <span class="sidebar-label truncate">Data Karyawan</span>
                                 </a>
+                                <a href="{{ route('organization.chart') }}" @class(['sidebar-nav-link flex items-center gap-2.5 rounded px-2.5 py-1.5 text-[13px] font-medium transition', 'bg-white text-gray-950 shadow-xs ring-1 ring-gray-200' => request()->routeIs('organization.chart'), 'text-gray-600 hover:bg-white hover:text-gray-950' => ! request()->routeIs('organization.chart')]) title="Bagan Organisasi">
+                                    <svg class="size-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="2" width="6" height="5" rx="1"></rect><rect x="3" y="16" width="6" height="5" rx="1"></rect><rect x="15" y="16" width="6" height="5" rx="1"></rect><path d="M12 7v5M6 16v-2a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v2"></path></svg>
+                                    <span class="sidebar-label truncate">Bagan Organisasi</span>
+                                </a>
                             </div>
                         </div>
                     @endcan

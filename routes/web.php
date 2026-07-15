@@ -22,6 +22,7 @@ use App\Http\Controllers\MyRosterController;
 use App\Http\Controllers\MyScheduleController;
 use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\OrganizationController;
+use App\Http\Controllers\OrgChartController;
 use App\Http\Controllers\OvertimeController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\SettingsController;
@@ -165,6 +166,12 @@ Route::middleware('auth')->group(function () {
     Route::get('organization', OrganizationController::class)
         ->middleware('permission:organization.view')
         ->name('organization.index');
+
+    // Bagan/struktur organisasi dari data karyawan (pohon pelaporan). Karena
+    // menampilkan nama & jabatan karyawan, aksesnya mengikuti izin data karyawan.
+    Route::get('organization/chart', OrgChartController::class)
+        ->middleware('permission:employees.view')
+        ->name('organization.chart');
 
     Route::prefix('organization')->name('organization.')->group(function () {
         Route::get('branches', [BranchController::class, 'index'])->middleware('permission:branches.view')->name('branches.index');
