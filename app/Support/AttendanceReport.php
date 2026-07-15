@@ -27,8 +27,10 @@ class AttendanceReport
         $stats = Attendance::query()
             ->whereBetween('work_date', [$from, $to])
             ->whereHas('employee', function ($query) use ($branchId, $departmentId) {
+                // Divisi cocok bila SALAH SATU divisi karyawan sama (karyawan bisa
+                // muncul di rekap lebih dari satu divisi).
                 $query->when($branchId, fn ($q) => $q->where('branch_id', $branchId))
-                    ->when($departmentId, fn ($q) => $q->where('department_id', $departmentId));
+                    ->when($departmentId, fn ($q) => $q->byDepartment($departmentId));
             })
             ->when($scope, fn ($query) => $scope->constrain($query))
             ->selectRaw(<<<'SQL'

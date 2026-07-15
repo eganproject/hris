@@ -26,7 +26,7 @@ class LeaveReport
 
         $employees = ($scope?->employees() ?? Employee::query())
             ->when($branchId, fn ($q) => $q->where('branch_id', $branchId))
-            ->when($departmentId, fn ($q) => $q->where('department_id', $departmentId))
+            ->when($departmentId, fn ($q) => $q->byDepartment($departmentId))
             ->with(['branch', 'department'])
             ->orderBy('full_name')
             ->get();

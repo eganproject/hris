@@ -131,9 +131,9 @@ class ReportController extends Controller
         return Attendance::query()
             ->whereBetween('work_date', [$from, $to])
             ->when($branchId, fn ($q) => $q->whereHas('employee', fn ($e) => $e->where('branch_id', $branchId)))
-            ->when($departmentId, fn ($q) => $q->whereHas('employee', fn ($e) => $e->where('department_id', $departmentId)))
+            ->when($departmentId, fn ($q) => $q->whereHas('employee', fn ($e) => $e->byDepartment($departmentId)))
             ->when($scope, fn ($q) => $scope->constrain($q))
-            ->with(['employee.department', 'shift'])
+            ->with(['employee.departments', 'shift'])
             ->get()
             ->sortBy(fn (Attendance $r) => $r->work_date->format('Y-m-d').'|'.strtolower((string) $r->employee?->full_name))
             ->values();

@@ -927,20 +927,26 @@ class EmployeeManagementController extends Controller
     }
 
     /**
-     * Sync the full division set: the home division (department_id) plus any extra
-     * divisions. All are stored equally in the pivot.
+     * Divisi karyawan disimpan di pivot sebagai himpunan setara. Tidak ada divisi
+     * utama; department_id sekadar denormalisasi (salah satu divisi) untuk pembacaan
+     * nilai-tunggal lama — selalu diambil dari divisi pertama.
      */
     private function syncDepartments(EmployeeRequest $request, Employee $employee): void
     {
-        $ids = collect($request->validated('department_ids', []))
+        $employee->departments()->sync($this->divisionIds($request));
+    }
+
+    /**
+     * @return list<int>
+     */
+    private function divisionIds(EmployeeRequest $request): array
+    {
+        return collect($request->validated('department_ids', []))
             ->map(fn ($id) => (int) $id)
-            ->push((int) $employee->department_id)
             ->filter()
             ->unique()
             ->values()
             ->all();
-
-        $employee->departments()->sync($ids);
     }
 
     /**
@@ -950,7 +956,6 @@ class EmployeeManagementController extends Controller
     {
         $payload = $request->safe()->only([
             'branch_id',
-            'department_id',
             'job_position_id',
             'manager_id',
             'full_name',
@@ -962,6 +967,9 @@ class EmployeeManagementController extends Controller
             'employment_status',
             'address',
         ]);
+
+        // department_id = salah satu divisi (yang pertama), untuk pembacaan lama.
+        $payload['department_id'] = $this->divisionIds($request)[0] ?? null;
 
         if ($request->hasFile('photo')) {
             $payload['photo_path'] = $request->file('photo')->store('employees/photos', 'public');

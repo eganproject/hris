@@ -18,6 +18,17 @@ class EmployeeRequest extends FormRequest
     }
 
     /**
+     * Backward-compat: payload lama/impor yang masih mengirim satu department_id
+     * dilipat menjadi department_ids, sehingga model divisi-jamak tetap berjalan.
+     */
+    protected function prepareForValidation(): void
+    {
+        if (empty($this->input('department_ids')) && $this->filled('department_id')) {
+            $this->merge(['department_ids' => [$this->integer('department_id')]]);
+        }
+    }
+
+    /**
      * @return array<string, array<int, mixed>>
      */
     public function rules(): array
@@ -37,9 +48,8 @@ class EmployeeRequest extends FormRequest
 
         return [
             'branch_id' => ['required', 'integer', 'exists:branches,id'],
-            'department_id' => ['required', 'integer', 'exists:departments,id'],
-            // Divisi tambahan (opsional) — semua setara dengan divisi jabatan.
-            'department_ids' => ['nullable', 'array'],
+            // Divisi karyawan — semua setara, minimal satu. Tidak ada "divisi utama".
+            'department_ids' => ['required', 'array', 'min:1'],
             'department_ids.*' => ['integer', 'exists:departments,id'],
             'job_position_id' => ['required', 'integer', 'exists:job_positions,id'],
             'manager_id' => ['nullable', 'integer', 'exists:employees,id', Rule::notIn([$employeeId])],
@@ -155,61 +165,48 @@ class EmployeeRequest extends FormRequest
                 }
 
                 $branchId = $this->integer('branch_id');
-                $departmentId = $this->integer('department_id');
                 $jobPositionId = $this->integer('job_position_id');
+
+                // Semua divisi karyawan (setara, minimal satu).
+                $divisionIds = collect($this->input('department_ids', []))
+                    ->map(fn ($id) => (int) $id)
+                    ->filter()
+                    ->unique();
 
                 // The placement must stay inside the user's data scope; the pickers
                 // already hide the rest, but a hand-crafted POST must fail too.
                 $user = $this->user();
+                $allowedDepartments = $user->seesAllData(User::SCOPE_BYPASS_EMPLOYEES) ? [] : $user->accessDepartmentIds();
 
                 if (! $user->seesAllData(User::SCOPE_BYPASS_EMPLOYEES)) {
                     $allowedBranches = $user->accessBranchIds();
-                    $allowedDepartments = $user->accessDepartmentIds();
 
                     if ($allowedBranches !== [] && ! in_array($branchId, $allowedBranches, true)) {
                         $validator->errors()->add('branch_id', 'Lokasi kerja tersebut berada di luar cakupan akses Anda.');
                     }
-
-                    if ($allowedDepartments !== [] && ! in_array($departmentId, $allowedDepartments, true)) {
-                        $validator->errors()->add('department_id', 'Divisi tersebut berada di luar cakupan akses Anda.');
-                    }
                 }
 
-                // Setiap divisi (jabatan + tambahan) harus tersedia pada lokasi kerja
-                // dan berada dalam cakupan akses user.
-                $extraDepartmentIds = collect($this->input('department_ids', []))
-                    ->map(fn ($id) => (int) $id)
-                    ->filter()
-                    ->reject(fn (int $id) => $id === $departmentId)
-                    ->unique();
-
+                // Setiap divisi harus tersedia pada lokasi kerja dan dalam cakupan user.
                 $availableAtBranch = DB::table('branch_department')
                     ->where('branch_id', $branchId)
                     ->where('is_active', true)
                     ->pluck('department_id')
                     ->all();
 
-                if (! in_array($departmentId, $availableAtBranch, true)) {
-                    $validator->errors()->add('department_id', 'Divisi tidak tersedia pada lokasi kerja yang dipilih.');
-                }
-
-                $allowedDepartments = $user->seesAllData(User::SCOPE_BYPASS_EMPLOYEES) ? [] : $user->accessDepartmentIds();
-
-                foreach ($extraDepartmentIds as $extraId) {
-                    if (! in_array($extraId, $availableAtBranch, true)) {
-                        $validator->errors()->add('department_ids', 'Ada divisi tambahan yang tidak tersedia pada lokasi kerja yang dipilih.');
+                foreach ($divisionIds as $id) {
+                    if (! in_array($id, $availableAtBranch, true)) {
+                        $validator->errors()->add('department_ids', 'Ada divisi yang tidak tersedia pada lokasi kerja yang dipilih.');
                         break;
                     }
 
-                    if ($allowedDepartments !== [] && ! in_array($extraId, $allowedDepartments, true)) {
-                        $validator->errors()->add('department_ids', 'Ada divisi tambahan yang berada di luar cakupan akses Anda.');
+                    if ($allowedDepartments !== [] && ! in_array($id, $allowedDepartments, true)) {
+                        $validator->errors()->add('department_ids', 'Ada divisi yang berada di luar cakupan akses Anda.');
                         break;
                     }
                 }
 
-                // Jabatan boleh berasal dari divisi mana pun yang dimiliki karyawan
-                // (divisi jabatan + divisi lain), bukan hanya satu divisi.
-                $divisionIds = $extraDepartmentIds->push($departmentId)->unique()->all();
+                // Jabatan boleh berasal dari divisi mana pun yang dimiliki karyawan.
+                $divisionIds = $divisionIds->all();
 
                 $jobPositionAvailable = DB::table('department_job_position')
                     ->join('job_positions', 'job_positions.id', '=', 'department_job_position.job_position_id')

@@ -130,17 +130,6 @@
                     @error('branch_id')<p class="mt-2 text-sm text-red-600">{{ $message }}</p>@enderror
                 </div>
                 <div>
-                    <label for="department_id" class="block text-sm font-medium text-gray-700">Divisi Utama <span class="field-requirement is-required" aria-label="Wajib diisi">*</span></label>
-                    <select id="department_id" name="department_id" required data-placement-department class="mt-2 block w-full rounded-md border border-gray-300 px-3 py-2.5 text-sm shadow-xs outline-none focus:border-primary focus:ring-2 focus:ring-primary/20">
-                        <option value="">Pilih divisi</option>
-                        @foreach ($departments as $department)
-                            <option value="{{ $department->id }}" data-placement-department-option @selected(old('department_id', $employee->department_id) == $department->id)>{{ $department->name }}</option>
-                        @endforeach
-                    </select>
-                    <p class="mt-2 text-xs text-gray-500">Minimal satu divisi. Jabatan bisa dipilih dari divisi ini maupun Divisi Lain.</p>
-                    @error('department_id')<p class="mt-2 text-sm text-red-600">{{ $message }}</p>@enderror
-                </div>
-                <div>
                     <label for="job_position_id" class="block text-sm font-medium text-gray-700">Jabatan <span class="field-requirement is-required" aria-label="Wajib diisi">*</span></label>
                     <select id="job_position_id" name="job_position_id" required data-placement-position class="mt-2 block w-full rounded-md border border-gray-300 px-3 py-2.5 text-sm shadow-xs outline-none focus:border-primary focus:ring-2 focus:ring-primary/20">
                         <option value="">Pilih jabatan</option>
@@ -163,16 +152,16 @@
                     @error('manager_id')<p class="mt-2 text-sm text-red-600">{{ $message }}</p>@enderror
                 </div>
                 @php
-                    $selectedExtra = collect(old('department_ids', $employee->exists ? $employee->departments->pluck('id')->all() : []))
+                    $selectedDepartments = collect(old('department_ids', $employee->exists ? $employee->departments->pluck('id')->all() : []))
                         ->map(fn ($id) => (int) $id)->all();
                 @endphp
                 <div class="md:col-span-3">
-                    <label class="block text-sm font-medium text-gray-700">Divisi Lain <span class="text-gray-400">(opsional)</span></label>
-                    <p class="mt-1 text-xs text-gray-500">Centang bila karyawan ini juga bekerja di divisi lain. Semua divisi dianggap setara — hanya yang tersedia di lokasi kerja terpilih yang bisa dicentang.</p>
-                    <div class="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4" data-extra-departments>
+                    <label class="block text-sm font-medium text-gray-700">Divisi <span class="field-requirement is-required" aria-label="Wajib diisi">*</span></label>
+                    <p class="mt-1 text-xs text-gray-500">Centang divisi tempat karyawan ini bekerja — minimal satu, boleh lebih dari satu (semua setara). Jabatan diambil dari divisi yang dicentang. Hanya divisi yang tersedia di lokasi kerja terpilih yang bisa dicentang.</p>
+                    <div class="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4" data-placement-departments>
                         @foreach ($departments as $department)
-                            <label class="flex items-center gap-2 rounded-md border border-gray-200 px-3 py-2 text-sm text-gray-700" data-extra-department-option data-department-id="{{ $department->id }}">
-                                <input type="checkbox" name="department_ids[]" value="{{ $department->id }}" @checked(in_array($department->id, $selectedExtra, true)) class="size-4 rounded border-gray-300 text-primary focus:ring-primary">
+                            <label class="flex items-center gap-2 rounded-md border border-gray-200 px-3 py-2 text-sm text-gray-700" data-department-option data-department-id="{{ $department->id }}">
+                                <input type="checkbox" name="department_ids[]" value="{{ $department->id }}" @checked(in_array($department->id, $selectedDepartments, true)) class="size-4 rounded border-gray-300 text-primary focus:ring-primary">
                                 <span>{{ $department->name }}</span>
                             </label>
                         @endforeach

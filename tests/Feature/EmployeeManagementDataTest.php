@@ -536,7 +536,7 @@ test('employee placement must use department available at selected branch', func
             'login_password' => 'Password!2',
         ])
         ->assertRedirect('/employees/create')
-        ->assertSessionHasErrors(['department_id', 'job_position_id']);
+        ->assertSessionHasErrors(['department_ids', 'job_position_id']);
 });
 
 test('employee with login account can be updated without changing password', function () {

@@ -56,8 +56,7 @@ test('an employee can be created in more than one division', function () {
 
     $this->actingAs($hr)->post('/employees', [
         'branch_id' => $branch->id,
-        'department_id' => $ops->id,
-        'department_ids' => [$acc->id],
+        'department_ids' => [$ops->id, $acc->id],
         'job_position_id' => $position->id,
         'machine_pins' => [['device_id' => null, 'machine_user_id' => '10']],
         'full_name' => 'Budi Lintas Divisi',
@@ -72,6 +71,7 @@ test('an employee can be created in more than one division', function () {
 
     $employee = Employee::query()->where('full_name', 'Budi Lintas Divisi')->firstOrFail();
 
+    // Kedua divisi tersimpan setara; department_id sekadar salah satunya (yang pertama).
     expect($employee->departments->pluck('id')->sort()->values()->all())->toBe(collect([$ops->id, $acc->id])->sort()->values()->all())
         ->and($employee->department_id)->toBe($ops->id);
 });

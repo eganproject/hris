@@ -1087,27 +1087,23 @@ document.querySelectorAll('[data-employee-stepper]').forEach((stepper) => {
 
 document.querySelectorAll('[data-placement-form]').forEach((form) => {
     const branchSelect = form.querySelector('[data-placement-branch]');
-    const departmentSelect = form.querySelector('[data-placement-department]');
     const positionSelect = form.querySelector('[data-placement-position]');
+    const departmentOptions = [...form.querySelectorAll('[data-department-option]')];
 
-    if (!branchSelect || !departmentSelect || !positionSelect) {
+    if (!branchSelect || !positionSelect || departmentOptions.length === 0) {
         return;
     }
 
     const catalog = JSON.parse(form.dataset.placementCatalog || '{"branches":{},"departments":{}}');
-    const departmentOptions = [...departmentSelect.querySelectorAll('[data-placement-department-option]')];
     const positionOptions = [...positionSelect.querySelectorAll('[data-placement-position-option]')];
-    const extraDepartmentOptions = [...form.querySelectorAll('[data-extra-department-option]')];
 
-    // The "Divisi Lain" checklist mirrors the same branch filter, and never offers
-    // the division already chosen as the job's division.
-    const syncExtraDepartments = () => {
-        const allowedDepartments = catalog.branches[branchSelect.value]?.map(String) ?? [];
+    // Only the divisions available at the chosen branch may be checked.
+    const syncDepartments = () => {
+        const allowed = catalog.branches[branchSelect.value]?.map(String) ?? [];
 
-        extraDepartmentOptions.forEach((option) => {
+        departmentOptions.forEach((option) => {
             const id = option.dataset.departmentId;
-            const isHome = id === departmentSelect.value;
-            const isAllowed = (!branchSelect.value || allowedDepartments.includes(id)) && !isHome;
+            const isAllowed = !branchSelect.value || allowed.includes(id);
             const box = option.querySelector('input[type="checkbox"]');
 
             option.hidden = !isAllowed;
@@ -1118,21 +1114,13 @@ document.querySelectorAll('[data-placement-form]').forEach((form) => {
         });
     };
 
-    // Divisi yang dimiliki karyawan: divisi jabatan (anchor) + divisi lain yang dicentang.
-    const selectedDepartmentIds = () => {
-        const ids = departmentSelect.value ? [departmentSelect.value] : [];
+    // Checked divisions (all equal).
+    const selectedDepartmentIds = () => departmentOptions
+        .map((option) => option.querySelector('input[type="checkbox"]'))
+        .filter((box) => box && box.checked && !box.disabled)
+        .map((box) => box.value);
 
-        extraDepartmentOptions.forEach((option) => {
-            const box = option.querySelector('input[type="checkbox"]');
-            if (box && box.checked && !box.disabled) {
-                ids.push(option.dataset.departmentId);
-            }
-        });
-
-        return ids;
-    };
-
-    // Jabatan bisa dari divisi MANA PUN yang dimiliki karyawan (gabungan).
+    // Jabatan diambil dari gabungan divisi yang dicentang.
     const syncPositions = () => {
         const deptIds = selectedDepartmentIds();
         const allowed = new Set();
@@ -1152,34 +1140,14 @@ document.querySelectorAll('[data-placement-form]').forEach((form) => {
         $(positionSelect).trigger('change.select2');
     };
 
-    const syncDepartments = () => {
-        const allowedDepartments = catalog.branches[branchSelect.value]?.map(String) ?? [];
-
-        departmentOptions.forEach((option) => {
-            const isAllowed = !branchSelect.value || allowedDepartments.includes(option.value);
-
-            option.hidden = !isAllowed;
-            option.disabled = !isAllowed;
-        });
-
-        if (departmentSelect.value && departmentSelect.selectedOptions[0]?.disabled) {
-            departmentSelect.value = '';
-        }
-
-        $(departmentSelect).trigger('change.select2');
-        syncExtraDepartments();
-        syncPositions();
-    };
-
-    branchSelect.addEventListener('change', syncDepartments);
-    departmentSelect.addEventListener('change', () => { syncExtraDepartments(); syncPositions(); });
-    // Mencentang/melepas divisi lain memperluas/menyempitkan pilihan jabatan.
-    extraDepartmentOptions.forEach((option) => {
+    branchSelect.addEventListener('change', () => { syncDepartments(); syncPositions(); });
+    departmentOptions.forEach((option) => {
         const box = option.querySelector('input[type="checkbox"]');
         if (box) box.addEventListener('change', syncPositions);
     });
 
     syncDepartments();
+    syncPositions();
 });
 
 // Inline exit verification: when the "Status Kepegawaian" field is set to "Nonaktif"
