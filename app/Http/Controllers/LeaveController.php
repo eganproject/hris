@@ -92,19 +92,4 @@ class LeaveController extends Controller
 
         return redirect()->route('attendance.leave.index')->with('status', 'Pengajuan ditolak.');
     }
-
-    /**
-     * Undo an approved leave without erasing it: the request stays on record as
-     * "Dibatalkan" (who approved it is still visible) and its days go back to the
-     * punch-based attendance status.
-     */
-    public function cancel(Request $request, LeaveRequest $leaveRequest): RedirectResponse
-    {
-        DataScope::forAttendance($request->user())->authorize($leaveRequest->employee);
-        abort_unless($leaveRequest->status === LeaveRequestStatus::Approved, 403);
-
-        $this->workflow->cancel($leaveRequest);
-
-        return redirect()->route('attendance.leave.index')->with('status', 'Cuti/izin yang sudah disetujui dibatalkan & absensi dikembalikan.');
-    }
 }

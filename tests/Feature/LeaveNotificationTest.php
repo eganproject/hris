@@ -126,10 +126,9 @@ test('a rejection says at which step it was rejected, and why', function () {
         ->and($inbox[0]['message'])->toContain('ditolak oleh atasan');
 });
 
-test('cancelling an approved leave tells the employee it was revoked', function () {
-    ['employeeUser' => $employeeUser, 'supervisorUser' => $supervisorUser, 'hr' => $hr, 'employee' => $employee, 'type' => $type] = leaveNotificationFixture('Cuti Tahunan');
+test('an approved leave can no longer be cancelled by HR', function () {
+    ['employeeUser' => $employeeUser, 'supervisorUser' => $supervisorUser, 'hr' => $hr, 'type' => $type] = leaveNotificationFixture('Cuti Tahunan');
 
-    // Tanpa atasan pun alurnya sama; di sini pakai jalur normal sampai disetujui HR.
     $this->actingAs($employeeUser)->post('/my-leave', [
         'leave_type_id' => $type->id,
         'start_date' => now()->addDays(7)->toDateString(),
@@ -142,17 +141,9 @@ test('cancelling an approved leave tells the employee it was revoked', function 
     $this->actingAs($supervisorUser)->patch("/my-leave/{$leave->id}/approve")->assertRedirect();
     $this->actingAs($hr)->patch("/attendance/leave/{$leave->id}/approve")->assertRedirect();
 
-    $employeeUser->notifications()->delete();
-
-    // HR membatalkan cuti yang sudah disetujui.
-    $this->actingAs($hr)->patch("/attendance/leave/{$leave->id}/cancel")->assertRedirect();
-
-    $inbox = notificationsOf($employeeUser);
-
-    expect($inbox)->toHaveCount(1)
-        ->and($inbox[0]['title'])->toBe('Cuti Tahunan dibatalkan')
-        ->and($inbox[0]['message'])->toContain('dibatalkan oleh HR')
-        ->and($inbox[0]['message'])->toContain('Absensi pada hari tersebut dikembalikan');
+    // Rute pembatalan cuti sudah tidak ada — pengajuan yang disetujui bersifat final.
+    $this->actingAs($hr)->patch("/attendance/leave/{$leave->id}/cancel")->assertNotFound();
+    expect($leave->fresh()->status)->toBe(App\Enums\LeaveRequestStatus::Approved);
 });
 
 test('an employee cancelling their own request tells the supervisor waiting on it', function () {

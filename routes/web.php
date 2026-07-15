@@ -252,7 +252,7 @@ Route::middleware('auth')->group(function () {
         Route::post('leave', [LeaveController::class, 'store'])->middleware('permission:leave.create')->name('leave.store');
         Route::patch('leave/{leaveRequest}/approve', [LeaveController::class, 'approve'])->middleware('permission:leave.update')->name('leave.approve');
         Route::patch('leave/{leaveRequest}/reject', [LeaveController::class, 'reject'])->middleware('permission:leave.update')->name('leave.reject');
-        Route::patch('leave/{leaveRequest}/cancel', [LeaveController::class, 'cancel'])->middleware('permission:leave.update')->name('leave.cancel');
+        // Cuti/izin yang sudah DISETUJUI bersifat final — tidak bisa dibatalkan.
         // Catatan: pengajuan cuti/izin HANYA boleh dihapus oleh karyawan yang
         // mengajukannya (lihat my-leave.destroy). HR menyetujui/menolak/membatalkan,
         // tetapi tidak menghapus pengajuan orang lain.

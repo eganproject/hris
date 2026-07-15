@@ -207,7 +207,7 @@ test('the requester cannot delete a leave once it is approved', function () {
     expect($leave->fresh()->status)->toBe(LeaveRequestStatus::Approved);
 });
 
-test('an approved leave can only be cancelled, never decided again', function () {
+test('an approved leave is final — it cannot be decided again nor cancelled', function () {
     $user = attendanceManager();
     $employee = Employee::query()->create(['full_name' => 'Sudah Disetujui', 'employment_status' => 'active']);
     $type = LeaveType::query()->create(['code' => 'IZ', 'name' => 'Izin', 'attendance_status' => 'leave', 'is_paid' => true, 'is_active' => true]);
@@ -229,19 +229,16 @@ test('an approved leave can only be cancelled, never decided again', function ()
     $this->actingAs($user)->patch("/attendance/leave/{$leave->id}/approve")->assertForbidden();
     $this->actingAs($user)->patch("/attendance/leave/{$leave->id}/reject")->assertForbidden();
 
-    // The list offers "Batalkan" for an approved leave, never "Hapus".
+    // There is no longer a cancel route for approved leave, and the list shows no
+    // Batalkan / Hapus action for it.
     $this->actingAs($user)->get('/attendance/leave')
         ->assertOk()
-        ->assertSee('Batalkan')
+        ->assertDontSee('Batalkan')
         ->assertDontSee('Hapus');
 
-    // Cancelling keeps the record (and who approved it) but takes it out of effect.
-    $this->actingAs($user)->patch("/attendance/leave/{$leave->id}/cancel")->assertRedirect('/attendance/leave');
-    $leave->refresh();
-
-    expect($leave->status)->toBe(LeaveRequestStatus::Cancelled)
-        ->and($leave->approved_by)->toBe($user->id)
-        ->and(LeaveRequest::query()->approvedOn('2026-02-10')->exists())->toBeFalse();
+    // The approval stays in effect.
+    expect($leave->fresh()->status)->toBe(LeaveRequestStatus::Approved)
+        ->and(LeaveRequest::query()->approvedOn('2026-02-10')->exists())->toBeTrue();
 });
 
 test('a request for an employee without a manager starts at the HR step', function () {

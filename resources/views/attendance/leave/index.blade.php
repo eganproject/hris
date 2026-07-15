@@ -71,34 +71,24 @@
                                     @endif
                                 </td>
                                 <td class="text-right">
-                                    @can('leave.update')
+                                    {{-- Hanya pengajuan yang masih menunggu keputusan yang punya aksi. Cuti/izin
+                                         yang sudah DISETUJUI bersifat final: tidak bisa dibatalkan maupun dihapus.
+                                         Pengajuan yang belum disetujui hanya bisa dihapus oleh karyawan yang
+                                         mengajukan (menu Cuti Saya). --}}
+                                    @if (auth()->user()->can('leave.update') && $leaveRequest->status->isPending())
                                         <x-action-menu>
-                                            @can('leave.update')
-                                                @if ($leaveRequest->status->isPending())
-                                                    <form method="POST" action="{{ route('attendance.leave.approve', $leaveRequest) }}" data-no-confirm="true">
-                                                        @csrf @method('PATCH')
-                                                        <button type="submit" class="action-menu-item"><x-icon name="user-check"/> {{ $leaveRequest->status === \App\Enums\LeaveRequestStatus::PendingSupervisor ? 'Setujui (Atasan)' : 'Setujui (HR)' }}</button>
-                                                    </form>
-                                                    <form method="POST" action="{{ route('attendance.leave.reject', $leaveRequest) }}" data-no-confirm="true">
-                                                        @csrf @method('PATCH')
-                                                        <button type="submit" class="action-menu-item action-menu-item-danger"><x-icon name="user-x"/> Tolak</button>
-                                                    </form>
-                                                @endif
-                                            @endcan
-                                            {{-- Approved leave is undone by cancelling it (the record and its
-                                                 approval trail stay), never by deleting it. --}}
-                                            @can('leave.update')
-                                                @if ($leaveRequest->status === \App\Enums\LeaveRequestStatus::Approved)
-                                                    <form method="POST" action="{{ route('attendance.leave.cancel', $leaveRequest) }}" onsubmit="return confirm('Batalkan cuti/izin yang sudah disetujui ini? Absensi pada hari tersebut akan dikembalikan.')">
-                                                        @csrf @method('PATCH')
-                                                        <button type="submit" class="action-menu-item action-menu-item-danger"><x-icon name="user-x"/> Batalkan</button>
-                                                    </form>
-                                                @endif
-                                            @endcan
-                                            {{-- Pengajuan hanya bisa dihapus oleh karyawan yang mengajukan
-                                                 (lewat menu Cuti Saya), bukan oleh HR/atasan. --}}
+                                            <form method="POST" action="{{ route('attendance.leave.approve', $leaveRequest) }}" data-no-confirm="true">
+                                                @csrf @method('PATCH')
+                                                <button type="submit" class="action-menu-item"><x-icon name="user-check"/> {{ $leaveRequest->status === \App\Enums\LeaveRequestStatus::PendingSupervisor ? 'Setujui (Atasan)' : 'Setujui (HR)' }}</button>
+                                            </form>
+                                            <form method="POST" action="{{ route('attendance.leave.reject', $leaveRequest) }}" data-no-confirm="true">
+                                                @csrf @method('PATCH')
+                                                <button type="submit" class="action-menu-item action-menu-item-danger"><x-icon name="user-x"/> Tolak</button>
+                                            </form>
                                         </x-action-menu>
-                                    @endcan
+                                    @else
+                                        <span class="text-xs text-gray-400">—</span>
+                                    @endif
                                 </td>
                             </tr>
                         @empty
