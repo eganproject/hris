@@ -105,6 +105,9 @@ class MyLeaveController extends Controller
 
     private function authorizeSupervisor(LeaveRequest $leaveRequest): void
     {
+        // Pemisahan wewenang: tidak bisa memutuskan pengajuan sendiri.
+        abort_if($leaveRequest->employee_id === $this->employee()->id, 403, 'Anda tidak bisa memutuskan pengajuan Anda sendiri.');
+
         abort_unless(
             $leaveRequest->supervisor_id === $this->employee()->id
                 && $leaveRequest->status === LeaveRequestStatus::PendingSupervisor,

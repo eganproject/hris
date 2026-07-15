@@ -46,6 +46,7 @@ class AttendanceCorrectionController extends Controller
     public function approve(Request $request, AttendanceCorrection $correction): RedirectResponse
     {
         DataScope::forAttendance($request->user())->authorize($correction->employee);
+        $this->denySelfDecision($request, $correction);
         abort_unless($correction->isPending(), 403);
 
         $this->resolver->resolve(
@@ -70,6 +71,7 @@ class AttendanceCorrectionController extends Controller
     public function reject(Request $request, AttendanceCorrection $correction): RedirectResponse
     {
         DataScope::forAttendance($request->user())->authorize($correction->employee);
+        $this->denySelfDecision($request, $correction);
         abort_unless($correction->isPending(), 403);
 
         $correction->forceFill([
@@ -82,5 +84,15 @@ class AttendanceCorrectionController extends Controller
         app(ApprovalNotifier::class)->correctionDecided($correction);
 
         return redirect()->route('attendance.corrections.index')->with('status', 'Koreksi ditolak.');
+    }
+
+    /** Pemisahan wewenang: tidak bisa memutuskan koreksi absensi milik sendiri. */
+    private function denySelfDecision(Request $request, AttendanceCorrection $correction): void
+    {
+        abort_if(
+            $correction->employee?->user_id !== null && $correction->employee->user_id === $request->user()->id,
+            403,
+            'Anda tidak bisa memutuskan koreksi absensi Anda sendiri.',
+        );
     }
 }

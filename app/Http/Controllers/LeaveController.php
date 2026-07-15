@@ -72,6 +72,7 @@ class LeaveController extends Controller
     public function approve(Request $request, LeaveRequest $leaveRequest): RedirectResponse
     {
         DataScope::forAttendance($request->user())->authorize($leaveRequest->employee);
+        $this->denySelfDecision($request, $leaveRequest);
         abort_unless($leaveRequest->status->isPending(), 403);
 
         if ($leaveRequest->status === LeaveRequestStatus::PendingSupervisor) {
@@ -86,10 +87,24 @@ class LeaveController extends Controller
     public function reject(Request $request, LeaveRequest $leaveRequest): RedirectResponse
     {
         DataScope::forAttendance($request->user())->authorize($leaveRequest->employee);
+        $this->denySelfDecision($request, $leaveRequest);
         abort_unless($leaveRequest->status->isPending(), 403);
 
         $this->workflow->reject($leaveRequest, auth()->user(), $request->string('decision_notes')->toString() ?: null);
 
         return redirect()->route('attendance.leave.index')->with('status', 'Pengajuan ditolak.');
+    }
+
+    /**
+     * Pemisahan wewenang: seseorang tidak boleh memutuskan (setujui/tolak) pengajuan
+     * cuti/izin miliknya sendiri — harus diputuskan HR/atasan lain.
+     */
+    private function denySelfDecision(Request $request, LeaveRequest $leaveRequest): void
+    {
+        abort_if(
+            $leaveRequest->employee?->user_id !== null && $leaveRequest->employee->user_id === $request->user()->id,
+            403,
+            'Anda tidak bisa memutuskan pengajuan cuti/izin Anda sendiri.',
+        );
     }
 }

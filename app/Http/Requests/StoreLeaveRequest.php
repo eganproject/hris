@@ -40,6 +40,12 @@ class StoreLeaveRequest extends FormRequest
 
             $employee = Employee::find($this->integer('employee_id'));
 
+            if ($employee && $employee->isInactive()) {
+                $validator->errors()->add('employee_id', 'Karyawan tersebut sudah nonaktif — tidak bisa diajukan cuti/izin.');
+
+                return;
+            }
+
             if ($employee) {
                 LeaveGuard::check($validator, $employee, $this->integer('leave_type_id'), $this->input('start_date'), $this->input('end_date'));
             }

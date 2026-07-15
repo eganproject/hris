@@ -155,6 +155,9 @@ class MyOvertimeController extends Controller
 
     private function authorizeSupervisor(OvertimeApproval $overtime): void
     {
+        // Pemisahan wewenang: tidak bisa memutuskan pengajuan lembur sendiri.
+        abort_if($overtime->employee_id === $this->employee()->id, 403, 'Anda tidak bisa memutuskan pengajuan lembur Anda sendiri.');
+
         abort_unless(
             $overtime->supervisor_id === $this->employee()->id
                 && $overtime->status === OvertimeApproval::STATUS_PENDING,
