@@ -50,6 +50,41 @@ test('all attendance foundation pages render without errors', function () {
     }
 });
 
+test('the daily board links to a per-employee attendance history page', function () {
+    $user = attendanceManager();
+    $employee = Employee::query()->create(['full_name' => 'Riwayat Budi', 'employment_status' => 'active']);
+
+    // The board shows the employee name as a link to the history page.
+    $this->actingAs($user)->get('/attendance/daily')
+        ->assertOk()
+        ->assertSee(route('attendance.daily.history', ['employee' => $employee, 'month' => now()->format('Y-m'), 'branch_id' => null]), false);
+
+    // The history page itself renders for the current month.
+    $this->actingAs($user)->get(route('attendance.daily.history', ['employee' => $employee]))
+        ->assertOk()
+        ->assertSee('Riwayat Budi')
+        ->assertSee('Riwayat Absensi');
+});
+
+test('a scoped user cannot open the history of an employee outside their scope', function () {
+    app(PermissionRegistrar::class)->forgetCachedPermissions();
+    foreach (['attendance-daily.view'] as $p) {
+        Permission::findOrCreate($p, 'web');
+    }
+    $branchA = \App\Models\Branch::query()->create(['name' => 'Cabang A', 'code' => 'A', 'is_active' => true]);
+    $branchB = \App\Models\Branch::query()->create(['name' => 'Cabang B', 'code' => 'B', 'is_active' => true]);
+    $dept = \App\Models\Department::query()->create(['code' => 'OPS', 'name' => 'Operasional', 'is_active' => true]);
+
+    // A supervisor scoped to branch A only (no attendance.view.all bypass).
+    $user = User::factory()->create();
+    $user->givePermissionTo('attendance-daily.view');
+    Employee::query()->create(['user_id' => $user->id, 'full_name' => 'Atasan A', 'employment_status' => 'active', 'branch_id' => $branchA->id, 'department_id' => $dept->id]);
+
+    $outsider = Employee::query()->create(['full_name' => 'Luar Cakupan', 'employment_status' => 'active', 'branch_id' => $branchB->id, 'department_id' => $dept->id]);
+
+    $this->actingAs($user)->get(route('attendance.daily.history', $outsider))->assertForbidden();
+});
+
 test('a shift resolves an overnight window and computes work minutes', function () {
     $shift = Shift::query()->create([
         'code' => 'NGT',

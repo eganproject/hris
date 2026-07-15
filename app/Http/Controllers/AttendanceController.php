@@ -63,6 +63,54 @@ class AttendanceController extends Controller
     }
 
     /**
+     * Per-employee attendance history for one month, reachable by clicking an
+     * employee on the daily board. Same scope gate as the board itself.
+     */
+    public function history(Request $request, Employee $employee): View
+    {
+        DataScope::forAttendance($request->user())->authorize($employee);
+
+        $month = $this->resolveMonth($request->input('month'));
+        $from = $month->copy()->startOfMonth()->toDateString();
+        $to = $month->copy()->endOfMonth()->toDateString();
+
+        $records = Attendance::query()
+            ->where('employee_id', $employee->id)
+            ->whereBetween('work_date', [$from, $to])
+            ->with('shift')
+            ->orderBy('work_date')
+            ->get();
+
+        // Approved overtime per date (authoritative figure), keyed by Y-m-d.
+        $approvedOvertime = \Illuminate\Support\Facades\DB::table('overtime_approvals')
+            ->where('employee_id', $employee->id)
+            ->where('status', 'approved')
+            ->whereBetween('work_date', [$from, $to])
+            ->pluck('approved_minutes', 'work_date');
+
+        $worked = ['present', 'late', 'early_leave', 'wfh', 'business_trip'];
+
+        return view('attendance.daily.history', [
+            'employee' => $employee->load(['branch', 'departments', 'jobPosition']),
+            'records' => $records,
+            'approvedOvertime' => $approvedOvertime,
+            'month' => $month,
+            'prevMonth' => $month->copy()->subMonth()->format('Y-m'),
+            'nextMonth' => $month->copy()->addMonth()->format('Y-m'),
+            'branchId' => $request->integer('branch_id') ?: null,
+            'summary' => [
+                'total_hari' => $records->count(),
+                'hadir' => $records->filter(fn ($r) => in_array($r->status?->value, $worked, true))->count(),
+                'terlambat' => $records->filter(fn ($r) => $r->status?->value === 'late')->count(),
+                'alfa' => $records->filter(fn ($r) => $r->status?->value === 'absent')->count(),
+                'terlambat_menit' => (int) $records->sum('late_minutes'),
+                'kerja_menit' => (int) $records->sum('work_minutes'),
+                'lembur_menit' => (int) $approvedOvertime->sum(),
+            ],
+        ]);
+    }
+
+    /**
      * Resolve/refresh the whole date for the current scope. Existing punches are
      * preserved; unscheduled days become DayOff, scheduled-but-unpunched become Absent.
      */
@@ -108,6 +156,15 @@ class AttendanceController extends Controller
             return $value ? Carbon::parse($value)->startOfDay() : now()->startOfDay();
         } catch (\Throwable) {
             return now()->startOfDay();
+        }
+    }
+
+    private function resolveMonth(?string $value): Carbon
+    {
+        try {
+            return $value ? Carbon::createFromFormat('Y-m', $value)->startOfMonth() : now()->startOfMonth();
+        } catch (\Throwable) {
+            return now()->startOfMonth();
         }
     }
 }
