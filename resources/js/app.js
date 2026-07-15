@@ -1079,11 +1079,28 @@ document.querySelectorAll('[data-placement-form]').forEach((form) => {
         });
     };
 
+    // Divisi yang dimiliki karyawan: divisi jabatan (anchor) + divisi lain yang dicentang.
+    const selectedDepartmentIds = () => {
+        const ids = departmentSelect.value ? [departmentSelect.value] : [];
+
+        extraDepartmentOptions.forEach((option) => {
+            const box = option.querySelector('input[type="checkbox"]');
+            if (box && box.checked && !box.disabled) {
+                ids.push(option.dataset.departmentId);
+            }
+        });
+
+        return ids;
+    };
+
+    // Jabatan bisa dari divisi MANA PUN yang dimiliki karyawan (gabungan).
     const syncPositions = () => {
-        const allowedPositions = catalog.departments[departmentSelect.value]?.map(String) ?? [];
+        const deptIds = selectedDepartmentIds();
+        const allowed = new Set();
+        deptIds.forEach((id) => (catalog.departments[id] ?? []).forEach((pid) => allowed.add(String(pid))));
 
         positionOptions.forEach((option) => {
-            const isAllowed = !departmentSelect.value || allowedPositions.includes(option.value);
+            const isAllowed = deptIds.length === 0 || allowed.has(option.value);
 
             option.hidden = !isAllowed;
             option.disabled = !isAllowed;
@@ -1111,12 +1128,17 @@ document.querySelectorAll('[data-placement-form]').forEach((form) => {
         }
 
         $(departmentSelect).trigger('change.select2');
-        syncPositions();
         syncExtraDepartments();
+        syncPositions();
     };
 
     branchSelect.addEventListener('change', syncDepartments);
-    departmentSelect.addEventListener('change', () => { syncPositions(); syncExtraDepartments(); });
+    departmentSelect.addEventListener('change', () => { syncExtraDepartments(); syncPositions(); });
+    // Mencentang/melepas divisi lain memperluas/menyempitkan pilihan jabatan.
+    extraDepartmentOptions.forEach((option) => {
+        const box = option.querySelector('input[type="checkbox"]');
+        if (box) box.addEventListener('change', syncPositions);
+    });
 
     syncDepartments();
 });

@@ -130,14 +130,14 @@
                     @error('branch_id')<p class="mt-2 text-sm text-red-600">{{ $message }}</p>@enderror
                 </div>
                 <div>
-                    <label for="department_id" class="block text-sm font-medium text-gray-700">Divisi Jabatan <span class="field-requirement is-required" aria-label="Wajib diisi">*</span></label>
+                    <label for="department_id" class="block text-sm font-medium text-gray-700">Divisi Utama <span class="field-requirement is-required" aria-label="Wajib diisi">*</span></label>
                     <select id="department_id" name="department_id" required data-placement-department class="mt-2 block w-full rounded-md border border-gray-300 px-3 py-2.5 text-sm shadow-xs outline-none focus:border-primary focus:ring-2 focus:ring-primary/20">
                         <option value="">Pilih divisi</option>
                         @foreach ($departments as $department)
                             <option value="{{ $department->id }}" data-placement-department-option @selected(old('department_id', $employee->department_id) == $department->id)>{{ $department->name }}</option>
                         @endforeach
                     </select>
-                    <p class="mt-2 text-xs text-gray-500">Divisi tempat jabatan di atas berada.</p>
+                    <p class="mt-2 text-xs text-gray-500">Minimal satu divisi. Jabatan bisa dipilih dari divisi ini maupun Divisi Lain.</p>
                     @error('department_id')<p class="mt-2 text-sm text-red-600">{{ $message }}</p>@enderror
                 </div>
                 <div>

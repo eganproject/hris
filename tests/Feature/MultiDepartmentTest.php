@@ -76,6 +76,69 @@ test('an employee can be created in more than one division', function () {
         ->and($employee->department_id)->toBe($ops->id);
 });
 
+test('a job position from another of the employee divisions can be assigned', function () {
+    $hr = multiDeptHr();
+    $branch = Branch::query()->create(['code' => 'SBY', 'name' => 'Surabaya', 'is_active' => true]);
+    $ops = Department::query()->create(['code' => 'OPS', 'name' => 'Operasional', 'is_active' => true]);
+    $acc = Department::query()->create(['code' => 'ACC', 'name' => 'Accounting', 'is_active' => true]);
+    $branch->departments()->attach([$ops->id => ['is_active' => true], $acc->id => ['is_active' => true]]);
+
+    // Jabatan "Akuntan" HANYA tersedia di Accounting.
+    $akuntan = JobPosition::query()->create(['code' => 'AKN', 'name' => 'Akuntan', 'is_active' => true]);
+    $akuntan->departments()->attach([$acc->id => ['is_active' => true]]);
+
+    // Divisi utama Operasional, tapi karyawan juga di Accounting → jabatan Accounting boleh.
+    $this->actingAs($hr)->post('/employees', [
+        'branch_id' => $branch->id,
+        'department_id' => $ops->id,
+        'department_ids' => [$acc->id],
+        'job_position_id' => $akuntan->id,
+        'machine_pins' => [['device_id' => null, 'machine_user_id' => '11']],
+        'full_name' => 'Budi Akuntan',
+        'join_date' => now()->toDateString(),
+        'employment_status' => 'active',
+        'contract_number' => 'CTR-AKN',
+        'contract_type' => 'PKWT',
+        'contract_start_date' => now()->toDateString(),
+        'contract_end_date' => now()->addYear()->toDateString(),
+        'contract_status' => 'active',
+    ])->assertRedirect('/employees');
+
+    $employee = Employee::query()->where('full_name', 'Budi Akuntan')->firstOrFail();
+    expect($employee->job_position_id)->toBe($akuntan->id);
+});
+
+test('a job position not in any of the employee divisions is rejected', function () {
+    $hr = multiDeptHr();
+    $branch = Branch::query()->create(['code' => 'SBY', 'name' => 'Surabaya', 'is_active' => true]);
+    $ops = Department::query()->create(['code' => 'OPS', 'name' => 'Operasional', 'is_active' => true]);
+    $hrDept = Department::query()->create(['code' => 'HRD', 'name' => 'SDM', 'is_active' => true]);
+    $branch->departments()->attach([$ops->id => ['is_active' => true]]);
+
+    // Jabatan HRD tidak terkait divisi karyawan (Operasional).
+    $hrdPos = JobPosition::query()->create(['code' => 'HRO', 'name' => 'HR Officer', 'is_active' => true]);
+    $hrdPos->departments()->attach([$hrDept->id => ['is_active' => true]]);
+
+    $this->actingAs($hr)
+        ->from('/employees/create')
+        ->post('/employees', [
+            'branch_id' => $branch->id,
+            'department_id' => $ops->id,
+            'job_position_id' => $hrdPos->id,
+            'machine_pins' => [['device_id' => null, 'machine_user_id' => '12']],
+            'full_name' => 'Salah Jabatan',
+            'join_date' => now()->toDateString(),
+            'employment_status' => 'active',
+            'contract_number' => 'CTR-X',
+            'contract_type' => 'PKWT',
+            'contract_start_date' => now()->toDateString(),
+            'contract_end_date' => now()->addYear()->toDateString(),
+            'contract_status' => 'active',
+        ])
+        ->assertRedirect('/employees/create')
+        ->assertSessionHasErrors('job_position_id');
+});
+
 test('a scoped HR sees an employee via any of their divisions', function () {
     ['branch' => $branch, 'ops' => $ops, 'acc' => $acc, 'position' => $position] = multiDeptFixture();
 

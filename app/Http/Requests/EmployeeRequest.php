@@ -207,16 +207,20 @@ class EmployeeRequest extends FormRequest
                     }
                 }
 
-                $jobPositionAvailableForDepartment = DB::table('department_job_position')
+                // Jabatan boleh berasal dari divisi mana pun yang dimiliki karyawan
+                // (divisi jabatan + divisi lain), bukan hanya satu divisi.
+                $divisionIds = $extraDepartmentIds->push($departmentId)->unique()->all();
+
+                $jobPositionAvailable = DB::table('department_job_position')
                     ->join('job_positions', 'job_positions.id', '=', 'department_job_position.job_position_id')
-                    ->where('department_job_position.department_id', $departmentId)
+                    ->whereIn('department_job_position.department_id', $divisionIds)
                     ->where('department_job_position.job_position_id', $jobPositionId)
                     ->where('department_job_position.is_active', true)
                     ->where('job_positions.is_active', true)
                     ->exists();
 
-                if (! $jobPositionAvailableForDepartment) {
-                    $validator->errors()->add('job_position_id', 'Jabatan tidak sesuai dengan divisi yang dipilih.');
+                if (! $jobPositionAvailable) {
+                    $validator->errors()->add('job_position_id', 'Jabatan tidak tersedia di divisi mana pun yang dipilih untuk karyawan ini.');
                 }
             },
         ];
