@@ -52,7 +52,7 @@ class SchedulePatternController extends Controller
             'is_active' => $request->boolean('is_active'),
         ]);
 
-        $this->syncDays($pattern, $request->input('days', []));
+        $this->syncDays($pattern, $request->input('days', []), $request->input('days_wfh', []));
 
         return redirect()->route('attendance.schedule-patterns.index')->with('status', 'Pola jadwal berhasil dibuat.');
     }
@@ -78,7 +78,7 @@ class SchedulePatternController extends Controller
             'is_active' => $request->boolean('is_active'),
         ]);
 
-        $this->syncDays($schedulePattern->fresh(), $request->input('days', []));
+        $this->syncDays($schedulePattern->fresh(), $request->input('days', []), $request->input('days_wfh', []));
 
         return redirect()->route('attendance.schedule-patterns.index')->with('status', 'Pola jadwal berhasil diperbarui.');
     }
@@ -91,11 +91,13 @@ class SchedulePatternController extends Controller
     }
 
     /**
-     * Rewrite the pattern's slots. Each slot index maps to a shift id (or null = off).
+     * Rewrite the pattern's slots. Each slot index maps to a shift id (or null = off),
+     * and may be flagged WFH (only meaningful on a slot that has a shift).
      *
      * @param  array<int|string, mixed>  $days
+     * @param  array<int|string, mixed>  $daysWfh
      */
-    private function syncDays(SchedulePattern $pattern, array $days): void
+    private function syncDays(SchedulePattern $pattern, array $days, array $daysWfh = []): void
     {
         $pattern->days()->delete();
 
@@ -105,6 +107,7 @@ class SchedulePatternController extends Controller
             $pattern->days()->create([
                 'day_index' => $index,
                 'shift_id' => $shiftId ?: null,
+                'is_wfh' => (bool) ($shiftId && ! empty($daysWfh[$index])),
             ]);
         }
     }

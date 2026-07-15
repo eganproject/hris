@@ -20,6 +20,7 @@ class ScheduleOverrideRequest extends FormRequest
             'employee_id' => ['required', 'integer', 'exists:employees,id'],
             'work_date' => ['required', 'date'],
             'is_day_off' => ['sometimes', 'boolean'],
+            'is_wfh' => ['sometimes', 'boolean'],
             'shift_id' => ['nullable', 'required_without:is_day_off', 'integer', 'exists:shifts,id'],
             'note' => ['nullable', 'string', 'max:255'],
         ];

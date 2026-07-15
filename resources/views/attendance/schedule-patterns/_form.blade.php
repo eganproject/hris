@@ -4,6 +4,7 @@
     // Weekly slots use Carbon's dayOfWeek index (0=Minggu..6=Sabtu); present Mon-first.
     $weekdays = [1 => 'Senin', 2 => 'Selasa', 3 => 'Rabu', 4 => 'Kamis', 5 => 'Jumat', 6 => 'Sabtu', 0 => 'Minggu'];
     $dayShift = $pattern->days->mapWithKeys(fn ($day) => [$day->day_index => $day->shift_id])->all();
+    $dayWfh = $pattern->days->mapWithKeys(fn ($day) => [$day->day_index => (bool) $day->is_wfh])->all();
     $currentType = old('type', $pattern->type?->value ?? SchedulePatternType::FixedWeekly->value);
 @endphp
 
@@ -40,7 +41,7 @@
 {{-- Weekly pattern: one shift per weekday --}}
 <section data-block="fixed_weekly" class="rounded-lg border border-gray-200 bg-white p-6 shadow-sm" @style(['display:none' => $currentType !== 'fixed_weekly'])>
     <h3 class="text-sm font-semibold text-gray-950">Jadwal Mingguan</h3>
-    <p class="mt-1 text-xs text-gray-500">Pilih shift untuk tiap hari. Kosongkan (Libur) untuk hari libur.</p>
+    <p class="mt-1 text-xs text-gray-500">Pilih shift untuk tiap hari. Kosongkan (Libur) untuk hari libur. Centang <span class="font-medium">WFH</span> bila hari itu dikerjakan dari rumah.</p>
     <div class="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         @foreach ($weekdays as $index => $label)
             <div>
@@ -51,6 +52,10 @@
                         <option value="{{ $shift->id }}" @selected((string) old("days.$index", $dayShift[$index] ?? '') === (string) $shift->id)>{{ $shift->code }} — {{ $shift->name }}</option>
                     @endforeach
                 </select>
+                <label class="mt-2 flex items-center gap-2 text-xs text-gray-600">
+                    <input type="checkbox" name="days_wfh[{{ $index }}]" value="1" @checked(old("days_wfh.$index", $dayWfh[$index] ?? false)) @disabled($currentType !== 'fixed_weekly') data-weekly-select class="size-3.5 rounded border-gray-300 text-primary focus:ring-primary">
+                    WFH
+                </label>
             </div>
         @endforeach
     </div>
@@ -83,7 +88,9 @@
 
         const shifts = @json($shifts->map(fn ($s) => ['id' => $s->id, 'label' => $s->code.' — '.$s->name])->values());
         const dayShift = @json((object) $dayShift);
+        const dayWfh = @json((object) $dayWfh);
         const oldRotating = @json((object) (old('type') === 'rotating' ? old('days', []) : []));
+        const oldRotatingWfh = @json((object) (old('type') === 'rotating' ? old('days_wfh', []) : []));
         const cycleInput = document.querySelector('[data-cycle-length]');
         const slotsEl = document.querySelector('[data-rotating-slots]');
 
@@ -102,10 +109,14 @@
             slotsEl.innerHTML = '';
             for (let i = 0; i < n; i++) {
                 const selected = (oldRotating[i] !== undefined ? oldRotating[i] : (dayShift[i] ?? ''));
+                const wfhOn = (oldRotatingWfh[i] !== undefined ? !!oldRotatingWfh[i] : !!(dayWfh[i] ?? false));
+                const disabled = rotating ? '' : 'disabled';
                 const wrap = document.createElement('div');
                 wrap.innerHTML = '<label class="block text-sm font-medium text-gray-700">Hari ke-' + (i + 1) + '</label>' +
-                    '<select name="days[' + i + ']" ' + (rotating ? '' : 'disabled') + ' class="mt-2 block w-full rounded-md border border-gray-300 px-3 py-2.5 text-sm shadow-xs outline-none focus:border-primary focus:ring-2 focus:ring-primary/20">' +
-                    optionsHtml(selected) + '</select>';
+                    '<select name="days[' + i + ']" ' + disabled + ' class="mt-2 block w-full rounded-md border border-gray-300 px-3 py-2.5 text-sm shadow-xs outline-none focus:border-primary focus:ring-2 focus:ring-primary/20">' +
+                    optionsHtml(selected) + '</select>' +
+                    '<label class="mt-2 flex items-center gap-2 text-xs text-gray-600">' +
+                    '<input type="checkbox" name="days_wfh[' + i + ']" value="1" ' + (wfhOn ? 'checked' : '') + ' ' + disabled + ' class="size-3.5 rounded border-gray-300 text-primary focus:ring-primary"> WFH</label>';
                 slotsEl.appendChild(wrap);
             }
         }

@@ -89,11 +89,12 @@
                                         $hol = $holidays[$key] ?? null;
                                         $leave = $employeeLeaves[$key] ?? null;
                                         $isManual = $sched && $sched->source === \App\Enums\ScheduleSource::Manual;
+                                        $isWfh = $sched && ! $sched->is_day_off && $sched->is_wfh;
                                         // Approved leave wins the cell: the shift may still be on the
                                         // roster, but the person will not be at work that day.
                                         $title = $leave
                                             ? ($leave->leaveType?->name ?? 'Cuti').' (disetujui)'.($sched && ! $sched->is_day_off ? ' — jadwal '.$sched->shift?->name : '')
-                                            : ($sched && ! $sched->is_day_off ? $sched->shift?->name : ($sched && $sched->is_day_off ? 'Libur' : 'Belum dijadwalkan')).($isManual ? ' (manual)' : '');
+                                            : ($sched && ! $sched->is_day_off ? $sched->shift?->name.($isWfh ? ' (WFH)' : '') : ($sched && $sched->is_day_off ? 'Libur' : 'Belum dijadwalkan')).($isManual ? ' (manual)' : '');
                                     @endphp
                                     <td @class(['border-l border-gray-100 p-0.5', 'bg-red-50/60' => $hol, 'bg-gray-50/60' => ! $hol && $day->isWeekend()])>
                                         <button type="button"
@@ -102,13 +103,15 @@
                                                 data-date="{{ $key }}" data-date-label="{{ $day->translatedFormat('l, d M Y') }}"
                                                 data-shift="{{ $sched && ! $sched->is_day_off ? $sched->shift_id : '' }}"
                                                 data-off="{{ $sched && $sched->is_day_off ? 1 : 0 }}"
+                                                data-wfh="{{ $isWfh ? 1 : 0 }}"
                                                 data-leave="{{ $leave ? ($leave->leaveType?->name ?? 'Cuti') : '' }}"
                                             @else disabled @endcan
                                             @class([
                                                 'flex h-9 w-full items-center justify-center rounded text-[11px] font-semibold transition',
                                                 'cursor-pointer hover:ring-2 hover:ring-primary/40' => auth()->user()->can('schedules.update'),
                                                 'bg-amber-100 text-amber-800' => $leave,
-                                                'bg-primary/10 text-primary' => ! $leave && $sched && ! $sched->is_day_off,
+                                                'bg-indigo-100 text-indigo-700' => ! $leave && $isWfh,
+                                                'bg-primary/10 text-primary' => ! $leave && ! $isWfh && $sched && ! $sched->is_day_off,
                                                 'text-gray-300' => ! $leave && (! $sched || $sched->is_day_off),
                                                 'ring-1 ring-blue-400' => ! $leave && $isManual,
                                             ])
@@ -116,7 +119,7 @@
                                             @if ($leave)
                                                 {{ $leave->leaveType?->code ?? 'C' }}
                                             @elseif ($sched && ! $sched->is_day_off)
-                                                {{ $sched->shift?->code ?? '?' }}
+                                                {{ $isWfh ? '🏠' : ($sched->shift?->code ?? '?') }}
                                             @elseif ($sched && $sched->is_day_off)
                                                 —
                                             @else
@@ -134,6 +137,7 @@
             </div>
             <div class="flex flex-wrap items-center gap-4 border-t border-gray-200 px-4 py-3 text-[11px] text-gray-500">
                 <span class="inline-flex items-center gap-1.5"><span class="inline-block size-3 rounded bg-primary/10 ring-1 ring-primary/20"></span> Ada shift (kode)</span>
+                <span class="inline-flex items-center gap-1.5"><span class="inline-block size-3 rounded bg-indigo-100 ring-1 ring-indigo-200"></span> WFH (🏠)</span>
                 <span class="inline-flex items-center gap-1.5"><span class="inline-block size-3 rounded bg-amber-100 ring-1 ring-amber-200"></span> Cuti/izin disetujui (kode jenis)</span>
                 <span class="inline-flex items-center gap-1.5"><span class="inline-block size-3 rounded text-gray-300">—</span> Libur</span>
                 <span class="inline-flex items-center gap-1.5"><span class="inline-block size-3 rounded ring-1 ring-blue-400"></span> Override manual</span>
@@ -197,6 +201,10 @@
                             <option value="{{ $shift->id }}">{{ $shift->code }} — {{ $shift->name }}</option>
                         @endforeach
                     </select>
+                    <label class="mt-3 flex items-center gap-2 text-sm text-gray-700">
+                        <input type="checkbox" name="is_wfh" value="1" id="ov-wfh" class="size-4 rounded border-gray-300 text-primary focus:ring-primary">
+                        Kerja dari rumah (WFH) — jam kerja tetap dihitung
+                    </label>
                 </div>
                 <div>
                     <label for="ov-note" class="block text-sm font-medium text-gray-700">Catatan <span class="text-gray-400">(opsional)</span></label>
@@ -222,6 +230,7 @@
                 const shift = document.getElementById('ov-shift');
                 const shiftWrap = document.getElementById('ov-shift-wrap');
                 const note = document.getElementById('ov-note');
+                const wfh = document.getElementById('ov-wfh');
                 const leaveBox = document.getElementById('ov-leave');
                 const leaveType = document.getElementById('ov-leave-type');
 
@@ -230,6 +239,9 @@
                     shift.disabled = dayOff.checked;
                     // Shift wajib dipilih kecuali hari ini ditandai libur.
                     shift.required = !dayOff.checked;
+                    // WFH tidak berlaku pada hari libur.
+                    if (dayOff.checked) wfh.checked = false;
+                    wfh.disabled = dayOff.checked;
                 }
 
                 document.querySelectorAll('[data-cell]').forEach(function (cell) {
@@ -240,6 +252,7 @@
                         dateLabel.textContent = cell.dataset.dateLabel;
                         dayOff.checked = cell.dataset.off === '1';
                         shift.value = cell.dataset.shift || '';
+                        wfh.checked = cell.dataset.wfh === '1';
                         note.value = '';
                         // Warn before overriding a day the employee is already on leave for.
                         leaveType.textContent = cell.dataset.leave || '';

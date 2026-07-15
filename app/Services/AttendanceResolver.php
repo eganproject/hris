@@ -32,6 +32,10 @@ class AttendanceResolver
         $schedule = $employee->schedules()->whereDate('work_date', $date->toDateString())->with('shift')->first();
         $shift = ($schedule && ! $schedule->is_day_off) ? $schedule->shift : null;
 
+        // WFH bisa berasal dari jadwal (pola/override yang menandai hari ini WFH)
+        // atau dari pengajuan WFH yang disetujui (dicek di langkah 2).
+        $scheduledWfh = (bool) $schedule?->is_wfh;
+
         $in = $this->punch($date, $clockIn);
         $out = $this->punch($date, $clockOut);
 
@@ -72,12 +76,14 @@ class AttendanceResolver
         // only keeps the WFH label. Every other leave type (cuti/izin/sakit/dinas) is
         // non-working and stops here.
         $leave = $employee->leaveRequests()->approvedOn($date->toDateString())->with('leaveType')->first();
-        $isWfh = false;
+        $isWfh = $scheduledWfh;
 
         if ($leave) {
             $result['leave_request_id'] = $leave->id;
             $leaveStatus = $leave->leaveType?->attendance_status ?? AttendanceStatus::Leave;
 
+            // Cuti/izin/sakit/dinas mengalahkan jadwal WFH (orangnya memang tidak
+            // bekerja hari itu). WFH yang diajukan menegaskan status WFH.
             if ($leaveStatus !== AttendanceStatus::Wfh) {
                 $result['status'] = $leaveStatus;
 

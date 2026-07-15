@@ -256,6 +256,7 @@ class ScheduleController extends Controller
             $request->boolean('is_day_off') ? null : $request->integer('shift_id'),
             $request->boolean('is_day_off'),
             $request->string('note')->toString() ?: null,
+            $request->boolean('is_wfh'),
         );
 
         return redirect()

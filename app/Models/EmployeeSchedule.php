@@ -16,6 +16,7 @@ class EmployeeSchedule extends Model
     'work_date',
     'shift_id',
     'is_day_off',
+    'is_wfh',
     'source',
     'schedule_assignment_id',
     'note',
@@ -25,6 +26,7 @@ class EmployeeSchedule extends Model
     {
         return [
             'is_day_off' => 'boolean',
+            'is_wfh' => 'boolean',
             'source' => ScheduleSource::class,
         ];
     }

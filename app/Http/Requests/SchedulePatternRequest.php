@@ -30,6 +30,8 @@ class SchedulePatternRequest extends FormRequest
             'is_active' => ['sometimes', 'boolean'],
             'days' => ['array'],
             'days.*' => ['nullable', 'integer', 'exists:shifts,id'],
+            'days_wfh' => ['array'],
+            'days_wfh.*' => ['nullable'],
         ];
     }
 

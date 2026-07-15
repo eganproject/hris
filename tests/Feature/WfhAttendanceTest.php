@@ -114,6 +114,66 @@ test('self check-in is refused on a day that is not approved WFH', function () {
     expect(App\Models\Attendance::query()->count())->toBe(0);
 });
 
+test('a scheduled WFH day counts as worked hours without any leave request', function () {
+    // Karyawan dijadwalkan WFH (bukan mengajukan) — hari itu tetap bekerja dari rumah.
+    $shift = Shift::query()->create([
+        'code' => 'REG', 'name' => 'Reguler', 'start_time' => '08:00', 'end_time' => '17:00',
+        'break_minutes' => 60, 'is_active' => true,
+    ]);
+    $employee = Employee::query()->create(['full_name' => 'Terjadwal WFH', 'employment_status' => 'active']);
+
+    $date = now();
+    EmployeeSchedule::query()->create([
+        'employee_id' => $employee->id, 'work_date' => $date->toDateString(),
+        'shift_id' => $shift->id, 'is_day_off' => false, 'is_wfh' => true, 'source' => 'generated',
+    ]);
+
+    $attendance = app(AttendanceResolver::class)->resolve($employee, $date, '08:00', '17:00');
+
+    expect($attendance->status)->toBe(AttendanceStatus::Wfh)
+        ->and($attendance->work_minutes)->toBe(480); // 9 jam - 1 jam istirahat
+});
+
+test('the generator carries the WFH flag from a pattern day onto the roster', function () {
+    $shift = Shift::query()->create(['code' => 'REG', 'name' => 'Reguler', 'start_time' => '08:00', 'end_time' => '17:00', 'is_active' => true]);
+    $employee = Employee::query()->create(['full_name' => 'Hybrid', 'employment_status' => 'active']);
+
+    // Pola mingguan: semua hari kantor, kecuali satu hari WFH.
+    $pattern = App\Models\SchedulePattern::query()->create([
+        'code' => 'HYB', 'name' => 'Hybrid', 'type' => App\Enums\SchedulePatternType::FixedWeekly,
+        'cycle_length' => 7, 'is_active' => true,
+    ]);
+    // 2026-02-02 adalah Senin (dayOfWeek 1); jadikan Senin WFH.
+    foreach ([0 => null, 1 => $shift->id, 2 => $shift->id, 3 => $shift->id, 4 => $shift->id, 5 => $shift->id, 6 => null] as $index => $shiftId) {
+        $pattern->days()->create(['day_index' => $index, 'shift_id' => $shiftId, 'is_wfh' => $index === 1]);
+    }
+
+    $assignment = App\Models\ScheduleAssignment::query()->create([
+        'employee_id' => $employee->id, 'schedule_pattern_id' => $pattern->id,
+        'start_date' => '2026-02-02', 'end_date' => '2026-02-03',
+    ]);
+    app(App\Services\ScheduleGenerator::class)->forAssignment($assignment);
+
+    $monday = $employee->schedules()->whereDate('work_date', '2026-02-02')->firstOrFail();
+    $tuesday = $employee->schedules()->whereDate('work_date', '2026-02-03')->firstOrFail();
+
+    expect($monday->is_wfh)->toBeTrue()
+        ->and($tuesday->is_wfh)->toBeFalse();
+});
+
+test('the daily override can mark a day WFH, and clearing it removes the flag', function () {
+    $generator = app(App\Services\ScheduleGenerator::class);
+    $shift = Shift::query()->create(['code' => 'REG', 'name' => 'Reguler', 'start_time' => '08:00', 'end_time' => '17:00', 'is_active' => true]);
+    $employee = Employee::query()->create(['full_name' => 'Override WFH', 'employment_status' => 'active']);
+
+    $day = $generator->override($employee, now(), $shift->id, false, null, true);
+    expect($day->is_wfh)->toBeTrue();
+
+    // Ditandai libur → WFH ikut hilang.
+    $off = $generator->override($employee, now(), null, true, null, true);
+    expect($off->is_wfh)->toBeFalse();
+});
+
 test('non-WFH approved leave still short-circuits to its own status with zero hours', function () {
     ['employee' => $employee, 'date' => $date] = wfhFixture();
 

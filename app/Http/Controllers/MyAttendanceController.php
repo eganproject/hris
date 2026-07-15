@@ -86,11 +86,25 @@ class MyAttendanceController extends Controller
         return back()->with('status', 'Absen pulang WFH tercatat pukul '.$today->format('H:i').'.');
     }
 
-    /** Is the employee approved to work from home today? */
+    /**
+     * Is today a WFH day for this employee — whether from the roster (a scheduled
+     * WFH day) or from an approved WFH request?
+     */
     private function isWfhApprovedToday(Employee $employee): bool
     {
+        $today = now()->toDateString();
+
+        $scheduled = $employee->schedules()
+            ->whereDate('work_date', $today)
+            ->where('is_wfh', true)
+            ->exists();
+
+        if ($scheduled) {
+            return true;
+        }
+
         return $employee->leaveRequests()
-            ->approvedOn(now()->toDateString())
+            ->approvedOn($today)
             ->whereHas('leaveType', fn ($query) => $query->where('attendance_status', AttendanceStatus::Wfh->value))
             ->exists();
     }

@@ -12,12 +12,14 @@ class SchedulePatternDay extends Model
     'schedule_pattern_id',
     'day_index',
     'shift_id',
+    'is_wfh',
     ];
 
     protected function casts(): array
     {
         return [
             'day_index' => 'integer',
+            'is_wfh' => 'boolean',
         ];
     }
 

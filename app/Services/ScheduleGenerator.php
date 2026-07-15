@@ -68,6 +68,8 @@ class ScheduleGenerator
                 [
                     'shift_id' => $patternDay?->shift_id,
                     'is_day_off' => $patternDay === null || $patternDay->shift_id === null,
+                    // WFH hanya berlaku pada hari kerja (ada shift-nya).
+                    'is_wfh' => (bool) ($patternDay?->is_wfh && $patternDay->shift_id !== null),
                     'source' => ScheduleSource::Generated,
                     'schedule_assignment_id' => $assignment->id,
                     'note' => null,
@@ -98,13 +100,15 @@ class ScheduleGenerator
     /**
      * Set or clear a single day as a manual override that the generator won't touch.
      */
-    public function override(Employee $employee, CarbonInterface $date, ?int $shiftId, bool $isDayOff, ?string $note = null): EmployeeSchedule
+    public function override(Employee $employee, CarbonInterface $date, ?int $shiftId, bool $isDayOff, ?string $note = null, bool $isWfh = false): EmployeeSchedule
     {
         return EmployeeSchedule::query()->updateOrCreate(
             ['employee_id' => $employee->id, 'work_date' => Carbon::parse($date)->toDateString()],
             [
                 'shift_id' => $isDayOff ? null : $shiftId,
                 'is_day_off' => $isDayOff,
+                // WFH hanya berlaku pada hari kerja (bukan libur, dan ada shift-nya).
+                'is_wfh' => $isWfh && ! $isDayOff && $shiftId !== null,
                 'source' => ScheduleSource::Manual,
                 'note' => $note,
             ],
