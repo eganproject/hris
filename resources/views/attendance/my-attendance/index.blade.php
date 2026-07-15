@@ -12,6 +12,38 @@
         @if (session('status'))
             <div class="rounded-md border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">{{ session('status') }}</div>
         @endif
+        @if (session('error'))
+            <div class="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{{ session('error') }}</div>
+        @endif
+
+        {{-- Absen mandiri WFH: hanya muncul saat hari ini disetujui WFH --}}
+        @if ($wfhToday)
+            @php
+                $inLabel = $todayAttendance?->clock_in?->format('H:i');
+                $outLabel = $todayAttendance?->clock_out?->format('H:i');
+            @endphp
+            <section class="rounded-lg border border-emerald-200 bg-emerald-50/60 p-5 shadow-sm">
+                <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                    <div>
+                        <p class="text-sm font-semibold text-emerald-900">Work From Home — {{ now()->translatedFormat('l, d M Y') }}</p>
+                        <p class="mt-0.5 text-sm text-emerald-700">
+                            Absen masuk: <span class="font-semibold">{{ $inLabel ?? 'belum' }}</span>
+                            · Absen pulang: <span class="font-semibold">{{ $outLabel ?? 'belum' }}</span>
+                        </p>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <form method="POST" action="{{ route('my-attendance.check-in') }}" data-no-confirm="true">
+                            @csrf
+                            <button type="submit" @disabled($inLabel) class="rounded-md bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white shadow-xs transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:bg-gray-300">Absen Masuk</button>
+                        </form>
+                        <form method="POST" action="{{ route('my-attendance.check-out') }}" data-no-confirm="true">
+                            @csrf
+                            <button type="submit" @disabled(! $inLabel || $outLabel) class="rounded-md border border-emerald-600 px-4 py-2.5 text-sm font-semibold text-emerald-700 transition hover:bg-emerald-100 disabled:cursor-not-allowed disabled:border-gray-200 disabled:text-gray-400">Absen Pulang</button>
+                        </form>
+                    </div>
+                </div>
+            </section>
+        @endif
 
         {{-- Attendance history --}}
         <section class="overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm">

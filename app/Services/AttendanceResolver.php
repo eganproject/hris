@@ -67,32 +67,43 @@ class AttendanceResolver
             return $result;
         }
 
-        // 2. Approved leave (cuti/izin/sakit/dinas/wfh) maps to its own status.
+        // 2. Approved leave. WFH is a WORKING arrangement (the employee clocks in from
+        // home via self check-in), so it flows through the normal shift computation and
+        // only keeps the WFH label. Every other leave type (cuti/izin/sakit/dinas) is
+        // non-working and stops here.
         $leave = $employee->leaveRequests()->approvedOn($date->toDateString())->with('leaveType')->first();
+        $isWfh = false;
 
         if ($leave) {
             $result['leave_request_id'] = $leave->id;
-            $result['status'] = $leave->leaveType?->attendance_status ?? AttendanceStatus::Leave;
+            $leaveStatus = $leave->leaveType?->attendance_status ?? AttendanceStatus::Leave;
 
-            return $result;
+            if ($leaveStatus !== AttendanceStatus::Wfh) {
+                $result['status'] = $leaveStatus;
+
+                return $result;
+            }
+
+            $isWfh = true;
         }
 
         // 3. No shift scheduled (day off or nothing). Punches = worked on a rest day.
         if (! $shift) {
             if ($in && $out) {
-                $result['status'] = AttendanceStatus::Present;
+                $result['status'] = $isWfh ? AttendanceStatus::Wfh : AttendanceStatus::Present;
                 $result['work_minutes'] = $this->minutes($in, $out);
                 $result['overtime_minutes'] = $result['work_minutes'];
             } else {
-                $result['status'] = AttendanceStatus::DayOff;
+                $result['status'] = $isWfh ? AttendanceStatus::Wfh : AttendanceStatus::DayOff;
             }
 
             return $result;
         }
 
-        // 4. Scheduled shift with no punch = absent.
+        // 4. Scheduled shift with no punch. On a WFH day that just means the employee
+        // has not clocked in from home yet (still WFH, nol jam); otherwise = absent.
         if (! $in) {
-            $result['status'] = AttendanceStatus::Absent;
+            $result['status'] = $isWfh ? AttendanceStatus::Wfh : AttendanceStatus::Absent;
 
             return $result;
         }
@@ -111,7 +122,9 @@ class AttendanceResolver
             $result['overtime_minutes'] = $shift->overtimeMinutesFor($out, $date);
         }
 
-        $result['status'] = match (true) {
+        // A WFH day keeps the WFH label even when late/early — the worked minutes and
+        // overtime above are still computed and count for payroll.
+        $result['status'] = $isWfh ? AttendanceStatus::Wfh : match (true) {
             $lateMinutes > (int) $shift->late_tolerance_minutes => AttendanceStatus::Late,
             $earlyMinutes > (int) $shift->early_leave_tolerance_minutes => AttendanceStatus::EarlyLeave,
             default => AttendanceStatus::Present,

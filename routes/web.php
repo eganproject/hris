@@ -280,6 +280,8 @@ Route::middleware('auth')->group(function () {
     // Employee self-service: view own attendance and request corrections.
     Route::prefix('my-attendance')->name('my-attendance.')->middleware('permission:my-attendance.view')->group(function () {
         Route::get('/', [MyAttendanceController::class, 'index'])->name('index');
+        Route::post('check-in', [MyAttendanceController::class, 'checkIn'])->name('check-in');
+        Route::post('check-out', [MyAttendanceController::class, 'checkOut'])->name('check-out');
         Route::post('corrections', [MyAttendanceController::class, 'store'])->name('corrections.store');
         Route::delete('corrections/{correction}', [MyAttendanceController::class, 'cancel'])->name('corrections.cancel');
     });
