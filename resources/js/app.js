@@ -610,6 +610,45 @@ document.querySelectorAll('[data-role-matrix] [data-row-toggle]').forEach((toggl
     syncToggle();
 });
 
+// Generic instant list filter. A search input [data-list-filter="<scope>"] (and an
+// optional select [data-list-filter-select="<scope>"]) hide every [data-filter-item]
+// inside [data-filter-scope="<scope>"] that doesn't match. Matching is against the
+// row's data-filter-text (search) and data-filter-tags (select, comma-separated).
+document.querySelectorAll('[data-filter-scope]').forEach((scope) => {
+    const key = scope.dataset.filterScope;
+    const input = document.querySelector(`[data-list-filter="${key}"]`);
+    const select = document.querySelector(`[data-list-filter-select="${key}"]`);
+    const items = [...scope.querySelectorAll('[data-filter-item]')];
+    const empty = scope.querySelector('[data-filter-empty]');
+
+    if (!input && !select) {
+        return;
+    }
+
+    const apply = () => {
+        const q = (input?.value || '').trim().toLowerCase();
+        const tag = select?.value || '';
+        let shown = 0;
+
+        items.forEach((item) => {
+            const text = (item.dataset.filterText || '').toLowerCase();
+            const tags = (item.dataset.filterTags || '').split(',');
+            const matchText = !q || text.includes(q);
+            const matchTag = !tag || tags.includes(tag);
+            const visible = matchText && matchTag;
+
+            item.hidden = !visible;
+            if (visible) shown += 1;
+        });
+
+        if (empty) empty.hidden = shown !== 0;
+    };
+
+    input?.addEventListener('input', apply);
+    select?.addEventListener('change', apply);
+    apply();
+});
+
 // Show/hide password: [data-password-toggle="<input id>"] flips that input between
 // password and text, so a typed password can be checked before saving.
 document.querySelectorAll('[data-password-toggle]').forEach((button) => {

@@ -71,7 +71,7 @@
                                     @endif
                                 </td>
                                 <td class="text-right">
-                                    @canany(['leave.update', 'leave.delete'])
+                                    @can('leave.update')
                                         <x-action-menu>
                                             @can('leave.update')
                                                 @if ($leaveRequest->status->isPending())
@@ -95,16 +95,10 @@
                                                     </form>
                                                 @endif
                                             @endcan
-                                            @can('leave.delete')
-                                                @if ($leaveRequest->status !== \App\Enums\LeaveRequestStatus::Approved)
-                                                    <form method="POST" action="{{ route('attendance.leave.destroy', $leaveRequest) }}" data-delete-leave="{{ $leaveRequest->id }}">
-                                                        @csrf @method('DELETE')
-                                                        <button type="submit" class="action-menu-item action-menu-item-danger"><x-icon name="trash"/> Hapus</button>
-                                                    </form>
-                                                @endif
-                                            @endcan
+                                            {{-- Pengajuan hanya bisa dihapus oleh karyawan yang mengajukan
+                                                 (lewat menu Cuti Saya), bukan oleh HR/atasan. --}}
                                         </x-action-menu>
-                                    @endcanany
+                                    @endcan
                                 </td>
                             </tr>
                         @empty

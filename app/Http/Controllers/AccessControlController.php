@@ -20,14 +20,21 @@ use Spatie\Permission\PermissionRegistrar;
 
 class AccessControlController extends Controller
 {
-    public function index(): View
+    public function index(Request $request): View
     {
+        $userSearch = $request->string('user_search')->toString();
+        $userRole = $request->string('user_role')->toString();
+
         return view('access-control.index', [
             'users' => User::query()
                 ->with(['roles', 'accessBranches', 'accessDepartments'])
+                ->when($userSearch, fn ($query, $search) => $query->where(fn ($q) => $q
+                    ->where('name', 'like', "%{$search}%")->orWhere('email', 'like', "%{$search}%")))
+                ->when($userRole, fn ($query, $role) => $query->whereHas('roles', fn ($q) => $q->where('name', $role)))
                 ->orderBy('name')
                 ->paginate(15)
                 ->withQueryString(),
+            'userFilters' => ['search' => $userSearch, 'role' => $userRole],
             'roles' => Role::query()
                 ->with('permissions')
                 ->withCount('users')

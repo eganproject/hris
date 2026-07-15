@@ -107,18 +107,4 @@ class LeaveController extends Controller
 
         return redirect()->route('attendance.leave.index')->with('status', 'Cuti/izin yang sudah disetujui dibatalkan & absensi dikembalikan.');
     }
-
-    /**
-     * Only requests that are not in effect can be erased. An approved leave must be
-     * cancelled instead, so the approval trail is never silently deleted.
-     */
-    public function destroy(Request $request, LeaveRequest $leaveRequest): RedirectResponse
-    {
-        DataScope::forAttendance($request->user())->authorize($leaveRequest->employee);
-        abort_if($leaveRequest->status === LeaveRequestStatus::Approved, 403);
-
-        $leaveRequest->delete();
-
-        return redirect()->route('attendance.leave.index')->with('status', 'Pengajuan dihapus.');
-    }
 }

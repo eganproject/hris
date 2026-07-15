@@ -48,14 +48,19 @@
 
             @error('name')<p class="px-5 pt-3 text-sm text-red-600">{{ $message }}</p>@enderror
 
-            <div class="divide-y divide-gray-100">
+            <div class="border-b border-gray-100 px-5 py-3">
+                <input type="search" data-list-filter="roles" placeholder="Cari role…" class="block w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-xs outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 sm:max-w-xs">
+            </div>
+
+            <div class="divide-y divide-gray-100" data-filter-scope="roles">
+                <p data-filter-empty hidden class="px-5 py-8 text-center text-sm text-gray-500">Tidak ada role yang cocok.</p>
                 @foreach ($roles as $role)
                     @php
                         $isProtected = in_array($role->name, ['superadmin', 'super-admin'], true);
                         $locked = ! auth()->user()->can('access-control.update') || $isProtected;
                         $held = $role->permissions->pluck('name')->all();
                     @endphp
-                    <details class="group" @if ($loop->first) open @endif>
+                    <details class="group" data-filter-item data-filter-text="{{ $role->name }}" @if ($loop->first) open @endif>
                         <summary class="flex cursor-pointer items-center justify-between gap-4 px-5 py-4 hover:bg-gray-50">
                             <div>
                                 <p class="font-medium text-gray-950">{{ $role->name }}</p>
@@ -160,9 +165,31 @@
                     <span class="font-medium">Role</span> menentukan menu & hak akses pengguna — centang role untuk menetapkannya ke pengguna yang sudah ada.
                     <span class="font-medium">Cakupan</span> membatasi data yang dilihat: karyawan/absensi/jadwal/cuti/laporan hanya untuk lokasi kerja dan divisi yang dipilih (kosong = semua). Pengguna dengan permission <span class="font-medium">lihat semua</span> tidak dibatasi cakupan.
                 </p>
+
+                <form method="GET" action="{{ route('access-control.index') }}" class="mt-4 flex flex-col gap-2 sm:flex-row sm:items-end">
+                    <div class="flex-1">
+                        <label for="user_search" class="block text-xs font-medium text-gray-600">Cari pengguna</label>
+                        <input id="user_search" name="user_search" value="{{ $userFilters['search'] }}" placeholder="Nama atau email" class="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-xs outline-none focus:border-primary focus:ring-2 focus:ring-primary/20">
+                    </div>
+                    <div>
+                        <label for="user_role" class="block text-xs font-medium text-gray-600">Role</label>
+                        <select id="user_role" name="user_role" class="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-xs outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 sm:w-52">
+                            <option value="">Semua role</option>
+                            @foreach ($roles as $role)
+                                <option value="{{ $role->name }}" @selected($userFilters['role'] === $role->name)>{{ $role->name }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+                    <div class="flex gap-2">
+                        <button type="submit" class="rounded-md bg-primary px-4 py-2 text-sm font-semibold text-white shadow-xs transition hover:bg-primary-hover">Filter</button>
+                        @if ($userFilters['search'] !== '' || $userFilters['role'] !== '')
+                            <a href="{{ route('access-control.index') }}" class="rounded-md border border-gray-200 px-4 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-50">Reset</a>
+                        @endif
+                    </div>
+                </form>
             </div>
             <div class="divide-y divide-gray-100">
-                @foreach ($users as $user)
+                @forelse ($users as $user)
                     @php
                         $seesAllEmployees = $user->seesAllData(\App\Models\User::SCOPE_BYPASS_EMPLOYEES);
                         $seesAllAttendance = $user->seesAllData(\App\Models\User::SCOPE_BYPASS_ATTENDANCE);
@@ -228,7 +255,9 @@
                             @endcan
                         </div>
                     </form>
-                @endforeach
+                @empty
+                    <p class="px-5 py-10 text-center text-sm text-gray-500">Tidak ada pengguna yang cocok dengan filter.</p>
+                @endforelse
             </div>
             <div class="border-t border-gray-200 px-5 py-3">
                 {{ $users->links() }}
@@ -239,10 +268,20 @@
             <div class="border-b border-gray-200 px-5 py-4">
                 <h2 class="text-base font-semibold text-gray-950">Role Default Per Jabatan</h2>
                 <p class="mt-1 text-sm text-gray-500">Akun karyawan baru akan memakai role default dari jabatan bila role tidak dipilih manual.</p>
+                <div class="mt-4 flex flex-col gap-2 sm:flex-row">
+                    <input type="search" data-list-filter="positions" placeholder="Cari jabatan…" class="block w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-xs outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 sm:max-w-xs">
+                    <select data-list-filter-select="positions" class="block w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-xs outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 sm:w-52">
+                        <option value="">Semua divisi</option>
+                        @foreach ($departments as $department)
+                            <option value="{{ $department->id }}">{{ $department->name }}</option>
+                        @endforeach
+                    </select>
+                </div>
             </div>
-            <div class="divide-y divide-gray-100">
+            <div class="divide-y divide-gray-100" data-filter-scope="positions">
+                <p data-filter-empty hidden class="px-5 py-8 text-center text-sm text-gray-500">Tidak ada jabatan yang cocok.</p>
                 @foreach ($jobPositions as $jobPosition)
-                    <form method="POST" action="{{ route('access-control.job-positions.update', $jobPosition) }}" class="grid grid-cols-1 gap-4 p-5 md:grid-cols-[1fr_220px_auto] md:items-end">
+                    <form method="POST" action="{{ route('access-control.job-positions.update', $jobPosition) }}" data-filter-item data-filter-text="{{ $jobPosition->name }} {{ $jobPosition->code }}" data-filter-tags="{{ $jobPosition->activeDepartments->pluck('id')->join(',') }}" class="grid grid-cols-1 gap-4 p-5 md:grid-cols-[1fr_220px_auto] md:items-end">
                         @csrf
                         @method('PUT')
 
@@ -271,16 +310,18 @@
             <div class="border-b border-gray-200 px-5 py-4">
                 <h2 class="text-base font-semibold text-gray-950">Klasifikasi Lokasi & Divisi</h2>
                 <p class="mt-1 text-sm text-gray-500">Atur divisi mana saja yang tersedia di setiap lokasi kerja. Pilihan ini dipakai di form karyawan.</p>
+                <input type="search" data-list-filter="locations" placeholder="Cari lokasi atau kota…" class="mt-4 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-xs outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 sm:max-w-xs">
             </div>
 
-            <div class="divide-y divide-gray-100">
+            <div class="divide-y divide-gray-100" data-filter-scope="locations">
+                <p data-filter-empty hidden class="px-5 py-8 text-center text-sm text-gray-500">Tidak ada lokasi yang cocok.</p>
                 @foreach ($branches as $branch)
                     @php
                         $selectedDepartmentIds = $branch->departments->pluck('id');
                         $primaryDepartmentId = $branch->departments->firstWhere('pivot.is_primary', true)?->id;
                     @endphp
 
-                    <form method="POST" action="{{ route('access-control.branches.departments.update', $branch) }}" class="grid grid-cols-1 gap-5 p-5 xl:grid-cols-[260px_1fr_auto]">
+                    <form method="POST" action="{{ route('access-control.branches.departments.update', $branch) }}" data-filter-item data-filter-text="{{ $branch->name }} {{ $branch->city }} {{ $branch->code }}" class="grid grid-cols-1 gap-5 p-5 xl:grid-cols-[260px_1fr_auto]">
                         @csrf
                         @method('PUT')
 

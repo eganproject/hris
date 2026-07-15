@@ -157,7 +157,57 @@ test('an admin leave request for an employee with a manager needs two approvals'
         ->and(LeaveRequest::query()->approvedOn('2026-02-11')->exists())->toBeTrue();
 });
 
-test('an approved leave can only be cancelled, never deleted or decided again', function () {
+test('HR cannot delete a leave request — only the requester can', function () {
+    $user = attendanceManager();
+    $requesterUser = App\Models\User::factory()->create();
+    $employee = Employee::query()->create(['user_id' => $requesterUser->id, 'full_name' => 'Pengaju', 'employment_status' => 'active']);
+    Spatie\Permission\Models\Permission::findOrCreate('my-leave.view', 'web');
+    $requesterUser->givePermissionTo('my-leave.view');
+    $type = LeaveType::query()->create(['code' => 'IZ', 'name' => 'Izin', 'attendance_status' => 'leave', 'is_paid' => true, 'is_active' => true]);
+
+    $this->actingAs($user)->post('/attendance/leave', [
+        'employee_id' => $employee->id, 'leave_type_id' => $type->id,
+        'start_date' => now()->addDays(3)->toDateString(), 'end_date' => now()->addDays(4)->toDateString(),
+    ])->assertRedirect('/attendance/leave');
+
+    $leave = LeaveRequest::query()->firstOrFail();
+
+    // HR tidak lagi punya jalur hapus, dan daftarnya tidak menawarkan "Hapus".
+    $this->actingAs($user)->get('/attendance/leave')->assertOk()->assertDontSee('Hapus');
+
+    // Karyawan lain tidak boleh menghapus pengajuan bukan miliknya.
+    $otherUser = App\Models\User::factory()->create();
+    Employee::query()->create(['user_id' => $otherUser->id, 'full_name' => 'Orang Lain', 'employment_status' => 'active']);
+    $otherUser->givePermissionTo('my-leave.view');
+    $this->actingAs($otherUser)->delete("/my-leave/{$leave->id}")->assertForbidden();
+
+    // Pengaju boleh menghapus pengajuannya sendiri (belum disetujui).
+    $this->actingAs($requesterUser)->delete("/my-leave/{$leave->id}")->assertRedirect('/my-leave');
+    expect(LeaveRequest::query()->whereKey($leave->id)->exists())->toBeFalse();
+});
+
+test('the requester cannot delete a leave once it is approved', function () {
+    $hr = attendanceManager();
+    $requesterUser = App\Models\User::factory()->create();
+    $employee = Employee::query()->create(['user_id' => $requesterUser->id, 'full_name' => 'Pengaju2', 'employment_status' => 'active']);
+    Spatie\Permission\Models\Permission::findOrCreate('my-leave.view', 'web');
+    $requesterUser->givePermissionTo('my-leave.view');
+    $type = LeaveType::query()->create(['code' => 'IZ', 'name' => 'Izin', 'attendance_status' => 'leave', 'is_paid' => true, 'is_active' => true]);
+
+    $this->actingAs($hr)->post('/attendance/leave', [
+        'employee_id' => $employee->id, 'leave_type_id' => $type->id,
+        'start_date' => now()->addDays(3)->toDateString(), 'end_date' => now()->addDays(3)->toDateString(),
+    ])->assertRedirect('/attendance/leave');
+
+    $leave = LeaveRequest::query()->firstOrFail();
+    $this->actingAs($hr)->patch("/attendance/leave/{$leave->id}/approve")->assertRedirect('/attendance/leave');
+
+    // Sudah disetujui → pengaju pun tidak bisa menghapus (harus dibatalkan HR).
+    $this->actingAs($requesterUser)->delete("/my-leave/{$leave->id}")->assertForbidden();
+    expect($leave->fresh()->status)->toBe(LeaveRequestStatus::Approved);
+});
+
+test('an approved leave can only be cancelled, never decided again', function () {
     $user = attendanceManager();
     $employee = Employee::query()->create(['full_name' => 'Sudah Disetujui', 'employment_status' => 'active']);
     $type = LeaveType::query()->create(['code' => 'IZ', 'name' => 'Izin', 'attendance_status' => 'leave', 'is_paid' => true, 'is_active' => true]);
@@ -179,15 +229,11 @@ test('an approved leave can only be cancelled, never deleted or decided again', 
     $this->actingAs($user)->patch("/attendance/leave/{$leave->id}/approve")->assertForbidden();
     $this->actingAs($user)->patch("/attendance/leave/{$leave->id}/reject")->assertForbidden();
 
-    // Deleting an approved leave would erase the approval trail.
-    $this->actingAs($user)->delete("/attendance/leave/{$leave->id}")->assertForbidden();
-    expect(LeaveRequest::query()->whereKey($leave->id)->exists())->toBeTrue();
-
-    // The list must not even offer "Hapus" for it.
+    // The list offers "Batalkan" for an approved leave, never "Hapus".
     $this->actingAs($user)->get('/attendance/leave')
         ->assertOk()
         ->assertSee('Batalkan')
-        ->assertDontSee('data-delete-leave="'.$leave->id.'"', escape: false);
+        ->assertDontSee('Hapus');
 
     // Cancelling keeps the record (and who approved it) but takes it out of effect.
     $this->actingAs($user)->patch("/attendance/leave/{$leave->id}/cancel")->assertRedirect('/attendance/leave');
@@ -196,10 +242,6 @@ test('an approved leave can only be cancelled, never deleted or decided again', 
     expect($leave->status)->toBe(LeaveRequestStatus::Cancelled)
         ->and($leave->approved_by)->toBe($user->id)
         ->and(LeaveRequest::query()->approvedOn('2026-02-10')->exists())->toBeFalse();
-
-    // Once cancelled it is no longer in effect, so it may be deleted.
-    $this->actingAs($user)->delete("/attendance/leave/{$leave->id}")->assertRedirect('/attendance/leave');
-    expect(LeaveRequest::query()->whereKey($leave->id)->exists())->toBeFalse();
 });
 
 test('a request for an employee without a manager starts at the HR step', function () {

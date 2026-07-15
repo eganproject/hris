@@ -253,7 +253,9 @@ Route::middleware('auth')->group(function () {
         Route::patch('leave/{leaveRequest}/approve', [LeaveController::class, 'approve'])->middleware('permission:leave.update')->name('leave.approve');
         Route::patch('leave/{leaveRequest}/reject', [LeaveController::class, 'reject'])->middleware('permission:leave.update')->name('leave.reject');
         Route::patch('leave/{leaveRequest}/cancel', [LeaveController::class, 'cancel'])->middleware('permission:leave.update')->name('leave.cancel');
-        Route::delete('leave/{leaveRequest}', [LeaveController::class, 'destroy'])->middleware('permission:leave.delete')->name('leave.destroy');
+        // Catatan: pengajuan cuti/izin HANYA boleh dihapus oleh karyawan yang
+        // mengajukannya (lihat my-leave.destroy). HR menyetujui/menolak/membatalkan,
+        // tetapi tidak menghapus pengajuan orang lain.
 
         // Master data cuti: jenis cuti + kuota per karyawan. Rute literal
         // (create, leave-balances) dideklarasikan sebelum wildcard {leaveType}.
@@ -273,6 +275,7 @@ Route::middleware('auth')->group(function () {
         Route::get('create', [MyLeaveController::class, 'create'])->name('create');
         Route::post('/', [MyLeaveController::class, 'store'])->name('store');
         Route::patch('{leaveRequest}/cancel', [MyLeaveController::class, 'cancel'])->name('cancel');
+        Route::delete('{leaveRequest}', [MyLeaveController::class, 'destroy'])->name('destroy');
         Route::patch('{leaveRequest}/approve', [MyLeaveController::class, 'approve'])->name('approve');
         Route::patch('{leaveRequest}/reject', [MyLeaveController::class, 'reject'])->name('reject');
     });

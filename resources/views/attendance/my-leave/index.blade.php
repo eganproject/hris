@@ -68,14 +68,23 @@
                                     @if ($req->decision_notes)<p class="mt-1 text-xs text-gray-500">{{ $req->decision_notes }}</p>@endif
                                 </td>
                                 <td class="text-right">
-                                    @if ($req->status->isPending())
-                                        <form method="POST" action="{{ route('my-leave.cancel', $req) }}" data-no-confirm="true" class="inline">
-                                            @csrf @method('PATCH')
-                                            <button type="submit" class="rounded-md border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-700 transition hover:bg-gray-50">Batalkan</button>
-                                        </form>
-                                    @else
-                                        <span class="text-xs text-gray-400">—</span>
-                                    @endif
+                                    <div class="flex items-center justify-end gap-2">
+                                        @if ($req->status->isPending())
+                                            <form method="POST" action="{{ route('my-leave.cancel', $req) }}" data-no-confirm="true" class="inline">
+                                                @csrf @method('PATCH')
+                                                <button type="submit" class="rounded-md border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-700 transition hover:bg-gray-50">Batalkan</button>
+                                            </form>
+                                        @endif
+                                        {{-- Hanya pengaju yang boleh menghapus, dan hanya bila belum disetujui. --}}
+                                        @if ($req->status !== \App\Enums\LeaveRequestStatus::Approved)
+                                            <form method="POST" action="{{ route('my-leave.destroy', $req) }}" onsubmit="return confirm('Hapus pengajuan ini?')" class="inline">
+                                                @csrf @method('DELETE')
+                                                <button type="submit" class="inline-flex items-center gap-1 rounded-md border border-red-200 px-3 py-1.5 text-xs font-medium text-red-600 transition hover:bg-red-50"><x-icon name="trash"/> Hapus</button>
+                                            </form>
+                                        @elseif (! $req->status->isPending())
+                                            <span class="text-xs text-gray-400">—</span>
+                                        @endif
+                                    </div>
                                 </td>
                             </tr>
                         @empty

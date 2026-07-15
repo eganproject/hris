@@ -113,3 +113,25 @@ test('access control page is protected by permission', function () {
         ->get('/access-control')
         ->assertForbidden();
 });
+
+test('the user list can be filtered by search and by role', function () {
+    $admin = accessAdmin();
+
+    $role = Role::findOrCreate('supervisor-cuti', 'web');
+
+    $budi = User::factory()->create(['name' => 'Budi Santoso', 'email' => 'budi@contoh.test']);
+    $budi->assignRole($role);
+    $sari = User::factory()->create(['name' => 'Sari Wijaya', 'email' => 'sari@contoh.test']);
+
+    // Cari nama.
+    $this->actingAs($admin)->get('/access-control?user_search=Budi')
+        ->assertOk()
+        ->assertSee('Budi Santoso')
+        ->assertDontSee('Sari Wijaya');
+
+    // Filter role.
+    $this->actingAs($admin)->get('/access-control?user_role=supervisor-cuti')
+        ->assertOk()
+        ->assertSee('Budi Santoso')
+        ->assertDontSee('Sari Wijaya');
+});

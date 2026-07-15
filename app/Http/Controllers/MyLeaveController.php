@@ -68,6 +68,23 @@ class MyLeaveController extends Controller
         return redirect()->route('my-leave.index')->with('status', 'Pengajuan dibatalkan.');
     }
 
+    /**
+     * Menghapus pengajuan miliknya sendiri. Hanya pengaju yang boleh menghapus (bukan
+     * HR/atasan), dan hanya selama belum disetujui — cuti yang sudah disetujui
+     * memengaruhi absensi, jadi harus dibatalkan HR, bukan dihapus.
+     */
+    public function destroy(LeaveRequest $leaveRequest): RedirectResponse
+    {
+        $employee = $this->employee();
+
+        abort_unless($leaveRequest->employee_id === $employee->id, 403);
+        abort_if($leaveRequest->status === LeaveRequestStatus::Approved, 403, 'Cuti yang sudah disetujui tidak bisa dihapus.');
+
+        $leaveRequest->delete();
+
+        return redirect()->route('my-leave.index')->with('status', 'Pengajuan cuti/izin dihapus.');
+    }
+
     public function approve(LeaveRequest $leaveRequest): RedirectResponse
     {
         $this->authorizeSupervisor($leaveRequest);
