@@ -17,6 +17,7 @@ class SchedulePatternController extends Controller
         $perPage = min(max((int) $request->input('per_page', 15), 10), 100);
 
         $patterns = SchedulePattern::query()
+            ->visibleTo($request->user())
             ->withCount(['assignments', 'days'])
             ->with(['days.shift'])
             ->when($request->string('search')->toString(), function ($query, string $search): void {
@@ -50,6 +51,7 @@ class SchedulePatternController extends Controller
             'cycle_length' => $request->input('type') === SchedulePatternType::Rotating->value ? $request->integer('cycle_length') : 7,
             'anchor_date' => $request->input('type') === SchedulePatternType::Rotating->value ? $request->date('anchor_date') : null,
             'is_active' => $request->boolean('is_active'),
+            'created_by' => $request->user()->id,
         ]);
 
         $this->syncDays($pattern, $request->input('days', []), $request->input('days_wfh', []));
@@ -57,8 +59,9 @@ class SchedulePatternController extends Controller
         return redirect()->route('attendance.schedule-patterns.index')->with('status', 'Pola jadwal berhasil dibuat.');
     }
 
-    public function edit(SchedulePattern $schedulePattern): View
+    public function edit(Request $request, SchedulePattern $schedulePattern): View
     {
+        $this->authorizeOwner($request, $schedulePattern);
         $schedulePattern->load('days');
 
         return view('attendance.schedule-patterns.edit', [
@@ -69,6 +72,7 @@ class SchedulePatternController extends Controller
 
     public function update(SchedulePatternRequest $request, SchedulePattern $schedulePattern): RedirectResponse
     {
+        $this->authorizeOwner($request, $schedulePattern);
         $schedulePattern->update([
             'code' => $request->string('code')->toString(),
             'name' => $request->string('name')->toString(),
@@ -83,11 +87,21 @@ class SchedulePatternController extends Controller
         return redirect()->route('attendance.schedule-patterns.index')->with('status', 'Pola jadwal berhasil diperbarui.');
     }
 
-    public function destroy(SchedulePattern $schedulePattern): RedirectResponse
+    public function destroy(Request $request, SchedulePattern $schedulePattern): RedirectResponse
     {
+        $this->authorizeOwner($request, $schedulePattern);
         $schedulePattern->delete();
 
         return redirect()->route('attendance.schedule-patterns.index')->with('status', 'Pola jadwal berhasil dihapus.');
+    }
+
+    /** Pola hanya boleh disentuh oleh pembuatnya (atau pemegang attendance.view.all). */
+    private function authorizeOwner(Request $request, SchedulePattern $pattern): void
+    {
+        abort_unless(
+            $request->user()->can(\App\Models\User::SCOPE_BYPASS_ATTENDANCE) || $pattern->created_by === $request->user()->id,
+            403,
+        );
     }
 
     /**

@@ -4,7 +4,9 @@ namespace App\Models;
 
 use App\Enums\SchedulePatternType;
 use Carbon\CarbonInterface;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Carbon;
 
@@ -18,6 +20,7 @@ class SchedulePattern extends Model
     'cycle_length',
     'anchor_date',
     'is_active',
+    'created_by',
     ];
 
     protected function casts(): array
@@ -28,6 +31,23 @@ class SchedulePattern extends Model
             'anchor_date' => 'date',
             'is_active' => 'boolean',
         ];
+    }
+
+    public function creator(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'created_by');
+    }
+
+    /**
+     * Pola yang dibuat oleh pengguna ini. Pemegang attendance.view.all melihat semua.
+     */
+    public function scopeVisibleTo(Builder $query, User $user): void
+    {
+        if ($user->can(User::SCOPE_BYPASS_ATTENDANCE)) {
+            return;
+        }
+
+        $query->where('created_by', $user->id);
     }
 
     public function days(): HasMany

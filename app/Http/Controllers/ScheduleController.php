@@ -70,6 +70,7 @@ class ScheduleController extends Controller
             ->overlapping($from, $to)
             ->when($branchId, fn ($query) => $query->whereHas('employee', fn ($q) => $q->where('branch_id', $branchId)))
             ->tap(fn ($query) => $scope->constrain($query))
+            ->visibleToCreator($request->user())
             ->orderByDesc('start_date')
             ->get();
 
@@ -89,7 +90,7 @@ class ScheduleController extends Controller
             'branchId' => $branchId,
             'hasNoScope' => $scope->isEmpty(),
             'shifts' => Shift::query()->where('is_active', true)->orderBy('start_time')->get(),
-            'patternCount' => SchedulePattern::query()->where('is_active', true)->count(),
+            'patternCount' => SchedulePattern::query()->visibleTo($request->user())->where('is_active', true)->count(),
         ]);
     }
 
@@ -193,7 +194,8 @@ class ScheduleController extends Controller
 
         return view('attendance.schedules.assign', [
             'employees' => $employees,
-            'patterns' => SchedulePattern::query()->where('is_active', true)->orderBy('name')->get(),
+            // Hanya pola milik pengguna (kecuali pemegang attendance.view.all).
+            'patterns' => SchedulePattern::query()->visibleTo($request->user())->where('is_active', true)->orderBy('name')->get(),
             'defaultStart' => now()->startOfMonth()->toDateString(),
             'selectedEmployee' => $request->integer('employee_id') ?: null,
         ]);
@@ -208,6 +210,12 @@ class ScheduleController extends Controller
         $days = 0;
         $scope = DataScope::forAttendance($request->user());
 
+        // Hanya boleh menugaskan pola milik sendiri (kecuali pemegang attendance.view.all).
+        abort_unless(
+            SchedulePattern::query()->visibleTo($request->user())->whereKey($patternId)->exists(),
+            403,
+        );
+
         foreach ($request->input('employee_ids', []) as $employeeId) {
             $scope->authorize(Employee::find($employeeId));
 
@@ -216,6 +224,7 @@ class ScheduleController extends Controller
                 'schedule_pattern_id' => $patternId,
                 'start_date' => $start->toDateString(),
                 'end_date' => $end?->toDateString(),
+                'created_by' => $request->user()->id,
             ]);
 
             $days += $this->generator->forAssignment($assignment);
@@ -279,6 +288,10 @@ class ScheduleController extends Controller
     public function destroyAssignment(Request $request, ScheduleAssignment $assignment): RedirectResponse
     {
         DataScope::forAttendance($request->user())->authorize($assignment->employee);
+        abort_unless(
+            $request->user()->can(\App\Models\User::SCOPE_BYPASS_ATTENDANCE) || $assignment->created_by === $request->user()->id,
+            403,
+        );
 
         $month = Carbon::parse($assignment->start_date)->format('Y-m');
         $assignment->delete();

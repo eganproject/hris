@@ -16,6 +16,7 @@ class ScheduleAssignment extends Model
     'schedule_pattern_id',
     'start_date',
     'end_date',
+    'created_by',
     ];
 
     protected function casts(): array
@@ -34,6 +35,23 @@ class ScheduleAssignment extends Model
     public function pattern(): BelongsTo
     {
         return $this->belongsTo(SchedulePattern::class, 'schedule_pattern_id');
+    }
+
+    public function creator(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'created_by');
+    }
+
+    /**
+     * Penugasan yang dibuat pengguna ini. Pemegang attendance.view.all melihat semua.
+     */
+    public function scopeVisibleToCreator(Builder $query, User $user): void
+    {
+        if ($user->can(User::SCOPE_BYPASS_ATTENDANCE)) {
+            return;
+        }
+
+        $query->where('created_by', $user->id);
     }
 
     public function coversDate(CarbonInterface $date): bool
