@@ -63,7 +63,7 @@ class EmployeeManagementController extends Controller
 
         $employees = $applyFilters(
             Employee::query()
-                ->with(['branch', 'department', 'jobPosition', 'currentContract', 'latestContract'])
+                ->with(['branch', 'departments', 'jobPosition', 'currentContract', 'latestContract'])
                 // Lets each row decide whether "Hapus" may be offered at all.
                 ->withHistoryFlags()
         )
@@ -156,6 +156,7 @@ class EmployeeManagementController extends Controller
 
         DB::transaction(function () use ($request) {
             $employee = Employee::query()->create($this->employeePayload($request));
+            $this->syncDepartments($request, $employee);
 
             $contract = $employee->contracts()->create($this->contractPayload($request));
             $this->syncLoginAccount($request, $employee);
@@ -332,6 +333,7 @@ class EmployeeManagementController extends Controller
         $employee->load([
             'branch',
             'department',
+            'departments',
             'jobPosition',
             'user.roles',
             'contracts' => fn ($query) => $query->latest('start_date'),
@@ -350,7 +352,7 @@ class EmployeeManagementController extends Controller
     {
         $this->authorizeScope($employee);
 
-        $employee->load('currentContract', 'user.roles', 'deviceMappings.device', 'leaveBalances');
+        $employee->load('currentContract', 'user.roles', 'deviceMappings.device', 'leaveBalances', 'departments');
 
         return view('employees.edit', [
             'employee' => $employee,
@@ -373,6 +375,7 @@ class EmployeeManagementController extends Controller
 
         DB::transaction(function () use ($request, $employee, $isExitViaEdit, $isReactivateViaEdit) {
             $employee->update($this->employeePayload($request));
+            $this->syncDepartments($request, $employee);
 
             $contract = $employee->currentContract ?: $employee->contracts()->make();
             $contract->fill($this->contractPayload($request));
@@ -921,6 +924,23 @@ class EmployeeManagementController extends Controller
                 ['quota_days' => $entered],
             );
         }
+    }
+
+    /**
+     * Sync the full division set: the home division (department_id) plus any extra
+     * divisions. All are stored equally in the pivot.
+     */
+    private function syncDepartments(EmployeeRequest $request, Employee $employee): void
+    {
+        $ids = collect($request->validated('department_ids', []))
+            ->map(fn ($id) => (int) $id)
+            ->push((int) $employee->department_id)
+            ->filter()
+            ->unique()
+            ->values()
+            ->all();
+
+        $employee->departments()->sync($ids);
     }
 
     /**

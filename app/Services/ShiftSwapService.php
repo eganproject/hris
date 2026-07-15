@@ -39,10 +39,15 @@ class ShiftSwapService
             return $errors;
         }
 
-        // Tukar shift hanya antar rekan di lokasi kerja & divisi yang sama (dijaga di
-        // server, bukan hanya di dropdown, agar tidak bisa ditembus lewat request langsung).
-        if ($requester->branch_id !== $partner->branch_id || $requester->department_id !== $partner->department_id) {
-            $errors[] = 'Rekan tukar harus berada di lokasi kerja & divisi yang sama.';
+        // Tukar shift hanya antar rekan selokasi & berbagi minimal satu divisi (dijaga
+        // di server, bukan hanya di dropdown, agar tidak bisa ditembus lewat request
+        // langsung). Cek divisi hanya bila kedua pihak memang punya divisi.
+        $rDepts = $requester->departmentIds();
+        $pDepts = $partner->departmentIds();
+        $divisionOk = $rDepts === [] || $pDepts === [] || array_intersect($rDepts, $pDepts) !== [];
+
+        if ($requester->branch_id !== $partner->branch_id || ! $divisionOk) {
+            $errors[] = 'Rekan tukar harus selokasi kerja dan berbagi minimal satu divisi.';
 
             return $errors;
         }

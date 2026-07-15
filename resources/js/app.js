@@ -1058,6 +1058,26 @@ document.querySelectorAll('[data-placement-form]').forEach((form) => {
     const catalog = JSON.parse(form.dataset.placementCatalog || '{"branches":{},"departments":{}}');
     const departmentOptions = [...departmentSelect.querySelectorAll('[data-placement-department-option]')];
     const positionOptions = [...positionSelect.querySelectorAll('[data-placement-position-option]')];
+    const extraDepartmentOptions = [...form.querySelectorAll('[data-extra-department-option]')];
+
+    // The "Divisi Lain" checklist mirrors the same branch filter, and never offers
+    // the division already chosen as the job's division.
+    const syncExtraDepartments = () => {
+        const allowedDepartments = catalog.branches[branchSelect.value]?.map(String) ?? [];
+
+        extraDepartmentOptions.forEach((option) => {
+            const id = option.dataset.departmentId;
+            const isHome = id === departmentSelect.value;
+            const isAllowed = (!branchSelect.value || allowedDepartments.includes(id)) && !isHome;
+            const box = option.querySelector('input[type="checkbox"]');
+
+            option.hidden = !isAllowed;
+            if (box) {
+                box.disabled = !isAllowed;
+                if (!isAllowed) box.checked = false;
+            }
+        });
+    };
 
     const syncPositions = () => {
         const allowedPositions = catalog.departments[departmentSelect.value]?.map(String) ?? [];
@@ -1092,10 +1112,11 @@ document.querySelectorAll('[data-placement-form]').forEach((form) => {
 
         $(departmentSelect).trigger('change.select2');
         syncPositions();
+        syncExtraDepartments();
     };
 
     branchSelect.addEventListener('change', syncDepartments);
-    departmentSelect.addEventListener('change', syncPositions);
+    departmentSelect.addEventListener('change', () => { syncPositions(); syncExtraDepartments(); });
 
     syncDepartments();
 });

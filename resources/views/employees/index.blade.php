@@ -215,7 +215,7 @@
                                 </td>
                                 <td>
                                     <p>{{ $employee->jobPosition?->name ?? '-' }}</p>
-                                    <p class="mt-0.5 text-xs text-gray-500">{{ $employee->department?->name ?? '-' }}</p>
+                                    <p class="mt-0.5 text-xs text-gray-500">{{ $employee->departments->isNotEmpty() ? $employee->departments->pluck('name')->join(', ') : ($employee->department?->name ?? '-') }}</p>
                                 </td>
                                 <td>
                                     @php $ctr = $employee->latestContract; @endphp

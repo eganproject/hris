@@ -232,8 +232,8 @@
                             <dd class="mt-1 text-gray-500">{{ $employee->branch?->address ?? '-' }}</dd>
                         </div>
                         <div>
-                            <dt class="text-gray-500">Departemen</dt>
-                            <dd class="mt-1 font-medium text-gray-950">{{ $employee->department?->name ?? '-' }}</dd>
+                            <dt class="text-gray-500">Divisi</dt>
+                            <dd class="mt-1 font-medium text-gray-950">{{ $employee->departments->isNotEmpty() ? $employee->departments->pluck('name')->join(', ') : ($employee->department?->name ?? '-') }}</dd>
                         </div>
                         <div>
                             <dt class="text-gray-500">Jabatan</dt>

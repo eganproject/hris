@@ -38,6 +38,9 @@ class EmployeeRequest extends FormRequest
         return [
             'branch_id' => ['required', 'integer', 'exists:branches,id'],
             'department_id' => ['required', 'integer', 'exists:departments,id'],
+            // Divisi tambahan (opsional) — semua setara dengan divisi jabatan.
+            'department_ids' => ['nullable', 'array'],
+            'department_ids.*' => ['integer', 'exists:departments,id'],
             'job_position_id' => ['required', 'integer', 'exists:job_positions,id'],
             'manager_id' => ['nullable', 'integer', 'exists:employees,id', Rule::notIn([$employeeId])],
             'machine_pins' => ['nullable', 'array'],
@@ -172,14 +175,36 @@ class EmployeeRequest extends FormRequest
                     }
                 }
 
-                $isDepartmentAvailableAtBranch = DB::table('branch_department')
-                    ->where('branch_id', $branchId)
-                    ->where('department_id', $departmentId)
-                    ->where('is_active', true)
-                    ->exists();
+                // Setiap divisi (jabatan + tambahan) harus tersedia pada lokasi kerja
+                // dan berada dalam cakupan akses user.
+                $extraDepartmentIds = collect($this->input('department_ids', []))
+                    ->map(fn ($id) => (int) $id)
+                    ->filter()
+                    ->reject(fn (int $id) => $id === $departmentId)
+                    ->unique();
 
-                if (! $isDepartmentAvailableAtBranch) {
+                $availableAtBranch = DB::table('branch_department')
+                    ->where('branch_id', $branchId)
+                    ->where('is_active', true)
+                    ->pluck('department_id')
+                    ->all();
+
+                if (! in_array($departmentId, $availableAtBranch, true)) {
                     $validator->errors()->add('department_id', 'Divisi tidak tersedia pada lokasi kerja yang dipilih.');
+                }
+
+                $allowedDepartments = $user->seesAllData(User::SCOPE_BYPASS_EMPLOYEES) ? [] : $user->accessDepartmentIds();
+
+                foreach ($extraDepartmentIds as $extraId) {
+                    if (! in_array($extraId, $availableAtBranch, true)) {
+                        $validator->errors()->add('department_ids', 'Ada divisi tambahan yang tidak tersedia pada lokasi kerja yang dipilih.');
+                        break;
+                    }
+
+                    if ($allowedDepartments !== [] && ! in_array($extraId, $allowedDepartments, true)) {
+                        $validator->errors()->add('department_ids', 'Ada divisi tambahan yang berada di luar cakupan akses Anda.');
+                        break;
+                    }
                 }
 
                 $jobPositionAvailableForDepartment = DB::table('department_job_position')

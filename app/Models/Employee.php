@@ -6,6 +6,7 @@ use App\Support\EmployeeNumber;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\Model;
@@ -68,13 +69,30 @@ class Employee extends Model
     {
         static::created(function (Employee $employee): void {
             $employee->syncEmployeeNumber();
+            $employee->ensureHomeDepartmentLinked();
         });
 
         static::updated(function (Employee $employee): void {
             if ($employee->wasChanged(['join_date', 'branch_id'])) {
                 $employee->syncEmployeeNumber();
             }
+
+            if ($employee->wasChanged('department_id')) {
+                $employee->ensureHomeDepartmentLinked();
+            }
         });
+    }
+
+    /**
+     * Keep the home division present in the pivot, so an employee created/imported
+     * with only department_id (no explicit multi-division sync) still resolves its
+     * full division set from one place.
+     */
+    public function ensureHomeDepartmentLinked(): void
+    {
+        if ($this->department_id) {
+            $this->departments()->syncWithoutDetaching([$this->department_id]);
+        }
     }
 
     public function syncEmployeeNumber(): void
@@ -97,9 +115,37 @@ class Employee extends Model
         return $this->belongsTo(User::class);
     }
 
+    /** The employee's "home" division — the one their job position belongs to. */
     public function department(): BelongsTo
     {
         return $this->belongsTo(Department::class);
+    }
+
+    /**
+     * Every division the employee belongs to (all equal). The home department_id is
+     * always one of them; extra divisions are added on top. Reads that need the full
+     * set (scoping, shift swap, filters) use this.
+     */
+    public function departments(): BelongsToMany
+    {
+        return $this->belongsToMany(Department::class, 'department_employee')->withTimestamps();
+    }
+
+    /**
+     * @return list<int>
+     */
+    public function departmentIds(): array
+    {
+        $ids = $this->relationLoaded('departments')
+            ? $this->departments->pluck('id')->all()
+            : $this->departments()->pluck('departments.id')->all();
+
+        // The home division is always a member, even before the pivot is synced.
+        if ($this->department_id && ! in_array($this->department_id, $ids, true)) {
+            $ids[] = $this->department_id;
+        }
+
+        return $ids;
     }
 
     public function jobPosition(): BelongsTo
@@ -280,7 +326,12 @@ class Employee extends Model
         }
 
         if ($departmentIds !== []) {
-            $query->whereIn('department_id', $departmentIds);
+            // Visible if ANY of the employee's divisions is in scope (union), not only
+            // the home division.
+            $query->where(function (Builder $query) use ($departmentIds): void {
+                $query->whereIn('department_id', $departmentIds)
+                    ->orWhereHas('departments', fn (Builder $q) => $q->whereIn('departments.id', $departmentIds));
+            });
         }
     }
 
@@ -298,7 +349,7 @@ class Employee extends Model
         }
 
         $inBranch = $branchIds === [] || in_array($this->branch_id, $branchIds, true);
-        $inDepartment = $departmentIds === [] || in_array($this->department_id, $departmentIds, true);
+        $inDepartment = $departmentIds === [] || array_intersect($departmentIds, $this->departmentIds()) !== [];
 
         return $inBranch && $inDepartment;
     }
@@ -315,7 +366,11 @@ class Employee extends Model
 
     public function scopeByDepartment(Builder $query, int|string|null $departmentId): void
     {
-        $query->when($departmentId, fn (Builder $query) => $query->where('department_id', $departmentId));
+        // Match any employee who has this division (home or additional).
+        $query->when($departmentId, fn (Builder $query) => $query->where(function (Builder $query) use ($departmentId): void {
+            $query->where('department_id', $departmentId)
+                ->orWhereHas('departments', fn (Builder $q) => $q->where('departments.id', $departmentId));
+        }));
     }
 
     public function getContractTenureAttribute(): ?string
