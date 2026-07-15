@@ -29,6 +29,7 @@ use App\Http\Controllers\PunchController;
 use App\Http\Controllers\ReportController;
 use App\Http\Controllers\ScheduleController;
 use App\Http\Controllers\SchedulePatternController;
+use App\Http\Controllers\SearchController;
 use App\Http\Controllers\ShiftController;
 use App\Http\Controllers\ShiftSwapController;
 use Illuminate\Support\Facades\Route;
@@ -64,6 +65,9 @@ Route::middleware('auth')->group(function () {
 
     // Self-service: check own work schedule (read-only, no special permission).
     Route::get('jadwal-saya', [MyRosterController::class, 'index'])->name('my-roster.index');
+
+    // Global quick-search (command palette): finds employees within the user's scope.
+    Route::get('search', SearchController::class)->middleware('permission:employees.view')->name('search');
 
     // App settings (HR/admin toggles).
     Route::get('settings', [SettingsController::class, 'index'])->middleware('permission:settings.view')->name('settings.index');
@@ -221,6 +225,7 @@ Route::middleware('auth')->group(function () {
         Route::post('daily/punch', [AttendanceController::class, 'storePunch'])->middleware('permission:attendance-daily.update')->name('daily.punch');
 
         Route::get('corrections', [AttendanceCorrectionController::class, 'index'])->middleware('permission:corrections.view')->name('corrections.index');
+        Route::post('corrections/bulk-approve', [AttendanceCorrectionController::class, 'bulkApprove'])->middleware('permission:corrections.update')->name('corrections.bulk-approve');
         Route::patch('corrections/{correction}/approve', [AttendanceCorrectionController::class, 'approve'])->middleware('permission:corrections.update')->name('corrections.approve');
         Route::patch('corrections/{correction}/reject', [AttendanceCorrectionController::class, 'reject'])->middleware('permission:corrections.update')->name('corrections.reject');
 
@@ -230,6 +235,7 @@ Route::middleware('auth')->group(function () {
         Route::get('overtime/recap', [OvertimeController::class, 'recap'])->middleware('permission:overtime.view')->name('overtime.recap');
 
         Route::get('swaps', [ShiftSwapController::class, 'index'])->middleware('permission:swaps.view')->name('swaps.index');
+        Route::post('swaps/bulk-approve', [ShiftSwapController::class, 'bulkApprove'])->middleware('permission:swaps.update')->name('swaps.bulk-approve');
         Route::patch('swaps/{swap}/approve', [ShiftSwapController::class, 'approve'])->middleware('permission:swaps.update')->name('swaps.approve');
         Route::patch('swaps/{swap}/reject', [ShiftSwapController::class, 'reject'])->middleware('permission:swaps.update')->name('swaps.reject');
 
@@ -250,6 +256,7 @@ Route::middleware('auth')->group(function () {
 
         Route::get('leave', [LeaveController::class, 'index'])->middleware('permission:leave.view')->name('leave.index');
         Route::get('leave/create', [LeaveController::class, 'create'])->middleware('permission:leave.create')->name('leave.create');
+        Route::post('leave/bulk-approve', [LeaveController::class, 'bulkApprove'])->middleware('permission:leave.update')->name('leave.bulk-approve');
         Route::post('leave', [LeaveController::class, 'store'])->middleware('permission:leave.create')->name('leave.store');
         Route::patch('leave/{leaveRequest}/approve', [LeaveController::class, 'approve'])->middleware('permission:leave.update')->name('leave.approve');
         Route::patch('leave/{leaveRequest}/reject', [LeaveController::class, 'reject'])->middleware('permission:leave.update')->name('leave.reject');

@@ -82,6 +82,58 @@ class ShiftSwapController extends Controller
         return redirect()->route('attendance.swaps.index')->with('status', 'Tukar jadwal ditolak.');
     }
 
+    /**
+     * Setujui beberapa permintaan tukar jadwal sekaligus dari daftar (checklist).
+     * Kedua pihak harus dalam cakupan & statusnya masih menunggu HR. Baris yang
+     * bentrok jadwal tetap dilewati (tidak diterapkan) dan dilaporkan jumlahnya.
+     */
+    public function bulkApprove(Request $request): RedirectResponse
+    {
+        $ids = $request->input('ids', []);
+
+        if (! is_array($ids) || $ids === []) {
+            return back()->with('error', 'Pilih minimal satu permintaan untuk disetujui.');
+        }
+
+        $scope = DataScope::forAttendance($request->user());
+
+        $swaps = ShiftSwapRequest::query()->whereIn('id', $ids)->with(['requester', 'partner'])->get();
+
+        $approved = 0;
+        $skipped = 0;
+        $conflicted = 0;
+
+        foreach ($swaps as $swap) {
+            if (! $scope->allows($swap->requester) || ! $scope->allows($swap->partner) || ! $swap->isPendingHr()) {
+                $skipped++;
+
+                continue;
+            }
+
+            $conflicts = $this->swaps->hrApprove($swap, null);
+
+            if ($conflicts !== []) {
+                $conflicted++;
+
+                continue;
+            }
+
+            $approved++;
+        }
+
+        $message = "{$approved} tukar jadwal disetujui & diterapkan.";
+
+        if ($conflicted > 0) {
+            $message .= " {$conflicted} tidak bisa diterapkan karena bentrok jadwal.";
+        }
+
+        if ($skipped > 0) {
+            $message .= " {$skipped} dilewati (di luar cakupan atau sudah diputuskan).";
+        }
+
+        return redirect()->route('attendance.swaps.index')->with('status', $message);
+    }
+
     /** Both sides of the swap must be inside the user's scope. */
     private function authorizeScope(Request $request, ShiftSwapRequest $swap): void
     {

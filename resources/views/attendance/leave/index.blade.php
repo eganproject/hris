@@ -69,11 +69,22 @@
             </form>
         </section>
 
-        <section class="overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm">
+        @php $canDecide = auth()->user()->can('leave.update'); @endphp
+        <section data-approve-scope class="overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm">
+            @if ($canDecide)
+                <div data-approve-bar hidden class="flex flex-col gap-3 border-b border-primary/20 bg-primary-soft px-5 py-3 sm:flex-row sm:items-center sm:justify-between">
+                    <p class="text-sm font-medium text-gray-800"><span data-approve-count>0</span> pengajuan dipilih</p>
+                    <div class="flex items-center gap-2">
+                        <button type="button" data-approve-submit class="inline-flex items-center gap-1.5 rounded-md bg-emerald-600 px-3 py-2 text-sm font-semibold text-white shadow-xs transition hover:bg-emerald-700"><x-icon name="user-check" class="size-4"/> Setujui terpilih</button>
+                        <button type="button" data-approve-clear class="rounded-md border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-gray-600 transition hover:bg-gray-50">Bersihkan</button>
+                    </div>
+                </div>
+            @endif
             <div class="overflow-x-auto">
                 <table class="data-table">
                     <thead>
                         <tr>
+                            @if ($canDecide)<th class="w-10"><input type="checkbox" data-approve-all aria-label="Pilih semua" class="size-4 rounded border-gray-300 text-primary focus:ring-primary/30"></th>@endif
                             <th>Karyawan</th>
                             <th>Jenis</th>
                             <th>Periode</th>
@@ -84,6 +95,13 @@
                     <tbody>
                         @forelse ($leaveRequests as $leaveRequest)
                             <tr>
+                                @if ($canDecide)
+                                    <td>
+                                        @if ($leaveRequest->status->isPending() && ! ($leaveRequest->employee?->user_id && $leaveRequest->employee->user_id === auth()->id()))
+                                            <input type="checkbox" data-approve-checkbox value="{{ $leaveRequest->id }}" aria-label="Pilih pengajuan {{ $leaveRequest->employee?->full_name }}" class="size-4 rounded border-gray-300 text-primary focus:ring-primary/30">
+                                        @endif
+                                    </td>
+                                @endif
                                 <td>
                                     <p class="font-medium text-gray-950">{{ $leaveRequest->employee?->full_name ?? '-' }}</p>
                                     <p class="mt-0.5 text-xs text-gray-500">{{ $leaveRequest->employee?->employee_number }}</p>
@@ -127,12 +145,19 @@
                                 </td>
                             </tr>
                         @empty
-                            <tr><td colspan="5" class="cell-empty">Belum ada pengajuan cuti/izin.</td></tr>
+                            <tr><td colspan="{{ $canDecide ? 6 : 5 }}" class="cell-empty">Belum ada pengajuan cuti/izin.</td></tr>
                         @endforelse
                     </tbody>
                 </table>
             </div>
             <div class="border-t border-gray-200 px-5 py-4">{{ $leaveRequests->links() }}</div>
+
+            @if ($canDecide)
+                <form data-approve-form method="POST" action="{{ route('attendance.leave.bulk-approve') }}" class="hidden" data-confirm-message="Setujui semua pengajuan cuti/izin yang dipilih?" data-confirm-approve="Ya, setujui">
+                    @csrf
+                    <div data-approve-ids></div>
+                </form>
+            @endif
         </section>
     </div>
 </x-layouts.app>

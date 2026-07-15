@@ -107,6 +107,55 @@ class LeaveController extends Controller
     }
 
     /**
+     * Setujui beberapa pengajuan sekaligus dari daftar (checklist). Setiap baris tetap
+     * melewati aturan yang sama seperti approve() satuan: dalam cakupan, masih pending,
+     * dan bukan pengajuan milik pengambil keputusan sendiri. Baris yang tak memenuhi
+     * dilewati, bukan menggagalkan seluruh proses.
+     */
+    public function bulkApprove(Request $request): RedirectResponse
+    {
+        $ids = $request->input('ids', []);
+
+        if (! is_array($ids) || $ids === []) {
+            return back()->with('error', 'Pilih minimal satu pengajuan untuk disetujui.');
+        }
+
+        $scope = DataScope::forAttendance($request->user());
+        $userId = $request->user()->id;
+
+        $leaveRequests = LeaveRequest::query()->whereIn('id', $ids)->with('employee')->get();
+
+        $approved = 0;
+        $skipped = 0;
+
+        foreach ($leaveRequests as $leaveRequest) {
+            $isSelf = $leaveRequest->employee?->user_id !== null && $leaveRequest->employee->user_id === $userId;
+
+            if (! $scope->allows($leaveRequest->employee) || ! $leaveRequest->status->isPending() || $isSelf) {
+                $skipped++;
+
+                continue;
+            }
+
+            if ($leaveRequest->status === LeaveRequestStatus::PendingSupervisor) {
+                $this->workflow->supervisorApprove($leaveRequest, $request->user());
+            } else {
+                $this->workflow->hrApprove($leaveRequest, $request->user());
+            }
+
+            $approved++;
+        }
+
+        $message = "{$approved} pengajuan disetujui.";
+
+        if ($skipped > 0) {
+            $message .= " {$skipped} dilewati (di luar wewenang Anda, sudah final, atau pengajuan Anda sendiri).";
+        }
+
+        return redirect()->route('attendance.leave.index')->with('status', $message);
+    }
+
+    /**
      * Pemisahan wewenang: seseorang tidak boleh memutuskan (setujui/tolak) pengajuan
      * cuti/izin miliknya sendiri — harus diputuskan HR/atasan lain.
      */

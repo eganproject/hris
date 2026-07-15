@@ -288,6 +288,16 @@
                     </div>
 
                     <div class="flex items-center gap-3">
+                        @can('employees.view')
+                            <button type="button" data-search-open class="hidden items-center gap-2 rounded-md border border-gray-200 bg-white px-3 py-1.5 text-[12px] text-gray-500 transition hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-primary/20 sm:flex" aria-label="Cari karyawan">
+                                <svg class="size-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7"></circle><path d="m21 21-4.3-4.3"></path></svg>
+                                <span>Cari karyawan…</span>
+                                <kbd class="rounded border border-gray-200 bg-gray-50 px-1.5 py-0.5 text-[10px] font-medium text-gray-400">Ctrl K</kbd>
+                            </button>
+                            <button type="button" data-search-open class="flex size-9 items-center justify-center rounded-md border border-gray-200 bg-white text-gray-600 transition hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-primary/20 sm:hidden" aria-label="Cari karyawan">
+                                <svg class="size-[18px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7"></circle><path d="m21 21-4.3-4.3"></path></svg>
+                            </button>
+                        @endcan
                         @php
                             $notifUser = auth()->user();
                             $unreadCount = $notifUser->unreadNotifications()->count();
@@ -350,6 +360,22 @@
                 </footer>
             </div>
         </div>
+
+        @can('employees.view')
+            <div data-search-overlay hidden class="fixed inset-0 z-[60] flex items-start justify-center bg-gray-950/40 p-4 pt-[12vh] backdrop-blur-sm">
+                <div class="w-full max-w-xl overflow-hidden rounded-xl border border-gray-200 bg-white shadow-2xl" role="dialog" aria-modal="true" aria-label="Cari karyawan">
+                    <div class="flex items-center gap-2.5 border-b border-gray-100 px-4">
+                        <svg class="size-5 shrink-0 text-gray-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7"></circle><path d="m21 21-4.3-4.3"></path></svg>
+                        <input type="text" data-search-input autocomplete="off" spellcheck="false" placeholder="Cari nama, NIK, atau email karyawan…" class="w-full border-0 bg-transparent py-3.5 text-sm text-gray-900 outline-none placeholder:text-gray-400">
+                        <kbd class="shrink-0 rounded border border-gray-200 bg-gray-50 px-1.5 py-0.5 text-[10px] font-medium text-gray-400">Esc</kbd>
+                    </div>
+                    <div data-search-results class="max-h-80 overflow-y-auto">
+                        <p class="px-4 py-8 text-center text-sm text-gray-400">Ketik minimal 2 huruf untuk mencari karyawan.</p>
+                    </div>
+                    <span data-search-endpoint="{{ route('search') }}" hidden></span>
+                </div>
+            </div>
+        @endcan
 
         @stack('scripts')
     </body>

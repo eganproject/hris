@@ -1390,3 +1390,254 @@ document.querySelectorAll('[data-reactivate-active="true"]').forEach((stepper) =
     statusSelect.addEventListener('change', syncConfirmMessage);
     syncConfirmMessage();
 });
+
+// Global quick-search (command palette): Ctrl/Cmd+K or "/" opens an employee search
+// overlay from anywhere. Results come from the scoped /search endpoint.
+(() => {
+    const overlay = document.querySelector('[data-search-overlay]');
+
+    if (!overlay) {
+        return;
+    }
+
+    const input = overlay.querySelector('[data-search-input]');
+    const results = overlay.querySelector('[data-search-results]');
+    const endpoint = overlay.querySelector('[data-search-endpoint]')?.dataset.searchEndpoint;
+
+    let items = [];
+    let active = -1;
+    let timer = null;
+
+    const hint = (text) => {
+        results.innerHTML = '';
+        const p = document.createElement('p');
+        p.className = 'px-4 py-8 text-center text-sm text-gray-400';
+        p.textContent = text;
+        results.append(p);
+    };
+
+    const open = () => {
+        overlay.hidden = false;
+        document.body.style.overflow = 'hidden';
+        input.value = '';
+        items = [];
+        active = -1;
+        hint('Ketik minimal 2 huruf untuk mencari karyawan.');
+        window.setTimeout(() => input.focus(), 0);
+    };
+
+    const close = () => {
+        overlay.hidden = true;
+        document.body.style.overflow = '';
+        items = [];
+        active = -1;
+    };
+
+    const highlight = () => {
+        [...results.querySelectorAll('[data-search-result]')].forEach((el, i) => {
+            el.classList.toggle('bg-primary-soft', i === active);
+        });
+        results.querySelector(`[data-search-result="${active}"]`)?.scrollIntoView({ block: 'nearest' });
+    };
+
+    const render = (employees) => {
+        items = employees;
+        active = employees.length ? 0 : -1;
+
+        if (!employees.length) {
+            hint('Tidak ada karyawan yang cocok.');
+            return;
+        }
+
+        results.innerHTML = '';
+
+        employees.forEach((employee, index) => {
+            const link = document.createElement('a');
+            link.href = employee.url;
+            link.dataset.searchResult = String(index);
+            link.className = 'flex items-center gap-3 border-b border-gray-50 px-4 py-2.5 transition hover:bg-primary-soft';
+
+            const avatar = document.createElement('span');
+            avatar.className = 'flex size-8 shrink-0 items-center justify-center rounded-full bg-primary-soft text-[11px] font-semibold text-gray-700';
+            avatar.textContent = (employee.name || '?').slice(0, 1).toUpperCase();
+
+            const info = document.createElement('span');
+            info.className = 'min-w-0 flex-1';
+            const name = document.createElement('span');
+            name.className = 'block truncate text-[13px] font-medium text-gray-900';
+            name.textContent = employee.name;
+            const meta = document.createElement('span');
+            meta.className = 'block truncate text-xs text-gray-500';
+            meta.textContent = [employee.number, employee.position, employee.branch].filter(Boolean).join(' · ');
+            info.append(name, meta);
+
+            link.append(avatar, info);
+
+            if (!employee.active) {
+                const badge = document.createElement('span');
+                badge.className = 'shrink-0 rounded-full bg-gray-100 px-2 py-0.5 text-[10px] font-medium text-gray-500';
+                badge.textContent = 'Nonaktif';
+                link.append(badge);
+            }
+
+            results.append(link);
+        });
+
+        highlight();
+    };
+
+    const search = async (term) => {
+        if (!endpoint) {
+            return;
+        }
+
+        try {
+            const url = new URL(endpoint, window.location.origin);
+            url.searchParams.set('q', term);
+
+            const response = await fetch(url, { headers: { Accept: 'application/json' }, credentials: 'same-origin' });
+
+            if (!response.ok) {
+                return;
+            }
+
+            const data = await response.json();
+            render(data.employees || []);
+        } catch (_) {
+            // Network hiccup — leave the previous results in place.
+        }
+    };
+
+    input?.addEventListener('input', () => {
+        const term = input.value.trim();
+        window.clearTimeout(timer);
+
+        if (term.length < 2) {
+            items = [];
+            active = -1;
+            hint('Ketik minimal 2 huruf untuk mencari karyawan.');
+            return;
+        }
+
+        timer = window.setTimeout(() => search(term), 220);
+    });
+
+    input?.addEventListener('keydown', (event) => {
+        if (event.key === 'ArrowDown') {
+            event.preventDefault();
+            if (items.length) {
+                active = (active + 1) % items.length;
+                highlight();
+            }
+        } else if (event.key === 'ArrowUp') {
+            event.preventDefault();
+            if (items.length) {
+                active = (active - 1 + items.length) % items.length;
+                highlight();
+            }
+        } else if (event.key === 'Enter') {
+            if (active >= 0 && items[active]) {
+                event.preventDefault();
+                window.location.href = items[active].url;
+            }
+        }
+    });
+
+    document.querySelectorAll('[data-search-open]').forEach((button) => button.addEventListener('click', open));
+    overlay.addEventListener('click', (event) => {
+        if (event.target === overlay) {
+            close();
+        }
+    });
+
+    document.addEventListener('keydown', (event) => {
+        const typing = /^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement?.tagName || '') || document.activeElement?.isContentEditable;
+
+        if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'k') {
+            event.preventDefault();
+            overlay.hidden ? open() : close();
+        } else if (event.key === '/' && overlay.hidden && !typing) {
+            event.preventDefault();
+            open();
+        } else if (event.key === 'Escape' && !overlay.hidden) {
+            close();
+        }
+    });
+})();
+
+// Generic bulk-approve: inside a [data-approve-scope] container, ticking row
+// checkboxes reveals a bar whose "approve" button posts the selected ids to the
+// bulk-approve endpoint. Mirrors the employees bulk-action pattern.
+document.querySelectorAll('[data-approve-scope]').forEach((scope) => {
+    const boxes = () => [...scope.querySelectorAll('[data-approve-checkbox]')];
+    const all = scope.querySelector('[data-approve-all]');
+    const bar = scope.querySelector('[data-approve-bar]');
+    const countEls = scope.querySelectorAll('[data-approve-count]');
+    const form = scope.querySelector('[data-approve-form]');
+    const idsHolder = form?.querySelector('[data-approve-ids]');
+    const submitBtn = scope.querySelector('[data-approve-submit]');
+    const clearBtn = scope.querySelector('[data-approve-clear]');
+
+    if (!form || !idsHolder) {
+        return;
+    }
+
+    const selected = () => boxes().filter((box) => box.checked);
+
+    const sync = () => {
+        const n = selected().length;
+
+        countEls.forEach((el) => (el.textContent = String(n)));
+
+        if (bar) {
+            bar.hidden = n === 0;
+        }
+
+        if (all) {
+            const total = boxes().length;
+            all.checked = n > 0 && n === total;
+            all.indeterminate = n > 0 && n < total;
+        }
+    };
+
+    all?.addEventListener('change', () => {
+        boxes().forEach((box) => (box.checked = all.checked));
+        sync();
+    });
+
+    boxes().forEach((box) => box.addEventListener('change', sync));
+
+    clearBtn?.addEventListener('click', () => {
+        boxes().forEach((box) => (box.checked = false));
+        if (all) {
+            all.checked = false;
+            all.indeterminate = false;
+        }
+        sync();
+    });
+
+    submitBtn?.addEventListener('click', () => {
+        const ids = selected().map((box) => box.value);
+
+        if (!ids.length) {
+            return;
+        }
+
+        idsHolder.innerHTML = '';
+        ids.forEach((id) => {
+            const input = document.createElement('input');
+            input.type = 'hidden';
+            input.name = 'ids[]';
+            input.value = id;
+            idsHolder.append(input);
+        });
+
+        if (typeof form.requestSubmit === 'function') {
+            form.requestSubmit();
+        } else {
+            form.submit();
+        }
+    });
+
+    sync();
+});

@@ -53,13 +53,30 @@
             </form>
         </section>
 
-        <section class="overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm">
+        @php $canDecide = auth()->user()->can('swaps.update'); @endphp
+        <section data-approve-scope class="overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm">
+            @if ($canDecide)
+                <div data-approve-bar hidden class="flex flex-col gap-3 border-b border-primary/20 bg-primary-soft px-5 py-3 sm:flex-row sm:items-center sm:justify-between">
+                    <p class="text-sm font-medium text-gray-800"><span data-approve-count>0</span> permintaan dipilih</p>
+                    <div class="flex items-center gap-2">
+                        <button type="button" data-approve-submit class="inline-flex items-center gap-1.5 rounded-md bg-emerald-600 px-3 py-2 text-sm font-semibold text-white shadow-xs transition hover:bg-emerald-700"><x-icon name="user-check" class="size-4"/> Setujui terpilih</button>
+                        <button type="button" data-approve-clear class="rounded-md border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-gray-600 transition hover:bg-gray-50">Bersihkan</button>
+                    </div>
+                </div>
+            @endif
             <div class="overflow-x-auto">
                 <table class="data-table">
-                    <thead><tr><th>Jenis</th><th>Pengaju</th><th>Rekan</th><th>Tanggal</th><th>Status</th><th class="text-right">Aksi</th></tr></thead>
+                    <thead><tr>@if ($canDecide)<th class="w-10"><input type="checkbox" data-approve-all aria-label="Pilih semua" class="size-4 rounded border-gray-300 text-primary focus:ring-primary/30"></th>@endif<th>Jenis</th><th>Pengaju</th><th>Rekan</th><th>Tanggal</th><th>Status</th><th class="text-right">Aksi</th></tr></thead>
                     <tbody>
                         @forelse ($requests as $req)
                             <tr>
+                                @if ($canDecide)
+                                    <td>
+                                        @if ($req->isPendingHr())
+                                            <input type="checkbox" data-approve-checkbox value="{{ $req->id }}" aria-label="Pilih permintaan {{ $req->requester?->full_name }}" class="size-4 rounded border-gray-300 text-primary focus:ring-primary/30">
+                                        @endif
+                                    </td>
+                                @endif
                                 <td class="text-sm text-gray-800">{{ $req->type_label }}@if ($req->reason)<p class="mt-0.5 max-w-[16rem] truncate text-xs text-gray-500" title="{{ $req->reason }}">{{ $req->reason }}</p>@endif</td>
                                 <td class="text-sm text-gray-700">{{ $req->requester?->full_name }}</td>
                                 <td class="text-sm text-gray-700">{{ $req->partner?->full_name }}</td>
@@ -82,12 +99,19 @@
                                 </td>
                             </tr>
                         @empty
-                            <tr><td colspan="6" class="cell-empty">Tidak ada permintaan tukar jadwal.</td></tr>
+                            <tr><td colspan="{{ $canDecide ? 7 : 6 }}" class="cell-empty">Tidak ada permintaan tukar jadwal.</td></tr>
                         @endforelse
                     </tbody>
                 </table>
             </div>
             <div class="border-t border-gray-200 px-5 py-4">{{ $requests->links() }}</div>
+
+            @if ($canDecide)
+                <form data-approve-form method="POST" action="{{ route('attendance.swaps.bulk-approve') }}" class="hidden" data-confirm-message="Setujui & terapkan semua tukar jadwal terpilih?" data-confirm-approve="Ya, setujui">
+                    @csrf
+                    <div data-approve-ids></div>
+                </form>
+            @endif
         </section>
     </div>
 </x-layouts.app>
