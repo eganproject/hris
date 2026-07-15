@@ -21,6 +21,8 @@ class UserScopeRequest extends FormRequest
             'branches.*' => ['integer', 'exists:branches,id'],
             'departments' => ['nullable', 'array'],
             'departments.*' => ['integer', 'exists:departments,id'],
+            'roles' => ['nullable', 'array'],
+            'roles.*' => ['string', \Illuminate\Validation\Rule::exists('roles', 'name')->where('guard_name', 'web')],
         ];
     }
 }

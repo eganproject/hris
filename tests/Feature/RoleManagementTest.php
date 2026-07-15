@@ -89,6 +89,49 @@ test('the superadmin role cannot be renamed or deleted', function () {
     expect($superadmin->fresh()->name)->toBe('superadmin');
 });
 
+test('an admin can assign a role to an existing user and it takes effect', function () {
+    $admin = accessAdmin();
+
+    Permission::findOrCreate('leave.view', 'web');
+    $role = Role::findOrCreate('supervisor-cuti', 'web');
+    $role->syncPermissions(['leave.view']);
+
+    $member = User::factory()->create();
+
+    // Sebelumnya belum punya role & tidak bisa buka menu Cuti.
+    expect($member->fresh()->hasRole('supervisor-cuti'))->toBeFalse();
+
+    $this->actingAs($admin)
+        ->put(route('access-control.user-scope.update', $member), [
+            'roles' => ['supervisor-cuti'],
+            'branches' => [],
+            'departments' => [],
+        ])
+        ->assertRedirect(route('access-control.index'));
+
+    $member->refresh();
+
+    expect($member->hasRole('supervisor-cuti'))->toBeTrue()
+        ->and($member->can('leave.view'))->toBeTrue();
+
+    // users_count pada daftar role kini menghitungnya.
+    expect(Role::query()->withCount('users')->where('name', 'supervisor-cuti')->first()->users_count)->toBe(1);
+});
+
+test('unchecking every role removes the user from all roles', function () {
+    $admin = accessAdmin();
+    $role = Role::findOrCreate('sementara', 'web');
+
+    $member = User::factory()->create();
+    $member->assignRole($role);
+
+    $this->actingAs($admin)
+        ->put(route('access-control.user-scope.update', $member), ['roles' => [], 'branches' => [], 'departments' => []])
+        ->assertRedirect(route('access-control.index'));
+
+    expect($member->fresh()->roles)->toHaveCount(0);
+});
+
 test('managing roles requires the access-control update permission', function () {
     app(PermissionRegistrar::class)->forgetCachedPermissions();
     Permission::findOrCreate('access-control.view', 'web');

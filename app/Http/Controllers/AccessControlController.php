@@ -140,9 +140,14 @@ class AccessControlController extends Controller
         $user->accessBranches()->sync($request->validated('branches', []));
         $user->accessDepartments()->sync($request->validated('departments', []));
 
+        // Role menentukan menu & hak akses user. Disimpan bersama cakupan agar admin
+        // bisa mengatur keduanya dari satu tempat.
+        $user->syncRoles($request->validated('roles', []));
+        app(PermissionRegistrar::class)->forgetCachedPermissions();
+
         return redirect()
             ->route('access-control.index')
-            ->with('status', "Cakupan data {$user->name} berhasil diperbarui.");
+            ->with('status', "Role & cakupan data {$user->name} berhasil diperbarui.");
     }
 
     public function updateBranchDepartments(BranchDepartmentRequest $request, Branch $branch): RedirectResponse
