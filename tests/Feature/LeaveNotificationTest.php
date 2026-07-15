@@ -173,11 +173,17 @@ test('an employee cancelling their own request tells the supervisor waiting on i
 test('leave filed by HR on behalf of an employee notifies that employee', function () {
     ['employeeUser' => $employeeUser, 'employee' => $employee, 'hr' => $hr, 'type' => $type] = leaveNotificationFixture('Sakit');
 
+    // Tanggal dalam rentang yang diizinkan (bulan berjalan), dan tetap satu bulan
+    // sehingga format periodenya "d – d M Y".
+    $start = now()->startOfMonth()->addDays(9);
+    $end = $start->copy()->addDay();
+    $expectedRange = $start->translatedFormat('d').' – '.$end->translatedFormat('d M Y').' (2 hari)';
+
     $this->actingAs($hr)->post('/attendance/leave', [
         'employee_id' => $employee->id,
         'leave_type_id' => $type->id,
-        'start_date' => '2026-06-01',
-        'end_date' => '2026-06-02',
+        'start_date' => $start->toDateString(),
+        'end_date' => $end->toDateString(),
     ])->assertRedirect();
 
     $inbox = notificationsOf($employeeUser);
@@ -185,5 +191,5 @@ test('leave filed by HR on behalf of an employee notifies that employee', functi
     expect($inbox)->toHaveCount(1)
         ->and($inbox[0]['title'])->toBe('Pengajuan Sakit dibuat untuk Anda')
         ->and($inbox[0]['message'])->toContain('HR membuat pengajuan Sakit atas nama Anda')
-        ->and($inbox[0]['message'])->toContain('01 – 02 Jun 2026 (2 hari)');
+        ->and($inbox[0]['message'])->toContain($expectedRange);
 });

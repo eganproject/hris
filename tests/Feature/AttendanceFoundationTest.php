@@ -130,11 +130,15 @@ test('an admin leave request for an employee with a manager needs two approvals'
     $employee = Employee::query()->create(['full_name' => 'Budi', 'employment_status' => 'active', 'manager_id' => $manager->id]);
     $type = LeaveType::query()->create(['code' => 'IZ', 'name' => 'Izin', 'attendance_status' => 'leave', 'is_paid' => true, 'is_active' => true]);
 
+    $start = now()->addDays(3);
+    $mid = now()->addDays(4);
+    $end = now()->addDays(5);
+
     $this->actingAs($user)->post('/attendance/leave', [
         'employee_id' => $employee->id,
         'leave_type_id' => $type->id,
-        'start_date' => '2026-02-10',
-        'end_date' => '2026-02-12',
+        'start_date' => $start->toDateString(),
+        'end_date' => $end->toDateString(),
     ])->assertRedirect('/attendance/leave');
 
     $leave = LeaveRequest::query()->firstOrFail();
@@ -154,7 +158,7 @@ test('an admin leave request for an employee with a manager needs two approvals'
 
     expect($leave->status)->toBe(LeaveRequestStatus::Approved)
         ->and($leave->approved_by)->toBe($user->id)
-        ->and(LeaveRequest::query()->approvedOn('2026-02-11')->exists())->toBeTrue();
+        ->and(LeaveRequest::query()->approvedOn($mid->toDateString())->exists())->toBeTrue();
 });
 
 test('HR cannot delete a leave request — only the requester can', function () {
@@ -212,11 +216,14 @@ test('an approved leave is final — it cannot be decided again nor cancelled', 
     $employee = Employee::query()->create(['full_name' => 'Sudah Disetujui', 'employment_status' => 'active']);
     $type = LeaveType::query()->create(['code' => 'IZ', 'name' => 'Izin', 'attendance_status' => 'leave', 'is_paid' => true, 'is_active' => true]);
 
+    $start = now()->addDays(3);
+    $end = now()->addDays(4);
+
     $this->actingAs($user)->post('/attendance/leave', [
         'employee_id' => $employee->id,
         'leave_type_id' => $type->id,
-        'start_date' => '2026-02-10',
-        'end_date' => '2026-02-11',
+        'start_date' => $start->toDateString(),
+        'end_date' => $end->toDateString(),
     ])->assertRedirect('/attendance/leave');
 
     $leave = LeaveRequest::query()->firstOrFail();
@@ -238,7 +245,7 @@ test('an approved leave is final — it cannot be decided again nor cancelled', 
 
     // The approval stays in effect.
     expect($leave->fresh()->status)->toBe(LeaveRequestStatus::Approved)
-        ->and(LeaveRequest::query()->approvedOn('2026-02-10')->exists())->toBeTrue();
+        ->and(LeaveRequest::query()->approvedOn($start->toDateString())->exists())->toBeTrue();
 });
 
 test('a request for an employee without a manager starts at the HR step', function () {
@@ -249,8 +256,8 @@ test('a request for an employee without a manager starts at the HR step', functi
     $this->actingAs($user)->post('/attendance/leave', [
         'employee_id' => $employee->id,
         'leave_type_id' => $type->id,
-        'start_date' => '2026-03-01',
-        'end_date' => '2026-03-01',
+        'start_date' => now()->addDays(3)->toDateString(),
+        'end_date' => now()->addDays(3)->toDateString(),
     ])->assertRedirect('/attendance/leave');
 
     expect(LeaveRequest::query()->firstOrFail()->status)->toBe(LeaveRequestStatus::PendingHr);

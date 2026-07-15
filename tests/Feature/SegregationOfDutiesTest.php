@@ -109,3 +109,33 @@ test('HR cannot file a leave request for an inactive employee', function () {
 
     expect(LeaveRequest::query()->count())->toBe(0);
 });
+
+test('HR cannot backdate a leave earlier than the start of last month', function () {
+    [$user] = hrEmployee(['leave.create']);
+    $type = LeaveType::query()->create(['code' => 'IZ', 'name' => 'Izin', 'attendance_status' => 'leave', 'is_paid' => true, 'is_active' => true]);
+    $employee = Employee::query()->create(['full_name' => 'Karyawan', 'employment_status' => 'active']);
+
+    // Sehari sebelum awal bulan lalu — di luar batas yang diizinkan.
+    $tooEarly = now()->subMonthNoOverflow()->startOfMonth()->subDay();
+
+    $this->actingAs($user)
+        ->from('/attendance/leave/create')
+        ->post('/attendance/leave', [
+            'employee_id' => $employee->id, 'leave_type_id' => $type->id,
+            'start_date' => $tooEarly->toDateString(), 'end_date' => $tooEarly->toDateString(),
+        ])
+        ->assertRedirect('/attendance/leave/create')
+        ->assertSessionHasErrors('start_date');
+
+    expect(LeaveRequest::query()->count())->toBe(0);
+
+    // Tepat di awal bulan lalu — masih boleh.
+    $earliest = now()->subMonthNoOverflow()->startOfMonth();
+
+    $this->actingAs($user)->post('/attendance/leave', [
+        'employee_id' => $employee->id, 'leave_type_id' => $type->id,
+        'start_date' => $earliest->toDateString(), 'end_date' => $earliest->toDateString(),
+    ])->assertRedirect('/attendance/leave');
+
+    expect(LeaveRequest::query()->count())->toBe(1);
+});
