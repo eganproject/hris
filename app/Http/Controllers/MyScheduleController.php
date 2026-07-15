@@ -36,7 +36,13 @@ class MyScheduleController extends Controller
                 ->with('requester')
                 ->latest('id')
                 ->get(),
-            'colleagues' => Employee::query()->active()->where('id', '!=', $employee->id)->orderBy('full_name')->get(),
+            // Tukar shift hanya antar rekan di lokasi kerja yang sama.
+            'colleagues' => Employee::query()
+                ->active()
+                ->where('id', '!=', $employee->id)
+                ->when($employee->branch_id, fn ($query) => $query->where('branch_id', $employee->branch_id))
+                ->orderBy('full_name')
+                ->get(),
             'types' => ShiftSwapRequest::typeLabels(),
         ]);
     }

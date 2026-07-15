@@ -67,6 +67,42 @@ test('an employee submits a shift swap and it awaits the partner', function () {
     expect(ShiftSwapRequest::query()->where('requester_id', $me->id)->where('status', 'pending_partner')->count())->toBe(1);
 });
 
+test('the colleague list and the swap are limited to the same work location', function () {
+    $sby = App\Models\Branch::query()->create(['code' => 'SBY', 'name' => 'Surabaya', 'is_active' => true]);
+    $jkt = App\Models\Branch::query()->create(['code' => 'JKT', 'name' => 'Jakarta', 'is_active' => true]);
+
+    $pagi = Shift::query()->create(['code' => 'PG', 'name' => 'Pagi', 'start_time' => '07:00', 'end_time' => '15:00', 'is_active' => true]);
+    $siang = Shift::query()->create(['code' => 'SG', 'name' => 'Siang', 'start_time' => '15:00', 'end_time' => '23:00', 'is_active' => true]);
+
+    [$user, $me] = swapEmployee('Andi Surabaya');
+    $me->update(['branch_id' => $sby->id]);
+    [, $sameLoc] = swapEmployee('Bima Surabaya');
+    $sameLoc->update(['branch_id' => $sby->id]);
+    [, $otherLoc] = swapEmployee('Cici Jakarta');
+    $otherLoc->update(['branch_id' => $jkt->id]);
+
+    // Dropdown rekan hanya berisi karyawan selokasi.
+    $this->actingAs($user)->get('/my-schedule')
+        ->assertOk()
+        ->assertSee('Bima Surabaya')
+        ->assertDontSee('Cici Jakarta');
+
+    $date = now()->addDays(3)->toDateString();
+    scheduleRow($me, $date, $pagi);
+    scheduleRow($otherLoc, $date, $siang);
+
+    // Menembus lewat request langsung ke rekan lintas lokasi tetap ditolak.
+    $this->actingAs($user)
+        ->from(route('my-schedule.index'))
+        ->post('/my-schedule/swaps', [
+            'type' => 'swap', 'partner_id' => $otherLoc->id,
+            'requester_date' => $date, 'partner_date' => $date,
+        ])
+        ->assertSessionHasErrors('partner_id');
+
+    expect(ShiftSwapRequest::query()->count())->toBe(0);
+});
+
 test('a swap on a day with no shift is rejected at submission', function () {
     [$user, $me] = swapEmployee('Andi');
     [, $partner] = swapEmployee('Budi');

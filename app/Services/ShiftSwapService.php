@@ -39,6 +39,14 @@ class ShiftSwapService
             return $errors;
         }
 
+        // Tukar shift hanya antar rekan di lokasi kerja yang sama (dijaga di server,
+        // bukan hanya di dropdown, agar tidak bisa ditembus lewat request langsung).
+        if ($requester->branch_id !== $partner->branch_id) {
+            $errors[] = 'Rekan tukar harus berada di lokasi kerja yang sama.';
+
+            return $errors;
+        }
+
         if ($rDate->lessThan($today)) {
             $errors[] = 'Tanggal Anda sudah lewat.';
         }
