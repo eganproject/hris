@@ -7,6 +7,7 @@ use App\Http\Requests\ScheduleAssignmentRequest;
 use App\Http\Requests\ScheduleOverrideRequest;
 use App\Models\Employee;
 use App\Models\Holiday;
+use App\Models\JobPosition;
 use App\Models\LeaveRequest;
 use App\Models\ScheduleAssignment;
 use App\Models\SchedulePattern;
@@ -35,11 +36,19 @@ class ScheduleController extends Controller
         $from = $month->copy()->startOfMonth();
         $to = $month->copy()->endOfMonth();
         $branchId = $request->integer('branch_id') ?: null;
+        $departmentId = $request->integer('department_id') ?: null;
+        $jobPositionId = $request->integer('job_position_id') ?: null;
+        $search = $request->string('search')->toString();
         $scope = DataScope::forAttendance($request->user());
 
-        $employees = $scope->employees()
-            ->active()
-            ->when($branchId, fn ($query) => $query->where('branch_id', $branchId))
+        $applyFilters = fn ($query) => $query
+            ->when($branchId, fn ($q) => $q->where('branch_id', $branchId))
+            ->when($departmentId, fn ($q) => $q->byDepartment($departmentId))
+            ->when($jobPositionId, fn ($q) => $q->where('job_position_id', $jobPositionId))
+            ->when($search, fn ($q, $s) => $q->where(fn ($q) => $q
+                ->where('full_name', 'like', "%{$s}%")->orWhere('employee_number', 'like', "%{$s}%")));
+
+        $employees = $applyFilters($scope->employees()->active())
             ->with(['schedules' => fn ($query) => $query
                 ->whereBetween('work_date', [$from->toDateString(), $to->toDateString()])
                 ->with('shift'),
@@ -74,6 +83,9 @@ class ScheduleController extends Controller
             'prevMonth' => $month->copy()->subMonth()->format('Y-m'),
             'nextMonth' => $month->copy()->addMonth()->format('Y-m'),
             'branches' => $scope->branches(),
+            'departments' => $scope->departments(),
+            'jobPositions' => JobPosition::query()->where('is_active', true)->orderBy('name')->get(),
+            'filters' => ['branch_id' => $branchId, 'department_id' => $departmentId, 'job_position_id' => $jobPositionId, 'search' => $search],
             'branchId' => $branchId,
             'hasNoScope' => $scope->isEmpty(),
             'shifts' => Shift::query()->where('is_active', true)->orderBy('start_time')->get(),

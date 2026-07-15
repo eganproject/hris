@@ -206,9 +206,15 @@
                             <p class="mt-1 text-xs text-gray-500">{{ $userRoles ? implode(', ', $userRoles) : 'Tanpa role' }}</p>
                             @if ($seesAllEmployees && $seesAllAttendance)
                                 <p class="mt-2 inline-flex rounded-md bg-emerald-50 px-2 py-0.5 text-[11px] font-medium text-emerald-700">Lihat semua data</p>
+                            @elseif ($user->isLimitedToSubordinates())
+                                <p class="mt-2 inline-flex rounded-md bg-sky-50 px-2 py-0.5 text-[11px] font-medium text-sky-700">Hanya bawahannya</p>
                             @elseif ($selectedBranches === [] && $selectedDepartments === [])
                                 <p class="mt-2 inline-flex rounded-md bg-amber-50 px-2 py-0.5 text-[11px] font-medium text-amber-800">Belum ada cakupan — tidak melihat data</p>
                             @endif
+                            <label class="mt-3 flex items-start gap-2 text-xs text-gray-600">
+                                <input type="checkbox" name="limit_to_subordinates" value="1" @checked($user->isLimitedToSubordinates()) class="mt-0.5 size-3.5 rounded border-gray-300 text-primary focus:ring-primary">
+                                <span>Batasi ke bawahan saja <span class="block text-gray-400">Hanya melihat karyawan di bawah garis atasannya (mengabaikan lokasi/divisi di atas).</span></span>
+                            </label>
                         </div>
                         <div>
                             <p class="text-xs font-medium text-gray-700">Role</p>

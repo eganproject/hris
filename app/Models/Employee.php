@@ -312,6 +312,15 @@ class Employee extends Model
             return;
         }
 
+        // "Batasi ke bawahan" menggantikan cakupan lokasi/divisi: pengguna hanya
+        // melihat karyawan di bawah garis atasannya (berjenjang).
+        if ($user->isLimitedToSubordinates()) {
+            $ids = $user->subordinateEmployeeIds();
+            $query->whereIn('id', $ids !== [] ? $ids : [0]);
+
+            return;
+        }
+
         $branchIds = $user->accessBranchIds();
         $departmentIds = $user->accessDepartmentIds();
 
@@ -339,6 +348,10 @@ class Employee extends Model
     {
         if ($user->seesAllData($bypassPermission)) {
             return true;
+        }
+
+        if ($user->isLimitedToSubordinates()) {
+            return in_array($this->id, $user->subordinateEmployeeIds(), true);
         }
 
         $branchIds = $user->accessBranchIds();

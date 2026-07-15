@@ -36,21 +36,43 @@
             </div>
         @endif
 
-        {{-- Month navigation + branch filter --}}
+        {{-- Month navigation + filters --}}
         <section class="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
-            <form method="GET" action="{{ route('attendance.schedules.index') }}" class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                <div class="flex items-center gap-2">
-                    <a href="{{ route('attendance.schedules.index', ['month' => $prevMonth, 'branch_id' => $branchId]) }}" class="rounded-md border border-gray-200 px-3 py-2 text-sm text-gray-600 hover:bg-gray-50" aria-label="Bulan sebelumnya">‹</a>
-                    <input type="month" name="month" value="{{ $month->format('Y-m') }}" onchange="this.form.submit()" class="rounded-md border border-gray-300 px-3 py-2 text-sm shadow-xs outline-none focus:border-primary focus:ring-2 focus:ring-primary/20">
-                    <a href="{{ route('attendance.schedules.index', ['month' => $nextMonth, 'branch_id' => $branchId]) }}" class="rounded-md border border-gray-200 px-3 py-2 text-sm text-gray-600 hover:bg-gray-50" aria-label="Bulan berikutnya">›</a>
+            @php $q = fn ($extra = []) => array_merge(['month' => $month->format('Y-m')], array_filter($filters), $extra); @endphp
+            <form method="GET" action="{{ route('attendance.schedules.index') }}" class="flex flex-col gap-3">
+                <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                    <div class="flex items-center gap-2">
+                        <a href="{{ route('attendance.schedules.index', $q(['month' => $prevMonth])) }}" class="rounded-md border border-gray-200 px-3 py-2 text-sm text-gray-600 hover:bg-gray-50" aria-label="Bulan sebelumnya">‹</a>
+                        <input type="month" name="month" value="{{ $month->format('Y-m') }}" onchange="this.form.submit()" class="rounded-md border border-gray-300 px-3 py-2 text-sm shadow-xs outline-none focus:border-primary focus:ring-2 focus:ring-primary/20">
+                        <a href="{{ route('attendance.schedules.index', $q(['month' => $nextMonth])) }}" class="rounded-md border border-gray-200 px-3 py-2 text-sm text-gray-600 hover:bg-gray-50" aria-label="Bulan berikutnya">›</a>
+                    </div>
+                    <input type="text" name="search" value="{{ $filters['search'] }}" placeholder="Cari nama / kode karyawan" class="rounded-md border border-gray-300 px-3 py-2 text-sm shadow-xs outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 sm:w-64">
                 </div>
-                <div class="flex items-center gap-2">
+                <div class="grid grid-cols-1 gap-2 sm:grid-cols-4">
                     <select name="branch_id" onchange="this.form.submit()" class="rounded-md border border-gray-300 px-3 py-2 text-sm shadow-xs outline-none focus:border-primary focus:ring-2 focus:ring-primary/20">
                         <option value="">Semua lokasi</option>
                         @foreach ($branches as $branch)
-                            <option value="{{ $branch->id }}" @selected($branchId === $branch->id)>{{ $branch->name }}</option>
+                            <option value="{{ $branch->id }}" @selected($filters['branch_id'] === $branch->id)>{{ $branch->name }}</option>
                         @endforeach
                     </select>
+                    <select name="department_id" onchange="this.form.submit()" class="rounded-md border border-gray-300 px-3 py-2 text-sm shadow-xs outline-none focus:border-primary focus:ring-2 focus:ring-primary/20">
+                        <option value="">Semua divisi</option>
+                        @foreach ($departments as $department)
+                            <option value="{{ $department->id }}" @selected($filters['department_id'] === $department->id)>{{ $department->name }}</option>
+                        @endforeach
+                    </select>
+                    <select name="job_position_id" onchange="this.form.submit()" class="rounded-md border border-gray-300 px-3 py-2 text-sm shadow-xs outline-none focus:border-primary focus:ring-2 focus:ring-primary/20">
+                        <option value="">Semua jabatan</option>
+                        @foreach ($jobPositions as $position)
+                            <option value="{{ $position->id }}" @selected($filters['job_position_id'] === $position->id)>{{ $position->name }}</option>
+                        @endforeach
+                    </select>
+                    <div class="flex gap-2">
+                        <button type="submit" class="flex-1 rounded-md bg-primary px-4 py-2 text-sm font-semibold text-white shadow-xs transition hover:bg-primary-hover">Terapkan</button>
+                        @if (array_filter($filters))
+                            <a href="{{ route('attendance.schedules.index', ['month' => $month->format('Y-m')]) }}" class="rounded-md border border-gray-200 px-4 py-2 text-center text-sm font-medium text-gray-700 transition hover:bg-gray-50">Reset</a>
+                        @endif
+                    </div>
                 </div>
             </form>
         </section>

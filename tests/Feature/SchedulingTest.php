@@ -249,6 +249,36 @@ test('approved leave shows on the roster and on the per-employee schedule', func
         ->assertDontSee('Izin Khusus');
 });
 
+test('the roster can be filtered by division, position and name', function () {
+    $user = scheduleManager();
+    $branch = Branch::query()->create(['code' => 'SBY', 'name' => 'Surabaya', 'is_active' => true]);
+    $ops = Department::query()->create(['code' => 'OPS', 'name' => 'Operasional', 'is_active' => true]);
+    $acc = Department::query()->create(['code' => 'ACC', 'name' => 'Accounting', 'is_active' => true]);
+    $staf = JobPosition::query()->create(['code' => 'STF', 'name' => 'Staf', 'is_active' => true]);
+    $spv = JobPosition::query()->create(['code' => 'SPV', 'name' => 'Supervisor', 'is_active' => true]);
+
+    $make = fn (string $name, $dept, $pos) => Employee::query()->create([
+        'branch_id' => $branch->id, 'department_id' => $dept->id, 'job_position_id' => $pos->id,
+        'full_name' => $name, 'employment_status' => 'active', 'join_date' => now()->toDateString(),
+    ]);
+
+    $make('Budi Operasional Staf', $ops, $staf);
+    $make('Sari Accounting Staf', $acc, $staf);
+    $make('Tono Operasional Spv', $ops, $spv);
+
+    // Filter divisi Operasional.
+    $this->actingAs($user)->get('/attendance/schedules?department_id='.$ops->id)
+        ->assertOk()->assertSee('Budi Operasional Staf')->assertSee('Tono Operasional Spv')->assertDontSee('Sari Accounting Staf');
+
+    // Filter jabatan Supervisor.
+    $this->actingAs($user)->get('/attendance/schedules?job_position_id='.$spv->id)
+        ->assertOk()->assertSee('Tono Operasional Spv')->assertDontSee('Budi Operasional Staf');
+
+    // Cari nama.
+    $this->actingAs($user)->get('/attendance/schedules?search=Sari')
+        ->assertOk()->assertSee('Sari Accounting Staf')->assertDontSee('Budi Operasional Staf');
+});
+
 test('the assign page shows each employee org info and their existing schedule period', function () {
     $user = scheduleManager();
     $reg = Shift::query()->create(['code' => 'REG', 'name' => 'Reguler', 'start_time' => '08:00', 'end_time' => '17:00', 'is_active' => true]);
