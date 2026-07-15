@@ -29,15 +29,30 @@
         </section>
 
         <section data-tab-panel="roles" class="rounded-lg border border-gray-200 bg-white shadow-sm">
-            <div class="border-b border-gray-200 px-5 py-4">
-                <h2 class="text-base font-semibold text-gray-950">Role & Permission Menu</h2>
-                <p class="mt-1 text-sm text-gray-500">Centang aksi yang boleh dilakukan tiap role pada tiap menu. Sel yang kosong berarti aksi itu memang tidak ada pada menu tersebut.</p>
+            <div class="flex flex-col justify-between gap-4 border-b border-gray-200 px-5 py-4 sm:flex-row sm:items-end">
+                <div>
+                    <h2 class="text-base font-semibold text-gray-950">Role & Permission Menu</h2>
+                    <p class="mt-1 text-sm text-gray-500">Centang aksi yang boleh dilakukan tiap role pada tiap menu. Sel yang kosong berarti aksi itu memang tidak ada pada menu tersebut.</p>
+                </div>
+                @can('access-control.update')
+                    <form method="POST" action="{{ route('access-control.roles.store') }}" class="flex items-end gap-2">
+                        @csrf
+                        <div>
+                            <label for="new-role-name" class="block text-xs font-medium text-gray-600">Tambah role baru</label>
+                            <input id="new-role-name" name="name" required maxlength="50" placeholder="mis. supervisor-cabang" class="mt-1 w-56 rounded-md border border-gray-300 px-3 py-2 text-sm shadow-xs outline-none focus:border-primary focus:ring-2 focus:ring-primary/20">
+                        </div>
+                        <button type="submit" class="rounded-md bg-primary px-4 py-2 text-sm font-semibold text-white shadow-xs transition hover:bg-primary-hover">Tambah</button>
+                    </form>
+                @endcan
             </div>
+
+            @error('name')<p class="px-5 pt-3 text-sm text-red-600">{{ $message }}</p>@enderror
 
             <div class="divide-y divide-gray-100">
                 @foreach ($roles as $role)
                     @php
-                        $locked = ! auth()->user()->can('access-control.update') || $role->name === 'superadmin';
+                        $isProtected = in_array($role->name, ['superadmin', 'super-admin'], true);
+                        $locked = ! auth()->user()->can('access-control.update') || $isProtected;
                         $held = $role->permissions->pluck('name')->all();
                     @endphp
                     <details class="group" @if ($loop->first) open @endif>
@@ -46,7 +61,7 @@
                                 <p class="font-medium text-gray-950">{{ $role->name }}</p>
                                 <p class="mt-0.5 text-xs text-gray-500">
                                     {{ $role->users_count }} user · {{ count($held) }} akses
-                                    @if ($role->name === 'superadmin') · <span class="text-amber-700">akses penuh, tidak dapat diubah</span>@endif
+                                    @if ($isProtected) · <span class="text-amber-700">role sistem, tidak dapat diubah/dihapus</span>@endif
                                 </p>
                             </div>
                             <span class="text-xs text-gray-400 group-open:hidden">Buka</span>
@@ -108,11 +123,31 @@
                             @can('access-control.update')
                                 <div class="mt-4 flex justify-end">
                                     <button type="submit" @disabled($locked) class="rounded-md bg-primary px-4 py-2.5 text-sm font-semibold text-white shadow-xs transition hover:bg-primary-hover disabled:cursor-not-allowed disabled:bg-gray-300">
-                                        Simpan
+                                        Simpan Hak Akses
                                     </button>
                                 </div>
                             @endcan
                         </form>
+
+                        {{-- Ubah nama / hapus role (bukan role sistem) --}}
+                        @can('access-control.update')
+                            @unless ($isProtected)
+                                <div class="flex flex-col gap-3 border-t border-gray-100 bg-gray-50/60 px-5 py-4 sm:flex-row sm:items-end sm:justify-between">
+                                    <form method="POST" action="{{ route('access-control.roles.rename', $role) }}" class="flex items-end gap-2">
+                                        @csrf @method('PATCH')
+                                        <div>
+                                            <label class="block text-xs font-medium text-gray-600">Ubah nama role</label>
+                                            <input name="name" value="{{ $role->name }}" required maxlength="50" class="mt-1 w-56 rounded-md border border-gray-300 px-3 py-2 text-sm shadow-xs outline-none focus:border-primary focus:ring-2 focus:ring-primary/20">
+                                        </div>
+                                        <button type="submit" class="rounded-md border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-50">Simpan Nama</button>
+                                    </form>
+                                    <form method="POST" action="{{ route('access-control.roles.destroy', $role) }}" onsubmit="return confirm('Hapus role {{ $role->name }}? Hanya bisa bila tidak ada pengguna yang memakainya.')">
+                                        @csrf @method('DELETE')
+                                        <button type="submit" class="inline-flex items-center gap-1.5 rounded-md border border-red-200 px-3 py-2 text-sm font-medium text-red-600 transition hover:bg-red-50"><x-icon name="trash"/> Hapus Role</button>
+                                    </form>
+                                </div>
+                            @endunless
+                        @endcan
                     </details>
                 @endforeach
             </div>

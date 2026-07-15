@@ -308,9 +308,18 @@ Route::middleware('auth')->group(function () {
         Route::get('/', [AccessControlController::class, 'index'])
             ->middleware('permission:access-control.view')
             ->name('index');
+        Route::post('roles', [AccessControlController::class, 'storeRole'])
+            ->middleware('permission:access-control.update')
+            ->name('roles.store');
         Route::put('roles/{role}', [AccessControlController::class, 'updateRole'])
             ->middleware('permission:access-control.update')
             ->name('roles.update');
+        Route::patch('roles/{role}/rename', [AccessControlController::class, 'renameRole'])
+            ->middleware('permission:access-control.update')
+            ->name('roles.rename');
+        Route::delete('roles/{role}', [AccessControlController::class, 'destroyRole'])
+            ->middleware('permission:access-control.update')
+            ->name('roles.destroy');
         Route::put('job-positions/{jobPosition}', [AccessControlController::class, 'updateJobPosition'])
             ->middleware('permission:access-control.update')
             ->name('job-positions.update');
