@@ -19,6 +19,10 @@ class ShiftSwapController extends Controller
     {
         $status = $request->string('status')->toString() ?: 'pending_hr';
         $perPage = min(max((int) $request->input('per_page', 15), 10), 100);
+        $branchId = $request->integer('branch_id') ?: null;
+        $search = $request->string('search')->toString() ?: null;
+        $dateFrom = $request->string('date_from')->toString() ?: null;
+        $dateTo = $request->string('date_to')->toString() ?: null;
 
         // A swap involves two people: it is only shown when BOTH are inside the scope,
         // otherwise approving it would silently change a roster the user cannot see.
@@ -29,6 +33,13 @@ class ShiftSwapController extends Controller
             ->tap(fn ($query) => $scope->constrain($query, 'requester_id'))
             ->tap(fn ($query) => $scope->constrain($query, 'partner_id'))
             ->when($status !== 'all', fn ($q) => $q->where('status', $status))
+            // Lokasi & pencarian dilihat dari sisi pengaju (requester).
+            ->when($branchId, fn ($q) => $q->whereHas('requester', fn ($e) => $e->byBranch($branchId)))
+            ->when($search, fn ($q, $s) => $q->whereHas('requester', fn ($e) => $e
+                ->where('full_name', 'like', "%{$s}%")
+                ->orWhere('employee_number', 'like', "%{$s}%")))
+            ->when($dateFrom, fn ($q, $d) => $q->whereDate('requester_date', '>=', $d))
+            ->when($dateTo, fn ($q, $d) => $q->whereDate('requester_date', '<=', $d))
             ->latest('id')
             ->paginate($perPage)
             ->withQueryString();
@@ -36,6 +47,8 @@ class ShiftSwapController extends Controller
         return view('attendance.swaps.index', [
             'requests' => $requests,
             'status' => $status,
+            'filters' => compact('search', 'branchId', 'dateFrom', 'dateTo'),
+            'branches' => $scope->branches(),
             'pendingCount' => ShiftSwapRequest::query()
                 ->pendingHr()
                 ->tap(fn ($query) => $scope->constrain($query, 'requester_id'))

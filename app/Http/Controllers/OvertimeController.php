@@ -20,12 +20,25 @@ class OvertimeController extends Controller
         $month = $this->resolveMonth($request->input('month'));
         [$from, $to] = [$month->copy()->startOfMonth(), $month->copy()->endOfMonth()];
         $branchId = $request->integer('branch_id') ?: null;
+        $departmentId = $request->integer('department_id') ?: null;
+        $status = $request->string('status')->toString() ?: null;
+        $search = $request->string('search')->toString() ?: null;
         $scope = DataScope::forAttendance($request->user());
 
-        $requests = OvertimeApproval::query()
+        // Basis (bulan + lokasi + divisi + pencarian) tanpa filter status, agar angka
+        // ringkasan di atas tetap mencerminkan seluruh lembur bulan itu.
+        $base = fn () => OvertimeApproval::query()
             ->whereBetween('work_date', [$from->toDateString(), $to->toDateString()])
-            ->whereHas('employee', fn ($q) => $q->when($branchId, fn ($q) => $q->where('branch_id', $branchId)))
-            ->tap(fn ($query) => $scope->constrain($query))
+            ->whereHas('employee', fn ($q) => $q
+                ->byBranch($branchId)
+                ->byDepartment($departmentId)
+                ->when($search, fn ($q, $s) => $q->where(fn ($q) => $q
+                    ->where('full_name', 'like', "%{$s}%")
+                    ->orWhere('employee_number', 'like', "%{$s}%"))))
+            ->tap(fn ($query) => $scope->constrain($query));
+
+        $requests = $base()
+            ->when($status, fn ($q, $s) => $q->where('status', $s))
             ->with(['employee', 'supervisor'])
             ->orderBy('work_date')
             ->get();
@@ -36,9 +49,14 @@ class OvertimeController extends Controller
             'prevMonth' => $month->copy()->subMonth()->format('Y-m'),
             'nextMonth' => $month->copy()->addMonth()->format('Y-m'),
             'branches' => $scope->branches(),
+            'departments' => $scope->departments(),
             'branchId' => $branchId,
-            'pendingCount' => $requests->where('status', OvertimeApproval::STATUS_PENDING)->count(),
-            'approvedMinutes' => (int) $requests->where('status', OvertimeApproval::STATUS_APPROVED)->sum('approved_minutes'),
+            'departmentId' => $departmentId,
+            'status' => $status,
+            'search' => $search,
+            'statuses' => OvertimeApproval::statusLabels(),
+            'pendingCount' => $base()->where('status', OvertimeApproval::STATUS_PENDING)->count(),
+            'approvedMinutes' => (int) $base()->where('status', OvertimeApproval::STATUS_APPROVED)->sum('approved_minutes'),
         ]);
     }
 

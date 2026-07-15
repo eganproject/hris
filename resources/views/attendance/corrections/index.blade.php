@@ -13,11 +13,49 @@
             <div class="rounded-md border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">{{ session('status') }}</div>
         @endif
 
-        <section class="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
-            <form method="GET" action="{{ route('attendance.corrections.index') }}" class="flex flex-wrap items-center gap-2">
+        <section class="space-y-4 rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
+            <div class="flex flex-wrap items-center gap-2">
                 @foreach (['pending' => 'Menunggu', 'approved' => 'Disetujui', 'rejected' => 'Ditolak', 'all' => 'Semua'] as $value => $label)
-                    <a href="{{ route('attendance.corrections.index', ['status' => $value]) }}" @class(['rounded-md px-3 py-1.5 text-sm font-medium', 'bg-primary text-white' => $status === $value, 'border border-gray-200 text-gray-700 hover:bg-gray-50' => $status !== $value])>{{ $label }}</a>
+                    <a href="{{ route('attendance.corrections.index', array_merge(request()->except('page'), ['status' => $value])) }}" @class(['rounded-md px-3 py-1.5 text-sm font-medium', 'bg-primary text-white' => $status === $value, 'border border-gray-200 text-gray-700 hover:bg-gray-50' => $status !== $value])>{{ $label }}</a>
                 @endforeach
+            </div>
+
+            <form method="GET" action="{{ route('attendance.corrections.index') }}" class="grid grid-cols-1 gap-3 border-t border-gray-100 pt-4 sm:grid-cols-2 lg:grid-cols-6 lg:items-end">
+                <input type="hidden" name="status" value="{{ $status }}">
+                <div class="lg:col-span-2">
+                    <label for="search" class="block text-xs font-medium text-gray-600">Cari karyawan</label>
+                    <input id="search" name="search" value="{{ $filters['search'] }}" placeholder="Nama / NIK" class="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-xs outline-none focus:border-primary focus:ring-2 focus:ring-primary/20">
+                </div>
+                <div>
+                    <label for="branch_id" class="block text-xs font-medium text-gray-600">Lokasi</label>
+                    <select id="branch_id" name="branch_id" class="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-xs outline-none focus:border-primary focus:ring-2 focus:ring-primary/20">
+                        <option value="">Semua</option>
+                        @foreach ($branches as $branch)
+                            <option value="{{ $branch->id }}" @selected($filters['branchId'] === $branch->id)>{{ $branch->name }}</option>
+                        @endforeach
+                    </select>
+                </div>
+                <div>
+                    <label for="department_id" class="block text-xs font-medium text-gray-600">Divisi</label>
+                    <select id="department_id" name="department_id" class="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-xs outline-none focus:border-primary focus:ring-2 focus:ring-primary/20">
+                        <option value="">Semua</option>
+                        @foreach ($departments as $department)
+                            <option value="{{ $department->id }}" @selected($filters['departmentId'] === $department->id)>{{ $department->name }}</option>
+                        @endforeach
+                    </select>
+                </div>
+                <div>
+                    <label for="date_from" class="block text-xs font-medium text-gray-600">Dari tanggal</label>
+                    <input type="date" id="date_from" name="date_from" value="{{ $filters['dateFrom'] }}" class="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-xs outline-none focus:border-primary focus:ring-2 focus:ring-primary/20">
+                </div>
+                <div>
+                    <label for="date_to" class="block text-xs font-medium text-gray-600">Sampai tanggal</label>
+                    <input type="date" id="date_to" name="date_to" value="{{ $filters['dateTo'] }}" class="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-xs outline-none focus:border-primary focus:ring-2 focus:ring-primary/20">
+                </div>
+                <div class="flex gap-2 sm:col-span-2 lg:col-span-6 lg:justify-end">
+                    <button type="submit" class="rounded-md bg-primary px-4 py-2 text-sm font-semibold text-white">Filter</button>
+                    <a href="{{ route('attendance.corrections.index', ['status' => $status]) }}" class="rounded-md border border-gray-200 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">Reset</a>
+                </div>
             </form>
         </section>
 

@@ -105,14 +105,21 @@ class OvertimeApproval extends Model
         $query->where('status', self::STATUS_APPROVED);
     }
 
-    public function getStatusLabelAttribute(): string
+    /**
+     * @return array<string, string> status value => label, for filter dropdowns.
+     */
+    public static function statusLabels(): array
     {
-        return match ($this->status) {
+        return [
             self::STATUS_PENDING => 'Menunggu',
             self::STATUS_APPROVED => 'Disetujui',
             self::STATUS_REJECTED => 'Ditolak',
-            default => $this->status,
-        };
+        ];
+    }
+
+    public function getStatusLabelAttribute(): string
+    {
+        return self::statusLabels()[$this->status] ?? $this->status;
     }
 
     public function getStatusToneAttribute(): string

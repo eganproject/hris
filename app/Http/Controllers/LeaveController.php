@@ -23,13 +23,21 @@ class LeaveController extends Controller
         $perPage = min(max((int) $request->input('per_page', 15), 10), 100);
 
         $scope = DataScope::forAttendance($request->user());
+        $filters = $request->only(['search', 'status', 'leave_type_id', 'branch_id', 'department_id', 'date_from', 'date_to']);
 
         $leaveRequests = LeaveRequest::query()
             ->with(['employee', 'leaveType', 'supervisor', 'approver'])
             ->tap(fn ($query) => $scope->constrain($query))
-            ->when($request->string('status')->toString(), fn ($query, string $status) => $query->where('status', $status))
-            ->when($request->string('search')->toString(), function ($query, string $search): void {
-                $query->whereHas('employee', fn ($query) => $query->where('full_name', 'like', "%{$search}%"));
+            ->when($filters['status'] ?? null, fn ($query, string $status) => $query->where('status', $status))
+            ->when($filters['leave_type_id'] ?? null, fn ($query, $typeId) => $query->where('leave_type_id', $typeId))
+            ->when($filters['branch_id'] ?? null, fn ($query, $branchId) => $query->whereHas('employee', fn ($q) => $q->byBranch($branchId)))
+            ->when($filters['department_id'] ?? null, fn ($query, $deptId) => $query->whereHas('employee', fn ($q) => $q->byDepartment($deptId)))
+            // Rentang tanggal: tampilkan cuti yang periodenya beririsan dengan rentang.
+            ->when($filters['date_from'] ?? null, fn ($query, $from) => $query->whereDate('end_date', '>=', $from))
+            ->when($filters['date_to'] ?? null, fn ($query, $to) => $query->whereDate('start_date', '<=', $to))
+            ->when($filters['search'] ?? null, function ($query, string $search): void {
+                $query->whereHas('employee', fn ($query) => $query->where('full_name', 'like', "%{$search}%")
+                    ->orWhere('employee_number', 'like', "%{$search}%"));
             })
             ->latest('start_date')
             ->paginate($perPage)
@@ -37,9 +45,12 @@ class LeaveController extends Controller
 
         return view('attendance.leave.index', [
             'leaveRequests' => $leaveRequests,
-            'filters' => $request->only(['search', 'status']),
+            'filters' => $filters,
             'perPage' => $perPage,
             'statuses' => LeaveRequestStatus::options(),
+            'leaveTypes' => LeaveType::query()->orderBy('name')->get(),
+            'branches' => $scope->branches(),
+            'departments' => $scope->departments(),
         ]);
     }
 

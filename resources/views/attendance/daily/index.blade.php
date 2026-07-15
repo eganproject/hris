@@ -28,13 +28,13 @@
             <div class="rounded-md border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">{{ session('status') }}</div>
         @endif
 
-        {{-- Date navigation + branch filter --}}
+        {{-- Date navigation + filters --}}
         <section class="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
-            <form method="GET" action="{{ route('attendance.daily.index') }}" class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <form method="GET" action="{{ route('attendance.daily.index') }}" class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5 lg:items-center">
                 <div class="flex items-center gap-2">
-                    <a href="{{ route('attendance.daily.index', ['date' => $prevDate, 'branch_id' => $branchId]) }}" class="rounded-md border border-gray-200 px-3 py-2 text-sm text-gray-600 hover:bg-gray-50" aria-label="Hari sebelumnya">‹</a>
-                    <input type="date" name="date" value="{{ $date->toDateString() }}" onchange="this.form.submit()" class="rounded-md border border-gray-300 px-3 py-2 text-sm shadow-xs outline-none focus:border-primary focus:ring-2 focus:ring-primary/20">
-                    <a href="{{ route('attendance.daily.index', ['date' => $nextDate, 'branch_id' => $branchId]) }}" class="rounded-md border border-gray-200 px-3 py-2 text-sm text-gray-600 hover:bg-gray-50" aria-label="Hari berikutnya">›</a>
+                    <a href="{{ route('attendance.daily.index', array_merge(request()->query(), ['date' => $prevDate])) }}" class="rounded-md border border-gray-200 px-3 py-2 text-sm text-gray-600 hover:bg-gray-50" aria-label="Hari sebelumnya">‹</a>
+                    <input type="date" name="date" value="{{ $date->toDateString() }}" onchange="this.form.submit()" class="w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-xs outline-none focus:border-primary focus:ring-2 focus:ring-primary/20">
+                    <a href="{{ route('attendance.daily.index', array_merge(request()->query(), ['date' => $nextDate])) }}" class="rounded-md border border-gray-200 px-3 py-2 text-sm text-gray-600 hover:bg-gray-50" aria-label="Hari berikutnya">›</a>
                 </div>
                 <select name="branch_id" onchange="this.form.submit()" class="rounded-md border border-gray-300 px-3 py-2 text-sm shadow-xs outline-none focus:border-primary focus:ring-2 focus:ring-primary/20">
                     <option value="">Semua lokasi</option>
@@ -42,6 +42,19 @@
                         <option value="{{ $branch->id }}" @selected($branchId === $branch->id)>{{ $branch->name }}</option>
                     @endforeach
                 </select>
+                <select name="department_id" onchange="this.form.submit()" class="rounded-md border border-gray-300 px-3 py-2 text-sm shadow-xs outline-none focus:border-primary focus:ring-2 focus:ring-primary/20">
+                    <option value="">Semua divisi</option>
+                    @foreach ($departments as $department)
+                        <option value="{{ $department->id }}" @selected($departmentId === $department->id)>{{ $department->name }}</option>
+                    @endforeach
+                </select>
+                <select name="status" onchange="this.form.submit()" class="rounded-md border border-gray-300 px-3 py-2 text-sm shadow-xs outline-none focus:border-primary focus:ring-2 focus:ring-primary/20">
+                    <option value="">Semua status</option>
+                    @foreach ($statuses as $value => $label)
+                        <option value="{{ $value }}" @selected($statusFilter === $value)>{{ $label }}</option>
+                    @endforeach
+                </select>
+                <input name="search" value="{{ $search }}" placeholder="Cari nama / NIK" onchange="this.form.submit()" class="rounded-md border border-gray-300 px-3 py-2 text-sm shadow-xs outline-none focus:border-primary focus:ring-2 focus:ring-primary/20">
             </form>
         </section>
 

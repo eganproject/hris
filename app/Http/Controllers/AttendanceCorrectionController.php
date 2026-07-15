@@ -18,6 +18,11 @@ class AttendanceCorrectionController extends Controller
     {
         $status = $request->string('status')->toString() ?: 'pending';
         $perPage = min(max((int) $request->input('per_page', 15), 10), 100);
+        $branchId = $request->integer('branch_id') ?: null;
+        $departmentId = $request->integer('department_id') ?: null;
+        $search = $request->string('search')->toString() ?: null;
+        $dateFrom = $request->string('date_from')->toString() ?: null;
+        $dateTo = $request->string('date_to')->toString() ?: null;
 
         $scope = DataScope::forAttendance($request->user());
 
@@ -25,6 +30,13 @@ class AttendanceCorrectionController extends Controller
             ->with(['employee', 'reviewer'])
             ->tap(fn ($query) => $scope->constrain($query))
             ->when($status !== 'all', fn ($query) => $query->where('status', $status))
+            ->when($branchId, fn ($q) => $q->whereHas('employee', fn ($e) => $e->byBranch($branchId)))
+            ->when($departmentId, fn ($q) => $q->whereHas('employee', fn ($e) => $e->byDepartment($departmentId)))
+            ->when($search, fn ($q, $s) => $q->whereHas('employee', fn ($e) => $e
+                ->where('full_name', 'like', "%{$s}%")
+                ->orWhere('employee_number', 'like', "%{$s}%")))
+            ->when($dateFrom, fn ($q, $d) => $q->whereDate('work_date', '>=', $d))
+            ->when($dateTo, fn ($q, $d) => $q->whereDate('work_date', '<=', $d))
             ->orderByRaw("status = 'pending' desc")
             ->latest('work_date')
             ->paginate($perPage)
@@ -33,6 +45,9 @@ class AttendanceCorrectionController extends Controller
         return view('attendance.corrections.index', [
             'corrections' => $corrections,
             'status' => $status,
+            'filters' => compact('search', 'branchId', 'departmentId', 'dateFrom', 'dateTo'),
+            'branches' => $scope->branches(),
+            'departments' => $scope->departments(),
             'pendingCount' => AttendanceCorrection::query()
                 ->pending()
                 ->tap(fn ($query) => $scope->constrain($query))

@@ -16,12 +16,41 @@
             <div class="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{{ session('error') }}</div>
         @endif
 
-        <section class="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
+        <section class="space-y-4 rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
             <div class="flex flex-wrap items-center gap-2">
                 @foreach (['pending_hr' => 'Menunggu HR', 'pending_partner' => 'Menunggu Rekan', 'approved' => 'Disetujui', 'rejected' => 'Ditolak', 'all' => 'Semua'] as $value => $label)
-                    <a href="{{ route('attendance.swaps.index', ['status' => $value]) }}" @class(['rounded-md px-3 py-1.5 text-sm font-medium', 'bg-primary text-white' => $status === $value, 'border border-gray-200 text-gray-700 hover:bg-gray-50' => $status !== $value])>{{ $label }}</a>
+                    <a href="{{ route('attendance.swaps.index', array_merge(request()->except('page'), ['status' => $value])) }}" @class(['rounded-md px-3 py-1.5 text-sm font-medium', 'bg-primary text-white' => $status === $value, 'border border-gray-200 text-gray-700 hover:bg-gray-50' => $status !== $value])>{{ $label }}</a>
                 @endforeach
             </div>
+
+            <form method="GET" action="{{ route('attendance.swaps.index') }}" class="grid grid-cols-1 gap-3 border-t border-gray-100 pt-4 sm:grid-cols-2 lg:grid-cols-5 lg:items-end">
+                <input type="hidden" name="status" value="{{ $status }}">
+                <div class="lg:col-span-2">
+                    <label for="search" class="block text-xs font-medium text-gray-600">Cari pengaju</label>
+                    <input id="search" name="search" value="{{ $filters['search'] }}" placeholder="Nama / NIK" class="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-xs outline-none focus:border-primary focus:ring-2 focus:ring-primary/20">
+                </div>
+                <div>
+                    <label for="branch_id" class="block text-xs font-medium text-gray-600">Lokasi pengaju</label>
+                    <select id="branch_id" name="branch_id" class="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-xs outline-none focus:border-primary focus:ring-2 focus:ring-primary/20">
+                        <option value="">Semua</option>
+                        @foreach ($branches as $branch)
+                            <option value="{{ $branch->id }}" @selected($filters['branchId'] === $branch->id)>{{ $branch->name }}</option>
+                        @endforeach
+                    </select>
+                </div>
+                <div>
+                    <label for="date_from" class="block text-xs font-medium text-gray-600">Dari tanggal</label>
+                    <input type="date" id="date_from" name="date_from" value="{{ $filters['dateFrom'] }}" class="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-xs outline-none focus:border-primary focus:ring-2 focus:ring-primary/20">
+                </div>
+                <div>
+                    <label for="date_to" class="block text-xs font-medium text-gray-600">Sampai tanggal</label>
+                    <input type="date" id="date_to" name="date_to" value="{{ $filters['dateTo'] }}" class="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-xs outline-none focus:border-primary focus:ring-2 focus:ring-primary/20">
+                </div>
+                <div class="flex gap-2 sm:col-span-2 lg:col-span-5 lg:justify-end">
+                    <button type="submit" class="rounded-md bg-primary px-4 py-2 text-sm font-semibold text-white">Filter</button>
+                    <a href="{{ route('attendance.swaps.index', ['status' => $status]) }}" class="rounded-md border border-gray-200 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">Reset</a>
+                </div>
+            </form>
         </section>
 
         <section class="overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm">

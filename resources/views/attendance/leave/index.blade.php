@@ -16,7 +16,7 @@
             <form method="GET" action="{{ route('attendance.leave.index') }}" class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
                 <div class="lg:col-span-2">
                     <label for="search" class="block text-sm font-medium text-gray-700">Cari karyawan</label>
-                    <input id="search" name="search" value="{{ $filters['search'] ?? '' }}" class="mt-2 block w-full rounded-md border border-gray-300 px-3 py-2.5 text-sm shadow-xs outline-none focus:border-primary focus:ring-2 focus:ring-primary/20" placeholder="Nama karyawan">
+                    <input id="search" name="search" value="{{ $filters['search'] ?? '' }}" class="mt-2 block w-full rounded-md border border-gray-300 px-3 py-2.5 text-sm shadow-xs outline-none focus:border-primary focus:ring-2 focus:ring-primary/20" placeholder="Nama / NIK karyawan">
                 </div>
                 <div>
                     <label for="status" class="block text-sm font-medium text-gray-700">Status</label>
@@ -27,7 +27,42 @@
                         @endforeach
                     </select>
                 </div>
-                <div class="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-end">
+                <div>
+                    <label for="leave_type_id" class="block text-sm font-medium text-gray-700">Jenis cuti</label>
+                    <select id="leave_type_id" name="leave_type_id" class="mt-2 block w-full rounded-md border border-gray-300 px-3 py-2.5 text-sm shadow-xs outline-none focus:border-primary focus:ring-2 focus:ring-primary/20">
+                        <option value="">Semua jenis</option>
+                        @foreach ($leaveTypes as $type)
+                            <option value="{{ $type->id }}" @selected((string) ($filters['leave_type_id'] ?? '') === (string) $type->id)>{{ $type->name }}</option>
+                        @endforeach
+                    </select>
+                </div>
+                <div>
+                    <label for="branch_id" class="block text-sm font-medium text-gray-700">Lokasi</label>
+                    <select id="branch_id" name="branch_id" class="mt-2 block w-full rounded-md border border-gray-300 px-3 py-2.5 text-sm shadow-xs outline-none focus:border-primary focus:ring-2 focus:ring-primary/20">
+                        <option value="">Semua lokasi</option>
+                        @foreach ($branches as $branch)
+                            <option value="{{ $branch->id }}" @selected((string) ($filters['branch_id'] ?? '') === (string) $branch->id)>{{ $branch->name }}</option>
+                        @endforeach
+                    </select>
+                </div>
+                <div>
+                    <label for="department_id" class="block text-sm font-medium text-gray-700">Divisi</label>
+                    <select id="department_id" name="department_id" class="mt-2 block w-full rounded-md border border-gray-300 px-3 py-2.5 text-sm shadow-xs outline-none focus:border-primary focus:ring-2 focus:ring-primary/20">
+                        <option value="">Semua divisi</option>
+                        @foreach ($departments as $department)
+                            <option value="{{ $department->id }}" @selected((string) ($filters['department_id'] ?? '') === (string) $department->id)>{{ $department->name }}</option>
+                        @endforeach
+                    </select>
+                </div>
+                <div>
+                    <label for="date_from" class="block text-sm font-medium text-gray-700">Dari tanggal</label>
+                    <input type="date" id="date_from" name="date_from" value="{{ $filters['date_from'] ?? '' }}" class="mt-2 block w-full rounded-md border border-gray-300 px-3 py-2.5 text-sm shadow-xs outline-none focus:border-primary focus:ring-2 focus:ring-primary/20">
+                </div>
+                <div>
+                    <label for="date_to" class="block text-sm font-medium text-gray-700">Sampai tanggal</label>
+                    <input type="date" id="date_to" name="date_to" value="{{ $filters['date_to'] ?? '' }}" class="mt-2 block w-full rounded-md border border-gray-300 px-3 py-2.5 text-sm shadow-xs outline-none focus:border-primary focus:ring-2 focus:ring-primary/20">
+                </div>
+                <div class="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-end lg:col-span-4">
                     <button type="submit" class="w-full rounded-md bg-primary px-4 py-2.5 text-sm font-semibold text-white sm:w-auto">Filter</button>
                     <a href="{{ route('attendance.leave.index') }}" class="w-full rounded-md border border-gray-200 px-4 py-2.5 text-center text-sm font-medium text-gray-700 transition hover:bg-gray-50 sm:w-auto">Reset</a>
                 </div>

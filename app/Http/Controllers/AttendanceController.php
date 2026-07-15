@@ -30,11 +30,18 @@ class AttendanceController extends Controller
     {
         $date = $this->resolveDate($request->input('date'));
         $branchId = $request->integer('branch_id') ?: null;
+        $departmentId = $request->integer('department_id') ?: null;
+        $search = $request->string('search')->toString() ?: null;
+        $statusFilter = $request->string('status')->toString() ?: null;
         $scope = DataScope::forAttendance($request->user());
 
         $employees = $scope->employees()
             ->active()
             ->when($branchId, fn ($query) => $query->where('branch_id', $branchId))
+            ->byDepartment($departmentId)
+            ->when($search, fn ($query, $s) => $query->where(fn ($q) => $q
+                ->where('full_name', 'like', "%{$s}%")
+                ->orWhere('employee_number', 'like', "%{$s}%")))
             ->with([
                 'attendances' => fn ($query) => $query->whereDate('work_date', $date->toDateString())->with('shift'),
                 'schedules' => fn ($query) => $query->whereDate('work_date', $date->toDateString())->with('shift'),
@@ -42,11 +49,19 @@ class AttendanceController extends Controller
             ->orderBy('full_name')
             ->get();
 
-        // Status tally for the summary strip.
+        // Status tally for the summary strip — computed across the population (lokasi +
+        // divisi + pencarian), before the status filter narrows the visible rows.
         $summary = $employees
             ->map(fn (Employee $e) => $e->attendances->first()?->status)
             ->filter()
             ->countBy(fn (AttendanceStatus $status) => $status->value);
+
+        // The status filter only narrows the table itself.
+        if ($statusFilter) {
+            $employees = $employees
+                ->filter(fn (Employee $e) => $e->attendances->first()?->status?->value === $statusFilter)
+                ->values();
+        }
 
         return view('attendance.daily.index', [
             'employees' => $employees,
@@ -55,7 +70,11 @@ class AttendanceController extends Controller
             'prevDate' => $date->copy()->subDay()->toDateString(),
             'nextDate' => $date->copy()->addDay()->toDateString(),
             'branches' => $scope->branches(),
+            'departments' => $scope->departments(),
             'branchId' => $branchId,
+            'departmentId' => $departmentId,
+            'search' => $search,
+            'statusFilter' => $statusFilter,
             'hasNoScope' => $scope->isEmpty(),
             'shifts' => Shift::query()->where('is_active', true)->orderBy('start_time')->get(),
             'statuses' => AttendanceStatus::options(),

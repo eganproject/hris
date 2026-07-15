@@ -17,18 +17,31 @@
         @endif
 
         <section class="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
-            <form method="GET" action="{{ route('attendance.overtime.index') }}" class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <form method="GET" action="{{ route('attendance.overtime.index') }}" class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5 lg:items-end">
                 <div class="flex items-center gap-2">
-                    <a href="{{ route('attendance.overtime.index', ['month' => $prevMonth, 'branch_id' => $branchId]) }}" class="rounded-md border border-gray-200 px-3 py-2 text-sm text-gray-600 hover:bg-gray-50">‹</a>
-                    <input type="month" name="month" value="{{ $month->format('Y-m') }}" onchange="this.form.submit()" class="rounded-md border border-gray-300 px-3 py-2 text-sm shadow-xs outline-none focus:border-primary focus:ring-2 focus:ring-primary/20">
-                    <a href="{{ route('attendance.overtime.index', ['month' => $nextMonth, 'branch_id' => $branchId]) }}" class="rounded-md border border-gray-200 px-3 py-2 text-sm text-gray-600 hover:bg-gray-50">›</a>
+                    <a href="{{ route('attendance.overtime.index', array_merge(request()->query(), ['month' => $prevMonth])) }}" class="rounded-md border border-gray-200 px-3 py-2 text-sm text-gray-600 hover:bg-gray-50">‹</a>
+                    <input type="month" name="month" value="{{ $month->format('Y-m') }}" onchange="this.form.submit()" class="w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-xs outline-none focus:border-primary focus:ring-2 focus:ring-primary/20">
+                    <a href="{{ route('attendance.overtime.index', array_merge(request()->query(), ['month' => $nextMonth])) }}" class="rounded-md border border-gray-200 px-3 py-2 text-sm text-gray-600 hover:bg-gray-50">›</a>
                 </div>
+                <select name="status" onchange="this.form.submit()" class="rounded-md border border-gray-300 px-3 py-2 text-sm shadow-xs outline-none focus:border-primary focus:ring-2 focus:ring-primary/20">
+                    <option value="">Semua status</option>
+                    @foreach ($statuses as $value => $label)
+                        <option value="{{ $value }}" @selected($status === $value)>{{ $label }}</option>
+                    @endforeach
+                </select>
                 <select name="branch_id" onchange="this.form.submit()" class="rounded-md border border-gray-300 px-3 py-2 text-sm shadow-xs outline-none focus:border-primary focus:ring-2 focus:ring-primary/20">
                     <option value="">Semua lokasi</option>
                     @foreach ($branches as $branch)
                         <option value="{{ $branch->id }}" @selected($branchId === $branch->id)>{{ $branch->name }}</option>
                     @endforeach
                 </select>
+                <select name="department_id" onchange="this.form.submit()" class="rounded-md border border-gray-300 px-3 py-2 text-sm shadow-xs outline-none focus:border-primary focus:ring-2 focus:ring-primary/20">
+                    <option value="">Semua divisi</option>
+                    @foreach ($departments as $department)
+                        <option value="{{ $department->id }}" @selected($departmentId === $department->id)>{{ $department->name }}</option>
+                    @endforeach
+                </select>
+                <input name="search" value="{{ $search }}" placeholder="Cari nama / NIK" class="rounded-md border border-gray-300 px-3 py-2 text-sm shadow-xs outline-none focus:border-primary focus:ring-2 focus:ring-primary/20">
             </form>
         </section>
 
