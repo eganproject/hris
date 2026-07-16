@@ -53,11 +53,15 @@
         </section>
 
         <section class="overflow-x-auto rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
-            @forelse ($tree as $node)
-                @include('organization.partials.node', ['node' => $node, 'depth' => 0])
-            @empty
+            @if (count($tree) > 0)
+                <ul class="org-tree">
+                    @foreach ($tree as $node)
+                        <li>@include('organization.partials.node', ['node' => $node, 'depth' => 0])</li>
+                    @endforeach
+                </ul>
+            @else
                 <p class="px-2 py-8 text-center text-sm text-gray-400">Belum ada karyawan aktif untuk ditampilkan pada bagan.</p>
-            @endforelse
+            @endif
         </section>
     </div>
 
@@ -70,7 +74,7 @@
                 if (!children) return;
                 children.hidden = !open;
                 button.setAttribute('aria-expanded', String(open));
-                button.classList.toggle('rotate-90', open);
+                button.querySelector('svg')?.classList.toggle('rotate-90', open);
             };
 
             document.querySelectorAll('[data-org-toggle]').forEach((button) => {

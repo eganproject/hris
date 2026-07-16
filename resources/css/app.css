@@ -931,3 +931,89 @@
         }
     }
 }
+
+/* ── Bagan organisasi: pohon top-down dengan garis penghubung ─────────────── */
+.org-tree {
+    --org-line: #cbd5e1;
+    display: inline-flex;
+    justify-content: center;
+    min-width: 100%;
+    padding: 0.5rem 0.25rem 0.25rem;
+}
+
+.org-tree ul {
+    position: relative;
+    display: flex;
+    justify-content: center;
+    padding-top: 1.5rem;
+}
+
+/* A subtree node stacks its card above its children row. */
+.org-tree li {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 1.5rem 0.6rem 0;
+    list-style: none;
+}
+
+/* Root nodes have no parent, so no connector space above them. */
+.org-tree > li {
+    padding-top: 0;
+}
+
+/* Horizontal connectors between siblings (only for nested nodes). */
+.org-tree ul li::before,
+.org-tree ul li::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    right: 50%;
+    width: 50%;
+    height: 1.5rem;
+    border-top: 1px solid var(--org-line);
+}
+
+.org-tree ul li::after {
+    right: auto;
+    left: 50%;
+    border-left: 1px solid var(--org-line);
+}
+
+/* A lone child needs only the vertical drop, not the horizontal split. */
+.org-tree ul li:only-child::before,
+.org-tree ul li:only-child::after {
+    display: none;
+}
+
+/* Trim the outer half-lines at the ends of a sibling row and round the corners. */
+.org-tree ul li:first-child::before,
+.org-tree ul li:last-child::after {
+    border: 0 none;
+}
+
+.org-tree ul li:last-child::before {
+    border-right: 1px solid var(--org-line);
+    border-radius: 0 6px 0 0;
+}
+
+.org-tree ul li:first-child::after {
+    border-radius: 6px 0 0 0;
+}
+
+/* Vertical line dropping from a parent card into its children row. */
+.org-tree ul::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 50%;
+    width: 0;
+    height: 1.5rem;
+    border-left: 1px solid var(--org-line);
+}
+
+/* The [hidden] attribute must beat the flex display above when a node is collapsed. */
+.org-tree ul[hidden] {
+    display: none;
+}
