@@ -36,6 +36,16 @@ test('the iclock handshake returns options for a registered device', function ()
     expect(Device::query()->firstWhere('serial_number', 'X1')->last_seen_at)->not->toBeNull();
 });
 
+test('the handshake tells the device its timezone in hours so its clock stays correct', function () {
+    // Default (Jakarta) → GMT+7 so the X100-C stops drifting an hour off.
+    Device::query()->create(['serial_number' => 'X1', 'name' => 'Lobby', 'is_active' => true, 'timezone' => 'Asia/Jakarta']);
+    $this->get('/iclock/cdata?SN=X1')->assertOk()->assertSee('TimeZone=7');
+
+    // A device configured for another zone advertises its own offset (WIT → GMT+9).
+    Device::query()->create(['serial_number' => 'X2', 'name' => 'Papua', 'is_active' => true, 'timezone' => 'Asia/Jayapura']);
+    $this->get('/iclock/cdata?SN=X2')->assertOk()->assertSee('TimeZone=9');
+});
+
 test('an unknown or inactive serial number is rejected', function () {
     $this->get('/iclock/cdata?SN=NOPE')->assertStatus(401);
     pushAttlog('NOPE', "1\t2026-02-10 08:00:00\t0\t1")->assertStatus(401);

@@ -31,6 +31,13 @@ class IclockController extends Controller
         $device = $this->device($request);
         $this->record($device, $request, 'handshake');
 
+        // ZKTeco push devices (Solution X100-C) sync their clock from the ADMS. Without
+        // an authoritative TimeZone option the device falls back to its own offset and
+        // drifts — the X100-C ends up an hour off. We send the offset in HOURS (GMT+7 →
+        // 7 for Jakarta), the format this firmware expects, derived from the device's
+        // configured timezone so it always matches how punches are interpreted.
+        $offsetHours = intdiv(now($device->timezone ?: config('app.timezone'))->utcOffset(), 60);
+
         $options = implode("\n", [
             'GET OPTION FROM: '.$device->serial_number,
             'Stamp=9999',
@@ -40,6 +47,7 @@ class IclockController extends Controller
             'TransTimes=00:00;14:05',
             'TransInterval=1',
             'TransFlag=1111000000',
+            'TimeZone='.$offsetHours,
             'Realtime=1',
             'Encrypt=0',
         ]);
