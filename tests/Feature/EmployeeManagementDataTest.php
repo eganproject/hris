@@ -597,6 +597,74 @@ test('employee with login account can be updated without changing password', fun
         ->and($loginUser->email)->toBe('nina.updated@example.test');
 });
 
+test('the edit form still shows the contract when its status is no longer active', function () {
+    $user = employeeManager();
+    ['branch' => $branch, 'department' => $department, 'position' => $position] = hrMasterData();
+
+    $employee = Employee::query()->create([
+        'branch_id' => $branch->id, 'department_id' => $department->id, 'job_position_id' => $position->id,
+        'full_name' => 'Kontrak Kedaluwarsa', 'join_date' => now()->subYears(2)->format('Y-m-d'),
+        'employment_status' => 'active',
+    ]);
+
+    // Only "active" fills currentContract; an expired one used to blank the whole form.
+    $employee->contracts()->create([
+        'contract_number' => 'CTR-EXP-1', 'contract_type' => 'PKWT',
+        'start_date' => now()->subYears(2)->format('Y-m-d'), 'end_date' => now()->subDay()->format('Y-m-d'),
+        'status' => 'expired',
+    ]);
+
+    $this->actingAs($user)->get("/employees/{$employee->id}/edit")
+        ->assertOk()
+        ->assertSee('CTR-EXP-1');
+});
+
+test('editing an employee whose contract has ended updates it in place, not as a duplicate', function () {
+    $user = employeeManager();
+    ['branch' => $branch, 'department' => $department, 'position' => $position] = hrMasterData();
+
+    $employee = Employee::query()->create([
+        'branch_id' => $branch->id, 'department_id' => $department->id, 'job_position_id' => $position->id,
+        'full_name' => 'Kontrak Selesai', 'join_date' => now()->subYears(2)->format('Y-m-d'),
+        'employment_status' => 'active',
+    ]);
+    $employee->departments()->sync([$department->id]);
+
+    $contract = $employee->contracts()->create([
+        'contract_number' => 'CTR-END-1', 'contract_type' => 'PKWT',
+        'start_date' => now()->subYears(2)->format('Y-m-d'), 'end_date' => now()->subDay()->format('Y-m-d'),
+        'status' => 'expired',
+    ]);
+
+    // Saving the form back with the SAME contract number must not trip the unique rule
+    // (it used to, because the rule ignored nothing) nor create a second contract row.
+    $this->actingAs($user)
+        ->from("/employees/{$employee->id}/edit")
+        ->put("/employees/{$employee->id}", [
+            'branch_id' => $branch->id,
+            'department_ids' => [$department->id],
+            'job_position_id' => $position->id,
+            'full_name' => 'Kontrak Selesai Updated',
+            'machine_pins' => [['device_id' => null, 'machine_user_id' => '77']],
+            'join_date' => now()->subYears(2)->format('Y-m-d'),
+            'employment_status' => 'active',
+            'contract_number' => 'CTR-END-1',
+            'contract_type' => 'PKWT',
+            'contract_start_date' => now()->subYears(2)->format('Y-m-d'),
+            'contract_end_date' => now()->addYear()->format('Y-m-d'),
+            'contract_status' => 'active',
+            'login_password' => '',
+            'login_role_id' => null,
+        ])
+        ->assertSessionHasNoErrors()
+        ->assertRedirect('/employees');
+
+    expect($employee->fresh()->full_name)->toBe('Kontrak Selesai Updated')
+        ->and($employee->contracts()->count())->toBe(1)
+        ->and($contract->fresh()->status)->toBe('active')
+        ->and($contract->fresh()->end_date->format('Y-m-d'))->toBe(now()->addYear()->format('Y-m-d'));
+});
+
 test('employee can be resigned and login account is disabled', function () {
     $user = employeeManager();
     ['branch' => $branch, 'department' => $department, 'position' => $position] = hrMasterData();

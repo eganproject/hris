@@ -377,7 +377,14 @@ class EmployeeManagementController extends Controller
             $employee->update($this->employeePayload($request));
             $this->syncDepartments($request, $employee);
 
-            $contract = $employee->currentContract ?: $employee->contracts()->make();
+            // A plain edit keeps working on the contract already stored (active, or the
+            // most recent one for an employee whose contract has ended/expired) so its
+            // details are corrected in place. Only a reactivation starts a fresh
+            // contract, leaving the closed one intact as history.
+            $contract = $isReactivateViaEdit
+                ? $employee->contracts()->make()
+                : ($employee->editableContract() ?? $employee->contracts()->make());
+
             $contract->fill($this->contractPayload($request));
             $contract->save();
 

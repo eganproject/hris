@@ -35,7 +35,6 @@ class EmployeeRequest extends FormRequest
     {
         $employee = $this->route('employee');
         $employeeId = $employee?->id;
-        $contractId = $employee?->currentContract?->id;
         $userId = $employee?->user_id;
         $requiresLoginPassword = $this->isMethod('post') && $this->filled('email') && ! $userId;
 
@@ -44,6 +43,12 @@ class EmployeeRequest extends FormRequest
         // required and are processed together with the save.
         $isClosingExit = $this->input('employment_status') === 'inactive'
             && (! $employee || ! $employee->isInactive());
+
+        // Reactivating from the edit form starts a fresh contract (see update()), so
+        // its number must be new. A plain edit keeps working on the contract already
+        // stored, so that same number must not be flagged as taken.
+        $isReactivating = $employee && $employee->isInactive() && $this->input('employment_status') === 'active';
+        $contractId = $isReactivating ? null : $employee?->editableContract()?->id;
         $exitJoinDate = $employee?->join_date?->format('Y-m-d') ?: $this->input('join_date');
 
         return [

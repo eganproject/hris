@@ -256,6 +256,18 @@ class Employee extends Model
     }
 
     /**
+     * The contract the edit form reads and writes: the active one when there is one,
+     * otherwise the most recent (selesai/kedaluwarsa/diperpanjang/dibatalkan). Only
+     * five of the six statuses are "active", so keying off currentContract alone left
+     * the contract fields blank — and saving then created a duplicate contract row
+     * instead of editing the existing one.
+     */
+    public function editableContract(): ?EmployeeContract
+    {
+        return $this->currentContract ?? $this->latestContract;
+    }
+
+    /**
      * Rows that make an employee's record part of the operational history: deleting
      * the employee would cascade these away (attendance, leave, schedules, …), so
      * once any of them exists the record can only be exited, never deleted.

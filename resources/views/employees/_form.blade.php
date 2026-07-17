@@ -1,5 +1,5 @@
 @php
-    $contract = old('contract_number') ? null : ($employee->currentContract ?? null);
+    $contract = old('contract_number') ? null : ($employee->exists ? $employee->editableContract() : null);
     // Selecting "Nonaktif" runs the exit flow; that is possible whenever the employee
     // is not already inactive (a new employee, or an active one being edited).
     $canExit = ! ($employee->exists && $employee->isInactive());
@@ -231,7 +231,10 @@
     @endpush
 
     <section class="rounded-lg border border-gray-200 bg-white p-6 shadow-sm" role="tabpanel" data-stepper-panel="2" hidden>
-        <h2 class="text-base font-semibold text-gray-950">Kontrak Aktif</h2>
+        <h2 class="text-base font-semibold text-gray-950">Kontrak</h2>
+        @if ($contract && $contract->status !== 'active')
+            <p class="mt-1 text-sm text-gray-500">Kontrak terakhir karyawan ini berstatus <span class="font-medium text-gray-700">{{ $contract->status_label }}</span>. Menyimpan akan memperbarui kontrak tersebut. Untuk memulai kontrak baru, gunakan <span class="font-medium text-gray-700">Perpanjang Kontrak</span>.</p>
+        @endif
         <div class="mt-5 grid grid-cols-1 gap-5 md:grid-cols-2">
                 <div>
                     <label for="contract_number" class="block text-sm font-medium text-gray-700">Nomor Kontrak <span class="field-requirement is-required" aria-label="Wajib diisi">*</span></label>
