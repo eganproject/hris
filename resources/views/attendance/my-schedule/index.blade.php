@@ -4,7 +4,7 @@
             <div>
                 <p class="text-sm font-medium text-gray-500">Self-service</p>
                 <h1 class="mt-1 text-2xl font-semibold text-gray-950">Jadwal &amp; Tukar Jadwal</h1>
-                <p class="mt-1 text-sm text-gray-500">Jadwal 14 hari ke depan. Ajukan tukar shift, ambil-alih, atau tukar libur dengan rekan.</p>
+                <p class="mt-1 text-sm text-gray-500">Jadwal 14 hari ke depan, lengkap dengan cuti/izin Anda. Ajukan tukar shift, ambil-alih, atau tukar libur dengan rekan.</p>
             </div>
             <button type="button" data-open-swap class="rounded-md bg-primary px-4 py-2.5 text-sm font-semibold text-white shadow-xs hover:bg-primary-hover">Ajukan Tukar</button>
         </section>
@@ -39,16 +39,26 @@
             <div class="border-b border-gray-200 px-5 py-3"><h2 class="text-sm font-semibold text-gray-950">Jadwal Saya (14 hari)</h2></div>
             <div class="overflow-x-auto">
                 <table class="data-table">
-                    <thead><tr><th>Tanggal</th><th>Shift</th><th>Jam</th></tr></thead>
+                    <thead><tr><th>Tanggal</th><th>Shift</th><th>Jam</th><th>Keterangan</th></tr></thead>
                     <tbody>
                         @forelse ($schedule as $row)
-                            <tr>
+                            @php $leave = $leaveByDate[$row->work_date->format('Y-m-d')] ?? null; @endphp
+                            <tr @class(['bg-emerald-50/40' => $leave && $leave['status'] === \App\Enums\LeaveRequestStatus::Approved])>
                                 <td class="text-sm text-gray-700">{{ $row->work_date->translatedFormat('D, d M Y') }}</td>
                                 <td class="text-sm">@if ($row->is_day_off || ! $row->shift)<span class="text-gray-400">Libur</span>@else<span class="font-medium text-gray-900">{{ $row->shift->code }}</span> <span class="text-gray-500">{{ $row->shift->name }}</span>@endif</td>
                                 <td class="text-sm text-gray-500">{{ $row->shift && ! $row->is_day_off ? $row->shift->time_range_label : '—' }}</td>
+                                <td class="text-sm">
+                                    @if ($leave)
+                                        <x-status-badge :tone="$leave['status']->tone()">
+                                            {{ $leave['status'] === \App\Enums\LeaveRequestStatus::Approved ? $leave['label'] : $leave['label'] . ' (diajukan)' }}
+                                        </x-status-badge>
+                                    @else
+                                        <span class="text-gray-300">—</span>
+                                    @endif
+                                </td>
                             </tr>
                         @empty
-                            <tr><td colspan="3" class="cell-empty">Belum ada jadwal 14 hari ke depan.</td></tr>
+                            <tr><td colspan="4" class="cell-empty">Belum ada jadwal 14 hari ke depan.</td></tr>
                         @endforelse
                     </tbody>
                 </table>
