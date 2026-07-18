@@ -7,6 +7,8 @@
 
         <title>{{ $title ?? config('app.name', 'HRIS') }}</title>
 
+        <link rel="icon" type="image/svg+xml" href="{{ asset('img/company-logo.svg') }}">
+
         @vite(['resources/css/app.css', 'resources/js/app.js'])
     </head>
     <body class="min-h-screen bg-[#f5f7fa] font-sans text-[13px] text-gray-800 antialiased">
@@ -36,9 +38,8 @@
             <div class="mobile-nav-overlay" data-mobile-nav-overlay aria-hidden="true"></div>
             <aside class="admin-sidebar flex flex-col border-r border-[#e5e7eb] bg-[#f8fafc]">
                 <div class="sidebar-brand flex h-[52px] shrink-0 items-center gap-2.5 border-b border-[#e5e7eb] px-4">
-                    <div class="flex size-7 shrink-0 items-center justify-center rounded bg-primary text-[10px] font-semibold text-white">
-                        CO
-                    </div>
+                    <img src="{{ asset('img/company-logo.svg') }}" alt="{{ config('app.name', 'HRIS') }}" class="size-7 shrink-0 rounded border border-gray-200 bg-white object-contain">
+
                     <div class="sidebar-brand-text min-w-0">
                         <p class="truncate text-[13px] font-semibold text-gray-900">{{ config('app.name', 'HRIS') }}</p>
                         <p class="text-[11px] text-gray-500">Admin Workspace</p>

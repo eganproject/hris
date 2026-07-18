@@ -425,6 +425,15 @@ class Employee extends Model
         return $this->photo_path ? Storage::disk('public')->url($this->photo_path) : null;
     }
 
+    /**
+     * Foto yang siap ditampilkan: foto karyawan bila ada, selain itu memakai
+     * logo perusahaan sebagai gambar default.
+     */
+    public function getPhotoDisplayUrlAttribute(): string
+    {
+        return $this->photo_url ?? asset('img/company-logo.svg');
+    }
+
     public function getEmploymentStatusLabelAttribute(): string
     {
         return self::employmentStatusLabels()[$this->employment_status] ?? str($this->employment_status)->headline()->toString();

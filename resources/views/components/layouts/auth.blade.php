@@ -7,15 +7,16 @@
 
         <title>{{ $title ?? config('app.name', 'HRIS') }}</title>
 
+        <link rel="icon" type="image/svg+xml" href="{{ asset('img/company-logo.svg') }}">
+
         @vite(['resources/css/app.css', 'resources/js/app.js'])
     </head>
     <body class="min-h-screen bg-[#f7f8fa] font-sans text-gray-900 antialiased">
         <main class="grid min-h-screen grid-cols-1 lg:grid-cols-[1fr_520px]">
             <section class="hidden bg-[#edf2f7] px-12 py-10 lg:flex lg:flex-col lg:justify-between">
                 <div class="flex items-center gap-3">
-                    <div class="flex size-10 items-center justify-center rounded-md bg-primary text-sm font-semibold text-white">
-                        HR
-                    </div>
+                    <img src="{{ asset('img/company-logo.svg') }}" alt="{{ config('app.name', 'HRIS') }}" class="size-10 rounded-md border border-gray-200 bg-white object-contain">
+
                     <div>
                         <p class="text-sm font-semibold text-gray-950">{{ config('app.name', 'HRIS') }}</p>
                         <p class="text-xs text-gray-500">People operations workspace</p>

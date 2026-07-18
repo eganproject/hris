@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" role="img" aria-label="CoK">
+  <rect width="200" height="200" fill="#ffffff"/>
+  <g font-family="'Poppins','Segoe UI',system-ui,-apple-system,Arial,sans-serif" font-weight="800">
+    <text x="50" y="100" text-anchor="middle" dominant-baseline="central" font-size="96" fill="#16255A">C</text>
+    <circle cx="100" cy="100" r="16" fill="#F5A623"/>
+    <text x="150" y="100" text-anchor="middle" dominant-baseline="central" font-size="96" fill="#16255A">K</text>
+  </g>
+</svg>

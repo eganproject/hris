@@ -3,13 +3,7 @@
         <section class="flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
             <div>
                 <div class="mb-4">
-                    @if ($employee->photo_url)
-                        <img src="{{ $employee->photo_url }}" alt="Foto {{ $employee->full_name }}" class="size-20 rounded-md border border-gray-200 object-cover shadow-sm">
-                    @else
-                        <div class="flex size-20 items-center justify-center rounded-md border border-gray-200 bg-gray-100 text-2xl font-semibold text-gray-500 shadow-sm">
-                            {{ str($employee->full_name ?: 'K')->substr(0, 1)->upper() }}
-                        </div>
-                    @endif
+                    <img src="{{ $employee->photo_display_url }}" alt="Foto {{ $employee->full_name }}" class="size-20 rounded-md border border-gray-200 bg-white object-cover shadow-sm">
                 </div>
                 <p class="text-sm font-medium text-gray-500">{{ $employee->employee_number }}</p>
                 <h1 class="mt-1 text-2xl font-semibold text-gray-950">{{ $employee->full_name }}</h1>

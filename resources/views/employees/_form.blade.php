@@ -51,8 +51,8 @@
                     <div
                         data-image-placeholder
                         @if ($employee->photo_url) hidden @endif
-                        class="flex size-20 items-center justify-center rounded-md border border-gray-200 bg-gray-100 text-lg font-semibold text-gray-500">
-                        {{ str($employee->full_name ?: 'K')->substr(0, 1)->upper() }}
+                        class="size-20 overflow-hidden rounded-md border border-gray-200 bg-white">
+                        <img src="{{ asset('img/company-logo.svg') }}" alt="Logo perusahaan" class="size-full object-cover">
                     </div>
                     <div class="min-w-0 flex-1">
                         <input id="photo" name="photo" type="file" accept="image/jpeg,image/png,image/webp" data-image-input class="block w-full rounded-md border border-gray-300 bg-white px-3 py-2.5 text-sm shadow-xs outline-none file:mr-3 file:rounded-sm file:border-0 file:bg-gray-100 file:px-3 file:py-1.5 file:text-xs file:font-semibold file:text-gray-700 hover:file:bg-gray-200 focus:border-primary focus:ring-2 focus:ring-primary/20">

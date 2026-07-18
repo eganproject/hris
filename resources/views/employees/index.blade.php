@@ -194,13 +194,7 @@
                                 @endcanany
                                 <td>
                                     <div class="flex items-center gap-3">
-                                        @if ($employee->photo_url)
-                                            <img src="{{ $employee->photo_url }}" alt="Foto {{ $employee->full_name }}" class="size-9 shrink-0 rounded-full border border-gray-200 object-cover">
-                                        @else
-                                            <div class="flex size-9 shrink-0 items-center justify-center rounded-full border border-gray-200 bg-gray-100 text-sm font-semibold text-gray-500">
-                                                {{ str($employee->full_name ?: 'K')->substr(0, 1)->upper() }}
-                                            </div>
-                                        @endif
+                                        <img src="{{ $employee->photo_display_url }}" alt="Foto {{ $employee->full_name }}" class="size-9 shrink-0 rounded-full border border-gray-200 bg-white object-cover">
                                         <div class="min-w-0">
                                             <a href="{{ route('employees.show', $employee) }}" class="font-medium text-gray-950 hover:underline">
                                                 {{ $employee->full_name ?? 'Tanpa nama' }}

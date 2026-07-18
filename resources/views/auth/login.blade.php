@@ -2,9 +2,8 @@
     <div class="w-full max-w-md">
         <div class="mb-8 lg:hidden">
             <div class="flex items-center gap-3">
-                <div class="flex size-10 items-center justify-center rounded-md bg-primary text-sm font-semibold text-white">
-                    HR
-                </div>
+                <img src="{{ asset('img/company-logo.svg') }}" alt="{{ config('app.name', 'HRIS') }}" class="size-10 rounded-md border border-gray-200 bg-white object-contain">
+
                 <div>
                     <p class="text-sm font-semibold text-gray-950">{{ config('app.name', 'HRIS') }}</p>
                     <p class="text-xs text-gray-500">People operations workspace</p>
