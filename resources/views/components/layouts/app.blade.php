@@ -56,9 +56,10 @@
 
                     @can('employees.view')
                         @php $g = request()->routeIs('employees.*', 'organization.chart'); @endphp
-                        <div @class(['sidebar-group', 'is-open' => $g]) data-sidebar-group>
-                            <button type="button" data-sidebar-group-toggle aria-expanded="{{ $g ? 'true' : 'false' }}" class="sidebar-group-toggle flex w-full items-center justify-between rounded px-2.5 py-1 text-left transition hover:bg-white/70">
-                                <span class="sidebar-section-label text-[10px] font-semibold uppercase text-gray-400">Karyawan</span>
+                        <div @class(['sidebar-group', 'is-open' => $g]) data-sidebar-group="karyawan">
+                            <button type="button" data-sidebar-group-toggle aria-expanded="{{ $g ? 'true' : 'false' }}" class="sidebar-group-toggle flex w-full items-center gap-2.5 rounded px-2.5 py-1.5 text-left transition hover:bg-white/70">
+                                <svg class="size-4 shrink-0 text-gray-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H7a4 4 0 0 0-4 4v2"></path><circle cx="9.5" cy="7" r="4"></circle><path d="M22 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
+                                <span class="sidebar-section-label flex-1 truncate text-[11px] font-semibold uppercase tracking-wide text-gray-500">Karyawan</span>
                                 <svg class="sidebar-group-chevron size-3.5 shrink-0 text-gray-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 6 6 6-6 6"></path></svg>
                             </button>
                             <div class="sidebar-group-items space-y-0.5" data-sidebar-group-items>
@@ -80,9 +81,10 @@
 
                     @canany(['organization.view', 'branches.view', 'departments.view', 'job-positions.view'])
                         @php $g = request()->routeIs('organization.index', 'organization.branches.*', 'organization.departments.*', 'organization.job-positions.*'); @endphp
-                        <div @class(['sidebar-group', 'is-open' => $g]) data-sidebar-group>
-                            <button type="button" data-sidebar-group-toggle aria-expanded="{{ $g ? 'true' : 'false' }}" class="sidebar-group-toggle flex w-full items-center justify-between rounded px-2.5 py-1 text-left transition hover:bg-white/70">
-                                <span class="sidebar-section-label text-[10px] font-semibold uppercase text-gray-400">Organization</span>
+                        <div @class(['sidebar-group', 'is-open' => $g]) data-sidebar-group="organization">
+                            <button type="button" data-sidebar-group-toggle aria-expanded="{{ $g ? 'true' : 'false' }}" class="sidebar-group-toggle flex w-full items-center gap-2.5 rounded px-2.5 py-1.5 text-left transition hover:bg-white/70">
+                                <svg class="size-4 shrink-0 text-gray-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="3" width="16" height="18" rx="2"></rect><path d="M9 8h1M14 8h1M9 12h1M14 12h1M9 16h1M14 16h1"></path></svg>
+                                <span class="sidebar-section-label flex-1 truncate text-[11px] font-semibold uppercase tracking-wide text-gray-500">Organization</span>
                                 <svg class="sidebar-group-chevron size-3.5 shrink-0 text-gray-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 6 6 6-6 6"></path></svg>
                             </button>
                             <div class="sidebar-group-items space-y-0.5" data-sidebar-group-items>
@@ -116,9 +118,10 @@
 
                     @canany(['attendance-daily.view', 'devices.view', 'corrections.view'])
                         @php $g = request()->routeIs('attendance.daily.*', 'attendance.devices.*', 'attendance.punches.*', 'attendance.corrections.*'); @endphp
-                        <div @class(['sidebar-group', 'is-open' => $g]) data-sidebar-group>
-                            <button type="button" data-sidebar-group-toggle aria-expanded="{{ $g ? 'true' : 'false' }}" class="sidebar-group-toggle flex w-full items-center justify-between rounded px-2.5 py-1 text-left transition hover:bg-white/70">
-                                <span class="sidebar-section-label text-[10px] font-semibold uppercase text-gray-400">Absensi</span>
+                        <div @class(['sidebar-group', 'is-open' => $g]) data-sidebar-group="absensi">
+                            <button type="button" data-sidebar-group-toggle aria-expanded="{{ $g ? 'true' : 'false' }}" class="sidebar-group-toggle flex w-full items-center gap-2.5 rounded px-2.5 py-1.5 text-left transition hover:bg-white/70">
+                                <svg class="size-4 shrink-0 text-gray-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 11l3 3L22 4"></path><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path></svg>
+                                <span class="sidebar-section-label flex-1 truncate text-[11px] font-semibold uppercase tracking-wide text-gray-500">Absensi</span>
                                 <svg class="sidebar-group-chevron size-3.5 shrink-0 text-gray-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 6 6 6-6 6"></path></svg>
                             </button>
                             <div class="sidebar-group-items space-y-0.5" data-sidebar-group-items>
@@ -152,9 +155,10 @@
 
                     @canany(['schedules.view', 'schedule-patterns.view', 'shifts.view', 'holidays.view'])
                         @php $g = request()->routeIs('attendance.schedules.*', 'attendance.unscheduled.*', 'attendance.schedule-patterns.*', 'attendance.shifts.*', 'attendance.holidays.*'); @endphp
-                        <div @class(['sidebar-group', 'is-open' => $g]) data-sidebar-group>
-                            <button type="button" data-sidebar-group-toggle aria-expanded="{{ $g ? 'true' : 'false' }}" class="sidebar-group-toggle flex w-full items-center justify-between rounded px-2.5 py-1 text-left transition hover:bg-white/70">
-                                <span class="sidebar-section-label text-[10px] font-semibold uppercase text-gray-400">Penjadwalan</span>
+                        <div @class(['sidebar-group', 'is-open' => $g]) data-sidebar-group="penjadwalan">
+                            <button type="button" data-sidebar-group-toggle aria-expanded="{{ $g ? 'true' : 'false' }}" class="sidebar-group-toggle flex w-full items-center gap-2.5 rounded px-2.5 py-1.5 text-left transition hover:bg-white/70">
+                                <svg class="size-4 shrink-0 text-gray-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"></rect><path d="M3 9h18M8 4v3M16 4v3"></path></svg>
+                                <span class="sidebar-section-label flex-1 truncate text-[11px] font-semibold uppercase tracking-wide text-gray-500">Penjadwalan</span>
                                 <svg class="sidebar-group-chevron size-3.5 shrink-0 text-gray-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 6 6 6-6 6"></path></svg>
                             </button>
                             <div class="sidebar-group-items space-y-0.5" data-sidebar-group-items>
@@ -192,9 +196,10 @@
 
                     @canany(['leave.view', 'leave-types.view', 'overtime.view', 'swaps.view'])
                         @php $g = request()->routeIs('attendance.leave.*', 'attendance.leave-types.*', 'attendance.leave-balances.*', 'attendance.overtime.*', 'attendance.swaps.*'); @endphp
-                        <div @class(['sidebar-group', 'is-open' => $g]) data-sidebar-group>
-                            <button type="button" data-sidebar-group-toggle aria-expanded="{{ $g ? 'true' : 'false' }}" class="sidebar-group-toggle flex w-full items-center justify-between rounded px-2.5 py-1 text-left transition hover:bg-white/70">
-                                <span class="sidebar-section-label text-[10px] font-semibold uppercase text-gray-400">Cuti &amp; Lembur</span>
+                        <div @class(['sidebar-group', 'is-open' => $g]) data-sidebar-group="cuti-lembur">
+                            <button type="button" data-sidebar-group-toggle aria-expanded="{{ $g ? 'true' : 'false' }}" class="sidebar-group-toggle flex w-full items-center gap-2.5 rounded px-2.5 py-1.5 text-left transition hover:bg-white/70">
+                                <svg class="size-4 shrink-0 text-gray-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z"></path><path d="M14 2v6h6"></path><path d="m9 15 2 2 4-4"></path></svg>
+                                <span class="sidebar-section-label flex-1 truncate text-[11px] font-semibold uppercase tracking-wide text-gray-500">Cuti &amp; Lembur</span>
                                 <svg class="sidebar-group-chevron size-3.5 shrink-0 text-gray-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 6 6 6-6 6"></path></svg>
                             </button>
                             <div class="sidebar-group-items space-y-0.5" data-sidebar-group-items>
@@ -236,9 +241,10 @@
                     @php $selfServiceEmployee = auth()->user()?->employee; @endphp
                     @if ($selfServiceEmployee || auth()->user()?->canAny(['my-leave.view', 'my-attendance.view', 'my-schedule.view', 'my-overtime.view']))
                         @php $g = request()->routeIs('my-roster.*', 'my-leave.*', 'my-attendance.*', 'my-schedule.*', 'my-overtime.*'); @endphp
-                        <div @class(['sidebar-group', 'is-open' => $g]) data-sidebar-group>
-                            <button type="button" data-sidebar-group-toggle aria-expanded="{{ $g ? 'true' : 'false' }}" class="sidebar-group-toggle flex w-full items-center justify-between rounded px-2.5 py-1 text-left transition hover:bg-white/70">
-                                <span class="sidebar-section-label text-[10px] font-semibold uppercase text-gray-400">Self-service</span>
+                        <div @class(['sidebar-group', 'is-open' => $g]) data-sidebar-group="self-service">
+                            <button type="button" data-sidebar-group-toggle aria-expanded="{{ $g ? 'true' : 'false' }}" class="sidebar-group-toggle flex w-full items-center gap-2.5 rounded px-2.5 py-1.5 text-left transition hover:bg-white/70">
+                                <svg class="size-4 shrink-0 text-gray-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
+                                <span class="sidebar-section-label flex-1 truncate text-[11px] font-semibold uppercase tracking-wide text-gray-500">Self-service</span>
                                 <svg class="sidebar-group-chevron size-3.5 shrink-0 text-gray-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 6 6 6-6 6"></path></svg>
                             </button>
                             <div class="sidebar-group-items space-y-0.5" data-sidebar-group-items>
@@ -278,9 +284,10 @@
 
                     @canany(['access-control.view', 'settings.view'])
                         @php $g = request()->routeIs('settings.*', 'access-control.*'); @endphp
-                        <div @class(['sidebar-group', 'is-open' => $g]) data-sidebar-group>
-                            <button type="button" data-sidebar-group-toggle aria-expanded="{{ $g ? 'true' : 'false' }}" class="sidebar-group-toggle flex w-full items-center justify-between rounded px-2.5 py-1 text-left transition hover:bg-white/70">
-                                <span class="sidebar-section-label text-[10px] font-semibold uppercase text-gray-400">System</span>
+                        <div @class(['sidebar-group', 'is-open' => $g]) data-sidebar-group="system">
+                            <button type="button" data-sidebar-group-toggle aria-expanded="{{ $g ? 'true' : 'false' }}" class="sidebar-group-toggle flex w-full items-center gap-2.5 rounded px-2.5 py-1.5 text-left transition hover:bg-white/70">
+                                <svg class="size-4 shrink-0 text-gray-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z"></path></svg>
+                                <span class="sidebar-section-label flex-1 truncate text-[11px] font-semibold uppercase tracking-wide text-gray-500">System</span>
                                 <svg class="sidebar-group-chevron size-3.5 shrink-0 text-gray-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 6 6 6-6 6"></path></svg>
                             </button>
                             <div class="sidebar-group-items space-y-0.5" data-sidebar-group-items>

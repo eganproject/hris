@@ -288,30 +288,102 @@ document.querySelectorAll('[data-sidebar-toggle]').forEach((button) => {
     });
 });
 
-// Collapsible sidebar groups (single-open accordion). The group containing the
-// active page is rendered open server-side; clicking a header opens that group and
-// closes the others. Disabled visually when the sidebar is minimized to icons (CSS).
-document.querySelectorAll('[data-sidebar-group-toggle]').forEach((button) => {
-    button.addEventListener('click', () => {
-        const group = button.closest('[data-sidebar-group]');
+// Collapsible sidebar groups (single-open accordion) with smooth, exact-height
+// animation and memory. The group that owns the active page is always opened so the
+// current location stays visible; on pages that belong to no group (Dashboard,
+// Laporan) the last manually-opened group is restored from localStorage. Height is
+// animated to the real content height for a smooth open/close. Icon-only mode forces
+// everything visible via CSS (!important beats the inline max-height set here).
+(() => {
+    const STORAGE_KEY = 'sidebar-open-group';
+    const nav = document.querySelector('.sidebar-nav');
+    const groups = Array.from(document.querySelectorAll('[data-sidebar-group]'));
 
-        if (!group) {
+    if (!groups.length) {
+        return;
+    }
+
+    const itemsOf = (group) => group.querySelector('[data-sidebar-group-items]');
+
+    const setOpen = (group, open, animate) => {
+        const items = itemsOf(group);
+        const toggle = group.querySelector('[data-sidebar-group-toggle]');
+
+        if (!items) {
             return;
         }
 
-        const willOpen = !group.classList.contains('is-open');
+        toggle?.setAttribute('aria-expanded', open ? 'true' : 'false');
 
-        document.querySelectorAll('[data-sidebar-group].is-open').forEach((open) => {
-            open.classList.remove('is-open');
-            open.querySelector('[data-sidebar-group-toggle]')?.setAttribute('aria-expanded', 'false');
-        });
-
-        if (willOpen) {
+        if (open) {
             group.classList.add('is-open');
-            button.setAttribute('aria-expanded', 'true');
+
+            if (!animate) {
+                items.style.maxHeight = 'none';
+                return;
+            }
+
+            items.style.maxHeight = `${items.scrollHeight}px`;
+            items.addEventListener('transitionend', function done(event) {
+                if (event.target === items && event.propertyName === 'max-height') {
+                    // Release the cap so the group can grow if its contents change.
+                    items.style.maxHeight = 'none';
+                    items.removeEventListener('transitionend', done);
+                }
+            });
+        } else {
+            group.classList.remove('is-open');
+
+            if (!animate) {
+                items.style.maxHeight = '0px';
+                return;
+            }
+
+            // From an uncapped height, pin the current height, force a reflow, then
+            // collapse to 0 so the transition has two concrete values to animate.
+            items.style.maxHeight = `${items.scrollHeight}px`;
+            void items.offsetHeight;
+            items.style.maxHeight = '0px';
         }
+    };
+
+    const openOnly = (group, animate) => {
+        groups.forEach((candidate) => setOpen(candidate, candidate === group, animate));
+    };
+
+    // Initial state (no animation): honour the remembered open/closed choice. Only on
+    // the very first visit (nothing stored yet) do we fall back to the group that owns
+    // the active page, which the server rendered open.
+    const activeGroup = () => groups.find((group) => group.classList.contains('is-open')) || null;
+    const storedKey = window.localStorage.getItem(STORAGE_KEY);
+
+    if (storedKey === null) {
+        openOnly(activeGroup(), false);
+    } else if (storedKey === '') {
+        openOnly(null, false);
+    } else {
+        const remembered = groups.find((group) => group.dataset.sidebarGroup === storedKey) || null;
+        // If the remembered group isn't available here (e.g. permissions), fall back.
+        openOnly(remembered || activeGroup(), false);
+    }
+
+    // Enable transitions only after the initial state is painted.
+    requestAnimationFrame(() => nav?.classList.add('is-ready'));
+
+    groups.forEach((group) => {
+        group.querySelector('[data-sidebar-group-toggle]')?.addEventListener('click', () => {
+            const willOpen = !group.classList.contains('is-open');
+
+            if (willOpen) {
+                openOnly(group, true);
+                window.localStorage.setItem(STORAGE_KEY, group.dataset.sidebarGroup || '');
+            } else {
+                setOpen(group, false, true);
+                window.localStorage.setItem(STORAGE_KEY, '');
+            }
+        });
     });
-});
+})();
 
 // Mobile navigation drawer: the hamburger opens the sidebar; tapping the overlay,
 // a menu link, Escape, or resizing to desktop closes it.
