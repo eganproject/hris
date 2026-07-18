@@ -54,7 +54,7 @@ class AttendanceReportExport implements FromCollection, ShouldAutoSize, WithHead
             $employee->employee_number,
             $employee->full_name,
             $employee->branch?->name ?? '-',
-            $employee->department?->name ?? '-',
+            $employee->departments->pluck('name')->implode(', ') ?: ($employee->department?->name ?? '-'),
             $employee->jobPosition?->name ?? '-',
             $row['total_hari'],
             $row['hadir'],

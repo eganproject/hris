@@ -39,7 +39,7 @@
             @forelse ($rows as $row)
                 @php $e = $row['employee']; @endphp
                 <tr>
-                    <td class="l">{{ $e->full_name }}<br><span class="sub">{{ $e->employee_number }} &middot; {{ $e->department?->name ?? '—' }}</span></td>
+                    <td class="l">{{ $e->full_name }}<br><span class="sub">{{ $e->employee_number }} &middot; {{ $e->departments->pluck('name')->implode(', ') ?: ($e->department?->name ?? '—') }}</span></td>
                     <td class="c">{{ $row['total_hari'] }}</td>
                     <td class="c">{{ $row['hadir'] }}</td>
                     <td class="c">{{ $row['terlambat'] }}</td>
@@ -55,6 +55,24 @@
                 <tr><td colspan="11" style="text-align:center; padding:16px; color:#9ca3af;">Belum ada data kehadiran pada periode ini.</td></tr>
             @endforelse
         </tbody>
+        @if ($rows->isNotEmpty())
+            @php $kerjaTotal = (int) $rows->sum('kerja_menit'); $lemburTotal = (int) $rows->sum('lembur_menit'); @endphp
+            <tfoot>
+                <tr style="font-weight:bold; background:#f3f4f6;">
+                    <td class="l">Total &middot; {{ $rows->count() }} karyawan</td>
+                    <td class="c">{{ $rows->sum('total_hari') }}</td>
+                    <td class="c">{{ $rows->sum('hadir') }}</td>
+                    <td class="c">{{ $rows->sum('terlambat') }}</td>
+                    <td class="c">{{ $rows->sum('pulang_cepat') }}</td>
+                    <td class="c">{{ $rows->sum('alfa') }}</td>
+                    <td class="c">{{ $rows->sum('cuti') }}</td>
+                    <td class="c">{{ $rows->sum('sakit') }}</td>
+                    <td class="r">{{ $rows->sum('terlambat_menit') }} m</td>
+                    <td class="r">{{ intdiv($kerjaTotal, 60) }}j {{ $kerjaTotal % 60 }}m</td>
+                    <td class="r">{{ intdiv($lemburTotal, 60) }}j {{ $lemburTotal % 60 }}m</td>
+                </tr>
+            </tfoot>
+        @endif
     </table>
 </body>
 </html>

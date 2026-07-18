@@ -27,8 +27,7 @@ class AttendanceReport
         $stats = Attendance::query()
             ->whereBetween('work_date', [$from, $to])
             ->whereHas('employee', function ($query) use ($branchId, $departmentId) {
-                // Divisi cocok bila SALAH SATU divisi karyawan sama (karyawan bisa
-                // muncul di rekap lebih dari satu divisi).
+                // Divisi cocok bila SALAH SATU divisi karyawan sama (home atau tambahan).
                 $query->when($branchId, fn ($q) => $q->where('branch_id', $branchId))
                     ->when($departmentId, fn ($q) => $q->byDepartment($departmentId));
             })
@@ -43,13 +42,26 @@ class AttendanceReport
                 SUM(CASE WHEN status = 'sick' THEN 1 ELSE 0 END) as sakit,
                 COALESCE(SUM(late_minutes), 0) as terlambat_menit,
                 COALESCE(SUM(work_minutes), 0) as kerja_menit,
-                COUNT(*) as total_hari
+                -- "Hari" = hari kerja terjadwal; libur nasional & libur jadwal tidak
+                -- dihitung agar breakdown (hadir+alfa+cuti+sakit) berdamai dengan totalnya.
+                SUM(CASE WHEN status NOT IN ('holiday','day_off') THEN 1 ELSE 0 END) as total_hari
                 SQL)
             ->groupBy('employee_id')
             ->get()
             ->keyBy('employee_id');
 
-        if ($stats->isEmpty()) {
+        // Sertakan setiap karyawan aktif dalam cakupan yang sudah bekerja pada periode
+        // ini — termasuk yang belum punya satu pun baris absensi (belum terjadwal / baru
+        // masuk) — agar mereka tetap tampil bernilai nol, bukan hilang dari rekap.
+        $employeeQuery = ($scope ? $scope->employees() : Employee::query())
+            ->active()
+            ->where(fn ($q) => $q->whereNull('join_date')->orWhereDate('join_date', '<=', $to))
+            ->when($branchId, fn ($q) => $q->where('branch_id', $branchId))
+            ->when($departmentId, fn ($q) => $q->byDepartment($departmentId));
+
+        $employeeIds = $stats->keys()->merge($employeeQuery->pluck('id'))->unique()->values();
+
+        if ($employeeIds->isEmpty()) {
             return collect();
         }
 
@@ -59,30 +71,31 @@ class AttendanceReport
         $approvedOvertime = OvertimeApproval::query()
             ->approved()
             ->whereBetween('work_date', [$from, $to])
-            ->whereIn('employee_id', $stats->keys())
+            ->whereIn('employee_id', $employeeIds)
             ->groupBy('employee_id')
             ->selectRaw('employee_id, COALESCE(SUM(approved_minutes), 0) as menit')
             ->pluck('menit', 'employee_id');
 
         return Employee::query()
-            ->whereIn('id', $stats->keys())
-            ->with(['branch', 'department', 'jobPosition'])
+            ->whereIn('id', $employeeIds)
+            ->with(['branch', 'department', 'departments', 'jobPosition'])
             ->orderBy('full_name')
             ->get()
             ->map(function (Employee $employee) use ($stats, $approvedOvertime) {
-                $s = $stats[$employee->id];
+                // Null bila karyawan belum punya baris absensi pada periode ini.
+                $s = $stats->get($employee->id);
 
                 return [
                     'employee' => $employee,
-                    'total_hari' => (int) $s->total_hari,
-                    'hadir' => (int) $s->hadir,
-                    'terlambat' => (int) $s->terlambat,
-                    'pulang_cepat' => (int) $s->pulang_cepat,
-                    'alfa' => (int) $s->alfa,
-                    'cuti' => (int) $s->cuti,
-                    'sakit' => (int) $s->sakit,
-                    'terlambat_menit' => (int) $s->terlambat_menit,
-                    'kerja_menit' => (int) $s->kerja_menit,
+                    'total_hari' => (int) ($s->total_hari ?? 0),
+                    'hadir' => (int) ($s->hadir ?? 0),
+                    'terlambat' => (int) ($s->terlambat ?? 0),
+                    'pulang_cepat' => (int) ($s->pulang_cepat ?? 0),
+                    'alfa' => (int) ($s->alfa ?? 0),
+                    'cuti' => (int) ($s->cuti ?? 0),
+                    'sakit' => (int) ($s->sakit ?? 0),
+                    'terlambat_menit' => (int) ($s->terlambat_menit ?? 0),
+                    'kerja_menit' => (int) ($s->kerja_menit ?? 0),
                     'lembur_menit' => (int) ($approvedOvertime[$employee->id] ?? 0),
                 ];
             });
