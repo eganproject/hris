@@ -940,6 +940,11 @@
             padding-top: 0;
             overflow: visible;
         }
+
+        /* Mode ikon butuh ikon item lagi (label tersembunyi), jadi tampilkan kembali. */
+        body[data-sidebar-collapsed='true'] .sidebar-group-items .sidebar-nav-link > svg {
+            display: block;
+        }
     }
 }
 
@@ -976,6 +981,17 @@
 /* State awal diterapkan JS tanpa animasi; transisi baru aktif setelah siap. */
 .sidebar-nav:not(.is-ready) .sidebar-group-items {
     transition: none;
+}
+
+/* Item di dalam grup tampil sebagai teks tanpa ikon; teksnya diindentasi agar
+   sejajar di bawah label grup. Ikon item hanya dipakai saat sidebar diciutkan ke
+   mode ikon (lihat aturan data-sidebar-collapsed di atas). */
+.sidebar-group-items .sidebar-nav-link > svg {
+    display: none;
+}
+
+.sidebar-group-items .sidebar-nav-link {
+    padding-left: 2.25rem;
 }
 
 /* ── Bagan organisasi: pohon top-down dengan garis penghubung ─────────────── */
