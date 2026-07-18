@@ -53,6 +53,18 @@ class EmployeeContract extends Model
             ->whereBetween('end_date', [now()->toDateString(), now()->addDays($days)->toDateString()]);
     }
 
+    /**
+     * Contracts still marked "active" whose end date has already passed without
+     * being renewed or closed out — the state that needs HR attention.
+     */
+    public function scopeLapsed(Builder $query): void
+    {
+        $query
+            ->active()
+            ->whereNotNull('end_date')
+            ->whereDate('end_date', '<', now()->toDateString());
+    }
+
     public function getRemainingDaysAttribute(): ?int
     {
         if (! $this->end_date) {

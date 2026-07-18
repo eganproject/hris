@@ -5,6 +5,7 @@ use App\Http\Controllers\AccessControlController;
 use App\Http\Controllers\AttendanceController;
 use App\Http\Controllers\AttendanceCorrectionController;
 use App\Http\Controllers\BranchController;
+use App\Http\Controllers\ContractController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\DepartmentController;
 use App\Http\Controllers\DeviceController;
@@ -132,6 +133,14 @@ Route::middleware('auth')->group(function () {
         Route::get('export', [EmployeeManagementController::class, 'export'])
             ->middleware('permission:employees.export')
             ->name('export');
+        // Cross-employee contract list + its export. Literal segments declared before
+        // the "{employee}" wildcard so they are not captured as a bound employee.
+        Route::get('contracts', [ContractController::class, 'index'])
+            ->middleware('permission:employees.view')
+            ->name('contracts.index');
+        Route::get('contracts/export', [ContractController::class, 'export'])
+            ->middleware('permission:employees.export')
+            ->name('contracts.export');
         // Bulk actions on selected rows (checklist): declared before the "{employee}"
         // wildcard so the literal segments are not captured as an employee.
         Route::post('bulk/exit', [EmployeeManagementController::class, 'bulkExit'])
@@ -254,6 +263,10 @@ Route::middleware('auth')->group(function () {
         Route::delete('schedule-patterns/{schedulePattern}', [SchedulePatternController::class, 'destroy'])->middleware('permission:schedule-patterns.delete')->name('schedule-patterns.destroy');
 
         Route::get('schedules', [ScheduleController::class, 'index'])->middleware('permission:schedules.view')->name('schedules.index');
+        // Karyawan yang belum pernah ditugaskan pola jadwal. Nama route sengaja di luar
+        // "schedules.*" agar menu "Jadwal Kerja" tidak ikut ter-highlight.
+        Route::get('schedules/unscheduled', [ScheduleController::class, 'unscheduled'])->middleware('permission:schedules.view')->name('unscheduled.index');
+        Route::get('schedules/unscheduled/export', [ScheduleController::class, 'unscheduledExport'])->middleware('permission:schedules.view')->name('unscheduled.export');
         Route::get('schedules/assign', [ScheduleController::class, 'create'])->middleware('permission:schedules.create')->name('schedules.assign');
         Route::post('schedules/assign', [ScheduleController::class, 'store'])->middleware('permission:schedules.create')->name('schedules.store');
         Route::get('schedules/employees/{employee}', [ScheduleController::class, 'show'])->middleware('permission:schedules.view')->name('schedules.show');

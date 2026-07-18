@@ -48,24 +48,27 @@
 
                 <nav class="sidebar-nav min-h-0 flex-1 space-y-4 overflow-y-auto px-2.5 py-4">
                     @can('dashboard.view')
-                        <div>
-                            <p class="sidebar-section-label px-2.5 text-[10px] font-semibold uppercase text-gray-400">Utama</p>
-                            <div class="mt-1.5">
-                                <a href="{{ route('dashboard') }}" @class(['sidebar-nav-link flex items-center gap-2.5 rounded px-2.5 py-1.5 text-[13px] font-medium transition', 'bg-white text-gray-950 shadow-xs ring-1 ring-gray-200' => request()->routeIs('dashboard'), 'text-gray-600 hover:bg-white hover:text-gray-950' => ! request()->routeIs('dashboard')]) title="Dashboard">
-                                    <svg class="size-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 10.5 12 3l9 7.5"></path><path d="M5 9.5V21h14V9.5"></path><path d="M9 21v-6h6v6"></path></svg>
-                                    <span class="sidebar-label truncate">Dashboard</span>
-                                </a>
-                            </div>
-                        </div>
+                        <a href="{{ route('dashboard') }}" @class(['sidebar-nav-link flex items-center gap-2.5 rounded px-2.5 py-1.5 text-[13px] font-medium transition', 'bg-white text-gray-950 shadow-xs ring-1 ring-gray-200' => request()->routeIs('dashboard'), 'text-gray-600 hover:bg-white hover:text-gray-950' => ! request()->routeIs('dashboard')]) title="Dashboard">
+                            <svg class="size-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 10.5 12 3l9 7.5"></path><path d="M5 9.5V21h14V9.5"></path><path d="M9 21v-6h6v6"></path></svg>
+                            <span class="sidebar-label truncate">Dashboard</span>
+                        </a>
                     @endcan
 
                     @can('employees.view')
-                        <div>
-                            <p class="sidebar-section-label px-2.5 text-[10px] font-semibold uppercase text-gray-400">Karyawan</p>
-                            <div class="mt-1.5 space-y-0.5">
-                                <a href="{{ route('employees.index') }}" @class(['sidebar-nav-link flex items-center gap-2.5 rounded px-2.5 py-1.5 text-[13px] font-medium transition', 'bg-white text-gray-950 shadow-xs ring-1 ring-gray-200' => request()->routeIs('employees.*'), 'text-gray-600 hover:bg-white hover:text-gray-950' => ! request()->routeIs('employees.*')]) title="Data Karyawan">
+                        @php $g = request()->routeIs('employees.*', 'organization.chart'); @endphp
+                        <div @class(['sidebar-group', 'is-open' => $g]) data-sidebar-group>
+                            <button type="button" data-sidebar-group-toggle aria-expanded="{{ $g ? 'true' : 'false' }}" class="sidebar-group-toggle flex w-full items-center justify-between rounded px-2.5 py-1 text-left transition hover:bg-white/70">
+                                <span class="sidebar-section-label text-[10px] font-semibold uppercase text-gray-400">Karyawan</span>
+                                <svg class="sidebar-group-chevron size-3.5 shrink-0 text-gray-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 6 6 6-6 6"></path></svg>
+                            </button>
+                            <div class="sidebar-group-items space-y-0.5" data-sidebar-group-items>
+                                <a href="{{ route('employees.index') }}" @class(['sidebar-nav-link flex items-center gap-2.5 rounded px-2.5 py-1.5 text-[13px] font-medium transition', 'bg-white text-gray-950 shadow-xs ring-1 ring-gray-200' => request()->routeIs('employees.*') && ! request()->routeIs('employees.contracts.*'), 'text-gray-600 hover:bg-white hover:text-gray-950' => ! request()->routeIs('employees.*') || request()->routeIs('employees.contracts.*')]) title="Data Karyawan">
                                     <svg class="size-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H7a4 4 0 0 0-4 4v2"></path><circle cx="9.5" cy="7" r="4"></circle><path d="M22 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
                                     <span class="sidebar-label truncate">Data Karyawan</span>
+                                </a>
+                                <a href="{{ route('employees.contracts.index') }}" @class(['sidebar-nav-link flex items-center gap-2.5 rounded px-2.5 py-1.5 text-[13px] font-medium transition', 'bg-white text-gray-950 shadow-xs ring-1 ring-gray-200' => request()->routeIs('employees.contracts.*'), 'text-gray-600 hover:bg-white hover:text-gray-950' => ! request()->routeIs('employees.contracts.*')]) title="Kontrak Karyawan">
+                                    <svg class="size-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><path d="M14 2v6h6"></path><path d="M9 13h6M9 17h4"></path></svg>
+                                    <span class="sidebar-label truncate">Kontrak</span>
                                 </a>
                                 <a href="{{ route('organization.chart') }}" @class(['sidebar-nav-link flex items-center gap-2.5 rounded px-2.5 py-1.5 text-[13px] font-medium transition', 'bg-white text-gray-950 shadow-xs ring-1 ring-gray-200' => request()->routeIs('organization.chart'), 'text-gray-600 hover:bg-white hover:text-gray-950' => ! request()->routeIs('organization.chart')]) title="Bagan Organisasi">
                                     <svg class="size-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="2" width="6" height="5" rx="1"></rect><rect x="3" y="16" width="6" height="5" rx="1"></rect><rect x="15" y="16" width="6" height="5" rx="1"></rect><path d="M12 7v5M6 16v-2a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v2"></path></svg>
@@ -76,9 +79,13 @@
                     @endcan
 
                     @canany(['organization.view', 'branches.view', 'departments.view', 'job-positions.view'])
-                        <div>
-                            <p class="sidebar-section-label px-2.5 text-[10px] font-semibold uppercase text-gray-400">Organization</p>
-                            <div class="mt-1.5 space-y-0.5">
+                        @php $g = request()->routeIs('organization.index', 'organization.branches.*', 'organization.departments.*', 'organization.job-positions.*'); @endphp
+                        <div @class(['sidebar-group', 'is-open' => $g]) data-sidebar-group>
+                            <button type="button" data-sidebar-group-toggle aria-expanded="{{ $g ? 'true' : 'false' }}" class="sidebar-group-toggle flex w-full items-center justify-between rounded px-2.5 py-1 text-left transition hover:bg-white/70">
+                                <span class="sidebar-section-label text-[10px] font-semibold uppercase text-gray-400">Organization</span>
+                                <svg class="sidebar-group-chevron size-3.5 shrink-0 text-gray-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 6 6 6-6 6"></path></svg>
+                            </button>
+                            <div class="sidebar-group-items space-y-0.5" data-sidebar-group-items>
                                 @can('organization.view')
                                     <a href="{{ route('organization.index') }}" @class(['sidebar-nav-link flex items-center gap-2.5 rounded px-2.5 py-1.5 text-[13px] font-medium transition', 'bg-white text-gray-950 shadow-xs ring-1 ring-gray-200' => request()->routeIs('organization.index'), 'text-gray-600 hover:bg-white hover:text-gray-950' => ! request()->routeIs('organization.index')]) title="Overview Organization">
                                         <svg class="size-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="3" width="16" height="18" rx="2"></rect><path d="M9 8h1M14 8h1M9 12h1M14 12h1M9 16h1M14 16h1"></path></svg>
@@ -107,10 +114,14 @@
                         </div>
                     @endcanany
 
-                    @canany(['attendance-daily.view', 'devices.view', 'shifts.view', 'holidays.view', 'schedule-patterns.view', 'schedules.view', 'leave.view', 'leave-types.view', 'leave-balances.view', 'corrections.view', 'overtime.view', 'swaps.view'])
-                        <div>
-                            <p class="sidebar-section-label px-2.5 text-[10px] font-semibold uppercase text-gray-400">Attendance</p>
-                            <div class="mt-1.5 space-y-0.5">
+                    @canany(['attendance-daily.view', 'devices.view', 'corrections.view'])
+                        @php $g = request()->routeIs('attendance.daily.*', 'attendance.devices.*', 'attendance.punches.*', 'attendance.corrections.*'); @endphp
+                        <div @class(['sidebar-group', 'is-open' => $g]) data-sidebar-group>
+                            <button type="button" data-sidebar-group-toggle aria-expanded="{{ $g ? 'true' : 'false' }}" class="sidebar-group-toggle flex w-full items-center justify-between rounded px-2.5 py-1 text-left transition hover:bg-white/70">
+                                <span class="sidebar-section-label text-[10px] font-semibold uppercase text-gray-400">Absensi</span>
+                                <svg class="sidebar-group-chevron size-3.5 shrink-0 text-gray-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 6 6 6-6 6"></path></svg>
+                            </button>
+                            <div class="sidebar-group-items space-y-0.5" data-sidebar-group-items>
                                 @can('attendance-daily.view')
                                     <a href="{{ route('attendance.daily.index') }}" @class(['sidebar-nav-link flex items-center gap-2.5 rounded px-2.5 py-1.5 text-[13px] font-medium transition', 'bg-white text-gray-950 shadow-xs ring-1 ring-gray-200' => request()->routeIs('attendance.daily.*'), 'text-gray-600 hover:bg-white hover:text-gray-950' => ! request()->routeIs('attendance.daily.*')]) title="Absensi Harian">
                                         <svg class="size-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 11l3 3L22 4"></path><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path></svg>
@@ -129,6 +140,24 @@
                                         <span class="sidebar-label truncate">Monitor Mesin</span>
                                     </a>
                                 @endcan
+                                @can('corrections.view')
+                                    <a href="{{ route('attendance.corrections.index') }}" @class(['sidebar-nav-link flex items-center gap-2.5 rounded px-2.5 py-1.5 text-[13px] font-medium transition', 'bg-white text-gray-950 shadow-xs ring-1 ring-gray-200' => request()->routeIs('attendance.corrections.*'), 'text-gray-600 hover:bg-white hover:text-gray-950' => ! request()->routeIs('attendance.corrections.*')]) title="Koreksi Absensi">
+                                        <svg class="size-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20h9"></path><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"></path></svg>
+                                        <span class="sidebar-label truncate">Koreksi Absensi</span>
+                                    </a>
+                                @endcan
+                            </div>
+                        </div>
+                    @endcanany
+
+                    @canany(['schedules.view', 'schedule-patterns.view', 'shifts.view', 'holidays.view'])
+                        @php $g = request()->routeIs('attendance.schedules.*', 'attendance.unscheduled.*', 'attendance.schedule-patterns.*', 'attendance.shifts.*', 'attendance.holidays.*'); @endphp
+                        <div @class(['sidebar-group', 'is-open' => $g]) data-sidebar-group>
+                            <button type="button" data-sidebar-group-toggle aria-expanded="{{ $g ? 'true' : 'false' }}" class="sidebar-group-toggle flex w-full items-center justify-between rounded px-2.5 py-1 text-left transition hover:bg-white/70">
+                                <span class="sidebar-section-label text-[10px] font-semibold uppercase text-gray-400">Penjadwalan</span>
+                                <svg class="sidebar-group-chevron size-3.5 shrink-0 text-gray-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 6 6 6-6 6"></path></svg>
+                            </button>
+                            <div class="sidebar-group-items space-y-0.5" data-sidebar-group-items>
                                 @can('shifts.view')
                                     <a href="{{ route('attendance.shifts.index') }}" @class(['sidebar-nav-link flex items-center gap-2.5 rounded px-2.5 py-1.5 text-[13px] font-medium transition', 'bg-white text-gray-950 shadow-xs ring-1 ring-gray-200' => request()->routeIs('attendance.shifts.*'), 'text-gray-600 hover:bg-white hover:text-gray-950' => ! request()->routeIs('attendance.shifts.*')]) title="Shift Kerja">
                                         <svg class="size-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M12 7v5l3 2"></path></svg>
@@ -152,7 +181,23 @@
                                         <svg class="size-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"></rect><path d="M3 9h18M8 4v3M16 4v3"></path><path d="M7 13h2v2H7zM15 13h2v2h-2z"></path></svg>
                                         <span class="sidebar-label truncate">Jadwal Kerja</span>
                                     </a>
+                                    <a href="{{ route('attendance.unscheduled.index') }}" @class(['sidebar-nav-link flex items-center gap-2.5 rounded px-2.5 py-1.5 text-[13px] font-medium transition', 'bg-white text-gray-950 shadow-xs ring-1 ring-gray-200' => request()->routeIs('attendance.unscheduled.*'), 'text-gray-600 hover:bg-white hover:text-gray-950' => ! request()->routeIs('attendance.unscheduled.*')]) title="Karyawan Belum Terjadwal">
+                                        <svg class="size-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="m17 8 5 5M22 8l-5 5"></path></svg>
+                                        <span class="sidebar-label truncate">Belum Terjadwal</span>
+                                    </a>
                                 @endcan
+                            </div>
+                        </div>
+                    @endcanany
+
+                    @canany(['leave.view', 'leave-types.view', 'overtime.view', 'swaps.view'])
+                        @php $g = request()->routeIs('attendance.leave.*', 'attendance.leave-types.*', 'attendance.leave-balances.*', 'attendance.overtime.*', 'attendance.swaps.*'); @endphp
+                        <div @class(['sidebar-group', 'is-open' => $g]) data-sidebar-group>
+                            <button type="button" data-sidebar-group-toggle aria-expanded="{{ $g ? 'true' : 'false' }}" class="sidebar-group-toggle flex w-full items-center justify-between rounded px-2.5 py-1 text-left transition hover:bg-white/70">
+                                <span class="sidebar-section-label text-[10px] font-semibold uppercase text-gray-400">Cuti &amp; Lembur</span>
+                                <svg class="sidebar-group-chevron size-3.5 shrink-0 text-gray-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 6 6 6-6 6"></path></svg>
+                            </button>
+                            <div class="sidebar-group-items space-y-0.5" data-sidebar-group-items>
                                 @can('leave.view')
                                     <a href="{{ route('attendance.leave.index') }}" @class(['sidebar-nav-link flex items-center gap-2.5 rounded px-2.5 py-1.5 text-[13px] font-medium transition', 'bg-white text-gray-950 shadow-xs ring-1 ring-gray-200' => request()->routeIs('attendance.leave.*'), 'text-gray-600 hover:bg-white hover:text-gray-950' => ! request()->routeIs('attendance.leave.*')]) title="Cuti & Izin">
                                         <svg class="size-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z"></path><path d="M14 2v6h6"></path><path d="m9 15 2 2 4-4"></path></svg>
@@ -163,12 +208,6 @@
                                     <a href="{{ route('attendance.leave-types.index') }}" @class(['sidebar-nav-link flex items-center gap-2.5 rounded px-2.5 py-1.5 text-[13px] font-medium transition', 'bg-white text-gray-950 shadow-xs ring-1 ring-gray-200' => request()->routeIs('attendance.leave-types.*') || request()->routeIs('attendance.leave-balances.*'), 'text-gray-600 hover:bg-white hover:text-gray-950' => ! (request()->routeIs('attendance.leave-types.*') || request()->routeIs('attendance.leave-balances.*'))]) title="Jenis & Kuota Cuti">
                                         <svg class="size-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 4h16v4H4z"></path><path d="M4 12h10"></path><path d="M4 16h10"></path><path d="M4 20h6"></path><circle cx="18" cy="16" r="3"></circle></svg>
                                         <span class="sidebar-label truncate">Jenis & Kuota Cuti</span>
-                                    </a>
-                                @endcan
-                                @can('corrections.view')
-                                    <a href="{{ route('attendance.corrections.index') }}" @class(['sidebar-nav-link flex items-center gap-2.5 rounded px-2.5 py-1.5 text-[13px] font-medium transition', 'bg-white text-gray-950 shadow-xs ring-1 ring-gray-200' => request()->routeIs('attendance.corrections.*'), 'text-gray-600 hover:bg-white hover:text-gray-950' => ! request()->routeIs('attendance.corrections.*')]) title="Koreksi Absensi">
-                                        <svg class="size-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20h9"></path><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"></path></svg>
-                                        <span class="sidebar-label truncate">Koreksi Absensi</span>
                                     </a>
                                 @endcan
                                 @can('overtime.view')
@@ -188,22 +227,21 @@
                     @endcanany
 
                     @canany(['reports.attendance.view', 'reports.log.view', 'reports.leave.view'])
-                        <div>
-                            <p class="sidebar-section-label px-2.5 text-[10px] font-semibold uppercase text-gray-400">Laporan</p>
-                            <div class="mt-1.5 space-y-0.5">
-                                <a href="{{ route('reports.index') }}" @class(['sidebar-nav-link flex items-center gap-2.5 rounded px-2.5 py-1.5 text-[13px] font-medium transition', 'bg-white text-gray-950 shadow-xs ring-1 ring-gray-200' => request()->routeIs('reports.*'), 'text-gray-600 hover:bg-white hover:text-gray-950' => ! request()->routeIs('reports.*')]) title="Laporan">
-                                    <svg class="size-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 3v18h18"></path><rect x="7" y="10" width="3" height="7"></rect><rect x="12" y="6" width="3" height="11"></rect><rect x="17" y="13" width="3" height="4"></rect></svg>
-                                    <span class="sidebar-label truncate">Laporan</span>
-                                </a>
-                            </div>
-                        </div>
+                        <a href="{{ route('reports.index') }}" @class(['sidebar-nav-link flex items-center gap-2.5 rounded px-2.5 py-1.5 text-[13px] font-medium transition', 'bg-white text-gray-950 shadow-xs ring-1 ring-gray-200' => request()->routeIs('reports.*'), 'text-gray-600 hover:bg-white hover:text-gray-950' => ! request()->routeIs('reports.*')]) title="Laporan">
+                            <svg class="size-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 3v18h18"></path><rect x="7" y="10" width="3" height="7"></rect><rect x="12" y="6" width="3" height="11"></rect><rect x="17" y="13" width="3" height="4"></rect></svg>
+                            <span class="sidebar-label truncate">Laporan</span>
+                        </a>
                     @endcanany
 
                     @php $selfServiceEmployee = auth()->user()?->employee; @endphp
                     @if ($selfServiceEmployee || auth()->user()?->canAny(['my-leave.view', 'my-attendance.view', 'my-schedule.view', 'my-overtime.view']))
-                        <div>
-                            <p class="sidebar-section-label px-2.5 text-[10px] font-semibold uppercase text-gray-400">Self-service</p>
-                            <div class="mt-1.5 space-y-0.5">
+                        @php $g = request()->routeIs('my-roster.*', 'my-leave.*', 'my-attendance.*', 'my-schedule.*', 'my-overtime.*'); @endphp
+                        <div @class(['sidebar-group', 'is-open' => $g]) data-sidebar-group>
+                            <button type="button" data-sidebar-group-toggle aria-expanded="{{ $g ? 'true' : 'false' }}" class="sidebar-group-toggle flex w-full items-center justify-between rounded px-2.5 py-1 text-left transition hover:bg-white/70">
+                                <span class="sidebar-section-label text-[10px] font-semibold uppercase text-gray-400">Self-service</span>
+                                <svg class="sidebar-group-chevron size-3.5 shrink-0 text-gray-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 6 6 6-6 6"></path></svg>
+                            </button>
+                            <div class="sidebar-group-items space-y-0.5" data-sidebar-group-items>
                                 @if ($selfServiceEmployee)
                                     <a href="{{ route('my-roster.index') }}" @class(['sidebar-nav-link flex items-center gap-2.5 rounded px-2.5 py-1.5 text-[13px] font-medium transition', 'bg-white text-gray-950 shadow-xs ring-1 ring-gray-200' => request()->routeIs('my-roster.*'), 'text-gray-600 hover:bg-white hover:text-gray-950' => ! request()->routeIs('my-roster.*')]) title="Jadwal Saya">
                                         <svg class="size-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"></rect><path d="M3 9h18M8 4v3M16 4v3"></path><path d="M8 14h.01M12 14h.01M16 14h.01"></path></svg>
@@ -239,9 +277,13 @@
                     @endif
 
                     @canany(['access-control.view', 'settings.view'])
-                        <div>
-                            <p class="sidebar-section-label px-2.5 text-[10px] font-semibold uppercase text-gray-400">System</p>
-                            <div class="mt-1.5 space-y-0.5">
+                        @php $g = request()->routeIs('settings.*', 'access-control.*'); @endphp
+                        <div @class(['sidebar-group', 'is-open' => $g]) data-sidebar-group>
+                            <button type="button" data-sidebar-group-toggle aria-expanded="{{ $g ? 'true' : 'false' }}" class="sidebar-group-toggle flex w-full items-center justify-between rounded px-2.5 py-1 text-left transition hover:bg-white/70">
+                                <span class="sidebar-section-label text-[10px] font-semibold uppercase text-gray-400">System</span>
+                                <svg class="sidebar-group-chevron size-3.5 shrink-0 text-gray-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 6 6 6-6 6"></path></svg>
+                            </button>
+                            <div class="sidebar-group-items space-y-0.5" data-sidebar-group-items>
                                 @can('settings.view')
                                     <a href="{{ route('settings.index') }}" @class(['sidebar-nav-link flex items-center gap-2.5 rounded px-2.5 py-1.5 text-[13px] font-medium transition', 'bg-white text-gray-950 shadow-xs ring-1 ring-gray-200' => request()->routeIs('settings.*'), 'text-gray-600 hover:bg-white hover:text-gray-950' => ! request()->routeIs('settings.*')]) title="Pengaturan">
                                         <svg class="size-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z"></path></svg>

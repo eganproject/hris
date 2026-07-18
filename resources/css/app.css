@@ -929,7 +929,44 @@
         body[data-sidebar-collapsed='true'] .sidebar-toggle-icon {
             transform: rotate(180deg);
         }
+
+        /* Ikon-saja: sembunyikan header grup & tampilkan semua ikon rata (accordion nonaktif). */
+        body[data-sidebar-collapsed='true'] .sidebar-group-toggle {
+            display: none;
+        }
+
+        body[data-sidebar-collapsed='true'] .sidebar-group-items {
+            max-height: none;
+            padding-top: 0;
+            overflow: visible;
+        }
     }
+}
+
+/* ── Sidebar: grup menu yang bisa dilipat (accordion) ─────────────────────── */
+.sidebar-group-toggle {
+    cursor: pointer;
+    color: inherit;
+    background: transparent;
+}
+
+.sidebar-group-chevron {
+    transition: transform 0.18s ease;
+}
+
+.sidebar-group.is-open > .sidebar-group-toggle .sidebar-group-chevron {
+    transform: rotate(90deg);
+}
+
+.sidebar-group-items {
+    overflow: hidden;
+    max-height: 0;
+    transition: max-height 0.2s ease;
+}
+
+.sidebar-group.is-open > .sidebar-group-items {
+    max-height: 40rem;
+    padding-top: 0.375rem;
 }
 
 /* ── Bagan organisasi: pohon top-down dengan garis penghubung ─────────────── */

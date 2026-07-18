@@ -12,14 +12,18 @@ use App\Models\LeaveRequest;
 use App\Models\ScheduleAssignment;
 use App\Models\SchedulePattern;
 use App\Models\Shift;
+use App\Exports\UnscheduledEmployeesExport;
 use App\Services\ScheduleGenerator;
 use App\Support\DataScope;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\View\View;
 use Carbon\CarbonPeriod;
+use Maatwebsite\Excel\Facades\Excel;
+use Symfony\Component\HttpFoundation\BinaryFileResponse;
 
 class ScheduleController extends Controller
 {
@@ -92,6 +96,106 @@ class ScheduleController extends Controller
             'shifts' => Shift::query()->where('is_active', true)->orderBy('start_time')->get(),
             'patternCount' => SchedulePattern::query()->visibleTo($request->user())->where('is_active', true)->count(),
         ]);
+    }
+
+    /**
+     * Active employees still missing a schedule. Two modes:
+     *  - "no_pattern"  (varian a): never assigned any pola, so the generator has nothing
+     *    to build from — a persistent gap.
+     *  - "no_schedule" (varian b): no materialized schedule rows for the selected month,
+     *    e.g. the roster for that month simply hasn't been generated for them yet.
+     */
+    public function unscheduled(Request $request): View
+    {
+        $scope = DataScope::forAttendance($request->user());
+        $perPage = min(max((int) $request->input('per_page', 25), 10), 100);
+        $mode = $this->unscheduledMode($request);
+        $month = $this->resolveMonth($request->input('month'));
+        $from = $month->copy()->startOfMonth();
+        $to = $month->copy()->endOfMonth();
+
+        $query = $this->unscheduledQuery($request, $scope, $mode, $from, $to)
+            ->with(['branch', 'departments', 'jobPosition']);
+
+        // In monthly mode, flag who already has a pola covering the month (they just
+        // need the roster generated) versus who has no pola at all (needs assigning).
+        if ($mode === 'no_schedule') {
+            $query->withCount(['scheduleAssignments as covering_count' => fn ($q) => $q->overlapping($from, $to)]);
+        }
+
+        $employees = $query->orderBy('full_name')->paginate($perPage)->withQueryString();
+
+        return view('attendance.schedules.unscheduled', [
+            'employees' => $employees,
+            'mode' => $mode,
+            'month' => $month,
+            'prevMonth' => $month->copy()->subMonth()->format('Y-m'),
+            'nextMonth' => $month->copy()->addMonth()->format('Y-m'),
+            'branches' => $scope->branches(),
+            'departments' => $scope->departments(),
+            'jobPositions' => JobPosition::query()->where('is_active', true)->orderBy('name')->get(),
+            'filters' => [
+                'branch_id' => $request->integer('branch_id') ?: null,
+                'department_id' => $request->integer('department_id') ?: null,
+                'job_position_id' => $request->integer('job_position_id') ?: null,
+                'search' => $request->string('search')->toString(),
+            ],
+            'perPage' => $perPage,
+            'hasNoScope' => $scope->isEmpty(),
+        ]);
+    }
+
+    /**
+     * Export the "belum terjadwal" list (honouring the current mode/month/filters + scope).
+     */
+    public function unscheduledExport(Request $request): BinaryFileResponse
+    {
+        $mode = $this->unscheduledMode($request);
+        $month = $this->resolveMonth($request->input('month'));
+
+        $filters = $request->only(['branch_id', 'department_id', 'job_position_id', 'search']);
+        $filters['mode'] = $mode;
+        $filters['month'] = $month->format('Y-m');
+
+        // Monthly mode is period-specific, so name the file after the month; the
+        // pattern-gap list is timeless, so date-stamp it instead.
+        $suffix = $mode === 'no_schedule' ? $month->format('Y-m') : now()->format('Y-m-d');
+
+        return Excel::download(
+            new UnscheduledEmployeesExport($filters, $request->user()),
+            "karyawan-belum-terjadwal-{$suffix}.xlsx",
+        );
+    }
+
+    private function unscheduledMode(Request $request): string
+    {
+        return $request->input('mode') === 'no_schedule' ? 'no_schedule' : 'no_pattern';
+    }
+
+    /**
+     * Active, in-scope employees still missing a schedule for the given mode, narrowed
+     * by the location / division / position / search filters.
+     */
+    private function unscheduledQuery(Request $request, DataScope $scope, string $mode, Carbon $from, Carbon $to): Builder
+    {
+        $branchId = $request->integer('branch_id') ?: null;
+        $departmentId = $request->integer('department_id') ?: null;
+        $jobPositionId = $request->integer('job_position_id') ?: null;
+        $search = $request->string('search')->toString();
+
+        return $scope->employees()
+            ->active()
+            ->when(
+                $mode === 'no_schedule',
+                fn ($q) => $q->whereDoesntHave('schedules', fn ($s) => $s
+                    ->whereBetween('work_date', [$from->toDateString(), $to->toDateString()])),
+                fn ($q) => $q->whereDoesntHave('scheduleAssignments'),
+            )
+            ->when($branchId, fn ($q) => $q->where('branch_id', $branchId))
+            ->when($departmentId, fn ($q) => $q->byDepartment($departmentId))
+            ->when($jobPositionId, fn ($q) => $q->where('job_position_id', $jobPositionId))
+            ->when($search, fn ($q, $s) => $q->where(fn ($q) => $q
+                ->where('full_name', 'like', "%{$s}%")->orWhere('employee_number', 'like', "%{$s}%")));
     }
 
     /**

@@ -288,6 +288,31 @@ document.querySelectorAll('[data-sidebar-toggle]').forEach((button) => {
     });
 });
 
+// Collapsible sidebar groups (single-open accordion). The group containing the
+// active page is rendered open server-side; clicking a header opens that group and
+// closes the others. Disabled visually when the sidebar is minimized to icons (CSS).
+document.querySelectorAll('[data-sidebar-group-toggle]').forEach((button) => {
+    button.addEventListener('click', () => {
+        const group = button.closest('[data-sidebar-group]');
+
+        if (!group) {
+            return;
+        }
+
+        const willOpen = !group.classList.contains('is-open');
+
+        document.querySelectorAll('[data-sidebar-group].is-open').forEach((open) => {
+            open.classList.remove('is-open');
+            open.querySelector('[data-sidebar-group-toggle]')?.setAttribute('aria-expanded', 'false');
+        });
+
+        if (willOpen) {
+            group.classList.add('is-open');
+            button.setAttribute('aria-expanded', 'true');
+        }
+    });
+});
+
 // Mobile navigation drawer: the hamburger opens the sidebar; tapping the overlay,
 // a menu link, Escape, or resizing to desktop closes it.
 (() => {
