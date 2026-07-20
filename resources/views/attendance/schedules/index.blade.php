@@ -9,11 +9,11 @@
             <div class="flex flex-wrap items-center gap-2">
                 <a href="{{ route('attendance.schedule-patterns.index') }}" class="rounded-md border border-gray-200 px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50">Pola Jadwal</a>
                 @can('schedules.update')
-                    <form method="POST" action="{{ route('attendance.schedules.generate') }}">
+                    <form method="POST" action="{{ route('attendance.schedules.generate') }}" data-generate-form data-no-confirm="true">
                         @csrf
                         <input type="hidden" name="month" value="{{ $month->format('Y-m') }}">
                         <input type="hidden" name="branch_id" value="{{ $branchId }}">
-                        <button type="submit" class="inline-flex items-center gap-1.5 rounded-md border border-gray-200 px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50"><x-icon name="refresh"/> Generate Ulang</button>
+                        <button type="submit" class="inline-flex items-center gap-1.5 rounded-md border border-gray-200 px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-60"><x-icon name="refresh"/> Generate Ulang</button>
                     </form>
                 @endcan
                 @can('schedules.create')<a href="{{ route('attendance.schedules.assign') }}" class="rounded-md bg-primary px-4 py-2.5 text-sm font-semibold text-white shadow-xs hover:bg-primary-hover">Tugaskan Pola</a>@endcan
@@ -79,7 +79,7 @@
 
         {{-- Roster grid --}}
         <section class="overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm">
-            <div class="overflow-x-auto">
+            <div class="overflow-x-auto" data-roster-grid>
                 <table class="w-full border-collapse text-center text-xs">
                     <thead>
                         <tr class="bg-gray-50">
@@ -110,44 +110,9 @@
                                         $sched = $map[$key] ?? null;
                                         $hol = $holidays[$key] ?? null;
                                         $leave = $employeeLeaves[$key] ?? null;
-                                        $isManual = $sched && $sched->source === \App\Enums\ScheduleSource::Manual;
-                                        $isWfh = $sched && ! $sched->is_day_off && $sched->is_wfh;
-                                        // Approved leave wins the cell: the shift may still be on the
-                                        // roster, but the person will not be at work that day.
-                                        $title = $leave
-                                            ? ($leave->leaveType?->name ?? 'Cuti').' (disetujui)'.($sched && ! $sched->is_day_off ? ' — jadwal '.$sched->shift?->name : '')
-                                            : ($sched && ! $sched->is_day_off ? $sched->shift?->name.($isWfh ? ' (WFH)' : '') : ($sched && $sched->is_day_off ? 'Libur' : 'Belum dijadwalkan')).($isManual ? ' (manual)' : '');
                                     @endphp
-                                    <td @class(['border-l border-gray-100 p-0.5', 'bg-red-50/60' => $hol, 'bg-gray-50/60' => ! $hol && $day->isWeekend()])>
-                                        <button type="button"
-                                            @can('schedules.update') data-cell
-                                                data-emp="{{ $employee->id }}" data-emp-name="{{ $employee->full_name }}"
-                                                data-date="{{ $key }}" data-date-label="{{ $day->translatedFormat('l, d M Y') }}"
-                                                data-shift="{{ $sched && ! $sched->is_day_off ? $sched->shift_id : '' }}"
-                                                data-off="{{ $sched && $sched->is_day_off ? 1 : 0 }}"
-                                                data-wfh="{{ $isWfh ? 1 : 0 }}"
-                                                data-leave="{{ $leave ? ($leave->leaveType?->name ?? 'Cuti') : '' }}"
-                                            @else disabled @endcan
-                                            @class([
-                                                'flex h-9 w-full items-center justify-center rounded text-[11px] font-semibold transition',
-                                                'cursor-pointer hover:ring-2 hover:ring-primary/40' => auth()->user()->can('schedules.update'),
-                                                'bg-amber-100 text-amber-800' => $leave,
-                                                'bg-indigo-100 text-indigo-700' => ! $leave && $isWfh,
-                                                'bg-primary/10 text-primary' => ! $leave && ! $isWfh && $sched && ! $sched->is_day_off,
-                                                'text-gray-300' => ! $leave && (! $sched || $sched->is_day_off),
-                                                'ring-1 ring-blue-400' => ! $leave && $isManual,
-                                            ])
-                                            title="{{ $title }}">
-                                            @if ($leave)
-                                                {{ $leave->leaveType?->code ?? 'C' }}
-                                            @elseif ($sched && ! $sched->is_day_off)
-                                                {{ $isWfh ? '🏠' : ($sched->shift?->code ?? '?') }}
-                                            @elseif ($sched && $sched->is_day_off)
-                                                —
-                                            @else
-                                                ·
-                                            @endif
-                                        </button>
+                                    <td data-cell-slot="{{ $employee->id }}|{{ $key }}" @class(['border-l border-gray-100 p-0.5', 'bg-red-50/60' => $hol, 'bg-gray-50/60' => ! $hol && $day->isWeekend()])>
+                                        @include('attendance.schedules._cell', ['employee' => $employee, 'day' => $day, 'sched' => $sched, 'leave' => $leave])
                                     </td>
                                 @endforeach
                             </tr>
@@ -174,23 +139,23 @@
             <div class="overflow-x-auto">
                 <table class="data-table">
                     <thead><tr><th>Karyawan</th><th>Pola</th><th>Periode</th><th class="text-right">Aksi</th></tr></thead>
-                    <tbody>
+                    <tbody data-assignments-body>
                         @forelse ($assignments as $assignment)
-                            <tr>
+                            <tr data-assignment-row>
                                 <td class="font-medium text-gray-900">{{ $assignment->employee?->full_name }}</td>
                                 <td>{{ $assignment->pattern?->name }} <span class="text-xs text-gray-500">({{ $assignment->pattern?->type->label() }})</span></td>
                                 <td class="text-sm text-gray-600">{{ $assignment->start_date->translatedFormat('d M Y') }} – {{ $assignment->end_date ? $assignment->end_date->translatedFormat('d M Y') : 'seterusnya' }}</td>
                                 <td class="text-right">
                                     @can('schedules.delete')
-                                        <form method="POST" action="{{ route('attendance.schedules.assignments.destroy', $assignment) }}" onsubmit="return confirm('Hapus penugasan ini? Jadwal yang sudah dibuat tetap tersimpan.')">
+                                        <form method="POST" action="{{ route('attendance.schedules.assignments.destroy', $assignment) }}" data-assignment-delete data-no-confirm="true">
                                             @csrf @method('DELETE')
-                                            <button type="submit" class="inline-flex items-center gap-1 text-sm text-red-600 hover:text-red-700"><x-icon name="trash"/> Hapus</button>
+                                            <button type="submit" class="inline-flex items-center gap-1 text-sm text-red-600 hover:text-red-700 disabled:opacity-60"><x-icon name="trash"/> Hapus</button>
                                         </form>
                                     @endcan
                                 </td>
                             </tr>
                         @empty
-                            <tr><td colspan="4" class="cell-empty">Belum ada penugasan pada periode ini.</td></tr>
+                            <tr data-assignments-empty><td colspan="4" class="cell-empty">Belum ada penugasan pada periode ini.</td></tr>
                         @endforelse
                     </tbody>
                 </table>
@@ -200,7 +165,7 @@
 
     @can('schedules.update')
         <dialog id="override-dialog" class="w-full max-w-md rounded-lg p-0 backdrop:bg-black/40">
-            <form method="POST" action="{{ route('attendance.schedules.override') }}" data-no-confirm="true" class="space-y-4 p-6">
+            <form method="POST" action="{{ route('attendance.schedules.override') }}" data-override-form data-no-confirm="true" class="space-y-4 p-6">
                 @csrf
                 <input type="hidden" name="employee_id" id="ov-employee-id">
                 <input type="hidden" name="work_date" id="ov-work-date">
@@ -239,55 +204,5 @@
             </form>
         </dialog>
 
-        @push('scripts')
-        <script>
-            (function () {
-                const dialog = document.getElementById('override-dialog');
-                if (!dialog) return;
-                const empId = document.getElementById('ov-employee-id');
-                const workDate = document.getElementById('ov-work-date');
-                const empName = document.getElementById('ov-emp-name');
-                const dateLabel = document.getElementById('ov-date-label');
-                const dayOff = document.getElementById('ov-day-off');
-                const shift = document.getElementById('ov-shift');
-                const shiftWrap = document.getElementById('ov-shift-wrap');
-                const note = document.getElementById('ov-note');
-                const wfh = document.getElementById('ov-wfh');
-                const leaveBox = document.getElementById('ov-leave');
-                const leaveType = document.getElementById('ov-leave-type');
-
-                function syncOff() {
-                    shiftWrap.style.display = dayOff.checked ? 'none' : '';
-                    shift.disabled = dayOff.checked;
-                    // Shift wajib dipilih kecuali hari ini ditandai libur.
-                    shift.required = !dayOff.checked;
-                    // WFH tidak berlaku pada hari libur.
-                    if (dayOff.checked) wfh.checked = false;
-                    wfh.disabled = dayOff.checked;
-                }
-
-                document.querySelectorAll('[data-cell]').forEach(function (cell) {
-                    cell.addEventListener('click', function () {
-                        empId.value = cell.dataset.emp;
-                        workDate.value = cell.dataset.date;
-                        empName.textContent = cell.dataset.empName;
-                        dateLabel.textContent = cell.dataset.dateLabel;
-                        dayOff.checked = cell.dataset.off === '1';
-                        shift.value = cell.dataset.shift || '';
-                        wfh.checked = cell.dataset.wfh === '1';
-                        note.value = '';
-                        // Warn before overriding a day the employee is already on leave for.
-                        leaveType.textContent = cell.dataset.leave || '';
-                        leaveBox.hidden = !cell.dataset.leave;
-                        syncOff();
-                        dialog.showModal();
-                    });
-                });
-
-                dayOff.addEventListener('change', syncOff);
-                dialog.querySelector('[data-close-dialog]').addEventListener('click', function () { dialog.close(); });
-            })();
-        </script>
-        @endpush
     @endcan
 </x-layouts.app>

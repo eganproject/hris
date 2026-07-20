@@ -16,6 +16,7 @@ use App\Exports\UnscheduledEmployeesExport;
 use App\Services\ScheduleGenerator;
 use App\Support\DataScope;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
@@ -343,7 +344,7 @@ class ScheduleController extends Controller
      * (Re)generate the roster for a month across the current scope. Manual overrides
      * are preserved by the generator.
      */
-    public function generate(Request $request): RedirectResponse
+    public function generate(Request $request): RedirectResponse|JsonResponse
     {
         $month = $this->resolveMonth($request->input('month'));
         $from = $month->copy()->startOfMonth();
@@ -363,12 +364,18 @@ class ScheduleController extends Controller
             $days += $this->generator->forEmployee($employee, $from, $to);
         }
 
+        $status = "Roster {$month->translatedFormat('F Y')} diperbarui ({$days} hari).";
+
+        if ($request->expectsJson()) {
+            return response()->json(['status' => $status, 'days' => $days]);
+        }
+
         return redirect()
             ->route('attendance.schedules.index', $request->only('month', 'branch_id'))
-            ->with('status', "Roster {$month->translatedFormat('F Y')} diperbarui ({$days} hari).");
+            ->with('status', $status);
     }
 
-    public function override(ScheduleOverrideRequest $request): RedirectResponse
+    public function override(ScheduleOverrideRequest $request): RedirectResponse|JsonResponse
     {
         $employee = Employee::findOrFail($request->integer('employee_id'));
         DataScope::forAttendance($request->user())->authorize($employee);
@@ -384,12 +391,26 @@ class ScheduleController extends Controller
             $request->boolean('is_wfh'),
         );
 
+        // AJAX: kirim balik sel yang sudah diperbarui (dirender dari partial yang sama
+        // dengan grid) supaya halaman tidak perlu dimuat ulang.
+        if ($request->expectsJson()) {
+            return response()->json([
+                'status' => 'Jadwal harian diperbarui.',
+                'cell' => view('attendance.schedules._cell', [
+                    'employee' => $employee,
+                    'day' => $date,
+                    'sched' => $employee->schedules()->whereDate('work_date', $date->toDateString())->with('shift')->first(),
+                    'leave' => $employee->leaveRequests()->approvedOn($date->toDateString())->with('leaveType')->first(),
+                ])->render(),
+            ]);
+        }
+
         return redirect()
             ->route('attendance.schedules.index', ['month' => $date->format('Y-m'), 'branch_id' => $request->integer('branch_id') ?: null])
             ->with('status', 'Jadwal harian diperbarui.');
     }
 
-    public function destroyAssignment(Request $request, ScheduleAssignment $assignment): RedirectResponse
+    public function destroyAssignment(Request $request, ScheduleAssignment $assignment): RedirectResponse|JsonResponse
     {
         DataScope::forAttendance($request->user())->authorize($assignment->employee);
         abort_unless(
@@ -400,9 +421,15 @@ class ScheduleController extends Controller
         $month = Carbon::parse($assignment->start_date)->format('Y-m');
         $assignment->delete();
 
+        $status = 'Penugasan pola dihapus. Jadwal yang sudah dibuat tetap tersimpan.';
+
+        if ($request->expectsJson()) {
+            return response()->json(['status' => $status]);
+        }
+
         return redirect()
             ->route('attendance.schedules.index', ['month' => $month])
-            ->with('status', 'Penugasan pola dihapus. Jadwal yang sudah dibuat tetap tersimpan.');
+            ->with('status', $status);
     }
 
     private function resolveMonth(?string $value): Carbon

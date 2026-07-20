@@ -1738,3 +1738,198 @@ document.querySelectorAll('[data-approve-scope]').forEach((scope) => {
 
     sync();
 });
+
+// ── Jadwal Kerja (roster): input jadwal tanpa reload halaman ────────────────
+// Override sel, generate ulang, dan hapus penugasan dikirim lewat fetch; server
+// membalas JSON (sel dirender dari partial yang sama dengan grid) sehingga hanya
+// bagian yang berubah yang disentuh.
+(() => {
+    const grid = document.querySelector('[data-roster-grid]');
+
+    if (!grid) {
+        return;
+    }
+
+    const csrf = document.querySelector('meta[name="csrf-token"]')?.content || '';
+
+    const send = async (url, body) => {
+        const response = await fetch(url, {
+            method: 'POST',
+            body,
+            credentials: 'same-origin',
+            headers: {
+                'X-CSRF-TOKEN': csrf,
+                'X-Requested-With': 'XMLHttpRequest',
+                Accept: 'application/json',
+            },
+        });
+
+        let payload = null;
+
+        try {
+            payload = await response.json();
+        } catch {
+            // Bukan JSON (mis. halaman error) — pakai pesan umum di bawah.
+        }
+
+        if (!response.ok) {
+            throw new Error(
+                payload?.message
+                    || Object.values(payload?.errors || {}).flat()[0]
+                    || 'Terjadi kesalahan. Coba lagi.',
+            );
+        }
+
+        return payload || {};
+    };
+
+    // Roster bisa berubah menyeluruh setelah generate: ambil ulang halaman ini lalu
+    // tukar isi gridnya saja.
+    const refreshGrid = async () => {
+        const response = await fetch(window.location.href, {
+            credentials: 'same-origin',
+            headers: { 'X-Requested-With': 'XMLHttpRequest' },
+        });
+
+        const fresh = new DOMParser()
+            .parseFromString(await response.text(), 'text/html')
+            .querySelector('[data-roster-grid]');
+
+        if (fresh) {
+            grid.innerHTML = fresh.innerHTML;
+        }
+    };
+
+    // --- Dialog "Ubah Jadwal Harian" ---------------------------------------
+    const dialog = document.getElementById('override-dialog');
+    const overrideForm = document.querySelector('[data-override-form]');
+
+    if (dialog && overrideForm) {
+        const field = (id) => document.getElementById(id);
+        const dayOff = field('ov-day-off');
+        const shift = field('ov-shift');
+        const shiftWrap = field('ov-shift-wrap');
+        const wfh = field('ov-wfh');
+        let activeSlot = null;
+
+        const syncOff = () => {
+            shiftWrap.style.display = dayOff.checked ? 'none' : '';
+            shift.disabled = dayOff.checked;
+            // Shift wajib dipilih kecuali hari ini ditandai libur.
+            shift.required = !dayOff.checked;
+
+            // WFH tidak berlaku pada hari libur.
+            if (dayOff.checked) {
+                wfh.checked = false;
+            }
+
+            wfh.disabled = dayOff.checked;
+        };
+
+        // Didelegasikan: isi sel diganti setelah AJAX, jadi jangan ikat per elemen.
+        grid.addEventListener('click', (event) => {
+            const cell = event.target.closest('[data-cell]');
+
+            if (!cell) {
+                return;
+            }
+
+            activeSlot = cell.closest('[data-cell-slot]');
+            field('ov-employee-id').value = cell.dataset.emp;
+            field('ov-work-date').value = cell.dataset.date;
+            field('ov-emp-name').textContent = cell.dataset.empName;
+            field('ov-date-label').textContent = cell.dataset.dateLabel;
+            dayOff.checked = cell.dataset.off === '1';
+            shift.value = cell.dataset.shift || '';
+            wfh.checked = cell.dataset.wfh === '1';
+            field('ov-note').value = '';
+            // Ingatkan bila hari itu karyawan sudah disetujui cuti/izin.
+            field('ov-leave-type').textContent = cell.dataset.leave || '';
+            field('ov-leave').hidden = !cell.dataset.leave;
+            syncOff();
+            dialog.showModal();
+        });
+
+        dayOff.addEventListener('change', syncOff);
+        dialog.querySelector('[data-close-dialog]')?.addEventListener('click', () => dialog.close());
+
+        overrideForm.addEventListener('submit', async (event) => {
+            event.preventDefault();
+
+            const submit = overrideForm.querySelector('button[type="submit"]');
+            submit.disabled = true;
+
+            try {
+                const data = await send(overrideForm.action, new FormData(overrideForm));
+
+                if (activeSlot && data.cell) {
+                    activeSlot.innerHTML = data.cell;
+                }
+
+                dialog.close();
+                showFlashToast({ message: data.status });
+            } catch (error) {
+                showFlashToast({ message: error.message, type: 'error' });
+            } finally {
+                submit.disabled = false;
+            }
+        });
+    }
+
+    // --- Generate ulang roster ---------------------------------------------
+    const generateForm = document.querySelector('[data-generate-form]');
+
+    generateForm?.addEventListener('submit', async (event) => {
+        event.preventDefault();
+
+        const submit = generateForm.querySelector('button[type="submit"]');
+        submit.disabled = true;
+        loadingOverlay.show('Menyusun roster...', 'Membuat jadwal untuk bulan ini.');
+
+        try {
+            const data = await send(generateForm.action, new FormData(generateForm));
+            await refreshGrid();
+            showFlashToast({ message: data.status });
+        } catch (error) {
+            showFlashToast({ message: error.message, type: 'error' });
+        } finally {
+            loadingOverlay.hide();
+            submit.disabled = false;
+        }
+    });
+
+    // --- Hapus penugasan pola ----------------------------------------------
+    document.querySelector('[data-assignments-body]')?.addEventListener('submit', async (event) => {
+        const form = event.target.closest('[data-assignment-delete]');
+
+        if (!form) {
+            return;
+        }
+
+        event.preventDefault();
+
+        if (!window.confirm('Hapus penugasan ini? Jadwal yang sudah dibuat tetap tersimpan.')) {
+            return;
+        }
+
+        const submit = form.querySelector('button[type="submit"]');
+        submit.disabled = true;
+
+        try {
+            // _method=DELETE ikut terkirim lewat FormData (method spoofing Laravel).
+            const data = await send(form.action, new FormData(form));
+            const row = form.closest('[data-assignment-row]');
+            const body = row?.parentElement;
+            row?.remove();
+
+            if (body && !body.querySelector('[data-assignment-row]')) {
+                body.innerHTML = '<tr data-assignments-empty><td colspan="4" class="cell-empty">Belum ada penugasan pada periode ini.</td></tr>';
+            }
+
+            showFlashToast({ message: data.status });
+        } catch (error) {
+            showFlashToast({ message: error.message, type: 'error' });
+            submit.disabled = false;
+        }
+    });
+})();
