@@ -152,6 +152,9 @@ Route::middleware('auth')->group(function () {
         Route::post('bulk/delete', [EmployeeManagementController::class, 'bulkDestroy'])
             ->middleware('permission:employees.delete')
             ->name('bulk.destroy');
+        Route::post('bulk/office-hours', [EmployeeManagementController::class, 'bulkOfficeHours'])
+            ->middleware('permission:employees.update')
+            ->name('bulk.office-hours');
         Route::get('{employee}', [EmployeeManagementController::class, 'show'])
             ->middleware('permission:employees.view')
             ->name('show');

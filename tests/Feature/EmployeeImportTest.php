@@ -95,6 +95,32 @@ test('a manager can be referenced by the generated code of an existing employee'
         ->and($employee->employee_number)->toBe(sprintf('COK0726-HO%04d', $employee->id));
 });
 
+test('the ikut jam kantor column marks the employee to follow office hours', function () {
+    $import = runImport([
+        importRow(['nama_lengkap' => 'Office Worker', 'nomor_kontrak' => 'KTR-OH1', 'ikut_jam_kantor' => 'Ya']),
+        importRow(['nama_lengkap' => 'Shift Worker', 'nomor_kontrak' => 'KTR-OH2', 'ikut_jam_kantor' => 'Tidak']),
+        importRow(['nama_lengkap' => 'Default Worker', 'nomor_kontrak' => 'KTR-OH3']),
+    ]);
+
+    expect($import->errors())->toBe([]);
+
+    expect(Employee::query()->where('full_name', 'Office Worker')->value('follows_office_hours'))->toBeTrue()
+        ->and(Employee::query()->where('full_name', 'Shift Worker')->value('follows_office_hours'))->toBeFalse()
+        // Kolom dikosongkan = default Tidak.
+        ->and(Employee::query()->where('full_name', 'Default Worker')->value('follows_office_hours'))->toBeFalse();
+});
+
+test('an unrecognised ikut jam kantor value is reported and nothing is imported', function () {
+    $import = runImport([
+        importRow(['ikut_jam_kantor' => 'mungkin']),
+    ]);
+
+    expect($import->imported())->toBe(0)
+        ->and(Employee::query()->count())->toBe(0)
+        ->and($import->errors())->toHaveCount(1)
+        ->and($import->errors()[0])->toContain('Ikut Jam Kantor');
+});
+
 test('an unknown manager reference is reported and nothing is imported', function () {
     $import = runImport([
         importRow(['nomor_nama_atasan' => 'Siapa Ini']),

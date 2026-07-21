@@ -158,6 +158,12 @@
                             <button type="button" data-bulk-open="exit" class="inline-flex items-center gap-1.5 rounded-md border border-red-200 bg-white px-3 py-2 text-sm font-semibold text-red-700 transition hover:bg-red-50">
                                 <x-icon name="user-x" class="size-4"/> Proses Keluar
                             </button>
+                            <button type="button" data-bulk-office="1" class="inline-flex items-center gap-1.5 rounded-md border border-gray-200 bg-white px-3 py-2 text-sm font-semibold text-gray-700 transition hover:bg-gray-50">
+                                <x-icon name="clock" class="size-4"/> Ikut Jam Kantor
+                            </button>
+                            <button type="button" data-bulk-office="0" class="inline-flex items-center gap-1.5 rounded-md border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-gray-600 transition hover:bg-gray-50">
+                                Batalkan Jam Kantor
+                            </button>
                         @endcan
                         @can('employees.delete')
                             <button type="button" data-bulk-delete class="inline-flex items-center gap-1.5 rounded-md border border-red-200 bg-white px-3 py-2 text-sm font-semibold text-red-700 transition hover:bg-red-50">
@@ -499,6 +505,14 @@
                 </form>
             @endcan
 
+            @can('employees.update')
+                <form data-bulk-office-form method="POST" action="{{ route('employees.bulk.office-hours') }}" data-no-confirm="true" class="hidden">
+                    @csrf
+                    <input type="hidden" name="follows" data-bulk-office-value value="1">
+                    <div data-bulk-ids></div>
+                </form>
+            @endcan
+
             @push('scripts')
             <script>
                 (function () {
@@ -543,6 +557,27 @@
                         });
                         deleteForm.submit();
                     });
+
+                    // ---- Bulk office-hours toggle ----
+                    const officeForm = document.querySelector('[data-bulk-office-form]');
+                    document.querySelectorAll('[data-bulk-office]').forEach((btn) => btn.addEventListener('click', () => {
+                        const ids = checked().map((b) => b.value);
+                        if (!ids.length || !officeForm) return;
+                        const follows = btn.getAttribute('data-bulk-office') === '1';
+                        const message = follows
+                            ? 'Tandai ' + ids.length + ' karyawan terpilih mengikuti jam kantor (tanpa penjadwalan)?'
+                            : 'Kembalikan ' + ids.length + ' karyawan terpilih ke penjadwalan manual?';
+                        if (!window.confirm(message)) return;
+                        officeForm.querySelector('[data-bulk-office-value]').value = follows ? '1' : '0';
+                        const holder = officeForm.querySelector('[data-bulk-ids]');
+                        holder.innerHTML = '';
+                        ids.forEach((id) => {
+                            const input = document.createElement('input');
+                            input.type = 'hidden'; input.name = 'employee_ids[]'; input.value = id;
+                            holder.appendChild(input);
+                        });
+                        officeForm.submit();
+                    }));
 
                     // ---- Sequential per-employee wizards (exit & renew) ----
                     const FIELDS = {

@@ -1209,3 +1209,36 @@ test('creating an employee records joined and contract events', function () {
     expect($employee->events()->where('type', 'joined')->exists())->toBeTrue()
         ->and($employee->events()->where('type', 'contract_created')->exists())->toBeTrue();
 });
+
+test('the bulk action marks and unmarks employees to follow office hours', function () {
+    $user = employeeManager();
+    ['branch' => $branch, 'department' => $department, 'position' => $position] = hrMasterData();
+
+    $make = fn (string $name) => Employee::query()->create([
+        'branch_id' => $branch->id,
+        'department_id' => $department->id,
+        'job_position_id' => $position->id,
+        'full_name' => $name,
+        'join_date' => now()->subMonth()->toDateString(),
+        'employment_status' => 'active',
+    ]);
+
+    $a = $make('Kantoran Satu');
+    $b = $make('Kantoran Dua');
+
+    // Menandai keduanya mengikuti jam kantor.
+    $this->actingAs($user)
+        ->post('/employees/bulk/office-hours', ['employee_ids' => [$a->id, $b->id], 'follows' => 1])
+        ->assertRedirect('/employees');
+
+    expect($a->fresh()->follows_office_hours)->toBeTrue()
+        ->and($b->fresh()->follows_office_hours)->toBeTrue();
+
+    // Membatalkan untuk salah satu mengembalikannya ke penjadwalan manual.
+    $this->actingAs($user)
+        ->post('/employees/bulk/office-hours', ['employee_ids' => [$a->id], 'follows' => 0])
+        ->assertRedirect('/employees');
+
+    expect($a->fresh()->follows_office_hours)->toBeFalse()
+        ->and($b->fresh()->follows_office_hours)->toBeTrue();
+});

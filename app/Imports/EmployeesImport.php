@@ -75,6 +75,7 @@ class EmployeesImport implements SkipsEmptyRows, ToCollection, WithHeadingRow
             ['key' => 'tanggal_lahir', 'header' => 'Tanggal Lahir', 'required' => false, 'example' => '1995-04-17', 'desc' => 'Format YYYY-MM-DD. Opsional, harus sebelum hari ini.'],
             ['key' => 'tanggal_bergabung', 'header' => 'Tanggal Bergabung', 'required' => true, 'example' => '2024-01-05', 'desc' => 'Format YYYY-MM-DD. Wajib.'],
             ['key' => 'status_kepegawaian', 'header' => 'Status Kepegawaian', 'required' => true, 'example' => 'Aktif', 'desc' => 'Salah satu: Aktif, Nonaktif. Umumnya "Aktif" untuk karyawan baru.'],
+            ['key' => 'ikut_jam_kantor', 'header' => 'Ikut Jam Kantor', 'required' => false, 'example' => 'Tidak', 'desc' => 'Opsional (default Tidak). Isi "Ya" untuk karyawan yang mengikuti pola jam kantor default tanpa perlu dijadwalkan/di-generate roster. Kosongkan atau "Tidak" untuk pekerja shift yang jadwalnya diatur manual.'],
             ['key' => 'alamat', 'header' => 'Alamat', 'required' => false, 'example' => 'Jl. Melati No. 1', 'desc' => 'Opsional.'],
             ['key' => 'lokasi_kerja', 'header' => 'Lokasi Kerja', 'required' => true, 'example' => 'Kantor Pusat', 'desc' => 'Nama lokasi/cabang; harus sudah terdaftar dan aktif.'],
             ['key' => 'divisi', 'header' => 'Divisi', 'required' => true, 'example' => 'Operasional', 'desc' => 'Nama divisi; harus tersedia pada lokasi kerja tersebut.'],
@@ -272,6 +273,11 @@ class EmployeesImport implements SkipsEmptyRows, ToCollection, WithHeadingRow
             $add('Status Kepegawaian harus salah satu dari: Aktif, Nonaktif.', 'Status Kepegawaian');
         }
 
+        $followsOfficeHours = $this->normalizeBoolean($get('ikut_jam_kantor'));
+        if ($followsOfficeHours === null) {
+            $add('Ikut Jam Kantor harus "Ya" atau "Tidak" (atau kosongkan untuk Tidak).', 'Ikut Jam Kantor');
+        }
+
         if ($contractType !== '' && ! in_array($contractType, ['PKWT', 'PKWTT', 'Probation', 'Internship'], true)) {
             $add('Jenis Kontrak harus salah satu dari: PKWT, PKWTT, Probation, Internship.', 'Jenis Kontrak');
         }
@@ -317,6 +323,7 @@ class EmployeesImport implements SkipsEmptyRows, ToCollection, WithHeadingRow
                 'birth_date' => $birthDate,
                 'join_date' => $joinDate,
                 'employment_status' => $employmentStatus,
+                'follows_office_hours' => (bool) $followsOfficeHours,
                 'address' => $get('alamat') !== '' ? $get('alamat') : null,
             ],
             'contract' => [
@@ -600,6 +607,19 @@ class EmployeesImport implements SkipsEmptyRows, ToCollection, WithHeadingRow
             'nonaktif', 'non-aktif', 'inactive', 'tidak aktif' => 'inactive',
             // Legacy values from older templates fold into "Aktif".
             'probation', 'skorsing', 'suspended', 'skorsing / ditangguhkan' => 'active',
+            default => null,
+        };
+    }
+
+    /**
+     * Parse an optional Ya/Tidak flag. Empty = false (the sensible default), an
+     * unrecognised value = null so the row is flagged rather than silently ignored.
+     */
+    private function normalizeBoolean(string $value): ?bool
+    {
+        return match (strtolower(trim($value))) {
+            '', 'tidak', 'no', 'n', '0', 'false' => false,
+            'ya', 'yes', 'y', '1', 'true', 'benar' => true,
             default => null,
         };
     }

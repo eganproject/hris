@@ -77,6 +77,7 @@ class EmployeesExport implements FromQuery, ShouldAutoSize, WithHeadings, WithMa
             $employee->birth_date?->format('Y-m-d'),
             $employee->join_date?->format('Y-m-d'),
             $this->employmentStatusLabel($employee->employment_status),
+            $employee->follows_office_hours ? 'Ya' : 'Tidak',
             $employee->address,
             $employee->branch?->name,
             $employee->department?->name,

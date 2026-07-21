@@ -782,6 +782,37 @@ class EmployeeManagementController extends Controller
     }
 
     /**
+     * Bulk toggle "Ikuti jam kantor" for the checklisted employees. Marked employees
+     * follow the default office pattern without being scheduled; unmarking hands them
+     * back to manual scheduling. Out-of-scope ids simply don't resolve and are skipped.
+     */
+    public function bulkOfficeHours(Request $request): RedirectResponse
+    {
+        $validator = Validator::make($request->all(), [
+            'employee_ids' => ['required', 'array', 'min:1'],
+            'employee_ids.*' => ['integer', 'exists:employees,id'],
+            'follows' => ['required', 'boolean'],
+        ], [], ['employee_ids' => 'karyawan terpilih']);
+
+        if ($validator->fails()) {
+            return back()->with('bulk_error', $validator->errors()->first());
+        }
+
+        $follows = $request->boolean('follows');
+
+        $updated = Employee::query()
+            ->whereIn('id', $validator->validated()['employee_ids'])
+            ->visibleTo($request->user())
+            ->update(['follows_office_hours' => $follows]);
+
+        return redirect()
+            ->route('employees.index')
+            ->with('status', $follows
+                ? "{$updated} karyawan ditandai mengikuti jam kantor (tanpa penjadwalan)."
+                : "{$updated} karyawan dikembalikan ke penjadwalan manual.");
+    }
+
+    /**
      * Auto-deactivate employees with an expired contract, at most once per day so it
      * runs during normal usage even when no scheduler/cron is configured.
      */
