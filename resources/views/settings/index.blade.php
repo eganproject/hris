@@ -28,6 +28,20 @@
                     </span>
                 </label>
 
+                <div class="mt-6 border-t border-gray-100 pt-6">
+                    <label for="default_office_pattern_id" class="block text-sm font-medium text-gray-800">Pola jam kantor default</label>
+                    <p class="mt-1 text-xs text-gray-500">Pola acuan untuk karyawan yang ditandai <span class="font-medium">"Ikuti jam kantor (tanpa penjadwalan)"</span> di data karyawan. Absensi mereka dihitung langsung dari pola ini tanpa perlu di-assign atau digenerate roster. Biarkan kosong untuk mematikan fitur.</p>
+                    <select name="default_office_pattern_id" id="default_office_pattern_id" class="mt-2 block w-full max-w-md rounded-md border border-gray-300 px-3 py-2.5 text-sm shadow-xs outline-none focus:border-primary focus:ring-2 focus:ring-primary/20">
+                        <option value="">— Tidak diatur —</option>
+                        @foreach ($officePatterns as $pattern)
+                            <option value="{{ $pattern->id }}" @selected($officePatternId === $pattern->id)>{{ $pattern->name }}</option>
+                        @endforeach
+                    </select>
+                    @if ($officePatterns->isEmpty())
+                        <p class="mt-2 text-xs text-amber-700">Belum ada pola jadwal aktif. Buat dulu di <a href="{{ route('attendance.schedule-patterns.index') }}" class="font-medium underline">Pola Jadwal</a>.</p>
+                    @endif
+                </div>
+
                 <div class="mt-6 flex justify-end">
                     <button type="submit" class="rounded-md bg-primary px-5 py-2.5 text-sm font-semibold text-white shadow-xs transition hover:bg-primary-hover">Simpan Pengaturan</button>
                 </div>

@@ -978,6 +978,9 @@ class EmployeeManagementController extends Controller
         // department_id = salah satu divisi (yang pertama), untuk pembacaan lama.
         $payload['department_id'] = $this->divisionIds($request)[0] ?? null;
 
+        // Checkbox: absen kalau tidak dicentang, jadi selalu tetapkan eksplisit.
+        $payload['follows_office_hours'] = $request->boolean('follows_office_hours');
+
         if ($request->hasFile('photo')) {
             $payload['photo_path'] = $request->file('photo')->store('employees/photos', 'public');
         }

@@ -54,6 +54,8 @@ class UnscheduledEmployeesExport implements FromQuery, ShouldAutoSize, WithHeadi
         return $base
             ->with(['branch', 'departments', 'jobPosition'])
             ->active()
+            // Karyawan "jam kantor" sengaja tidak dijadwalkan — bukan bagian dari daftar.
+            ->where('follows_office_hours', false)
             ->when(
                 $noSchedule,
                 fn ($q) => $q->whereDoesntHave('schedules', fn ($s) => $s->whereBetween('work_date', [$from, $to])),

@@ -19,6 +19,8 @@ use Illuminate\Support\Carbon;
  */
 class AttendanceResolver
 {
+    public function __construct(private readonly DefaultOfficeSchedule $officeSchedule) {}
+
     /**
      * Compute (without persisting) the attendance for an employee on a date.
      * Punches are optional times ("H:i"); clock-out past midnight is inferred.
@@ -30,6 +32,12 @@ class AttendanceResolver
         $date = Carbon::parse($date)->startOfDay();
 
         $schedule = $employee->schedules()->whereDate('work_date', $date->toDateString())->with('shift')->first();
+
+        // Karyawan "jam kantor" tidak dijadwalkan: kalau tidak ada baris jadwal, pakai
+        // pola jam kantor default (Pengaturan). Baris jadwal nyata — termasuk override
+        // manual — selalu menang.
+        $schedule ??= $this->officeSchedule->scheduleFor($employee, $date);
+
         $shift = ($schedule && ! $schedule->is_day_off) ? $schedule->shift : null;
 
         // WFH bisa berasal dari jadwal (pola/override yang menandai hari ini WFH)

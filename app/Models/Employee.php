@@ -34,6 +34,7 @@ class Employee extends Model
     'birth_date',
     'join_date',
     'employment_status',
+    'follows_office_hours',
     'exit_reason',
     'exit_date',
     'exit_notes',
@@ -602,6 +603,7 @@ class Employee extends Model
             'birth_date' => 'date',
             'join_date' => 'date',
             'exit_date' => 'date',
+            'follows_office_hours' => 'boolean',
         ];
     }
 }

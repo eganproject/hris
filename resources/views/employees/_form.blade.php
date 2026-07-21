@@ -168,6 +168,21 @@
                     </div>
                     @error('department_ids')<p class="mt-2 text-sm text-red-600">{{ $message }}</p>@enderror
                 </div>
+                <div class="md:col-span-3">
+                    <label class="flex items-start justify-between gap-4 rounded-md border border-gray-200 px-4 py-3">
+                        <span>
+                            <span class="block text-sm font-medium text-gray-800">Ikuti jam kantor (tanpa penjadwalan)</span>
+                            <span class="mt-1 block text-xs text-gray-500">Karyawan ini mengikuti pola jam kantor default (diatur di menu <span class="font-medium">Pengaturan</span>) tanpa perlu di-assign pola atau digenerate roster. Biarkan kosong untuk pekerja shift yang jadwalnya diatur manual.</span>
+                        </span>
+                        <span class="relative inline-flex flex-none">
+                            <input type="hidden" name="follows_office_hours" value="0">
+                            <input type="checkbox" name="follows_office_hours" value="1" @checked(old('follows_office_hours', $employee->follows_office_hours)) class="peer sr-only">
+                            <span class="h-6 w-11 rounded-full bg-gray-300 transition peer-checked:bg-primary"></span>
+                            <span class="absolute left-0.5 top-0.5 size-5 rounded-full bg-white shadow transition peer-checked:translate-x-5"></span>
+                        </span>
+                    </label>
+                    @error('follows_office_hours')<p class="mt-2 text-sm text-red-600">{{ $message }}</p>@enderror
+                </div>
                 <div class="md:col-span-3" data-pin-repeater>
                     @php
                         $pinRows = old('machine_pins');

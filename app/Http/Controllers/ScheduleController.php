@@ -28,8 +28,10 @@ use Symfony\Component\HttpFoundation\BinaryFileResponse;
 
 class ScheduleController extends Controller
 {
-    public function __construct(private readonly ScheduleGenerator $generator)
-    {
+    public function __construct(
+        private readonly ScheduleGenerator $generator,
+        private readonly \App\Services\DefaultOfficeSchedule $officeSchedule,
+    ) {
     }
 
     /**
@@ -69,6 +71,14 @@ class ScheduleController extends Controller
             ->keyBy(fn (Holiday $holiday) => $holiday->date->toDateString());
 
         $days = collect(CarbonPeriod::create($from, $to)->toArray());
+
+        // Karyawan "jam kantor" tidak punya baris roster; isi selnya dari pola jam
+        // kantor default agar grid menampilkan jadwal mereka (bukan sel kosong).
+        foreach ($employees as $employee) {
+            if ($employee->follows_office_hours) {
+                $employee->setRelation('schedules', $this->officeSchedule->fill($employee, $employee->schedules, $days));
+            }
+        }
 
         $assignments = ScheduleAssignment::query()
             ->with(['employee', 'pattern'])
@@ -186,6 +196,9 @@ class ScheduleController extends Controller
 
         return $scope->employees()
             ->active()
+            // Karyawan "jam kantor" memang tidak dijadwalkan — jangan tampilkan sebagai
+            // "belum terjadwal", jadwalnya sudah otomatis dari pola jam kantor default.
+            ->where('follows_office_hours', false)
             ->when(
                 $mode === 'no_schedule',
                 fn ($q) => $q->whereDoesntHave('schedules', fn ($s) => $s
@@ -229,6 +242,18 @@ class ScheduleController extends Controller
         $leaves = $this->approvedLeaveByDate($from, $to, null, $employee)->get($employee->id, collect());
 
         $days = collect(CarbonPeriod::create($from, $to)->toArray());
+
+        // Karyawan "jam kantor": lengkapi hari tanpa baris jadwal dengan pola jam
+        // kantor default supaya bulan tampil terisi, bukan "belum dijadwalkan".
+        if ($employee->follows_office_hours && $this->officeSchedule->isConfigured()) {
+            foreach ($days as $day) {
+                $key = $day->toDateString();
+
+                if (! $schedules->has($key) && $synth = $this->officeSchedule->scheduleFor($employee, $day)) {
+                    $schedules->put($key, $synth);
+                }
+            }
+        }
 
         return view('attendance.schedules.employee', [
             'employee' => $employee,

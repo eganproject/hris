@@ -76,6 +76,7 @@ class EmployeeRequest extends FormRequest
             'birth_date' => ['nullable', 'date', 'before:today'],
             'join_date' => ['required', 'date'],
             'employment_status' => ['required', 'string', Rule::in(array_keys(Employee::employmentStatusLabels()))],
+            'follows_office_hours' => ['nullable', 'boolean'],
             'address' => ['nullable', 'string', 'max:1000'],
             'contract_number' => ['required', 'string', 'max:100', Rule::unique('employee_contracts', 'contract_number')->ignore($contractId)],
             'contract_type' => ['required', 'string', Rule::in(['PKWT', 'PKWTT', 'Probation', 'Internship'])],
