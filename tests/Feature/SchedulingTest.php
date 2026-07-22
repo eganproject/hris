@@ -335,7 +335,9 @@ test('the assign page shows each employee org info and their existing schedule p
         ->assertSee('Semua divisi')
         ->assertSee('Semua jabatan')
         ->assertSee('data-filter-search', escape: false)
-        ->assertSee('data-employee-row', escape: false);
+        ->assertSee('data-employee-row', escape: false)
+        // Script filter benar-benar ikut ter-render oleh @stack('scripts').
+        ->assertSee('visibleRows', escape: false);
 });
 
 test('the assign page hides schedule periods that have already ended', function () {
