@@ -249,6 +249,29 @@ test('approved leave shows on the roster and on the per-employee schedule', func
         ->assertDontSee('Izin Khusus');
 });
 
+test('the roster fills office-hours employees from the default pattern without materialized rows', function () {
+    $user = scheduleManager();
+    $reg = Shift::query()->create(['code' => 'REG', 'name' => 'Reguler', 'start_time' => '08:00', 'end_time' => '17:00', 'is_active' => true]);
+    $pattern = weeklyPattern($reg->id);
+    \App\Models\Setting::set(\App\Services\DefaultOfficeSchedule::SETTING_KEY, (string) $pattern->id);
+
+    $employee = Employee::query()->create([
+        'full_name' => 'Karyawan Kantoran', 'employment_status' => 'active',
+        'join_date' => now()->toDateString(), 'follows_office_hours' => true,
+    ]);
+
+    $month = now()->format('Y-m');
+
+    $this->actingAs($user)->get("/attendance/schedules?month={$month}")
+        ->assertOk()
+        ->assertSee('Karyawan Kantoran')
+        ->assertSee('Jam kantor') // badge next to the name
+        ->assertSee('REG');       // synthesized shift code appears in weekday cells
+
+    // The grid is virtual only: no schedule rows are written for this employee.
+    expect(EmployeeSchedule::query()->where('employee_id', $employee->id)->count())->toBe(0);
+});
+
 test('the roster can be filtered by division, position and name', function () {
     $user = scheduleManager();
     $branch = Branch::query()->create(['code' => 'SBY', 'name' => 'Surabaya', 'is_active' => true]);

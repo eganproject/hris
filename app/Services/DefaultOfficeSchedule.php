@@ -112,6 +112,6 @@ class DefaultOfficeSchedule
             }
         }
 
-        return $existing->newCollection($byDate->values()->all());
+        return new EloquentCollection($byDate->values()->all());
     }
 }
