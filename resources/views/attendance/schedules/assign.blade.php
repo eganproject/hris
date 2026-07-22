@@ -136,7 +136,9 @@
             const noMatch = document.querySelector('[data-no-match]');
             const countEl = document.querySelector('[data-visible-count]');
 
-            const visibleRows = () => rows.filter((r) => !r.hidden);
+            // Pakai inline style.display (bukan atribut .hidden): baris memakai class
+            // "flex", dan display:flex dari utilitas mengalahkan atribut [hidden].
+            const visibleRows = () => rows.filter((r) => r.style.display !== 'none');
             const checkbox = (row) => row.querySelector('[data-employee-check]');
 
             function syncCheckAll() {
@@ -159,7 +161,7 @@
                         && (!b || row.dataset.branch === b)
                         && (!d || depts.includes(d))
                         && (!p || row.dataset.position === p);
-                    row.hidden = !show;
+                    row.style.display = show ? '' : 'none';
                     // Baris yang tersembunyi tidak boleh ikut terkirim: hapus centangnya.
                     if (!show && checkbox(row)) checkbox(row).checked = false;
                 });
