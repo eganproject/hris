@@ -176,10 +176,27 @@
                 visibleRows().forEach((row) => { if (checkbox(row)) checkbox(row).checked = e.target.checked; });
             });
             rows.forEach((row) => checkbox(row)?.addEventListener('change', syncCheckAll));
-            [search, branch, department, position].forEach((el) => {
-                el?.addEventListener('input', apply);
-                el?.addEventListener('change', apply);
-            });
+
+            // Kotak pencarian teks biasa: event native cukup.
+            search?.addEventListener('input', apply);
+
+            // Dropdown lokasi/divisi/jabatan diperkaya select2, yang memancarkan
+            // perubahan lewat jQuery — addEventListener('change') native tak pernah
+            // menangkapnya. Ikat via jQuery setelah select2 siap; fallback ke native
+            // bila jQuery entah kenapa tak tersedia.
+            function bindDropdowns() {
+                const jq = window.jQuery;
+                [branch, department, position].forEach((el) => {
+                    if (!el) return;
+                    if (jq) jq(el).on('change select2:select select2:clear', apply);
+                    else el.addEventListener('change', apply);
+                });
+            }
+            if (document.readyState === 'loading') {
+                window.addEventListener('DOMContentLoaded', bindDropdowns);
+            } else {
+                bindDropdowns();
+            }
 
             apply();
         })();
