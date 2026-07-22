@@ -45,14 +45,44 @@
 
             <section class="rounded-lg border border-gray-200 bg-white p-6 shadow-sm">
                 <div class="flex items-center justify-between">
-                    <h3 class="text-sm font-semibold text-gray-950">Karyawan <span class="field-requirement is-required">*</span></h3>
-                    <label class="flex items-center gap-2 text-xs text-gray-600"><input type="checkbox" data-check-all class="size-4 rounded border-gray-300 text-primary focus:ring-primary"> Pilih semua</label>
+                    <h3 class="text-sm font-semibold text-gray-950">Karyawan <span class="field-requirement is-required">*</span> <span data-visible-count class="ml-1 text-xs font-normal text-gray-400"></span></h3>
+                    <label class="flex items-center gap-2 text-xs text-gray-600"><input type="checkbox" data-check-all class="size-4 rounded border-gray-300 text-primary focus:ring-primary"> Pilih semua <span class="text-gray-400">(yang tampil)</span></label>
                 </div>
                 <p class="mt-1 text-xs text-gray-500">Periode jadwal yang sudah berjalan atau akan datang ditampilkan di bawah tiap nama. Periode yang bentrok dengan tanggal di atas ditandai merah.</p>
                 @error('employee_ids')<p class="mt-2 text-sm text-red-600">{{ $message }}</p>@enderror
+
+                {{-- Filter pemilihan karyawan. Sisi-klien: menyaring daftar tanpa reload,
+                     sehingga pola, tanggal, dan centang yang sudah dipilih tidak hilang. --}}
+                <div class="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-4">
+                    <input type="text" data-filter-search placeholder="Cari nama / kode" class="rounded-md border border-gray-300 px-3 py-2 text-sm shadow-xs outline-none focus:border-primary focus:ring-2 focus:ring-primary/20">
+                    <select data-filter-branch class="rounded-md border border-gray-300 px-3 py-2 text-sm shadow-xs outline-none focus:border-primary focus:ring-2 focus:ring-primary/20">
+                        <option value="">Semua lokasi</option>
+                        @foreach ($branches as $branch)
+                            <option value="{{ $branch->id }}">{{ $branch->name }}</option>
+                        @endforeach
+                    </select>
+                    <select data-filter-department class="rounded-md border border-gray-300 px-3 py-2 text-sm shadow-xs outline-none focus:border-primary focus:ring-2 focus:ring-primary/20">
+                        <option value="">Semua divisi</option>
+                        @foreach ($departments as $department)
+                            <option value="{{ $department->id }}">{{ $department->name }}</option>
+                        @endforeach
+                    </select>
+                    <select data-filter-position class="rounded-md border border-gray-300 px-3 py-2 text-sm shadow-xs outline-none focus:border-primary focus:ring-2 focus:ring-primary/20">
+                        <option value="">Semua jabatan</option>
+                        @foreach ($jobPositions as $position)
+                            <option value="{{ $position->id }}">{{ $position->name }}</option>
+                        @endforeach
+                    </select>
+                </div>
+
                 <div class="mt-3 max-h-96 overflow-y-auto rounded-md border border-gray-200">
                     @forelse ($employees as $employee)
-                        <label class="flex items-start gap-3 border-b border-gray-100 px-4 py-3 text-sm last:border-b-0 hover:bg-gray-50">
+                        <label data-employee-row
+                            data-branch="{{ $employee->branch_id }}"
+                            data-position="{{ $employee->job_position_id }}"
+                            data-departments="{{ implode(',', $employee->departmentIds()) }}"
+                            data-name="{{ strtolower($employee->full_name.' '.$employee->employee_number) }}"
+                            class="flex items-start gap-3 border-b border-gray-100 px-4 py-3 text-sm last:border-b-0 hover:bg-gray-50">
                             <input type="checkbox" name="employee_ids[]" value="{{ $employee->id }}" data-employee-check @checked(collect(old('employee_ids', $selectedEmployee ? [$selectedEmployee] : []))->contains($employee->id)) class="mt-0.5 size-4 shrink-0 rounded border-gray-300 text-primary focus:ring-primary">
                             <span class="min-w-0 flex-1">
                                 <span class="flex flex-wrap items-baseline gap-x-2">
@@ -86,6 +116,7 @@
                     @empty
                         <p class="px-4 py-3 text-sm text-gray-500">Tidak ada karyawan aktif.</p>
                     @endforelse
+                    <p data-no-match hidden class="px-4 py-3 text-sm text-gray-500">Tidak ada karyawan yang cocok dengan filter.</p>
                 </div>
             </section>
 
@@ -95,9 +126,61 @@
 
     @push('scripts')
     <script>
-        document.querySelector('[data-check-all]')?.addEventListener('change', function (e) {
-            document.querySelectorAll('[data-employee-check]').forEach(function (c) { c.checked = e.target.checked; });
-        });
+        (function () {
+            const rows = Array.from(document.querySelectorAll('[data-employee-row]'));
+            const checkAll = document.querySelector('[data-check-all]');
+            const search = document.querySelector('[data-filter-search]');
+            const branch = document.querySelector('[data-filter-branch]');
+            const department = document.querySelector('[data-filter-department]');
+            const position = document.querySelector('[data-filter-position]');
+            const noMatch = document.querySelector('[data-no-match]');
+            const countEl = document.querySelector('[data-visible-count]');
+
+            const visibleRows = () => rows.filter((r) => !r.hidden);
+            const checkbox = (row) => row.querySelector('[data-employee-check]');
+
+            function syncCheckAll() {
+                if (!checkAll) return;
+                const vis = visibleRows();
+                const checked = vis.filter((r) => checkbox(r)?.checked);
+                checkAll.checked = vis.length > 0 && checked.length === vis.length;
+                checkAll.indeterminate = checked.length > 0 && checked.length < vis.length;
+            }
+
+            function apply() {
+                const q = (search?.value || '').trim().toLowerCase();
+                const b = branch?.value || '';
+                const d = department?.value || '';
+                const p = position?.value || '';
+
+                rows.forEach((row) => {
+                    const depts = (row.dataset.departments || '').split(',').filter(Boolean);
+                    const show = (!q || (row.dataset.name || '').includes(q))
+                        && (!b || row.dataset.branch === b)
+                        && (!d || depts.includes(d))
+                        && (!p || row.dataset.position === p);
+                    row.hidden = !show;
+                    // Baris yang tersembunyi tidak boleh ikut terkirim: hapus centangnya.
+                    if (!show && checkbox(row)) checkbox(row).checked = false;
+                });
+
+                const vis = visibleRows();
+                if (noMatch) noMatch.hidden = vis.length !== 0 || rows.length === 0;
+                if (countEl) countEl.textContent = rows.length ? (vis.length + ' dari ' + rows.length + ' karyawan') : '';
+                syncCheckAll();
+            }
+
+            checkAll?.addEventListener('change', function (e) {
+                visibleRows().forEach((row) => { if (checkbox(row)) checkbox(row).checked = e.target.checked; });
+            });
+            rows.forEach((row) => checkbox(row)?.addEventListener('change', syncCheckAll));
+            [search, branch, department, position].forEach((el) => {
+                el?.addEventListener('input', apply);
+                el?.addEventListener('change', apply);
+            });
+
+            apply();
+        })();
 
         (function () {
             const startInput = document.getElementById('start_date');

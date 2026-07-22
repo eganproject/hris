@@ -305,14 +305,19 @@ class ScheduleController extends Controller
 
     public function create(Request $request): View
     {
+        $scope = DataScope::forAttendance($request->user());
+
         // The picker shows each employee's still-running/upcoming assignments so the
         // user can see which periods are already taken before choosing new dates.
-        $employees = DataScope::forAttendance($request->user())
+        // `departments:id` feeds the client-side division filter (an employee may
+        // belong to more than one division).
+        $employees = $scope
             ->employees()
             ->active()
             ->with([
                 'jobPosition:id,name',
                 'department:id,name',
+                'departments:id',
                 'branch:id,name',
                 'scheduleAssignments' => fn ($query) => $query
                     ->where(fn ($q) => $q->whereNull('end_date')->orWhereDate('end_date', '>=', now()->toDateString()))
@@ -328,6 +333,10 @@ class ScheduleController extends Controller
             'patterns' => SchedulePattern::query()->visibleTo($request->user())->where('is_active', true)->orderBy('name')->get(),
             'defaultStart' => now()->startOfMonth()->toDateString(),
             'selectedEmployee' => $request->integer('employee_id') ?: null,
+            // Opsi filter pemilihan karyawan (lokasi/divisi/jabatan), dibatasi cakupan.
+            'branches' => $scope->branches(),
+            'departments' => $scope->departments(),
+            'jobPositions' => JobPosition::query()->where('is_active', true)->orderBy('name')->get(),
         ]);
     }
 
