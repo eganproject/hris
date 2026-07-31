@@ -1,11 +1,15 @@
 <?php
 
+use App\Exports\EmployeeTemplateExport;
 use App\Imports\EmployeesImport;
 use App\Models\Branch;
 use App\Models\Department;
 use App\Models\Employee;
 use App\Models\JobPosition;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Maatwebsite\Excel\Excel as ExcelWriter;
+use Maatwebsite\Excel\Facades\Excel;
+use PhpOffice\PhpSpreadsheet\IOFactory;
 
 uses(RefreshDatabase::class);
 
@@ -130,4 +134,28 @@ test('an unknown manager reference is reported and nothing is imported', functio
         ->and(Employee::query()->count())->toBe(0)
         ->and($import->errors())->toHaveCount(1)
         ->and($import->errors()[0])->toContain('Atasan "Siapa Ini" tidak ditemukan');
+});
+
+test('the guide sheet in the template is ignored instead of being read as employee rows', function () {
+    // The template ships two sheets. Reading the second one as data used to report
+    // every instruction line as a malformed employee — while the first sheet had
+    // already been persisted, so the user saw "import dibatalkan" over saved data.
+    $path = tempnam(sys_get_temp_dir(), 'employees-').'.xlsx';
+    file_put_contents($path, Excel::raw(new EmployeeTemplateExport, ExcelWriter::XLSX));
+
+    $columns = collect(EmployeesImport::columns())->pluck('key');
+    $values = $columns->mapWithKeys(fn (string $key) => [$key => importRow()[$key] ?? ''])->values()->all();
+
+    $spreadsheet = IOFactory::load($path);
+    $spreadsheet->getSheet(0)->fromArray($values, null, 'A2');
+    IOFactory::createWriter($spreadsheet, 'Xlsx')->save($path);
+    $spreadsheet->disconnectWorksheets();
+
+    $import = new EmployeesImport;
+    Excel::import($import, $path);
+    unlink($path);
+
+    expect($import->errors())->toBe([])
+        ->and($import->imported())->toBe(1)
+        ->and(Employee::query()->count())->toBe(1);
 });

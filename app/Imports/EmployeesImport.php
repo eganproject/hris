@@ -17,6 +17,7 @@ use Illuminate\Support\Str;
 use Maatwebsite\Excel\Concerns\SkipsEmptyRows;
 use Maatwebsite\Excel\Concerns\ToCollection;
 use Maatwebsite\Excel\Concerns\WithHeadingRow;
+use Maatwebsite\Excel\Concerns\WithMultipleSheets;
 use PhpOffice\PhpSpreadsheet\Shared\Date as ExcelDate;
 
 /**
@@ -32,8 +33,22 @@ use PhpOffice\PhpSpreadsheet\Shared\Date as ExcelDate;
  * registered machine (by serial number) and be unique on that machine. A login
  * account is created when both Email and Password Login are provided.
  */
-class EmployeesImport implements SkipsEmptyRows, ToCollection, WithHeadingRow
+class EmployeesImport implements SkipsEmptyRows, ToCollection, WithHeadingRow, WithMultipleSheets
 {
+    /**
+     * Only the first sheet holds employee data. Without this, maatwebsite runs the
+     * importer over every sheet in the workbook — including the template's own
+     * "Petunjuk Pengisian" — which reports each of its rows as a malformed employee
+     * while the real sheet has already been persisted, breaking the all-or-nothing
+     * guarantee the user is promised.
+     *
+     * @return array<int, object>
+     */
+    public function sheets(): array
+    {
+        return [0 => $this];
+    }
+
     /**
      * Structured problems, one per issue: the offending row (null for
      * file-level problems), the human-readable column header it belongs to
