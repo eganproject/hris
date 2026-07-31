@@ -9,6 +9,9 @@
             <div class="flex flex-wrap items-center gap-2">
                 <a href="{{ route('attendance.schedule-patterns.index') }}" class="rounded-md border border-gray-200 px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50">Pola Jadwal</a>
                 @can('schedules.update')
+                    <button type="button" data-open-import class="inline-flex items-center gap-1.5 rounded-md border border-gray-200 bg-white px-4 py-2.5 text-sm font-medium text-gray-700 shadow-xs transition hover:bg-gray-50">
+                        <x-icon name="upload" class="size-4"/> Import Excel
+                    </button>
                     <form method="POST" action="{{ route('attendance.schedules.generate') }}" data-generate-form data-no-confirm="true">
                         @csrf
                         <input type="hidden" name="month" value="{{ $month->format('Y-m') }}">
@@ -207,5 +210,101 @@
             </form>
         </dialog>
 
+        {{-- Import roster bulanan dari Excel --}}
+        @php
+            $importErrors = session('import_errors', []);
+            $templateQuery = array_merge(['month' => $month->format('Y-m')], array_filter($filters));
+        @endphp
+        <div data-import-modal @unless ($importErrors) hidden @endunless class="fixed inset-0 z-50 flex items-center justify-center bg-gray-950/50 p-4">
+            <div class="w-full max-w-lg rounded-lg border border-gray-200 bg-white shadow-xl" role="dialog" aria-modal="true" aria-labelledby="schedule-import-title">
+                <div class="flex items-start justify-between gap-4 border-b border-gray-100 p-5">
+                    <div>
+                        <h2 id="schedule-import-title" class="text-base font-semibold text-gray-950">Import Jadwal dari Excel</h2>
+                        <p class="mt-1 text-sm text-gray-500">Isi roster satu bulan penuh dalam satu file: satu baris per karyawan, satu kolom per tanggal.</p>
+                    </div>
+                    <button type="button" data-import-close class="-m-1 rounded-md p-1 text-gray-400 transition hover:bg-gray-100 hover:text-gray-600" aria-label="Tutup">&times;</button>
+                </div>
+
+                <div class="max-h-[70vh] overflow-y-auto p-5">
+                    @if ($importErrors)
+                        <div class="mb-4 rounded-md border border-red-200 bg-red-50 p-3">
+                            <p class="text-sm font-semibold text-red-800">Import dibatalkan — perbaiki {{ count($importErrors) }} masalah berikut. Tidak ada jadwal yang tersimpan.</p>
+                            <ul class="mt-2 max-h-48 space-y-1 overflow-y-auto pr-1 text-xs text-red-700">
+                                @foreach ($importErrors as $importError)
+                                    <li>• {{ $importError }}</li>
+                                @endforeach
+                            </ul>
+                            @if ($importErrorToken = session('import_error_token'))
+                                <a href="{{ route('attendance.schedules.import.errors', $importErrorToken) }}" class="mt-3 inline-flex items-center gap-1.5 rounded-md border border-red-300 bg-white px-3 py-1.5 text-xs font-semibold text-red-700 transition hover:bg-red-100">
+                                    <x-icon name="download" class="size-3.5"/> Unduh File dengan Rincian Kesalahan
+                                </a>
+                                <p class="mt-1.5 text-xs text-red-600">File Anda dikembalikan dengan sel bermasalah ditandai merah, kolom “Kesalahan”, dan sheet “Kesalahan” berisi rincian tiap baris.</p>
+                            @endif
+                        </div>
+                    @endif
+
+                    <ol class="space-y-3 text-sm text-gray-600">
+                        <li class="flex gap-3">
+                            <span class="flex size-6 flex-none items-center justify-center rounded-full bg-primary-soft text-xs font-semibold text-gray-700">1</span>
+                            <span>
+                                Unduh template. File sudah berisi <strong>daftar karyawan sesuai filter di halaman ini</strong> beserta jadwal {{ $month->translatedFormat('F Y') }} yang sudah ada, jadi tinggal disesuaikan.
+                                <a href="{{ route('attendance.schedules.import.template', $templateQuery) }}" class="mt-2 inline-flex items-center gap-1.5 rounded-md border border-gray-200 bg-white px-3 py-1.5 text-xs font-semibold text-gray-700 transition hover:bg-gray-50">
+                                    <x-icon name="download" class="size-3.5"/> Unduh Template {{ $month->translatedFormat('F Y') }}
+                                </a>
+                            </span>
+                        </li>
+                        <li class="flex gap-3">
+                            <span class="flex size-6 flex-none items-center justify-center rounded-full bg-primary-soft text-xs font-semibold text-gray-700">2</span>
+                            <span>Pada sheet <strong>“Jadwal”</strong>, isi tiap sel dengan <strong>kode shift</strong> (mis. <code class="rounded bg-gray-100 px-1">{{ $shifts->first()?->code ?? 'P' }}</code>), <strong>L</strong> untuk libur, atau tambahkan <code class="rounded bg-gray-100 px-1">/WFH</code> di belakang kode untuk kerja dari rumah. <strong>Sel kosong tidak diubah.</strong></span>
+                        </li>
+                        <li class="flex gap-3">
+                            <span class="flex size-6 flex-none items-center justify-center rounded-full bg-primary-soft text-xs font-semibold text-gray-700">3</span>
+                            <span>Bulan yang diimpor mengikuti sel <strong>B1 (“Periode”)</strong> di dalam file, bukan bulan yang sedang dibuka. Sheet <strong>“Petunjuk”</strong> memuat daftar kode shift dan aturan lengkapnya.</span>
+                        </li>
+                        <li class="flex gap-3">
+                            <span class="flex size-6 flex-none items-center justify-center rounded-full bg-primary-soft text-xs font-semibold text-gray-700">4</span>
+                            <span>Unggah file di bawah. Jika ada <strong>satu sel saja</strong> yang salah, seluruh import dibatalkan — tidak ada jadwal setengah jadi.</span>
+                        </li>
+                    </ol>
+
+                    <p class="mt-3 rounded-md bg-amber-50 px-3 py-2 text-xs text-amber-700">Hari yang diisi menjadi <strong>jadwal manual</strong> dan tidak akan ditimpa lagi oleh generator roster otomatis. Untuk tanggal yang sudah lewat dan absensinya sudah diproses, status absensi dihitung ulang mengikuti jadwal baru — jam presensi yang sudah tercatat tetap dipertahankan.</p>
+
+                    <form method="POST" action="{{ route('attendance.schedules.import') }}" enctype="multipart/form-data" data-no-confirm="true" data-loading-title="Mengimpor jadwal..." data-loading-message="Memvalidasi dan menyimpan roster." class="mt-5 space-y-4">
+                        @csrf
+                        <input type="hidden" name="branch_id" value="{{ $filters['branch_id'] }}">
+                        <input type="hidden" name="department_id" value="{{ $filters['department_id'] }}">
+                        <input type="hidden" name="job_position_id" value="{{ $filters['job_position_id'] }}">
+                        <div>
+                            <label for="schedule-import-file" class="block text-sm font-medium text-gray-700">File Excel (.xlsx, .xls, .csv) <span class="field-requirement is-required" aria-label="Wajib diisi">*</span></label>
+                            <input id="schedule-import-file" name="file" type="file" accept=".xlsx,.xls,.csv" required class="mt-2 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-700 shadow-xs outline-none file:mr-3 file:rounded file:border-0 file:bg-gray-100 file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-gray-700 focus:border-primary focus:ring-2 focus:ring-primary/20">
+                            @error('file')<p class="mt-2 text-sm text-red-600">{{ $message }}</p>@enderror
+                        </div>
+                        <div class="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+                            <button type="button" data-import-close class="rounded-md border border-gray-200 px-4 py-2.5 text-sm font-medium text-gray-700 transition hover:bg-gray-50">Batal</button>
+                            <button type="submit" class="inline-flex items-center justify-center gap-1.5 rounded-md bg-primary px-4 py-2.5 text-sm font-semibold text-white shadow-xs transition hover:bg-primary-hover">
+                                <x-icon name="upload" class="size-4"/> Import Sekarang
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        @push('scripts')
+        <script>
+            (function () {
+                const modal = document.querySelector('[data-import-modal]');
+                if (!modal) return;
+
+                const open = () => { modal.hidden = false; };
+                const close = () => { modal.hidden = true; };
+
+                document.querySelectorAll('[data-open-import]').forEach((button) => button.addEventListener('click', open));
+                modal.querySelectorAll('[data-import-close]').forEach((button) => button.addEventListener('click', close));
+                modal.addEventListener('click', (event) => { if (event.target === modal) close(); });
+                document.addEventListener('keydown', (event) => { if (event.key === 'Escape' && !modal.hidden) close(); });
+            })();
+        </script>
+        @endpush
     @endcan
 </x-layouts.app>

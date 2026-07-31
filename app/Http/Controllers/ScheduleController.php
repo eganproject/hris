@@ -12,9 +12,13 @@ use App\Models\LeaveRequest;
 use App\Models\ScheduleAssignment;
 use App\Models\SchedulePattern;
 use App\Models\Shift;
+use App\Exports\ScheduleTemplateExport;
 use App\Exports\UnscheduledEmployeesExport;
+use App\Imports\ScheduleMatrixImport;
 use App\Services\ScheduleGenerator;
 use App\Support\DataScope;
+use App\Support\ImportErrorStore;
+use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -464,6 +468,98 @@ class ScheduleController extends Controller
         return redirect()
             ->route('attendance.schedules.index', ['month' => $month])
             ->with('status', $status);
+    }
+
+    /**
+     * The roster template for a month, pre-filled with the employees currently in
+     * view (same filters as the grid) and their existing schedule, so the file can
+     * be edited and sent straight back.
+     */
+    public function importTemplate(Request $request): BinaryFileResponse
+    {
+        $month = $this->resolveMonth($request->input('month'));
+        $scope = DataScope::forAttendance($request->user());
+
+        $employees = $this->filtered($scope->employees()->active(), $request)
+            ->orderBy('full_name')
+            ->get();
+
+        return Excel::download(
+            new ScheduleTemplateExport(CarbonImmutable::parse($month)->startOfMonth(), $employees),
+            'template-jadwal-'.$month->format('Y-m').'.xlsx',
+        );
+    }
+
+    /**
+     * Import a filled-in roster matrix. All-or-nothing, exactly like the employee
+     * import: a single bad cell cancels the whole file and the problems are flashed
+     * back for the modal (plus a downloadable, annotated copy of the upload).
+     */
+    public function import(Request $request): RedirectResponse
+    {
+        $request->validate([
+            'file' => ['required', 'file', 'mimes:xlsx,xls,csv', 'max:10240'],
+        ], [], ['file' => 'file Excel']);
+
+        $scope = DataScope::forAttendance($request->user());
+
+        abort_if($scope->isEmpty(), 403);
+
+        $import = new ScheduleMatrixImport($request->user());
+
+        try {
+            Excel::import($import, $request->file('file'));
+        } catch (\Throwable $exception) {
+            report($exception);
+
+            return back()->with('import_errors', ['Gagal membaca file. Pastikan file sesuai template. ('.$exception->getMessage().')']);
+        }
+
+        if ($import->errors() !== []) {
+            return back()
+                ->with('import_errors', $import->errors())
+                ->with('import_error_token', ImportErrorStore::put($request->file('file'), $import->rowErrors()));
+        }
+
+        $period = $import->period();
+
+        $status = sprintf(
+            'Jadwal %s diimpor: %d hari untuk %d karyawan.',
+            $period?->translatedFormat('F Y') ?? '',
+            $import->importedDays(),
+            $import->importedEmployees(),
+        );
+
+        if ($import->reprocessedAttendances() > 0) {
+            $status .= " Absensi {$import->reprocessedAttendances()} hari yang sudah lewat dihitung ulang mengikuti jadwal baru.";
+        }
+
+        return redirect()
+            ->route('attendance.schedules.index', ['month' => $period?->format('Y-m')] + $request->only('branch_id', 'department_id', 'job_position_id', 'search'))
+            ->with('status', $status);
+    }
+
+    /**
+     * The just-uploaded roster returned with the offending cells highlighted.
+     */
+    public function importErrors(string $token): BinaryFileResponse
+    {
+        return ImportErrorStore::download($token, ScheduleMatrixImport::HEADER_ROW);
+    }
+
+    /**
+     * The grid's own filters (lokasi / divisi / jabatan / pencarian), so the
+     * template covers exactly the people the user is looking at.
+     */
+    private function filtered(Builder $query, Request $request): Builder
+    {
+        return $query
+            ->when($request->integer('branch_id') ?: null, fn ($q, $id) => $q->where('branch_id', $id))
+            ->when($request->integer('department_id') ?: null, fn ($q, $id) => $q->byDepartment($id))
+            ->when($request->integer('job_position_id') ?: null, fn ($q, $id) => $q->where('job_position_id', $id))
+            ->when($request->string('search')->toString() ?: null, fn ($q, $s) => $q->where(fn ($inner) => $inner
+                ->where('full_name', 'like', "%{$s}%")
+                ->orWhere('employee_number', 'like', "%{$s}%")));
     }
 
     private function resolveMonth(?string $value): Carbon

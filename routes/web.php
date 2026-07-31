@@ -270,6 +270,11 @@ Route::middleware('auth')->group(function () {
         // "schedules.*" agar menu "Jadwal Kerja" tidak ikut ter-highlight.
         Route::get('schedules/unscheduled', [ScheduleController::class, 'unscheduled'])->middleware('permission:schedules.view')->name('unscheduled.index');
         Route::get('schedules/unscheduled/export', [ScheduleController::class, 'unscheduledExport'])->middleware('permission:schedules.view')->name('unscheduled.export');
+        // Import roster bulanan dari Excel. Dideklarasikan sebelum rute ber-wildcard
+        // di bawahnya, dan memakai izin "update" karena isinya menimpa jadwal.
+        Route::get('schedules/import/template', [ScheduleController::class, 'importTemplate'])->middleware('permission:schedules.update')->name('schedules.import.template');
+        Route::post('schedules/import', [ScheduleController::class, 'import'])->middleware('permission:schedules.update')->name('schedules.import');
+        Route::get('schedules/import/errors/{token}', [ScheduleController::class, 'importErrors'])->middleware('permission:schedules.update')->name('schedules.import.errors');
         Route::get('schedules/assign', [ScheduleController::class, 'create'])->middleware('permission:schedules.create')->name('schedules.assign');
         Route::post('schedules/assign', [ScheduleController::class, 'store'])->middleware('permission:schedules.create')->name('schedules.store');
         Route::get('schedules/employees/{employee}', [ScheduleController::class, 'show'])->middleware('permission:schedules.view')->name('schedules.show');

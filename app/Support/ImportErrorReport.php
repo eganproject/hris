@@ -10,13 +10,17 @@ use PhpOffice\PhpSpreadsheet\Worksheet\Worksheet;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
 
 /**
- * Turns a failed employee import into a downloadable Excel workbook built on top
- * of the file the user uploaded: the original data sheet is kept as-is but the
- * offending cells are highlighted and a trailing "Kesalahan" column spells out
- * what is wrong per row, and a dedicated "Kesalahan" sheet lists every problem
- * as Baris / Kolom / Keterangan so the user can see exactly where to fix it.
+ * Turns a failed Excel import into a downloadable workbook built on top of the
+ * file the user uploaded: the original data sheet is kept as-is but the offending
+ * cells are highlighted and a trailing "Kesalahan" column spells out what is wrong
+ * per row, and a dedicated "Kesalahan" sheet lists every problem as Baris / Kolom /
+ * Keterangan so the user can see exactly where to fix it.
+ *
+ * Shared by every import (karyawan, jadwal, …). Templates whose headers do not sit
+ * on the first row pass their own $headerRow so cell highlighting still lands on
+ * the right column.
  */
-class EmployeeImportErrorReport
+class ImportErrorReport
 {
     private const RED_FILL = 'FFC7CE';
 
@@ -24,13 +28,14 @@ class EmployeeImportErrorReport
 
     /**
      * @param  list<array{row: ?int, column: ?string, message: string}>  $errors
+     * @param  int  $headerRow  1-indexed row holding the column headers
      */
-    public static function download(string $sourcePath, array $errors, string $downloadName): BinaryFileResponse
+    public static function download(string $sourcePath, array $errors, string $downloadName, int $headerRow = 1): BinaryFileResponse
     {
         $spreadsheet = IOFactory::load($sourcePath);
 
         $dataSheet = $spreadsheet->getSheet(0);
-        self::annotateDataSheet($dataSheet, $errors);
+        self::annotateDataSheet($dataSheet, $errors, $headerRow);
         self::addErrorSheet($spreadsheet, $errors);
 
         $spreadsheet->setActiveSheetIndex(0);
@@ -49,22 +54,22 @@ class EmployeeImportErrorReport
      *
      * @param  list<array{row: ?int, column: ?string, message: string}>  $errors
      */
-    private static function annotateDataSheet(Worksheet $sheet, array $errors): void
+    private static function annotateDataSheet(Worksheet $sheet, array $errors, int $headerRow): void
     {
-        // Map each header (lowercased) in row 1 to its column letter so a
+        // Map each header (lowercased) in the header row to its column letter so a
         // problem tied to a column can be traced back to the physical cell.
         $lastColIndex = Coordinate::columnIndexFromString($sheet->getHighestColumn());
         $headerToLetter = [];
         for ($col = 1; $col <= $lastColIndex; $col++) {
             $letter = Coordinate::stringFromColumnIndex($col);
-            $header = strtolower(trim((string) $sheet->getCell($letter.'1')->getValue()));
+            $header = strtolower(trim((string) $sheet->getCell($letter.$headerRow)->getValue()));
             if ($header !== '') {
                 $headerToLetter[$header] = $letter;
             }
         }
 
         $noteLetter = Coordinate::stringFromColumnIndex($lastColIndex + 1);
-        $sheet->setCellValue($noteLetter.'1', 'Kesalahan');
+        $sheet->setCellValue($noteLetter.$headerRow, 'Kesalahan');
 
         // Group problems per row so each row gets one combined note.
         $byRow = [];
@@ -93,7 +98,7 @@ class EmployeeImportErrorReport
             $sheet->getStyle($noteCell)->getAlignment()->setWrapText(true)->setVertical(Alignment::VERTICAL_TOP);
         }
 
-        $sheet->getStyle('A1:'.$noteLetter.'1')->getFont()->setBold(true);
+        $sheet->getStyle('A'.$headerRow.':'.$noteLetter.$headerRow)->getFont()->setBold(true);
         $sheet->getColumnDimension($noteLetter)->setWidth(55);
     }
 
