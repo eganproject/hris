@@ -433,3 +433,74 @@ test('scheduling pages render', function () {
         $this->actingAs($user)->get($url)->assertOk();
     }
 });
+
+/**
+ * A pattern that works every day of the week, so tests that touch "today" do not
+ * depend on which weekday the suite happens to run on.
+ */
+function everydayPattern(int $shiftId): SchedulePattern
+{
+    $pattern = SchedulePattern::query()->create([
+        'code' => 'ALL', 'name' => 'Setiap Hari', 'type' => SchedulePatternType::FixedWeekly,
+        'cycle_length' => 7, 'is_active' => true,
+    ]);
+
+    foreach (range(0, 6) as $index) {
+        $pattern->days()->create(['day_index' => $index, 'shift_id' => $shiftId]);
+    }
+
+    return $pattern;
+}
+
+test('the nightly roster generator recalculates attendance already recorded for today', function () {
+    $user = scheduleManager();
+    $reg = Shift::query()->create(['code' => 'REG', 'name' => 'Reguler', 'start_time' => '08:00', 'end_time' => '17:00', 'is_active' => true]);
+    $employee = Employee::query()->create(['full_name' => 'Budi', 'employment_status' => 'active']);
+
+    ScheduleAssignment::query()->create([
+        'employee_id' => $employee->id,
+        'schedule_pattern_id' => everydayPattern($reg->id)->id,
+        'start_date' => Carbon::today()->toDateString(),
+        'end_date' => null,
+        'created_by' => $user->id,
+    ]);
+
+    // Closed out before the roster existed, so it was recorded as a rest day.
+    $attendance = app(AttendanceResolver::class)->resolve($employee, Carbon::today());
+    expect($attendance->status)->toBe(AttendanceStatus::DayOff);
+
+    $this->artisan('schedule:generate-roster', ['--days' => 1])->assertSuccessful();
+
+    expect($attendance->fresh()->status)->toBe(AttendanceStatus::Absent)
+        ->and($attendance->fresh()->shift_id)->toBe($reg->id);
+});
+
+test('any schedule written through the generator refreshes attendance, not just the controllers', function () {
+    $reg = Shift::query()->create(['code' => 'REG', 'name' => 'Reguler', 'start_time' => '08:00', 'end_time' => '17:00', 'is_active' => true]);
+    $employee = Employee::query()->create(['full_name' => 'Budi', 'employment_status' => 'active']);
+    $date = Carbon::yesterday();
+
+    $attendance = app(AttendanceResolver::class)->resolve($employee, $date);
+    expect($attendance->status)->toBe(AttendanceStatus::DayOff);
+
+    // The path ShiftSwapService and the importer take — no controller involved.
+    app(ScheduleGenerator::class)->override($employee, $date, $reg->id, false);
+
+    expect($attendance->fresh()->status)->toBe(AttendanceStatus::Absent);
+});
+
+test('marking a scheduled day off turns a recorded Alfa back into Libur', function () {
+    $reg = Shift::query()->create(['code' => 'REG', 'name' => 'Reguler', 'start_time' => '08:00', 'end_time' => '17:00', 'is_active' => true]);
+    $employee = Employee::query()->create(['full_name' => 'Budi', 'employment_status' => 'active']);
+    $date = Carbon::yesterday();
+    $generator = app(ScheduleGenerator::class);
+
+    $generator->override($employee, $date, $reg->id, false);
+    $attendance = app(AttendanceResolver::class)->resolve($employee, $date);
+    expect($attendance->status)->toBe(AttendanceStatus::Absent);
+
+    // The correction runs the other way too: the day was not a work day after all.
+    $generator->override($employee, $date, null, true);
+
+    expect($attendance->fresh()->status)->toBe(AttendanceStatus::DayOff);
+});

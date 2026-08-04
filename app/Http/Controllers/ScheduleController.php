@@ -17,7 +17,6 @@ use App\Models\SchedulePattern;
 use App\Models\Shift;
 use App\Models\User;
 use App\Services\DefaultOfficeSchedule;
-use App\Services\ScheduleAttendanceSynchronizer;
 use App\Services\ScheduleGenerator;
 use App\Support\DataScope;
 use App\Support\ImportErrorStore;
@@ -38,7 +37,6 @@ class ScheduleController extends Controller
     public function __construct(
         private readonly ScheduleGenerator $generator,
         private readonly DefaultOfficeSchedule $officeSchedule,
-        private readonly ScheduleAttendanceSynchronizer $attendanceSynchronizer,
     ) {}
 
     /**
@@ -374,8 +372,6 @@ class ScheduleController extends Controller
             ]);
 
             $days += $this->generator->forAssignment($assignment);
-            $syncTo = $end ?? $start->copy()->addDays(ScheduleGenerator::DEFAULT_HORIZON_DAYS);
-            $this->attendanceSynchronizer->forRange($assignment->employee, $start, $syncTo);
         }
 
         return redirect()
@@ -405,7 +401,6 @@ class ScheduleController extends Controller
 
         foreach ($employees as $employee) {
             $days += $this->generator->forEmployee($employee, $from, $to);
-            $this->attendanceSynchronizer->forRange($employee, $from, $to);
         }
 
         $status = "Roster {$month->translatedFormat('F Y')} diperbarui ({$days} hari).";
@@ -434,8 +429,6 @@ class ScheduleController extends Controller
             $request->string('note')->toString() ?: null,
             $request->boolean('is_wfh'),
         );
-
-        $this->attendanceSynchronizer->forDate($employee, $date);
 
         // AJAX: kirim balik sel yang sudah diperbarui (dirender dari partial yang sama
         // dengan grid) supaya halaman tidak perlu dimuat ulang.
@@ -532,15 +525,11 @@ class ScheduleController extends Controller
         $period = $import->period();
 
         $status = sprintf(
-            'Jadwal %s diimpor: %d hari untuk %d karyawan.',
+            'Jadwal %s diimpor: %d hari untuk %d karyawan. Absensi pada tanggal yang sudah lewat ikut dihitung ulang mengikuti jadwal baru.',
             $period?->translatedFormat('F Y') ?? '',
             $import->importedDays(),
             $import->importedEmployees(),
         );
-
-        if ($import->reprocessedAttendances() > 0) {
-            $status .= " Absensi {$import->reprocessedAttendances()} hari yang sudah lewat dihitung ulang mengikuti jadwal baru.";
-        }
 
         return redirect()
             ->route('attendance.schedules.index', ['month' => $period?->format('Y-m')] + $request->only('branch_id', 'department_id', 'job_position_id', 'search'))

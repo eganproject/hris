@@ -284,8 +284,7 @@ test('a past day already closed out as Libur becomes Alfa once the shift is impo
         rosterRow($employee, [3 => 'P'], $month->daysInMonth),
     ]);
 
-    expect($import->errors())->toBe([])
-        ->and($import->reprocessedAttendances())->toBe(1);
+    expect($import->errors())->toBe([]);
 
     $after = Attendance::query()
         ->where('employee_id', $employee->id)
@@ -346,7 +345,7 @@ test('a day with no attendance row yet is left for the nightly job', function ()
         rosterRow($employee, [3 => 'P'], $month->daysInMonth),
     ]);
 
-    expect($import->reprocessedAttendances())->toBe(0)
+    expect($import->errors())->toBe([])
         ->and(Attendance::query()->count())->toBe(0);
 });
 

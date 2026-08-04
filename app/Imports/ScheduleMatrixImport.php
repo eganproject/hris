@@ -5,7 +5,6 @@ namespace App\Imports;
 use App\Models\Employee;
 use App\Models\Shift;
 use App\Models\User;
-use App\Services\ScheduleAttendanceSynchronizer;
 use App\Services\ScheduleGenerator;
 use App\Support\DataScope;
 use Carbon\CarbonImmutable;
@@ -71,8 +70,6 @@ class ScheduleMatrixImport implements ToCollection, WithMultipleSheets
 
     private int $importedDays = 0;
 
-    private int $reprocessedAttendances = 0;
-
     /**
      * @param  User|null  $actor  the importer, whose data scope every row must fall
      *                            inside; null skips the scope check (console use)
@@ -121,11 +118,6 @@ class ScheduleMatrixImport implements ToCollection, WithMultipleSheets
     public function importedDays(): int
     {
         return $this->importedDays;
-    }
-
-    public function reprocessedAttendances(): int
-    {
-        return $this->reprocessedAttendances;
     }
 
     public function period(): ?CarbonImmutable
@@ -419,15 +411,13 @@ class ScheduleMatrixImport implements ToCollection, WithMultipleSheets
     private function persist(array $prepared): void
     {
         $generator = app(ScheduleGenerator::class);
-        $attendanceSynchronizer = app(ScheduleAttendanceSynchronizer::class);
-        $today = CarbonImmutable::today();
 
-        DB::transaction(function () use ($prepared, $generator, $attendanceSynchronizer, $today) {
-            /** @var list<array{employee: Employee, date: CarbonImmutable}> $toReprocess */
-            $toReprocess = [];
-
+        DB::transaction(function () use ($prepared, $generator) {
             foreach ($prepared as $entry) {
                 foreach ($entry['days'] as $day) {
+                    // The generator re-resolves any attendance already recorded for
+                    // the day, so a roster filled in after the fact turns a wrongly
+                    // stored "Libur" into the correct status.
                     $generator->override(
                         $entry['employee'],
                         $day['date'],
@@ -438,23 +428,9 @@ class ScheduleMatrixImport implements ToCollection, WithMultipleSheets
                     );
 
                     $this->importedDays++;
-
-                    if (! $day['date']->greaterThan($today)) {
-                        $toReprocess[] = ['employee' => $entry['employee'], 'date' => $day['date']];
-                    }
                 }
 
                 $this->importedEmployees++;
-            }
-
-            // A roster filled in after the fact leaves stale attendance behind: days
-            // resolved as "Libur" only because no shift was known. Re-resolve those
-            // (punches and notes are preserved) so reports agree with the new roster.
-            foreach ($toReprocess as $item) {
-                $this->reprocessedAttendances += $attendanceSynchronizer->forDate(
-                    $item['employee'],
-                    $item['date'],
-                );
             }
         });
     }

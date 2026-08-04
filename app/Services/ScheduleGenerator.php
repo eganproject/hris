@@ -10,6 +10,13 @@ use App\Models\SchedulePattern;
 use Carbon\CarbonInterface;
 use Illuminate\Support\Carbon;
 
+/**
+ * Materializes the daily roster. Every write goes through here, so this is also
+ * where already-resolved attendance is refreshed: a day whose schedule changes
+ * invalidates the status that was computed from the old one. Doing it inside the
+ * generator rather than at each call site is deliberate — a caller that forgets
+ * leaves an employee showing "Libur" on a day they were in fact scheduled to work.
+ */
 class ScheduleGenerator
 {
     /**
@@ -17,6 +24,8 @@ class ScheduleGenerator
      * roster is populated without an explicit end date.
      */
     public const DEFAULT_HORIZON_DAYS = 90;
+
+    public function __construct(private readonly ScheduleAttendanceSynchronizer $attendanceSynchronizer) {}
 
     /**
      * Materialize the daily schedule for one employee across an inclusive date range.
@@ -79,6 +88,11 @@ class ScheduleGenerator
             $written++;
         }
 
+        // Refresh whatever attendance was already resolved across the range. Days
+        // with no attendance row yet are left to the normal daily close-out, and a
+        // range entirely in the future costs a single lookup.
+        $this->attendanceSynchronizer->forRange($employee, $from, $to);
+
         return $written;
     }
 
@@ -102,7 +116,7 @@ class ScheduleGenerator
      */
     public function override(Employee $employee, CarbonInterface $date, ?int $shiftId, bool $isDayOff, ?string $note = null, bool $isWfh = false): EmployeeSchedule
     {
-        return EmployeeSchedule::query()->updateOrCreate(
+        $schedule = EmployeeSchedule::query()->updateOrCreate(
             ['employee_id' => $employee->id, 'work_date' => Carbon::parse($date)->toDateString()],
             [
                 'shift_id' => $isDayOff ? null : $shiftId,
@@ -113,6 +127,10 @@ class ScheduleGenerator
                 'note' => $note,
             ],
         );
+
+        $this->attendanceSynchronizer->forDate($employee, $date);
+
+        return $schedule;
     }
 
     /**
