@@ -48,7 +48,10 @@ function overtimeStaff(int $computedMinutes = 90): array
         'manager_id' => $supervisor->id,
     ]);
 
-    $date = now()->startOfMonth()->addDays(5)->toDateString();
+    // Must be inside the current month (the HR recap is monthly) but never in the
+    // future — filing overtime is only allowed for a day that has already happened.
+    // "start of month + 5" broke on the 1st–5th of every month.
+    $date = now()->startOfMonth()->toDateString();
 
     Attendance::query()->create([
         'employee_id' => $employee->id, 'work_date' => $date,
