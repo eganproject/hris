@@ -1,21 +1,26 @@
 <?php
 
+use App\Enums\AttendanceStatus;
 use App\Enums\LeaveRequestStatus;
-use App\Enums\ScheduleSource;
 use App\Enums\SchedulePatternType;
+use App\Enums\ScheduleSource;
 use App\Models\Branch;
 use App\Models\Department;
 use App\Models\Employee;
+use App\Models\EmployeeSchedule;
 use App\Models\JobPosition;
 use App\Models\LeaveRequest;
 use App\Models\LeaveType;
-use App\Models\EmployeeSchedule;
 use App\Models\ScheduleAssignment;
 use App\Models\SchedulePattern;
+use App\Models\Setting;
 use App\Models\Shift;
 use App\Models\User;
+use App\Services\AttendanceResolver;
+use App\Services\DefaultOfficeSchedule;
 use App\Services\ScheduleGenerator;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Carbon;
 use Spatie\Permission\Models\Permission;
 use Spatie\Permission\PermissionRegistrar;
 
@@ -120,10 +125,10 @@ test('a manual override is never clobbered when the roster is regenerated', func
     $generator->forAssignment($assignment);
 
     // Override the Monday to a different shift, manually.
-    $generator->override($employee, \Illuminate\Support\Carbon::parse('2026-02-02'), $extra->id, false, 'Tukar shift');
+    $generator->override($employee, Carbon::parse('2026-02-02'), $extra->id, false, 'Tukar shift');
 
     // Regenerate the whole window.
-    $generator->forEmployee($employee, \Illuminate\Support\Carbon::parse('2026-02-01'), \Illuminate\Support\Carbon::parse('2026-02-07'));
+    $generator->forEmployee($employee, Carbon::parse('2026-02-01'), Carbon::parse('2026-02-07'));
 
     $monday = EmployeeSchedule::query()->where('work_date', '2026-02-02')->first();
 
@@ -147,6 +152,49 @@ test('assigning a pattern via the controller generates the schedule', function (
 
     expect(ScheduleAssignment::query()->where('employee_id', $employee->id)->exists())->toBeTrue()
         ->and(EmployeeSchedule::query()->where('employee_id', $employee->id)->count())->toBe(28);
+});
+
+test('assigning a pattern recalculates an existing day-off attendance', function () {
+    $user = scheduleManager();
+    $reg = Shift::query()->create(['code' => 'REG', 'name' => 'Reguler', 'start_time' => '08:00', 'end_time' => '17:00', 'is_active' => true]);
+    $employee = Employee::query()->create(['full_name' => 'Budi', 'employment_status' => 'active']);
+    $pattern = weeklyPattern($reg->id);
+
+    $attendance = app(AttendanceResolver::class)->resolve($employee, Carbon::parse('2026-02-02'));
+    expect($attendance->status)->toBe(AttendanceStatus::DayOff);
+
+    $this->actingAs($user)->post('/attendance/schedules/assign', [
+        'employee_ids' => [$employee->id],
+        'schedule_pattern_id' => $pattern->id,
+        'start_date' => '2026-02-01',
+        'end_date' => '2026-02-28',
+    ])->assertRedirect();
+
+    expect($attendance->fresh()->status)->toBe(AttendanceStatus::Absent)
+        ->and($attendance->fresh()->shift_id)->toBe($reg->id);
+});
+
+test('generating a roster recalculates existing attendance in that month', function () {
+    $user = scheduleManager();
+    $reg = Shift::query()->create(['code' => 'REG', 'name' => 'Reguler', 'start_time' => '08:00', 'end_time' => '17:00', 'is_active' => true]);
+    $employee = Employee::query()->create(['full_name' => 'Budi', 'employment_status' => 'active']);
+    $pattern = weeklyPattern($reg->id);
+
+    ScheduleAssignment::query()->create([
+        'employee_id' => $employee->id,
+        'schedule_pattern_id' => $pattern->id,
+        'start_date' => '2026-02-01',
+        'end_date' => '2026-02-28',
+        'created_by' => $user->id,
+    ]);
+    $attendance = app(AttendanceResolver::class)->resolve($employee, Carbon::parse('2026-02-02'));
+
+    $this->actingAs($user)->post('/attendance/schedules/generate', [
+        'month' => '2026-02',
+    ])->assertRedirect();
+
+    expect($attendance->fresh()->status)->toBe(AttendanceStatus::Absent)
+        ->and($attendance->fresh()->shift_id)->toBe($reg->id);
 });
 
 test('storing a pattern persists its slots', function () {
@@ -185,6 +233,22 @@ test('a manual override can be set through the controller', function () {
     expect($row)->not->toBeNull()
         ->and($row->shift_id)->toBe($reg->id)
         ->and($row->source)->toBe(ScheduleSource::Manual);
+});
+
+test('a manual override recalculates an existing day-off attendance', function () {
+    $user = scheduleManager();
+    $reg = Shift::query()->create(['code' => 'REG', 'name' => 'Reguler', 'start_time' => '08:00', 'end_time' => '17:00', 'is_active' => true]);
+    $employee = Employee::query()->create(['full_name' => 'Budi', 'employment_status' => 'active']);
+    $attendance = app(AttendanceResolver::class)->resolve($employee, Carbon::parse('2026-02-10'));
+
+    $this->actingAs($user)->post('/attendance/schedules/override', [
+        'employee_id' => $employee->id,
+        'work_date' => '2026-02-10',
+        'shift_id' => $reg->id,
+    ])->assertRedirect();
+
+    expect($attendance->fresh()->status)->toBe(AttendanceStatus::Absent)
+        ->and($attendance->fresh()->shift_id)->toBe($reg->id);
 });
 
 test('approved leave shows on the roster and on the per-employee schedule', function () {
@@ -253,7 +317,7 @@ test('the roster fills office-hours employees from the default pattern without m
     $user = scheduleManager();
     $reg = Shift::query()->create(['code' => 'REG', 'name' => 'Reguler', 'start_time' => '08:00', 'end_time' => '17:00', 'is_active' => true]);
     $pattern = weeklyPattern($reg->id);
-    \App\Models\Setting::set(\App\Services\DefaultOfficeSchedule::SETTING_KEY, (string) $pattern->id);
+    Setting::set(DefaultOfficeSchedule::SETTING_KEY, (string) $pattern->id);
 
     $employee = Employee::query()->create([
         'full_name' => 'Karyawan Kantoran', 'employment_status' => 'active',

@@ -3,8 +3,11 @@
 namespace App\Http\Controllers;
 
 use App\Enums\LeaveRequestStatus;
+use App\Exports\ScheduleTemplateExport;
+use App\Exports\UnscheduledEmployeesExport;
 use App\Http\Requests\ScheduleAssignmentRequest;
 use App\Http\Requests\ScheduleOverrideRequest;
+use App\Imports\ScheduleMatrixImport;
 use App\Models\Employee;
 use App\Models\Holiday;
 use App\Models\JobPosition;
@@ -12,13 +15,14 @@ use App\Models\LeaveRequest;
 use App\Models\ScheduleAssignment;
 use App\Models\SchedulePattern;
 use App\Models\Shift;
-use App\Exports\ScheduleTemplateExport;
-use App\Exports\UnscheduledEmployeesExport;
-use App\Imports\ScheduleMatrixImport;
+use App\Models\User;
+use App\Services\DefaultOfficeSchedule;
+use App\Services\ScheduleAttendanceSynchronizer;
 use App\Services\ScheduleGenerator;
 use App\Support\DataScope;
 use App\Support\ImportErrorStore;
 use Carbon\CarbonImmutable;
+use Carbon\CarbonPeriod;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -26,7 +30,6 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\View\View;
-use Carbon\CarbonPeriod;
 use Maatwebsite\Excel\Facades\Excel;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
 
@@ -34,9 +37,9 @@ class ScheduleController extends Controller
 {
     public function __construct(
         private readonly ScheduleGenerator $generator,
-        private readonly \App\Services\DefaultOfficeSchedule $officeSchedule,
-    ) {
-    }
+        private readonly DefaultOfficeSchedule $officeSchedule,
+        private readonly ScheduleAttendanceSynchronizer $attendanceSynchronizer,
+    ) {}
 
     /**
      * Monthly roster grid: employees × days, showing the materialized schedule.
@@ -279,7 +282,7 @@ class ScheduleController extends Controller
      * Approved leave expanded per day, so a roster cell can answer "is this person
      * off on leave today?" with a single lookup.
      *
-     * @return Collection<int, Collection<string, LeaveRequest>>  employee id => date => leave
+     * @return Collection<int, Collection<string, LeaveRequest>> employee id => date => leave
      */
     private function approvedLeaveByDate(Carbon $from, Carbon $to, ?int $branchId = null, ?Employee $employee = null, ?DataScope $scope = null): Collection
     {
@@ -371,6 +374,8 @@ class ScheduleController extends Controller
             ]);
 
             $days += $this->generator->forAssignment($assignment);
+            $syncTo = $end ?? $start->copy()->addDays(ScheduleGenerator::DEFAULT_HORIZON_DAYS);
+            $this->attendanceSynchronizer->forRange($assignment->employee, $start, $syncTo);
         }
 
         return redirect()
@@ -400,6 +405,7 @@ class ScheduleController extends Controller
 
         foreach ($employees as $employee) {
             $days += $this->generator->forEmployee($employee, $from, $to);
+            $this->attendanceSynchronizer->forRange($employee, $from, $to);
         }
 
         $status = "Roster {$month->translatedFormat('F Y')} diperbarui ({$days} hari).";
@@ -429,6 +435,8 @@ class ScheduleController extends Controller
             $request->boolean('is_wfh'),
         );
 
+        $this->attendanceSynchronizer->forDate($employee, $date);
+
         // AJAX: kirim balik sel yang sudah diperbarui (dirender dari partial yang sama
         // dengan grid) supaya halaman tidak perlu dimuat ulang.
         if ($request->expectsJson()) {
@@ -452,7 +460,7 @@ class ScheduleController extends Controller
     {
         DataScope::forAttendance($request->user())->authorize($assignment->employee);
         abort_unless(
-            $request->user()->can(\App\Models\User::SCOPE_BYPASS_ATTENDANCE) || $assignment->created_by === $request->user()->id,
+            $request->user()->can(User::SCOPE_BYPASS_ATTENDANCE) || $assignment->created_by === $request->user()->id,
             403,
         );
 

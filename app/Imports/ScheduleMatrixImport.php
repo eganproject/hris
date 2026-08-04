@@ -2,11 +2,10 @@
 
 namespace App\Imports;
 
-use App\Models\Attendance;
 use App\Models\Employee;
 use App\Models\Shift;
 use App\Models\User;
-use App\Services\AttendanceResolver;
+use App\Services\ScheduleAttendanceSynchronizer;
 use App\Services\ScheduleGenerator;
 use App\Support\DataScope;
 use Carbon\CarbonImmutable;
@@ -420,10 +419,10 @@ class ScheduleMatrixImport implements ToCollection, WithMultipleSheets
     private function persist(array $prepared): void
     {
         $generator = app(ScheduleGenerator::class);
-        $resolver = app(AttendanceResolver::class);
+        $attendanceSynchronizer = app(ScheduleAttendanceSynchronizer::class);
         $today = CarbonImmutable::today();
 
-        DB::transaction(function () use ($prepared, $generator, $resolver, $today) {
+        DB::transaction(function () use ($prepared, $generator, $attendanceSynchronizer, $today) {
             /** @var list<array{employee: Employee, date: CarbonImmutable}> $toReprocess */
             $toReprocess = [];
 
@@ -452,17 +451,10 @@ class ScheduleMatrixImport implements ToCollection, WithMultipleSheets
             // resolved as "Libur" only because no shift was known. Re-resolve those
             // (punches and notes are preserved) so reports agree with the new roster.
             foreach ($toReprocess as $item) {
-                $exists = Attendance::query()
-                    ->where('employee_id', $item['employee']->id)
-                    ->whereDate('work_date', $item['date']->toDateString())
-                    ->exists();
-
-                if (! $exists) {
-                    continue; // the day was never closed out; the nightly job will do it
-                }
-
-                $resolver->reprocess($item['employee'], $item['date']);
-                $this->reprocessedAttendances++;
+                $this->reprocessedAttendances += $attendanceSynchronizer->forDate(
+                    $item['employee'],
+                    $item['date'],
+                );
             }
         });
     }
