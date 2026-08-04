@@ -270,6 +270,8 @@ Route::middleware('auth')->group(function () {
         // "schedules.*" agar menu "Jadwal Kerja" tidak ikut ter-highlight.
         Route::get('schedules/unscheduled', [ScheduleController::class, 'unscheduled'])->middleware('permission:schedules.view')->name('unscheduled.index');
         Route::get('schedules/unscheduled/export', [ScheduleController::class, 'unscheduledExport'])->middleware('permission:schedules.view')->name('unscheduled.export');
+        // Tugaskan satu pola ke banyak karyawan sekaligus dari daftar belum terjadwal.
+        Route::post('schedules/unscheduled/assign', [ScheduleController::class, 'bulkAssign'])->middleware('permission:schedules.create')->name('unscheduled.assign');
         // Import roster bulanan dari Excel. Dideklarasikan sebelum rute ber-wildcard
         // di bawahnya, dan memakai izin "update" karena isinya menimpa jadwal.
         Route::get('schedules/import/template', [ScheduleController::class, 'importTemplate'])->middleware('permission:schedules.update')->name('schedules.import.template');

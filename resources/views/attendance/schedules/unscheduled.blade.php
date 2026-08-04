@@ -98,11 +98,87 @@
             </form>
         </section>
 
+        @if (session('status'))
+            <div class="rounded-md border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">{{ session('status') }}</div>
+        @endif
+
+        @if ($errors->any())
+            <div class="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                <ul class="space-y-1">
+                    @foreach ($errors->all() as $error)
+                        <li>• {{ $error }}</li>
+                    @endforeach
+                </ul>
+            </div>
+        @endif
+
+        {{-- Bulk assign: tick people in the table below, then give them one pattern. --}}
+        @if ($canCreate && $employees->isNotEmpty())
+            {{-- The row checkboxes live in the table and point back here with form=,
+                 so the panel stays a self-contained form instead of wrapping it. --}}
+            <form id="bulk-assign-form" method="POST" action="{{ route('attendance.unscheduled.assign') }}" data-bulk-form data-no-confirm="true"
+                data-loading-title="Menugaskan pola..." data-loading-message="Membuat jadwal untuk karyawan terpilih."
+                class="rounded-lg border border-gray-200 bg-white p-5 shadow-sm">
+                @csrf
+                {{-- Kembali ke tampilan yang sama setelah selesai. --}}
+                <input type="hidden" name="mode" value="{{ $mode }}">
+                <input type="hidden" name="month" value="{{ $month->format('Y-m') }}">
+                <input type="hidden" name="branch_id" value="{{ $filters['branch_id'] ?? '' }}">
+                <input type="hidden" name="department_id" value="{{ $filters['department_id'] ?? '' }}">
+                <input type="hidden" name="job_position_id" value="{{ $filters['job_position_id'] ?? '' }}">
+                <input type="hidden" name="search" value="{{ $filters['search'] ?? '' }}">
+                <input type="hidden" name="per_page" value="{{ $perPage }}">
+
+                <div class="flex flex-col gap-1 border-b border-gray-100 pb-4">
+                    <h2 class="text-sm font-semibold text-gray-950">Penjadwalan Massal</h2>
+                    <p class="text-sm text-gray-500">Centang karyawan di tabel bawah, lalu tetapkan <span class="font-medium text-gray-700">satu pola yang sama</span> untuk semuanya sekaligus.</p>
+                </div>
+
+                @if ($patterns->isEmpty())
+                    <p class="mt-4 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+                        Belum ada pola jadwal aktif. <a href="{{ route('attendance.schedule-patterns.create') }}" class="font-medium underline">Buat pola dulu</a>.
+                    </p>
+                @else
+                    <div class="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+                        <div>
+                            <label for="bulk-pattern" class="block text-sm font-medium text-gray-700">Pola jadwal <span class="field-requirement is-required" aria-label="Wajib diisi">*</span></label>
+                            <select id="bulk-pattern" name="schedule_pattern_id" required class="mt-2 block w-full rounded-md border border-gray-300 bg-white px-3 py-2.5 text-sm shadow-xs outline-none focus:border-primary focus:ring-2 focus:ring-primary/20">
+                                <option value="">Pilih pola…</option>
+                                @foreach ($patterns as $pattern)
+                                    <option value="{{ $pattern->id }}" @selected(old('schedule_pattern_id') == $pattern->id)>{{ $pattern->name }} ({{ $pattern->type->label() }})</option>
+                                @endforeach
+                            </select>
+                        </div>
+                        <div>
+                            <label for="bulk-start" class="block text-sm font-medium text-gray-700">Tanggal mulai <span class="field-requirement is-required" aria-label="Wajib diisi">*</span></label>
+                            <input id="bulk-start" type="date" name="start_date" required value="{{ old('start_date', $defaultStart) }}" class="mt-2 block w-full rounded-md border border-gray-300 bg-white px-3 py-2.5 text-sm shadow-xs outline-none focus:border-primary focus:ring-2 focus:ring-primary/20">
+                        </div>
+                        <div>
+                            <label for="bulk-end" class="block text-sm font-medium text-gray-700">Tanggal selesai <span class="text-gray-400">(opsional)</span></label>
+                            <input id="bulk-end" type="date" name="end_date" value="{{ old('end_date') }}" class="mt-2 block w-full rounded-md border border-gray-300 bg-white px-3 py-2.5 text-sm shadow-xs outline-none focus:border-primary focus:ring-2 focus:ring-primary/20">
+                            <p class="mt-1 text-xs text-gray-500">Kosongkan agar berlaku seterusnya.</p>
+                        </div>
+                        <div class="flex items-end">
+                            <button type="submit" data-bulk-submit disabled class="w-full rounded-md bg-primary px-4 py-2.5 text-sm font-semibold text-white shadow-xs transition hover:bg-primary-hover disabled:cursor-not-allowed disabled:opacity-50">
+                                Tugaskan ke <span data-bulk-count>0</span> karyawan
+                            </button>
+                        </div>
+                    </div>
+                    <p data-bulk-hint class="mt-3 text-xs text-gray-500">Belum ada karyawan dicentang. Pilihan berlaku untuk halaman ini saja.</p>
+                @endif
+            </form>
+        @endif
+
         <section class="overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm">
             <div class="overflow-x-auto">
                 <table class="data-table">
                     <thead>
                         <tr>
+                            @if ($canCreate && $employees->isNotEmpty())
+                                <th class="w-10">
+                                    <input type="checkbox" data-bulk-all aria-label="Pilih semua karyawan di halaman ini" class="size-4 rounded border-gray-300 text-primary focus:ring-primary">
+                                </th>
+                            @endif
                             <th>Karyawan</th>
                             <th>Lokasi</th>
                             <th>Divisi</th>
@@ -118,6 +194,13 @@
                         @forelse ($employees as $employee)
                             @php $hasCoveringPattern = $isMonthly && ($employee->covering_count ?? 0) > 0; @endphp
                             <tr>
+                                @if ($canCreate)
+                                    <td>
+                                        <input type="checkbox" form="bulk-assign-form" name="employee_ids[]" value="{{ $employee->id }}"
+                                            data-bulk-item aria-label="Pilih {{ $employee->full_name }}"
+                                            class="size-4 rounded border-gray-300 text-primary focus:ring-primary">
+                                    </td>
+                                @endif
                                 <td>
                                     <a href="{{ route('attendance.schedules.show', $employee) }}" class="font-medium text-gray-950 hover:underline">{{ $employee->full_name ?? 'Tanpa nama' }}</a>
                                     <p class="mt-0.5 text-xs text-gray-500">{{ $employee->employee_number ?? 'Kode belum dibuat' }}</p>
@@ -151,6 +234,7 @@
                             </tr>
                         @empty
                             <tr>
+                                {{-- No rows means no checkbox column in the header either. --}}
                                 <td colspan="{{ $isMonthly ? 7 : 6 }}" class="cell-empty">
                                     @if ($isMonthly)
                                         Semua karyawan sudah punya jadwal untuk {{ $month->translatedFormat('F Y') }} (sesuai filter). 🎉
@@ -169,4 +253,48 @@
             </div>
         </section>
     </div>
+
+    @if ($canCreate)
+        @push('scripts')
+        <script>
+            (function () {
+                const form = document.getElementById('bulk-assign-form');
+                if (!form) return;
+
+                const all = document.querySelector('[data-bulk-all]');
+                const items = Array.from(document.querySelectorAll('[data-bulk-item]'));
+                const submit = form.querySelector('[data-bulk-submit]');
+                const count = form.querySelector('[data-bulk-count]');
+                const hint = form.querySelector('[data-bulk-hint]');
+
+                const sync = () => {
+                    const selected = items.filter((item) => item.checked).length;
+
+                    if (count) count.textContent = selected;
+                    if (submit) submit.disabled = selected === 0;
+                    if (hint) {
+                        hint.textContent = selected === 0
+                            ? 'Belum ada karyawan dicentang. Pilihan berlaku untuk halaman ini saja.'
+                            : selected + ' karyawan dipilih. Semuanya akan mendapat pola dan periode yang sama.';
+                    }
+                    if (all) {
+                        all.checked = selected > 0 && selected === items.length;
+                        // Partially selected reads as neither on nor off.
+                        all.indeterminate = selected > 0 && selected < items.length;
+                    }
+                };
+
+                if (all) {
+                    all.addEventListener('change', () => {
+                        items.forEach((item) => { item.checked = all.checked; });
+                        sync();
+                    });
+                }
+
+                items.forEach((item) => item.addEventListener('change', sync));
+                sync();
+            })();
+        </script>
+        @endpush
+    @endif
 </x-layouts.app>

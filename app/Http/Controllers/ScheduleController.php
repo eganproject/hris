@@ -158,6 +158,9 @@ class ScheduleController extends Controller
             ],
             'perPage' => $perPage,
             'hasNoScope' => $scope->isEmpty(),
+            // Feeds the bulk-assign bar: only patterns this user is allowed to use.
+            'patterns' => SchedulePattern::query()->visibleTo($request->user())->where('is_active', true)->orderBy('name')->get(),
+            'defaultStart' => $mode === 'no_schedule' ? $from->toDateString() : now()->startOfMonth()->toDateString(),
         ]);
     }
 
@@ -347,11 +350,44 @@ class ScheduleController extends Controller
 
     public function store(ScheduleAssignmentRequest $request): RedirectResponse
     {
+        ['days' => $days, 'start' => $start] = $this->createAssignments($request);
+
+        return redirect()
+            ->route('attendance.schedules.index', ['month' => $start->format('Y-m')])
+            ->with('status', "Pola ditugaskan & {$days} hari jadwal dibuat.");
+    }
+
+    /**
+     * Assign one pattern to everybody ticked on the "belum terjadwal" list. Same
+     * rules as the assign page — this is only a faster route to it — but it returns
+     * to the list, where the people just handled have dropped off.
+     */
+    public function bulkAssign(ScheduleAssignmentRequest $request): RedirectResponse
+    {
+        ['days' => $days, 'employees' => $employees] = $this->createAssignments($request);
+
+        return redirect()
+            ->route('attendance.unscheduled.index', $request->only(
+                'mode', 'month', 'branch_id', 'department_id', 'job_position_id', 'search', 'per_page',
+            ))
+            ->with('status', "Pola ditugaskan ke {$employees} karyawan & {$days} hari jadwal dibuat.");
+    }
+
+    /**
+     * Create one assignment per selected employee and materialize its roster.
+     * Every employee is scope-checked individually, and the pattern must be one the
+     * user may use — a hand-crafted request cannot reach past either.
+     *
+     * @return array{days: int, employees: int, start: Carbon}
+     */
+    private function createAssignments(ScheduleAssignmentRequest $request): array
+    {
         $patternId = $request->integer('schedule_pattern_id');
         $start = Carbon::parse($request->date('start_date'));
         $end = $request->date('end_date') ? Carbon::parse($request->date('end_date')) : null;
 
         $days = 0;
+        $employees = 0;
         $scope = DataScope::forAttendance($request->user());
 
         // Hanya boleh menugaskan pola milik sendiri (kecuali pemegang attendance.view.all).
@@ -372,11 +408,10 @@ class ScheduleController extends Controller
             ]);
 
             $days += $this->generator->forAssignment($assignment);
+            $employees++;
         }
 
-        return redirect()
-            ->route('attendance.schedules.index', ['month' => $start->format('Y-m')])
-            ->with('status', "Pola ditugaskan & {$days} hari jadwal dibuat.");
+        return ['days' => $days, 'employees' => $employees, 'start' => $start];
     }
 
     /**
