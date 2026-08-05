@@ -3,12 +3,14 @@
 namespace App\Http\Controllers;
 
 use App\Enums\LeaveRequestStatus;
+use App\Enums\ScheduleSource;
 use App\Exports\ScheduleTemplateExport;
 use App\Exports\UnscheduledEmployeesExport;
 use App\Http\Requests\ScheduleAssignmentRequest;
 use App\Http\Requests\ScheduleOverrideRequest;
 use App\Imports\ScheduleMatrixImport;
 use App\Models\Employee;
+use App\Models\EmployeeSchedule;
 use App\Models\Holiday;
 use App\Models\JobPosition;
 use App\Models\LeaveRequest;
@@ -91,7 +93,9 @@ class ScheduleController extends Controller
             ->when($branchId, fn ($query) => $query->whereHas('employee', fn ($q) => $q->where('branch_id', $branchId)))
             ->tap(fn ($query) => $scope->constrain($query))
             ->visibleToCreator($request->user())
-            ->orderByDesc('start_date')
+            // Newest first, matching the precedence the generator applies — the
+            // assignment actually governing an overlap is the one listed on top.
+            ->orderByDesc('id')
             ->get();
 
         return view('attendance.schedules.index', [
@@ -271,7 +275,7 @@ class ScheduleController extends Controller
             'leaves' => $leaves,
             'assignments' => $employee->scheduleAssignments()
                 ->with('pattern')
-                ->orderByDesc('start_date')
+                ->orderByDesc('id')
                 ->get(),
             'month' => $month,
             'prevMonth' => $month->copy()->subMonth()->format('Y-m'),
@@ -350,11 +354,11 @@ class ScheduleController extends Controller
 
     public function store(ScheduleAssignmentRequest $request): RedirectResponse
     {
-        ['days' => $days, 'start' => $start] = $this->createAssignments($request);
+        ['days' => $days, 'start' => $start, 'skipped' => $skipped] = $this->createAssignments($request);
 
         return redirect()
             ->route('attendance.schedules.index', ['month' => $start->format('Y-m')])
-            ->with('status', "Pola ditugaskan & {$days} hari jadwal dibuat.");
+            ->with('status', "Pola ditugaskan & {$days} hari jadwal dibuat.".$this->skippedNote($skipped));
     }
 
     /**
@@ -364,13 +368,26 @@ class ScheduleController extends Controller
      */
     public function bulkAssign(ScheduleAssignmentRequest $request): RedirectResponse
     {
-        ['days' => $days, 'employees' => $employees] = $this->createAssignments($request);
+        ['days' => $days, 'employees' => $employees, 'skipped' => $skipped] = $this->createAssignments($request);
 
         return redirect()
             ->route('attendance.unscheduled.index', $request->only(
                 'mode', 'month', 'branch_id', 'department_id', 'job_position_id', 'search', 'per_page',
             ))
-            ->with('status', "Pola ditugaskan ke {$employees} karyawan & {$days} hari jadwal dibuat.");
+            ->with('status', "Pola ditugaskan ke {$employees} karyawan & {$days} hari jadwal dibuat.".$this->skippedNote($skipped));
+    }
+
+    /**
+     * Days the generator refused to touch are otherwise invisible: the assignment
+     * reports success while part of the period keeps its old schedule. Say so.
+     */
+    private function skippedNote(int $skipped): string
+    {
+        if ($skipped === 0) {
+            return '';
+        }
+
+        return " {$skipped} hari dilewati karena sudah diubah manual (override harian atau import Excel) — ubah lewat grid roster bila ingin mengikuti pola baru.";
     }
 
     /**
@@ -378,7 +395,7 @@ class ScheduleController extends Controller
      * Every employee is scope-checked individually, and the pattern must be one the
      * user may use — a hand-crafted request cannot reach past either.
      *
-     * @return array{days: int, employees: int, start: Carbon}
+     * @return array{days: int, employees: int, start: Carbon, skipped: int}
      */
     private function createAssignments(ScheduleAssignmentRequest $request): array
     {
@@ -388,6 +405,7 @@ class ScheduleController extends Controller
 
         $days = 0;
         $employees = 0;
+        $employeeIds = [];
         $scope = DataScope::forAttendance($request->user());
 
         // Hanya boleh menugaskan pola milik sendiri (kecuali pemegang attendance.view.all).
@@ -408,10 +426,21 @@ class ScheduleController extends Controller
             ]);
 
             $days += $this->generator->forAssignment($assignment);
+            $employeeIds[] = $employeeId;
             $employees++;
         }
 
-        return ['days' => $days, 'employees' => $employees, 'start' => $start];
+        // Manual days inside the period are exactly the ones the generator skipped:
+        // assigning a pattern never creates them, so counting them afterwards is safe.
+        $rangeEnd = $end ?? $start->copy()->addDays(ScheduleGenerator::DEFAULT_HORIZON_DAYS);
+
+        $skipped = $employeeIds === [] ? 0 : EmployeeSchedule::query()
+            ->whereIn('employee_id', $employeeIds)
+            ->whereBetween('work_date', [$start->toDateString(), $rangeEnd->toDateString()])
+            ->where('source', ScheduleSource::Manual)
+            ->count();
+
+        return ['days' => $days, 'employees' => $employees, 'start' => $start, 'skipped' => $skipped];
     }
 
     /**

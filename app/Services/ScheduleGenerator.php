@@ -29,8 +29,9 @@ class ScheduleGenerator
 
     /**
      * Materialize the daily schedule for one employee across an inclusive date range.
-     * For each day the applicable assignment (latest-starting one covering that day)
-     * decides the shift via its pattern. Existing manual overrides are preserved.
+     * For each day the applicable assignment (see assignmentFor) decides the shift
+     * via its pattern. Existing manual overrides are preserved — a day edited by
+     * hand or written by the roster import is never rewritten by a pattern.
      *
      * @return int number of days written or refreshed
      */
@@ -134,7 +135,18 @@ class ScheduleGenerator
     }
 
     /**
-     * Pick the assignment that governs a date: the latest-starting one that covers it.
+     * Pick the assignment that governs a date: of those covering it, whichever was
+     * assigned most recently.
+     *
+     * Precedence is by when the assignment was made, not by its start date.
+     * Assigning a pattern states an intent ("from here on, use this"), so a newer
+     * assignment has to win wherever it overlaps an older one. Ranking by start
+     * date instead meant an older assignment that happened to start later kept
+     * control, and re-assigning that period silently did nothing.
+     *
+     * Older assignments still govern the days a newer one does not cover, so a
+     * short replacement period hands control back on its own once it ends — no
+     * need to truncate or split what is already on record.
      *
      * @param  \Illuminate\Support\Collection<int, ScheduleAssignment>  $assignments
      */
@@ -142,7 +154,7 @@ class ScheduleGenerator
     {
         return $assignments
             ->filter(fn (ScheduleAssignment $assignment) => $assignment->coversDate($date))
-            ->sortByDesc('start_date')
+            ->sortByDesc('id')
             ->first();
     }
 }

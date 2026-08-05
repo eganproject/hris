@@ -438,10 +438,10 @@ test('scheduling pages render', function () {
  * A pattern that works every day of the week, so tests that touch "today" do not
  * depend on which weekday the suite happens to run on.
  */
-function everydayPattern(int $shiftId): SchedulePattern
+function everydayPattern(int $shiftId, string $code = 'ALL'): SchedulePattern
 {
     $pattern = SchedulePattern::query()->create([
-        'code' => 'ALL', 'name' => 'Setiap Hari', 'type' => SchedulePatternType::FixedWeekly,
+        'code' => $code, 'name' => 'Setiap Hari '.$code, 'type' => SchedulePatternType::FixedWeekly,
         'cycle_length' => 7, 'is_active' => true,
     ]);
 
@@ -503,4 +503,103 @@ test('marking a scheduled day off turns a recorded Alfa back into Libur', functi
     $generator->override($employee, $date, null, true);
 
     expect($attendance->fresh()->status)->toBe(AttendanceStatus::DayOff);
+});
+
+test('re-assigning a pattern over the same period replaces the old one', function () {
+    $pagi = Shift::query()->create(['code' => 'PG', 'name' => 'Pagi', 'start_time' => '07:00', 'end_time' => '15:00', 'is_active' => true]);
+    $malam = Shift::query()->create(['code' => 'ML', 'name' => 'Malam', 'start_time' => '23:00', 'end_time' => '07:00', 'is_active' => true]);
+    $employee = Employee::query()->create(['full_name' => 'Budi', 'employment_status' => 'active']);
+    $generator = app(ScheduleGenerator::class);
+
+    $old = ScheduleAssignment::query()->create([
+        'employee_id' => $employee->id, 'schedule_pattern_id' => everydayPattern($pagi->id)->id,
+        'start_date' => '2026-09-01', 'end_date' => '2026-09-30',
+    ]);
+    $generator->forAssignment($old);
+
+    // Same employee, same period, different pattern — an explicit replacement.
+    $new = ScheduleAssignment::query()->create([
+        'employee_id' => $employee->id, 'schedule_pattern_id' => everydayPattern($malam->id, 'ALL2')->id,
+        'start_date' => '2026-09-01', 'end_date' => '2026-09-30',
+    ]);
+    $generator->forAssignment($new);
+
+    $day = EmployeeSchedule::query()->where('work_date', '2026-09-10')->firstOrFail();
+
+    expect($day->shift_id)->toBe($malam->id)
+        ->and($day->schedule_assignment_id)->toBe($new->id);
+});
+
+test('a newer assignment wins even over an older one that starts later', function () {
+    $pagi = Shift::query()->create(['code' => 'PG', 'name' => 'Pagi', 'start_time' => '07:00', 'end_time' => '15:00', 'is_active' => true]);
+    $malam = Shift::query()->create(['code' => 'ML', 'name' => 'Malam', 'start_time' => '23:00', 'end_time' => '07:00', 'is_active' => true]);
+    $employee = Employee::query()->create(['full_name' => 'Budi', 'employment_status' => 'active']);
+
+    // The old assignment starts later in the month, so under a start-date rule it
+    // would keep the second half. Assigning again must override it outright.
+    ScheduleAssignment::query()->create([
+        'employee_id' => $employee->id, 'schedule_pattern_id' => everydayPattern($malam->id)->id,
+        'start_date' => '2026-09-15', 'end_date' => '2026-09-30',
+    ]);
+    $newer = ScheduleAssignment::query()->create([
+        'employee_id' => $employee->id, 'schedule_pattern_id' => everydayPattern($pagi->id, 'ALL2')->id,
+        'start_date' => '2026-09-01', 'end_date' => '2026-09-30',
+    ]);
+
+    app(ScheduleGenerator::class)->forEmployee($employee, Carbon::parse('2026-09-01'), Carbon::parse('2026-09-30'));
+
+    expect(EmployeeSchedule::query()->where('work_date', '2026-09-20')->value('shift_id'))->toBe($pagi->id)
+        ->and(EmployeeSchedule::query()->where('work_date', '2026-09-20')->value('schedule_assignment_id'))->toBe($newer->id)
+        ->and(EmployeeSchedule::query()->where('work_date', '2026-09-05')->value('shift_id'))->toBe($pagi->id);
+});
+
+test('an older assignment resumes on the days the newer one does not cover', function () {
+    $pagi = Shift::query()->create(['code' => 'PG', 'name' => 'Pagi', 'start_time' => '07:00', 'end_time' => '15:00', 'is_active' => true]);
+    $malam = Shift::query()->create(['code' => 'ML', 'name' => 'Malam', 'start_time' => '23:00', 'end_time' => '07:00', 'is_active' => true]);
+    $employee = Employee::query()->create(['full_name' => 'Budi', 'employment_status' => 'active']);
+
+    // Standing pattern, open-ended.
+    $standing = ScheduleAssignment::query()->create([
+        'employee_id' => $employee->id, 'schedule_pattern_id' => everydayPattern($pagi->id)->id,
+        'start_date' => '2026-09-01', 'end_date' => null,
+    ]);
+    // A short replacement in the middle of it.
+    $temporary = ScheduleAssignment::query()->create([
+        'employee_id' => $employee->id, 'schedule_pattern_id' => everydayPattern($malam->id, 'ALL2')->id,
+        'start_date' => '2026-09-10', 'end_date' => '2026-09-20',
+    ]);
+
+    app(ScheduleGenerator::class)->forEmployee($employee, Carbon::parse('2026-09-01'), Carbon::parse('2026-09-30'));
+
+    $on = fn (string $date) => EmployeeSchedule::query()->where('work_date', $date)->first();
+
+    expect($on('2026-09-05')->schedule_assignment_id)->toBe($standing->id)
+        ->and($on('2026-09-15')->schedule_assignment_id)->toBe($temporary->id)
+        ->and($on('2026-09-15')->shift_id)->toBe($malam->id)
+        // Past the replacement window the standing pattern takes over again.
+        ->and($on('2026-09-25')->schedule_assignment_id)->toBe($standing->id)
+        ->and($on('2026-09-25')->shift_id)->toBe($pagi->id);
+});
+
+test('re-assigning reports the days it left alone because they were edited manually', function () {
+    $user = scheduleManager();
+    $pagi = Shift::query()->create(['code' => 'PG', 'name' => 'Pagi', 'start_time' => '07:00', 'end_time' => '15:00', 'is_active' => true]);
+    $malam = Shift::query()->create(['code' => 'ML', 'name' => 'Malam', 'start_time' => '23:00', 'end_time' => '07:00', 'is_active' => true]);
+    $employee = Employee::query()->create(['full_name' => 'Budi', 'employment_status' => 'active']);
+
+    // Two days edited by hand (or written by the roster import).
+    app(ScheduleGenerator::class)->override($employee, Carbon::parse('2026-09-10'), $pagi->id, false);
+    app(ScheduleGenerator::class)->override($employee, Carbon::parse('2026-09-11'), $pagi->id, false);
+
+    $this->actingAs($user)->post('/attendance/schedules/assign', [
+        'employee_ids' => [$employee->id],
+        'schedule_pattern_id' => everydayPattern($malam->id)->id,
+        'start_date' => '2026-09-01',
+        'end_date' => '2026-09-30',
+    ])->assertRedirect();
+
+    expect(session('status'))->toContain('2 hari dilewati karena sudah diubah manual')
+        // The manual days genuinely keep their old shift.
+        ->and(EmployeeSchedule::query()->where('work_date', '2026-09-10')->value('shift_id'))->toBe($pagi->id)
+        ->and(EmployeeSchedule::query()->where('work_date', '2026-09-12')->value('shift_id'))->toBe($malam->id);
 });
