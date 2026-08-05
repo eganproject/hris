@@ -148,6 +148,36 @@ class ScheduleGenerator
     }
 
     /**
+     * Of the given assignments, which ones actually decide at least one of the days.
+     *
+     * Overlapping assignments are legitimate — assigning a pattern again supersedes
+     * an older one without deleting it — but that leaves rows on screen with no way
+     * to tell which is in force. Answering that here keeps the UI honest without
+     * restating the precedence rule anywhere else.
+     *
+     * @param  \Illuminate\Support\Collection<int, ScheduleAssignment>  $assignments
+     * @param  iterable<CarbonInterface>  $days
+     * @return array<int, true> assignment id => governs at least one of those days
+     */
+    public function governingAssignmentIds($assignments, iterable $days): array
+    {
+        $days = collect($days);
+        $governing = [];
+
+        foreach ($assignments->groupBy('employee_id') as $forEmployee) {
+            foreach ($days as $day) {
+                $winner = $this->assignmentFor($forEmployee, $day);
+
+                if ($winner) {
+                    $governing[$winner->id] = true;
+                }
+            }
+        }
+
+        return $governing;
+    }
+
+    /**
      * Pick the assignment that governs a date: of those covering it, whichever was
      * assigned most recently.
      *

@@ -637,3 +637,49 @@ test('generating a roster for many employees stays within a sane query budget', 
     expect(EmployeeSchedule::query()->count())->toBe(50 * $days)
         ->and($queries)->toBeLessThan(50 * 20);
 });
+
+test('the roster marks which of two overlapping assignments is actually in force', function () {
+    $user = scheduleManager();
+    $pagi = Shift::query()->create(['code' => 'PG', 'name' => 'Pagi', 'start_time' => '07:00', 'end_time' => '15:00', 'is_active' => true]);
+    $malam = Shift::query()->create(['code' => 'ML', 'name' => 'Malam', 'start_time' => '23:00', 'end_time' => '07:00', 'is_active' => true]);
+    $employee = Employee::query()->create(['full_name' => 'Budi', 'employment_status' => 'active']);
+
+    ScheduleAssignment::query()->create([
+        'employee_id' => $employee->id, 'schedule_pattern_id' => everydayPattern($pagi->id)->id,
+        'start_date' => '2026-09-01', 'end_date' => '2026-09-30', 'created_by' => $user->id,
+    ]);
+    ScheduleAssignment::query()->create([
+        'employee_id' => $employee->id, 'schedule_pattern_id' => everydayPattern($malam->id, 'ALL2')->id,
+        'start_date' => '2026-09-01', 'end_date' => '2026-09-30', 'created_by' => $user->id,
+    ]);
+
+    $response = $this->actingAs($user)->get('/attendance/schedules?month=2026-09')->assertOk();
+
+    // Both rows are listed, but only the newer one decides any day of the month.
+    $response->assertSee('Berlaku')->assertSee('Tergantikan');
+
+    expect(substr_count($response->getContent(), 'Berlaku'))->toBe(1)
+        ->and(substr_count($response->getContent(), 'Tergantikan'))->toBe(1);
+});
+
+test('an older assignment still counts as in force where the newer one does not reach', function () {
+    $user = scheduleManager();
+    $pagi = Shift::query()->create(['code' => 'PG', 'name' => 'Pagi', 'start_time' => '07:00', 'end_time' => '15:00', 'is_active' => true]);
+    $malam = Shift::query()->create(['code' => 'ML', 'name' => 'Malam', 'start_time' => '23:00', 'end_time' => '07:00', 'is_active' => true]);
+    $employee = Employee::query()->create(['full_name' => 'Budi', 'employment_status' => 'active']);
+
+    ScheduleAssignment::query()->create([
+        'employee_id' => $employee->id, 'schedule_pattern_id' => everydayPattern($pagi->id)->id,
+        'start_date' => '2026-09-01', 'end_date' => null, 'created_by' => $user->id,
+    ]);
+    ScheduleAssignment::query()->create([
+        'employee_id' => $employee->id, 'schedule_pattern_id' => everydayPattern($malam->id, 'ALL2')->id,
+        'start_date' => '2026-09-10', 'end_date' => '2026-09-20', 'created_by' => $user->id,
+    ]);
+
+    $content = $this->actingAs($user)->get('/attendance/schedules?month=2026-09')->assertOk()->getContent();
+
+    // The standing pattern still owns 1-9 and 21-30, so neither is superseded.
+    expect(substr_count($content, 'Berlaku'))->toBe(2)
+        ->and(substr_count($content, 'Tergantikan'))->toBe(0);
+});

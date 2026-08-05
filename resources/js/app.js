@@ -1980,7 +1980,7 @@ document.querySelectorAll('[data-approve-scope]').forEach((scope) => {
             row?.remove();
 
             if (body && !body.querySelector('[data-assignment-row]')) {
-                body.innerHTML = '<tr data-assignments-empty><td colspan="4" class="cell-empty">Belum ada penugasan pada periode ini.</td></tr>';
+                body.innerHTML = '<tr data-assignments-empty><td colspan="5" class="cell-empty">Belum ada penugasan pada periode ini.</td></tr>';
             }
 
             showFlashToast({ message: data.status });

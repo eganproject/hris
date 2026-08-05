@@ -144,13 +144,20 @@
             <div class="border-b border-gray-200 px-5 py-3"><h2 class="text-sm font-semibold text-gray-950">Penugasan Pola Aktif</h2></div>
             <div class="overflow-x-auto">
                 <table class="data-table">
-                    <thead><tr><th>Karyawan</th><th>Pola</th><th>Periode</th><th class="text-right">Aksi</th></tr></thead>
+                    <thead><tr><th>Karyawan</th><th>Pola</th><th>Periode</th><th>Status</th><th class="text-right">Aksi</th></tr></thead>
                     <tbody data-assignments-body>
                         @forelse ($assignments as $assignment)
                             <tr data-assignment-row>
                                 <td class="font-medium text-gray-900">{{ $assignment->employee?->full_name }}</td>
                                 <td>{{ $assignment->pattern?->name }} <span class="text-xs text-gray-500">({{ $assignment->pattern?->type->label() }})</span></td>
                                 <td class="text-sm text-gray-600">{{ $assignment->start_date->translatedFormat('d M Y') }} – {{ $assignment->end_date ? $assignment->end_date->translatedFormat('d M Y') : 'seterusnya' }}</td>
+                                <td>
+                                    @if (isset($governingAssignments[$assignment->id]))
+                                        <x-status-badge tone="success">Berlaku</x-status-badge>
+                                    @else
+                                        <x-status-badge tone="neutral" title="Seluruh harinya sudah diambil alih penugasan yang lebih baru">Tergantikan</x-status-badge>
+                                    @endif
+                                </td>
                                 <td class="text-right">
                                     @can('schedules.delete')
                                         <form method="POST" action="{{ route('attendance.schedules.assignments.destroy', $assignment) }}" data-assignment-delete data-no-confirm="true">
@@ -161,7 +168,7 @@
                                 </td>
                             </tr>
                         @empty
-                            <tr data-assignments-empty><td colspan="4" class="cell-empty">Belum ada penugasan pada periode ini.</td></tr>
+                            <tr data-assignments-empty><td colspan="5" class="cell-empty">Belum ada penugasan pada periode ini.</td></tr>
                         @endforelse
                     </tbody>
                 </table>

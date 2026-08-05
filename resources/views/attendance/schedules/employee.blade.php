@@ -57,15 +57,22 @@
             <div class="border-b border-gray-200 px-5 py-3"><h2 class="text-sm font-semibold text-gray-950">Penugasan Pola</h2></div>
             <div class="overflow-x-auto">
                 <table class="data-table">
-                    <thead><tr><th>Pola</th><th>Periode</th></tr></thead>
+                    <thead><tr><th>Pola</th><th>Periode</th><th>Status</th></tr></thead>
                     <tbody>
                         @forelse ($assignments as $assignment)
                             <tr>
                                 <td class="font-medium text-gray-900">{{ $assignment->pattern?->name ?? 'Pola dihapus' }} <span class="text-xs text-gray-500">({{ $assignment->pattern?->type->label() }})</span></td>
                                 <td class="text-sm text-gray-600">{{ $assignment->start_date->translatedFormat('d M Y') }} – {{ $assignment->end_date ? $assignment->end_date->translatedFormat('d M Y') : 'seterusnya' }}</td>
+                                <td>
+                                    @if (isset($governingAssignments[$assignment->id]))
+                                        <x-status-badge tone="success">Berlaku</x-status-badge>
+                                    @else
+                                        <x-status-badge tone="neutral" title="Tidak menentukan satu hari pun pada bulan ini">Tidak berlaku</x-status-badge>
+                                    @endif
+                                </td>
                             </tr>
                         @empty
-                            <tr><td colspan="2" class="cell-empty">Karyawan ini belum pernah ditugaskan pola jadwal.</td></tr>
+                            <tr><td colspan="3" class="cell-empty">Karyawan ini belum pernah ditugaskan pola jadwal.</td></tr>
                         @endforelse
                     </tbody>
                 </table>

@@ -115,6 +115,7 @@ class ScheduleController extends Controller
             'hasNoScope' => $scope->isEmpty(),
             'shifts' => Shift::query()->where('is_active', true)->orderBy('start_time')->get(),
             'patternCount' => SchedulePattern::query()->visibleTo($request->user())->where('is_active', true)->count(),
+            'governingAssignments' => $this->generator->governingAssignmentIds($assignments, $days),
         ]);
     }
 
@@ -267,16 +268,19 @@ class ScheduleController extends Controller
             }
         }
 
+        $assignments = $employee->scheduleAssignments()
+            ->with('pattern')
+            ->orderByDesc('id')
+            ->get();
+
         return view('attendance.schedules.employee', [
             'employee' => $employee,
             'days' => $days,
             'schedules' => $schedules,
             'holidays' => $holidays,
             'leaves' => $leaves,
-            'assignments' => $employee->scheduleAssignments()
-                ->with('pattern')
-                ->orderByDesc('id')
-                ->get(),
+            'assignments' => $assignments,
+            'governingAssignments' => $this->generator->governingAssignmentIds($assignments, $days),
             'month' => $month,
             'prevMonth' => $month->copy()->subMonth()->format('Y-m'),
             'nextMonth' => $month->copy()->addMonth()->format('Y-m'),
