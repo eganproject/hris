@@ -12,10 +12,14 @@
                     <button type="button" data-open-import class="inline-flex items-center gap-1.5 rounded-md border border-gray-200 bg-white px-4 py-2.5 text-sm font-medium text-gray-700 shadow-xs transition hover:bg-gray-50">
                         <x-icon name="upload" class="size-4"/> Import Excel
                     </button>
+                    {{-- Carries every filter, so regenerating covers exactly the rows on screen. --}}
                     <form method="POST" action="{{ route('attendance.schedules.generate') }}" data-generate-form data-no-confirm="true">
                         @csrf
                         <input type="hidden" name="month" value="{{ $month->format('Y-m') }}">
-                        <input type="hidden" name="branch_id" value="{{ $branchId }}">
+                        <input type="hidden" name="branch_id" value="{{ $filters['branch_id'] }}">
+                        <input type="hidden" name="department_id" value="{{ $filters['department_id'] }}">
+                        <input type="hidden" name="job_position_id" value="{{ $filters['job_position_id'] }}">
+                        <input type="hidden" name="search" value="{{ $filters['search'] }}">
                         <button type="submit" class="inline-flex items-center gap-1.5 rounded-md border border-gray-200 px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-60"><x-icon name="refresh"/> Generate Ulang</button>
                     </form>
                 @endcan

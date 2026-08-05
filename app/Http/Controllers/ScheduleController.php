@@ -456,14 +456,14 @@ class ScheduleController extends Controller
         $month = $this->resolveMonth($request->input('month'));
         $from = $month->copy()->startOfMonth();
         $to = $month->copy()->endOfMonth();
-        $branchId = $request->integer('branch_id') ?: null;
 
-        // Regenerating only touches the roster of the employees this user may see.
-        $employees = DataScope::forAttendance($request->user())
-            ->employees()
-            ->active()
-            ->when($branchId, fn ($query) => $query->where('branch_id', $branchId))
-            ->get();
+        // Same scope and same filters as the grid, so this rebuilds exactly the rows
+        // the user is looking at. Regenerating the whole location while a division is
+        // filtered would quietly touch hundreds of people they never selected.
+        $employees = $this->filtered(
+            DataScope::forAttendance($request->user())->employees()->active(),
+            $request,
+        )->get();
 
         $days = 0;
 
@@ -471,14 +471,21 @@ class ScheduleController extends Controller
             $days += $this->generator->forEmployee($employee, $from, $to);
         }
 
-        $status = "Roster {$month->translatedFormat('F Y')} diperbarui ({$days} hari).";
+        $status = sprintf(
+            'Roster %s diperbarui (%d hari, %d karyawan).',
+            $month->translatedFormat('F Y'),
+            $days,
+            $employees->count(),
+        );
 
         if ($request->expectsJson()) {
             return response()->json(['status' => $status, 'days' => $days]);
         }
 
         return redirect()
-            ->route('attendance.schedules.index', $request->only('month', 'branch_id'))
+            ->route('attendance.schedules.index', $request->only(
+                'month', 'branch_id', 'department_id', 'job_position_id', 'search',
+            ))
             ->with('status', $status);
     }
 

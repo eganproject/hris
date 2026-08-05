@@ -683,3 +683,34 @@ test('an older assignment still counts as in force where the newer one does not 
     expect(substr_count($content, 'Berlaku'))->toBe(2)
         ->and(substr_count($content, 'Tergantikan'))->toBe(0);
 });
+
+test('regenerating the roster only touches the employees the filters leave on screen', function () {
+    $user = scheduleManager();
+    $reg = Shift::query()->create(['code' => 'REG', 'name' => 'Reguler', 'start_time' => '08:00', 'end_time' => '17:00', 'is_active' => true]);
+    $pattern = everydayPattern($reg->id);
+
+    $produksi = Department::query()->create(['code' => 'PRD', 'name' => 'Produksi', 'is_active' => true]);
+    $gudang = Department::query()->create(['code' => 'GDG', 'name' => 'Gudang', 'is_active' => true]);
+
+    $inScope = Employee::query()->create([
+        'full_name' => 'Andi', 'employment_status' => 'active', 'department_id' => $produksi->id,
+    ]);
+    $outOfScope = Employee::query()->create([
+        'full_name' => 'Budi', 'employment_status' => 'active', 'department_id' => $gudang->id,
+    ]);
+
+    foreach ([$inScope, $outOfScope] as $employee) {
+        ScheduleAssignment::query()->create([
+            'employee_id' => $employee->id, 'schedule_pattern_id' => $pattern->id,
+            'start_date' => '2026-09-01', 'end_date' => '2026-09-30', 'created_by' => $user->id,
+        ]);
+    }
+
+    $this->actingAs($user)->post('/attendance/schedules/generate', [
+        'month' => '2026-09',
+        'department_id' => $produksi->id,
+    ])->assertRedirect();
+
+    expect(EmployeeSchedule::query()->where('employee_id', $inScope->id)->count())->toBe(30)
+        ->and(EmployeeSchedule::query()->where('employee_id', $outOfScope->id)->count())->toBe(0);
+});
