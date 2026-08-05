@@ -158,28 +158,43 @@ document.querySelectorAll('[data-flash-notification]').forEach((flash) => {
     });
 });
 
-const resetLoadingControls = () => {
-    document.querySelectorAll('form[data-loading="true"]').forEach((form) => {
-        form.dataset.loading = 'false';
+/**
+ * Give one form its buttons back and clear its "busy" flag.
+ *
+ * Submitting normally navigates away, so the flag is usually cleaned up by the
+ * next page load. A handler that calls preventDefault() and posts over fetch
+ * instead has to release it explicitly — otherwise data-loading stays "true",
+ * every later submit is swallowed as a double-submit, and the button keeps
+ * reading "Memproses..." forever.
+ */
+const releaseFormLoading = (form) => {
+    if (!form) {
+        return;
+    }
 
-        form.querySelectorAll('button, input[type="submit"]').forEach((button) => {
-            if (button.dataset.loadingWasDisabled !== 'true') {
-                button.disabled = false;
+    form.dataset.loading = 'false';
+
+    form.querySelectorAll('button, input[type="submit"]').forEach((button) => {
+        if (button.dataset.loadingWasDisabled !== 'true') {
+            button.disabled = false;
+        }
+
+        if (button.dataset.originalText) {
+            if (button.tagName === 'INPUT') {
+                button.value = button.dataset.originalText;
+            } else {
+                button.textContent = button.dataset.originalText;
             }
+        }
 
-            if (button.dataset.originalText) {
-                if (button.tagName === 'INPUT') {
-                    button.value = button.dataset.originalText;
-                } else {
-                    button.textContent = button.dataset.originalText;
-                }
-            }
-
-            button.classList.remove('is-loading-control');
-            delete button.dataset.originalText;
-            delete button.dataset.loadingWasDisabled;
-        });
+        button.classList.remove('is-loading-control');
+        delete button.dataset.originalText;
+        delete button.dataset.loadingWasDisabled;
     });
+};
+
+const resetLoadingControls = () => {
+    document.querySelectorAll('form[data-loading="true"]').forEach(releaseFormLoading);
 };
 
 const pageLoader = (() => {
@@ -227,9 +242,18 @@ const loadingOverlay = (() => {
     const title = overlay.querySelector('[data-loading-title]');
     const message = overlay.querySelector('[data-loading-message]');
     let timer = null;
+    let watchdog = null;
+
+    /**
+     * Last resort. A stuck overlay is unrecoverable without a reload — it covers
+     * the whole viewport and eats every click — so past the point where any real
+     * request should have finished, give the page back and let the user retry.
+     */
+    const WATCHDOG_MS = 20000;
 
     const show = (nextTitle = 'Memproses data...', nextMessage = 'Mohon tunggu sebentar.') => {
         window.clearTimeout(timer);
+        window.clearTimeout(watchdog);
 
         if (title) {
             title.textContent = nextTitle;
@@ -243,10 +267,16 @@ const loadingOverlay = (() => {
             overlay.hidden = false;
             document.body.setAttribute('aria-busy', 'true');
         }, 120);
+
+        watchdog = window.setTimeout(() => {
+            hide();
+            resetLoadingControls();
+        }, WATCHDOG_MS);
     };
 
     const hide = () => {
         window.clearTimeout(timer);
+        window.clearTimeout(watchdog);
         overlay.hidden = true;
         document.body.removeAttribute('aria-busy');
     };
@@ -878,17 +908,24 @@ const confirmationModal = (() => {
         }
     });
     approveButton.addEventListener('click', () => {
-        if (!activeForm) {
-            close();
+        const form = activeForm;
+
+        // Drop the overlay before submitting, never after. requestSubmit() runs the
+        // browser's own validation and simply does nothing when a field is invalid —
+        // no submit event, no navigation. Closing afterwards would leave this
+        // full-viewport backdrop sitting over the page, swallowing every click.
+        close();
+
+        if (!form) {
             return;
         }
 
-        activeForm.dataset.confirmed = 'true';
+        form.dataset.confirmed = 'true';
 
-        if (typeof activeForm.requestSubmit === 'function') {
-            activeForm.requestSubmit();
+        if (typeof form.requestSubmit === 'function') {
+            form.requestSubmit();
         } else {
-            activeForm.submit();
+            form.submit();
         }
     });
 
@@ -916,6 +953,13 @@ document.querySelectorAll('form').forEach((form) => {
 
     form.addEventListener('submit', (event) => {
         if (form.dataset.confirmed === 'true') {
+            // Spend the token once every listener for this submit has read it. Other
+            // guards on the same form (stepper validation, exit modal) key off it
+            // too, so it cannot be cleared synchronously — but leaving it set
+            // forever would disable those guards for good, and a submission the
+            // browser then blocks would go through unconfirmed on the next click.
+            window.setTimeout(() => delete form.dataset.confirmed, 0);
+
             return;
         }
 
@@ -1007,9 +1051,22 @@ document.querySelectorAll('form').forEach((form) => {
         }
 
         const [title, message] = loadingMessageForForm(form);
+        const submitter = event.submitter;
 
-        markFormAsLoading(form, event.submitter);
-        loadingOverlay.show(form.dataset.loadingTitle || title, form.dataset.loadingMessage || message);
+        // Deferred on purpose. Handlers that post over fetch call preventDefault(),
+        // and they may be registered after this one or delegated to an ancestor —
+        // either way they run before this timeout. Showing the loading UI straight
+        // away would leave it up forever on a submit that never navigates: overlay
+        // stuck on screen, buttons disabled, and data-loading="true" swallowing
+        // every later submit as a double-submit.
+        window.setTimeout(() => {
+            if (event.defaultPrevented) {
+                return;
+            }
+
+            markFormAsLoading(form, submitter);
+            loadingOverlay.show(form.dataset.loadingTitle || title, form.dataset.loadingMessage || message);
+        }, 0);
     });
 });
 
