@@ -21,6 +21,7 @@ use App\Services\DefaultOfficeSchedule;
 use App\Services\ScheduleGenerator;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\DB;
 use Spatie\Permission\Models\Permission;
 use Spatie\Permission\PermissionRegistrar;
 
@@ -602,4 +603,37 @@ test('re-assigning reports the days it left alone because they were edited manua
         // The manual days genuinely keep their old shift.
         ->and(EmployeeSchedule::query()->where('work_date', '2026-09-10')->value('shift_id'))->toBe($pagi->id)
         ->and(EmployeeSchedule::query()->where('work_date', '2026-09-12')->value('shift_id'))->toBe($malam->id);
+});
+
+test('generating a roster for many employees stays within a sane query budget', function () {
+    $shift = Shift::query()->create([
+        'code' => 'REG', 'name' => 'Reguler', 'start_time' => '08:00', 'end_time' => '17:00', 'is_active' => true,
+    ]);
+    $pattern = everydayPattern($shift->id);
+    $generator = app(ScheduleGenerator::class);
+    $start = Carbon::today();
+
+    $employees = collect(range(1, 50))->map(fn ($n) => Employee::query()->create([
+        'full_name' => 'Karyawan '.$n, 'employment_status' => 'active',
+    ]));
+
+    $queries = 0;
+    DB::listen(function () use (&$queries) {
+        $queries++;
+    });
+
+    foreach ($employees as $employee) {
+        $generator->forAssignment($employee->scheduleAssignments()->create([
+            'schedule_pattern_id' => $pattern->id,
+            'start_date' => $start->toDateString(),
+            'end_date' => null,
+        ]));
+    }
+
+    $days = ScheduleGenerator::DEFAULT_HORIZON_DAYS + 1;
+
+    // Writing a day at a time cost ~190 queries per employee and blew past the
+    // request timeout on a bulk assign; the range is written as one upsert now.
+    expect(EmployeeSchedule::query()->count())->toBe(50 * $days)
+        ->and($queries)->toBeLessThan(50 * 20);
 });

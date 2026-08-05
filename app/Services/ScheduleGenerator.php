@@ -56,7 +56,7 @@ class ScheduleGenerator
             ->get()
             ->keyBy(fn (EmployeeSchedule $row) => $row->work_date->toDateString());
 
-        $written = 0;
+        $rows = [];
 
         for ($date = $from->copy(); $date->lessThanOrEqualTo($to); $date->addDay()) {
             $key = $date->toDateString();
@@ -73,21 +73,34 @@ class ScheduleGenerator
 
             $patternDay = $assignment->pattern?->dayFor($date);
 
-            EmployeeSchedule::query()->updateOrCreate(
-                ['employee_id' => $employee->id, 'work_date' => $key],
-                [
-                    'shift_id' => $patternDay?->shift_id,
-                    'is_day_off' => $patternDay === null || $patternDay->shift_id === null,
-                    // WFH hanya berlaku pada hari kerja (ada shift-nya).
-                    'is_wfh' => (bool) ($patternDay?->is_wfh && $patternDay->shift_id !== null),
-                    'source' => ScheduleSource::Generated,
-                    'schedule_assignment_id' => $assignment->id,
-                    'note' => null,
-                ],
-            );
-
-            $written++;
+            $rows[] = [
+                'employee_id' => $employee->id,
+                'work_date' => $key,
+                'shift_id' => $patternDay?->shift_id,
+                'is_day_off' => $patternDay === null || $patternDay->shift_id === null,
+                // WFH hanya berlaku pada hari kerja (ada shift-nya).
+                'is_wfh' => (bool) ($patternDay?->is_wfh && $patternDay->shift_id !== null),
+                'source' => ScheduleSource::Generated->value,
+                'schedule_assignment_id' => $assignment->id,
+                'note' => null,
+            ];
         }
+
+        // One statement for the whole range instead of a select+write per day.
+        // Assigning a pattern to a hundred people across the default horizon is
+        // ~9k days: as updateOrCreate that was ~19k queries and well past the
+        // request timeout. Values are written raw here, so work_date is already a
+        // Y-m-d string and source is the enum's backing value — the model's cast
+        // and mutator do not run on this path.
+        foreach (array_chunk($rows, 500) as $chunk) {
+            EmployeeSchedule::query()->upsert(
+                $chunk,
+                ['employee_id', 'work_date'],
+                ['shift_id', 'is_day_off', 'is_wfh', 'source', 'schedule_assignment_id', 'note'],
+            );
+        }
+
+        $written = count($rows);
 
         // Refresh whatever attendance was already resolved across the range. Days
         // with no attendance row yet are left to the normal daily close-out, and a
