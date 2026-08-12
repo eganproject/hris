@@ -1867,6 +1867,7 @@ document.querySelectorAll('[data-approve-scope]').forEach((scope) => {
         const shift = field('ov-shift');
         const shiftWrap = field('ov-shift-wrap');
         const wfh = field('ov-wfh');
+        const usesSelect2 = Boolean($(shift).data('select2'));
         let activeSlot = null;
 
         const syncOff = () => {
@@ -1881,7 +1882,31 @@ document.querySelectorAll('[data-approve-scope]').forEach((scope) => {
             }
 
             wfh.disabled = dayOff.checked;
+
+            // Yang dilihat pengguna adalah widget select2, bukan <select> aslinya —
+            // select2 menyembunyikannya. Menyetel .value/.disabled dari kode tidak
+            // memicu render ulang widget, jadi tanpa ini dialog selalu terbuka
+            // dengan tulisan "Pilih shift…" walau shift hari itu sudah terisi.
+            if (usesSelect2) {
+                $(shift).trigger('change.select2');
+            }
         };
+
+        // <select> aslinya disembunyikan select2 (lebarnya 1px), sehingga balon
+        // validasi bawaan browser tidak punya tempat untuk muncul: submit diblokir
+        // diam-diam dan tombol Simpan terasa mati. Sampaikan sendiri masalahnya.
+        shift.addEventListener('invalid', (event) => {
+            if (!usesSelect2) {
+                return;
+            }
+
+            event.preventDefault();
+            showFlashToast({
+                message: 'Pilih shift dulu, atau tandai hari ini sebagai libur.',
+                type: 'warning',
+            });
+            $(shift).select2('open');
+        });
 
         // Didelegasikan: isi sel diganti setelah AJAX, jadi jangan ikat per elemen.
         grid.addEventListener('click', (event) => {

@@ -12,7 +12,9 @@
       "Bash(echo \"done exit=$?\")",
       "Bash(node -e ' *)",
       "Bash(npm run *)",
-      "Bash(npm remove *)"
+      "Bash(npm remove *)",
+      "Bash(php artisan tinker '--execute= *)",
+      "Bash(node probe2.mjs)"
     ]
   }
 }
