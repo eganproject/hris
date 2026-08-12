@@ -610,6 +610,14 @@ const timeBaseOptions = {
     dateFormat: 'H:i',
     disableMobile: true,
     enableTime: true,
+    // flatpickr's own minute box is a real <input type="number"> that it stamps
+    // with step="<minuteIncrement>", and with `static: true` that box sits inside
+    // our <form>. At the default increment of 5, parsing a real punch like 07:58
+    // makes it fail stepMismatch — so the browser blocks the submit, and because
+    // the picker is closed (and the input unnamed) it can't even show why:
+    // "An invalid form control with name='' is not focusable". Stepping by one
+    // minute keeps every clock reading valid, which is what presensi needs anyway.
+    minuteIncrement: 1,
     noCalendar: true,
     time_24hr: true,
 };

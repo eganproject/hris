@@ -14,7 +14,11 @@
       "Bash(npm run *)",
       "Bash(npm remove *)",
       "Bash(php artisan tinker '--execute= *)",
-      "Bash(node probe2.mjs)"
+      "Bash(node probe2.mjs)",
+      "Bash(node timeprobe.mjs)",
+      "Bash(node interact.mjs)",
+      "Bash(node --check resources/js/app.js)",
+      "Bash(node final.mjs)"
     ]
   }
 }
