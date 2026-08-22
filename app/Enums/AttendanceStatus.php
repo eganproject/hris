@@ -19,6 +19,27 @@ enum AttendanceStatus: string
     case Holiday = 'holiday';        // Hari libur
     case DayOff = 'day_off';         // Libur sesuai jadwal
 
+    /**
+     * Status yang dihitung sebagai "hadir" di laporan: orangnya bekerja hari itu,
+     * entah dari kantor, dari rumah, atau di luar kota. Dipakai bersama oleh papan
+     * harian, rekap kehadiran, dan ekspor log absensi supaya angkanya tidak pernah
+     * berbeda antar laporan.
+     *
+     * @var list<self>
+     */
+    public const WORKED = [self::Present, self::Late, self::EarlyLeave, self::Wfh, self::BusinessTrip];
+
+    /** @return list<string> */
+    public static function workedValues(): array
+    {
+        return array_map(fn (self $status) => $status->value, self::WORKED);
+    }
+
+    public function isWorked(): bool
+    {
+        return in_array($this, self::WORKED, true);
+    }
+
     public function label(): string
     {
         return match ($this) {

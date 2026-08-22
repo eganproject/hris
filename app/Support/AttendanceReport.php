@@ -2,6 +2,7 @@
 
 namespace App\Support;
 
+use App\Enums\AttendanceStatus;
 use App\Models\Attendance;
 use App\Models\Employee;
 use App\Models\OvertimeApproval;
@@ -24,6 +25,10 @@ class AttendanceReport
      */
     public function rows(string $from, string $to, ?int $branchId = null, ?int $departmentId = null, ?DataScope $scope = null): Collection
     {
+        // Daftar status "hadir" berasal dari enum agar rekap ini, papan harian, dan
+        // ekspor log absensi tidak pernah memakai definisi yang berbeda.
+        $worked = "'".implode("','", AttendanceStatus::workedValues())."'";
+
         $stats = Attendance::query()
             ->whereBetween('work_date', [$from, $to])
             ->whereHas('employee', function ($query) use ($branchId, $departmentId) {
@@ -32,9 +37,9 @@ class AttendanceReport
                     ->when($departmentId, fn ($q) => $q->byDepartment($departmentId));
             })
             ->when($scope, fn ($query) => $scope->constrain($query))
-            ->selectRaw(<<<'SQL'
+            ->selectRaw(<<<SQL
                 employee_id,
-                SUM(CASE WHEN status IN ('present','late','early_leave','wfh','business_trip') THEN 1 ELSE 0 END) as hadir,
+                SUM(CASE WHEN status IN ({$worked}) THEN 1 ELSE 0 END) as hadir,
                 SUM(CASE WHEN status = 'late' THEN 1 ELSE 0 END) as terlambat,
                 SUM(CASE WHEN status = 'early_leave' THEN 1 ELSE 0 END) as pulang_cepat,
                 SUM(CASE WHEN status = 'absent' THEN 1 ELSE 0 END) as alfa,

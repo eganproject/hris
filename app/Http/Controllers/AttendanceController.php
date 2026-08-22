@@ -107,7 +107,7 @@ class AttendanceController extends Controller
             ->whereBetween('work_date', [$from, $to])
             ->pluck('approved_minutes', 'work_date');
 
-        $worked = ['present', 'late', 'early_leave', 'wfh', 'business_trip'];
+        $worked = AttendanceStatus::workedValues();
 
         return view('attendance.daily.history', [
             'employee' => $employee->load(['branch', 'departments', 'jobPosition']),

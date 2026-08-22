@@ -4,77 +4,37 @@ namespace App\Exports;
 
 use App\Models\Attendance;
 use Illuminate\Support\Collection;
-use Maatwebsite\Excel\Concerns\FromCollection;
-use Maatwebsite\Excel\Concerns\ShouldAutoSize;
-use Maatwebsite\Excel\Concerns\WithHeadings;
-use Maatwebsite\Excel\Concerns\WithMapping;
-use Maatwebsite\Excel\Concerns\WithStyles;
-use Maatwebsite\Excel\Concerns\WithTitle;
-use PhpOffice\PhpSpreadsheet\Worksheet\Worksheet;
+use Maatwebsite\Excel\Concerns\WithMultipleSheets;
 
 /**
- * Excel version of the daily attendance log: one row per attendance record with the
- * clock-in / clock-out times. Receives the already-fetched records so the sheet
- * matches the on-screen table exactly.
+ * Berkas Excel log absensi: bukan satu tabel mentah, melainkan empat lembar yang
+ * menjawab pertanyaan berbeda — ringkasan per orang untuk penggajian dan evaluasi,
+ * log harian untuk penelusuran kasus, rekap per tanggal untuk melihat pola, dan
+ * lembar keterangan supaya berkas yang beredar lewat email tidak kehilangan konteks.
+ *
+ * Urutannya sengaja dari yang paling sering dibuka ke yang paling jarang.
  */
-class AttendanceLogExport implements FromCollection, ShouldAutoSize, WithHeadings, WithMapping, WithStyles, WithTitle
+class AttendanceLogExport implements WithMultipleSheets
 {
     /**
-     * @param  Collection<int, Attendance>  $rows
+     * @param  Collection<int, Attendance>  $rows  sudah difilter & diurutkan per karyawan lalu tanggal
+     * @param  array<string, mixed>  $meta  filter yang dipakai, untuk lembar keterangan
      */
-    public function __construct(private Collection $rows) {}
+    public function __construct(
+        private readonly Collection $rows,
+        private readonly array $meta = [],
+    ) {}
 
-    public function title(): string
+    /** @return array<int, object> */
+    public function sheets(): array
     {
-        return 'Log Absensi';
-    }
+        $summary = new AttendanceLogSummary($this->rows);
 
-    public function collection(): Collection
-    {
-        return $this->rows;
-    }
-
-    /** @return list<string> */
-    public function headings(): array
-    {
         return [
-            'Tanggal', 'No. Karyawan', 'Nama', 'Divisi', 'Shift',
-            'Jam Masuk', 'Jam Keluar', 'Terlambat (menit)', 'Pulang Cepat (menit)',
-            'Jam Kerja', 'Status',
+            new AttendanceLogEmployeeSheet($summary),
+            new AttendanceLogDetailSheet($this->rows),
+            new AttendanceLogDailySheet($summary),
+            new AttendanceLogInfoSheet($this->meta, $this->rows->count(), $summary->employeeCount()),
         ];
-    }
-
-    /**
-     * @param  Attendance  $row
-     * @return list<string|int>
-     */
-    public function map($row): array
-    {
-        return [
-            $row->work_date->format('Y-m-d'),
-            $row->employee?->employee_number ?? '-',
-            $row->employee?->full_name ?? '-',
-            $row->employee?->department?->name ?? '-',
-            $row->shift?->code ?? '-',
-            $row->clock_in?->format('H:i') ?? '-',
-            $row->clock_out?->format('H:i') ?? '-',
-            (int) $row->late_minutes,
-            (int) $row->early_leave_minutes,
-            $this->hm((int) $row->work_minutes),
-            $row->status?->label() ?? '-',
-        ];
-    }
-
-    /**
-     * @return array<int, array<string, mixed>>
-     */
-    public function styles(Worksheet $sheet): array
-    {
-        return [1 => ['font' => ['bold' => true]]];
-    }
-
-    private function hm(int $minutes): string
-    {
-        return intdiv($minutes, 60).'j '.($minutes % 60).'m';
     }
 }

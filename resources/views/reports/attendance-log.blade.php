@@ -18,12 +18,14 @@
 
         <section class="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
             <form method="GET" action="{{ route('reports.attendance-log') }}" class="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                {{-- Jumlah baris per halaman ikut terbawa saat filter diganti --}}
+                <input type="hidden" name="per_page" value="{{ $perPage }}">
                 <div class="flex items-center gap-2">
                     <a href="{{ route('reports.attendance-log', array_merge(request()->query(), ['month' => $prevMonth])) }}" class="rounded-md border border-gray-200 px-3 py-2 text-sm text-gray-600 hover:bg-gray-50">‹</a>
                     <input type="month" name="month" value="{{ $month->format('Y-m') }}" onchange="this.form.submit()" class="rounded-md border border-gray-300 px-3 py-2 text-sm shadow-xs outline-none focus:border-primary focus:ring-2 focus:ring-primary/20">
                     <a href="{{ route('reports.attendance-log', array_merge(request()->query(), ['month' => $nextMonth])) }}" class="rounded-md border border-gray-200 px-3 py-2 text-sm text-gray-600 hover:bg-gray-50">›</a>
                 </div>
-                <div class="flex flex-col gap-2 sm:flex-row">
+                <div class="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-4">
                     <select name="branch_id" onchange="this.form.submit()" class="rounded-md border border-gray-300 px-3 py-2 text-sm shadow-xs outline-none focus:border-primary focus:ring-2 focus:ring-primary/20">
                         <option value="">Semua lokasi</option>
                         @foreach ($branches as $branch)
@@ -36,14 +38,35 @@
                             <option value="{{ $department->id }}" @selected($departmentId === $department->id)>{{ $department->name }}</option>
                         @endforeach
                     </select>
+                    <select name="status" onchange="this.form.submit()" class="rounded-md border border-gray-300 px-3 py-2 text-sm shadow-xs outline-none focus:border-primary focus:ring-2 focus:ring-primary/20">
+                        <option value="">Semua status</option>
+                        @foreach ($statuses as $value => $label)
+                            <option value="{{ $value }}" @selected($statusFilter === $value)>{{ $label }}</option>
+                        @endforeach
+                    </select>
+                    <input name="search" value="{{ $search }}" placeholder="Cari nama / NIK" onchange="this.form.submit()" class="rounded-md border border-gray-300 px-3 py-2 text-sm shadow-xs outline-none focus:border-primary focus:ring-2 focus:ring-primary/20">
                 </div>
             </form>
         </section>
 
+        {{-- Ringkasan seluruh periode — bukan hanya halaman yang sedang dibuka --}}
+        @if ($summary)
+            <section class="flex flex-wrap gap-2">
+                @foreach ($summary as $statusValue => $count)
+                    @php $s = \App\Enums\AttendanceStatus::tryFrom($statusValue); @endphp
+                    @if ($s)
+                        <x-status-badge :tone="$s->tone()">{{ $s->label() }}: {{ number_format($count) }}</x-status-badge>
+                    @endif
+                @endforeach
+            </section>
+        @endif
+
         <section class="overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm">
-            <div class="flex items-center justify-between border-b border-gray-200 px-5 py-3">
+            <div class="flex flex-col gap-2 border-b border-gray-200 px-5 py-3 sm:flex-row sm:items-center sm:justify-between">
                 <h2 class="text-sm font-semibold text-gray-950">Rincian Harian</h2>
-                <span class="text-xs text-gray-500">{{ $rows->count() }} baris</span>
+                <span class="text-xs text-gray-500">
+                    Menampilkan {{ $rows->firstItem() ?? 0 }}–{{ $rows->lastItem() ?? 0 }} dari {{ number_format($rows->total()) }} baris
+                </span>
             </div>
             <div class="overflow-x-auto">
                 <table class="data-table">
@@ -84,8 +107,24 @@
                     </tbody>
                 </table>
             </div>
+            @if ($rows->hasPages() || $rows->total() > 0)
+                <div class="flex flex-col gap-3 border-t border-gray-200 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
+                    <form method="GET" action="{{ route('reports.attendance-log') }}" class="flex items-center gap-2">
+                        @foreach (request()->except(['per_page', 'page']) as $key => $value)
+                            <input type="hidden" name="{{ $key }}" value="{{ $value }}">
+                        @endforeach
+                        <label for="log_per_page" class="text-xs text-gray-500">Per halaman</label>
+                        <select id="log_per_page" name="per_page" onchange="this.form.submit()" class="rounded-md border border-gray-300 px-2 py-1.5 text-xs shadow-xs outline-none focus:border-primary focus:ring-2 focus:ring-primary/20">
+                            @foreach ([25, 50, 100, 200] as $option)
+                                <option value="{{ $option }}" @selected(($perPage ?? 50) === $option)>{{ $option }}</option>
+                            @endforeach
+                        </select>
+                    </form>
+                    <div>{{ $rows->links() }}</div>
+                </div>
+            @endif
         </section>
 
-        <p class="text-xs text-gray-400">Jam masuk/keluar diambil dari punch pertama & terakhir pada hari kerja. Tanda “–” berarti tidak ada punch (mis. Alfa, Cuti, atau Libur).</p>
+        <p class="text-xs text-gray-400">Jam masuk/keluar diambil dari punch pertama & terakhir pada hari kerja. Tanda “–” berarti tidak ada punch (mis. Alfa, Cuti, atau Libur). Data diurutkan per karyawan lalu per tanggal, sehingga riwayat satu orang terbaca utuh sebagai satu blok. Ekspor Excel memuat seluruh periode, bukan hanya halaman ini.</p>
     </div>
 </x-layouts.app>

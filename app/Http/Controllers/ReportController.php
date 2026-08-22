@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Enums\AttendanceStatus;
 use App\Enums\LeaveRequestStatus;
 use App\Exports\AttendanceLogExport;
 use App\Exports\AttendanceReportExport;
@@ -16,6 +17,7 @@ use App\Support\DataScope;
 use App\Support\LeaveReport;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Response;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -86,9 +88,20 @@ class ReportController extends Controller
     {
         [$month, $from, $to, $branchId, $departmentId] = $this->filters($request);
         $scope = DataScope::forAttendance($request->user());
+        $search = $request->string('search')->toString() ?: null;
+        $status = $request->string('status')->toString() ?: null;
+        $perPage = min(max((int) $request->input('per_page', 50), 25), 200);
+
+        $query = $this->attendanceLogQuery($from, $to, $branchId, $departmentId, $scope, $search, $status);
 
         return view('reports.attendance-log', [
-            'rows' => $this->attendanceLogRows($from, $to, $branchId, $departmentId, $scope),
+            // Dipaginasi di database: sebulan penuh untuk satu perusahaan bisa ribuan
+            // baris, dan sebelumnya semuanya ditarik lalu diurutkan di PHP.
+            'rows' => $query->paginate($perPage)->withQueryString(),
+            // Ringkasan dihitung dari seluruh periode, bukan dari halaman yang tampil.
+            'summary' => $this->attendanceLogSummary(
+                $this->attendanceLogQuery($from, $to, $branchId, $departmentId, $scope, $search, null),
+            ),
             'month' => $month,
             'prevMonth' => $month->copy()->subMonth()->format('Y-m'),
             'nextMonth' => $month->copy()->addMonth()->format('Y-m'),
@@ -96,6 +109,10 @@ class ReportController extends Controller
             'departments' => $scope->departments(),
             'branchId' => $branchId,
             'departmentId' => $departmentId,
+            'search' => $search,
+            'statusFilter' => $status,
+            'statuses' => AttendanceStatus::options(),
+            'perPage' => $perPage,
         ]);
     }
 
@@ -103,10 +120,19 @@ class ReportController extends Controller
     {
         [$month, $from, $to, $branchId, $departmentId] = $this->filters($request);
 
-        return Excel::download(
-            new AttendanceLogExport($this->attendanceLogRows($from, $to, $branchId, $departmentId, DataScope::forAttendance($request->user()))),
-            'log-absensi-'.$month->format('Y-m').'.xlsx',
+        $export = new AttendanceLogExport(
+            $this->attendanceLogRows($request, $from, $to, $branchId, $departmentId),
+            [
+                'periode' => $month->translatedFormat('F Y'),
+                'lokasi' => $branchId ? Branch::find($branchId)?->name : null,
+                'divisi' => $departmentId ? Department::find($departmentId)?->name : null,
+                'pencarian' => $request->string('search')->toString() ?: null,
+                'status' => $request->string('status')->toString() ?: null,
+                'dibuat_oleh' => $request->user()?->name,
+            ],
         );
+
+        return Excel::download($export, 'log-absensi-'.$month->format('Y-m').'.xlsx');
     }
 
     public function attendanceLogPdf(Request $request): Response
@@ -114,7 +140,7 @@ class ReportController extends Controller
         [$month, $from, $to, $branchId, $departmentId] = $this->filters($request);
 
         $pdf = Pdf::loadView('reports.pdf.attendance-log', [
-            'rows' => $this->attendanceLogRows($from, $to, $branchId, $departmentId, DataScope::forAttendance($request->user())),
+            'rows' => $this->attendanceLogRows($request, $from, $to, $branchId, $departmentId),
             'month' => $month,
             'branchName' => $branchId ? Branch::find($branchId)?->name : null,
             'departmentName' => $departmentId ? Department::find($departmentId)?->name : null,
@@ -124,19 +150,69 @@ class ReportController extends Controller
     }
 
     /**
+     * Seluruh baris untuk periode terpilih, tanpa paginasi — dipakai ekspor Excel
+     * dan PDF, yang memang harus memuat semuanya.
+     *
      * @return \Illuminate\Support\Collection<int, Attendance>
      */
-    private function attendanceLogRows(string $from, string $to, ?int $branchId, ?int $departmentId, ?DataScope $scope = null): \Illuminate\Support\Collection
+    private function attendanceLogRows(Request $request, string $from, string $to, ?int $branchId, ?int $departmentId): \Illuminate\Support\Collection
     {
+        return $this->attendanceLogQuery(
+            $from,
+            $to,
+            $branchId,
+            $departmentId,
+            DataScope::forAttendance($request->user()),
+            $request->string('search')->toString() ?: null,
+            $request->string('status')->toString() ?: null,
+        )->get();
+    }
+
+    /**
+     * Log absensi satu periode. Diurutkan per karyawan lalu per tanggal, sehingga
+     * satu orang terbaca utuh sebagai satu blok alih-alih terpencar di antara
+     * rekan-rekannya seperti pengurutan per tanggal.
+     */
+    private function attendanceLogQuery(
+        string $from,
+        string $to,
+        ?int $branchId,
+        ?int $departmentId,
+        ?DataScope $scope = null,
+        ?string $search = null,
+        ?string $status = null,
+    ): Builder {
         return Attendance::query()
-            ->whereBetween('work_date', [$from, $to])
-            ->when($branchId, fn ($q) => $q->whereHas('employee', fn ($e) => $e->where('branch_id', $branchId)))
+            ->join('employees', 'employees.id', '=', 'attendances.employee_id')
+            ->select('attendances.*')
+            ->whereBetween('attendances.work_date', [$from, $to])
+            ->when($branchId, fn ($q) => $q->where('employees.branch_id', $branchId))
             ->when($departmentId, fn ($q) => $q->whereHas('employee', fn ($e) => $e->byDepartment($departmentId)))
-            ->when($scope, fn ($q) => $scope->constrain($q))
-            ->with(['employee.departments', 'shift'])
-            ->get()
-            ->sortBy(fn (Attendance $r) => $r->work_date->format('Y-m-d').'|'.strtolower((string) $r->employee?->full_name))
-            ->values();
+            ->when($search, fn ($q, $s) => $q->where(fn ($w) => $w
+                ->where('employees.full_name', 'like', "%{$s}%")
+                ->orWhere('employees.employee_number', 'like', "%{$s}%")))
+            ->when($status, fn ($q, $s) => $q->where('attendances.status', $s))
+            ->when($scope, fn ($q) => $scope->constrain($q, 'attendances.employee_id'))
+            ->with(['employee.departments', 'employee.branch', 'employee.jobPosition', 'shift'])
+            ->orderBy('employees.full_name')
+            ->orderBy('employees.id') // pemisah bila ada dua nama yang sama persis
+            ->orderBy('attendances.work_date');
+    }
+
+    /**
+     * Jumlah baris per status untuk seluruh periode — dihitung di database supaya
+     * tidak bergantung pada halaman yang kebetulan sedang dibuka.
+     *
+     * @return array<string, int>
+     */
+    private function attendanceLogSummary(Builder $query): array
+    {
+        return $query->reorder()
+            ->select('attendances.status')
+            ->selectRaw('COUNT(*) as total')
+            ->groupBy('attendances.status')
+            ->pluck('total', 'status')
+            ->all();
     }
 
     /**
@@ -172,7 +248,7 @@ class ReportController extends Controller
             'nextMonth' => $month->copy()->addMonth()->format('Y-m'),
             'summary' => [
                 'total_hari' => $records->count(),
-                'hadir' => $records->filter(fn ($r) => in_array($r->status?->value, ['present', 'late', 'early_leave', 'wfh', 'business_trip'], true))->count(),
+                'hadir' => $records->filter(fn ($r) => (bool) $r->status?->isWorked())->count(),
                 'terlambat' => $records->filter(fn ($r) => $r->status?->value === 'late')->count(),
                 'alfa' => $records->filter(fn ($r) => $r->status?->value === 'absent')->count(),
                 'terlambat_menit' => (int) $records->sum('late_minutes'),
