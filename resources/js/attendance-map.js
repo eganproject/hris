@@ -20,10 +20,18 @@ if (root) {
         '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
     }[char]));
 
-    // Hijau = WFH, biru = dinas luar. Lingkaran di sekitarnya menggambarkan akurasi
-    // GPS yang dilaporkan perangkat, supaya titik tidak terbaca lebih presisi
+    // Bendera hijau = WFH, biru = dinas luar. Lingkaran di sekitarnya menggambarkan
+    // akurasi GPS yang dilaporkan perangkat, supaya titik tidak terbaca lebih presisi
     // daripada kenyataannya.
     const COLORS = { wfh: '#059669', business_trip: '#2563eb' };
+
+    // Bentuknya harus sama dengan <x-map-flag> agar keterangan warna, daftar samping,
+    // dan penanda di peta terbaca sebagai satu hal yang sama.
+    const flagSvg = (color) => `
+        <svg width="24" height="30" viewBox="0 0 24 30" fill="none" style="filter:drop-shadow(0 1px 2px rgba(0,0,0,.35))">
+            <path d="M4 28V2" stroke="#374151" stroke-width="2.5" stroke-linecap="round"/>
+            <path d="M5.5 3.5h13.5l-3.2 4.75 3.2 4.75H5.5z" fill="${color}" stroke="#fff" stroke-width="1.2" stroke-linejoin="round"/>
+        </svg>`;
 
     const markers = points.map((point) => {
         const color = COLORS[point.status] ?? '#6b7280';
@@ -38,12 +46,15 @@ if (root) {
             }).addTo(map);
         }
 
-        const marker = L.circleMarker([point.lat, point.lng], {
-            radius: 8,
-            color: '#fff',
-            weight: 2,
-            fillColor: color,
-            fillOpacity: 1,
+        const marker = L.marker([point.lat, point.lng], {
+            icon: L.divIcon({
+                html: flagSvg(color),
+                className: '', // buang kotak putih bawaan divIcon
+                iconSize: [24, 30],
+                iconAnchor: [4, 29], // ujung bawah tiang = titik koordinat sebenarnya
+                popupAnchor: [8, -26],
+            }),
+            title: point.name,
         }).addTo(map);
 
         const photo = point.photo_url

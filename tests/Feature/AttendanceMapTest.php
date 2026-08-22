@@ -160,3 +160,28 @@ test('the map is closed to users without the daily attendance permission', funct
 
     $this->actingAs(User::factory()->create())->get('/attendance/map')->assertForbidden();
 });
+
+test('the flag colour distinguishes WFH from a business trip', function () {
+    $date = '2026-08-20';
+    $user = mapViewer();
+
+    $wfh = wfhEmployee('Orang WFH', $date);
+    $trip = Employee::query()->create(['full_name' => 'Orang Dinas', 'employment_status' => 'active']);
+
+    foreach ([[$wfh, AttendanceStatus::Wfh], [$trip, AttendanceStatus::BusinessTrip]] as [$employee, $status]) {
+        Attendance::query()->create([
+            'employee_id' => $employee->id, 'work_date' => $date, 'status' => $status->value,
+            'clock_in' => $date.' 08:00:00',
+            'clock_in_latitude' => -6.9, 'clock_in_longitude' => 107.6, 'clock_in_accuracy_m' => 20,
+        ]);
+    }
+
+    $response = $this->actingAs($user)->get('/attendance/map?date='.$date)->assertOk();
+
+    // Hijau untuk WFH, biru untuk dinas luar — dipakai bendera di daftar samping,
+    // dan warna yang sama dikirim ke Leaflet lewat data-points.
+    $response->assertSee('#059669', escape: false)->assertSee('#2563eb', escape: false);
+
+    expect($response->viewData('points')->pluck('status')->sort()->values()->all())
+        ->toBe(['business_trip', 'wfh']);
+});

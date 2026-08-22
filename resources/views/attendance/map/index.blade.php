@@ -40,9 +40,9 @@
         <section class="flex flex-wrap items-center gap-3">
             <x-status-badge tone="success">Sudah absen: {{ $points->count() }}</x-status-badge>
             <x-status-badge tone="warning">Belum absen: {{ $pending->count() }}</x-status-badge>
-            <span class="inline-flex items-center gap-1.5 text-xs text-gray-500"><span class="inline-block size-3 rounded-full bg-emerald-600"></span> WFH</span>
-            <span class="inline-flex items-center gap-1.5 text-xs text-gray-500"><span class="inline-block size-3 rounded-full bg-blue-600"></span> Dinas Luar</span>
-            <span class="text-xs text-gray-400">Lingkaran pucat = akurasi GPS yang dilaporkan perangkat.</span>
+            <span class="inline-flex items-center gap-1.5 text-xs text-gray-500"><x-map-flag color="#059669" /> WFH</span>
+            <span class="inline-flex items-center gap-1.5 text-xs text-gray-500"><x-map-flag color="#2563eb" /> Dinas Luar</span>
+            <span class="text-xs text-gray-400">Bendera menancap tepat di titik koordinat; lingkaran pucat = akurasi GPS yang dilaporkan perangkat.</span>
         </section>
 
         <div class="grid grid-cols-1 gap-6 lg:grid-cols-3">
@@ -76,7 +76,7 @@
                                     <p class="truncate text-sm font-medium text-gray-900">{{ $point['name'] }}</p>
                                     <p class="truncate text-xs text-gray-500">{{ $point['status_label'] }} · masuk {{ $point['clock_in'] }}</p>
                                 </div>
-                                <span class="size-2.5 flex-none rounded-full {{ $point['status'] === 'wfh' ? 'bg-emerald-600' : 'bg-blue-600' }}"></span>
+                                <x-map-flag :color="$point['status'] === 'wfh' ? '#059669' : '#2563eb'" />
                             </li>
                         @empty
                             <li class="px-4 py-6 text-center text-sm text-gray-400">Belum ada.</li>

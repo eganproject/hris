@@ -16,7 +16,7 @@
     "src": "node_modules/leaflet/dist/images/marker-icon.png"
   },
   "resources/css/app.css": {
-    "file": "assets/app-CV4FGr-x.css",
+    "file": "assets/app-CLA48d7H.css",
     "name": "app",
     "names": [
       "app.css"
@@ -37,7 +37,7 @@
     ]
   },
   "resources/js/attendance-map.js": {
-    "file": "assets/attendance-map--kiod2ka.js",
+    "file": "assets/attendance-map-BpSjDT1E.js",
     "name": "attendance-map",
     "src": "resources/js/attendance-map.js",
     "isEntry": true,
