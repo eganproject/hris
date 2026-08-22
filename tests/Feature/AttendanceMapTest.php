@@ -72,7 +72,8 @@ test('the map plots WFH employees who checked in, with their coordinates', funct
         ->and($points[0]['lng'])->toBe(107.6098111)
         ->and($points[0]['accuracy'])->toBe(18)
         ->and($points[0]['status'])->toBe('wfh')
-        ->and($points[0]['photo_url'])->toContain('budi.jpg')
+        // Menunjuk rute berotorisasi, bukan berkas di disk.
+        ->and($points[0]['photo_url'])->toContain('attendance-selfies/')
         ->and($response->viewData('pending'))->toHaveCount(0);
 });
 

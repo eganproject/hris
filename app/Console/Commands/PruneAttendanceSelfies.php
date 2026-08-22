@@ -21,7 +21,7 @@ class PruneAttendanceSelfies extends Command
     {
         $months = max(1, (int) $this->option('months'));
         $cutoff = now()->subMonths($months)->toDateString();
-        $disk = Storage::disk('public');
+        $disk = Storage::disk(Attendance::SELFIE_DISK);
         $deleted = 0;
 
         Attendance::query()

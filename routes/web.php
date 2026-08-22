@@ -3,6 +3,7 @@
 use App\Http\Controllers\Auth\AuthenticatedSessionController;
 use App\Http\Controllers\AccessControlController;
 use App\Http\Controllers\AttendanceController;
+use App\Http\Controllers\AttendanceSelfieController;
 use App\Http\Controllers\AttendanceMapController;
 use App\Http\Controllers\AttendanceCorrectionController;
 use App\Http\Controllers\BranchController;
@@ -316,6 +317,11 @@ Route::middleware('auth')->group(function () {
     // di dalam controller.
     Route::get('leave-attachments/{leaveRequest}', LeaveAttachmentController::class)->name('leave.attachment');
 
+    // Foto selfie absensi. Sama seperti lampiran cuti: berkasnya privat, dan siapa yang
+    // boleh melihat diperiksa di dalam controller (karyawannya sendiri atau petugas
+    // yang berwenang atas cakupan datanya).
+    Route::get('attendance-selfies/{attendance}/{side}', AttendanceSelfieController::class)->name('attendance.selfie');
+
     // Employee self-service: request own leave, and (as a supervisor) approve subordinates.
     Route::prefix('my-leave')->name('my-leave.')->middleware('permission:my-leave.view')->group(function () {
         Route::get('/', [MyLeaveController::class, 'index'])->name('index');
@@ -334,6 +340,7 @@ Route::middleware('auth')->group(function () {
         Route::post('check-out', [MyAttendanceController::class, 'checkOut'])->name('check-out');
         // Uji coba kamera + lokasi untuk superadmin; tidak mencatat absensi apa pun.
         Route::post('selfie-test', [MyAttendanceController::class, 'selfieTest'])->name('selfie-test');
+        Route::get('selfie-test/foto', [MyAttendanceController::class, 'selfieTestShow'])->name('selfie-test.show');
         Route::post('corrections', [MyAttendanceController::class, 'store'])->name('corrections.store');
         Route::delete('corrections/{correction}', [MyAttendanceController::class, 'cancel'])->name('corrections.cancel');
     });

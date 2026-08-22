@@ -95,7 +95,7 @@ test('a WFH day without a check-in is WFH with zero hours, never Absent', functi
 });
 
 test('the WFH self check-in records the clock-in and clock-out from the app', function () {
-    Storage::fake('public');
+    Storage::fake('local');
     ['user' => $user, 'employee' => $employee] = wfhFixture();
 
     $this->actingAs($user)->get('/my-attendance')->assertOk()->assertSee('Absen Masuk');
@@ -115,7 +115,7 @@ test('the WFH self check-in records the clock-in and clock-out from the app', fu
 });
 
 test('the self check-in stores the selfie and the coordinates as proof', function () {
-    Storage::fake('public');
+    Storage::fake('local');
     ['user' => $user, 'employee' => $employee] = wfhFixture();
 
     $this->actingAs($user)->post('/my-attendance/check-in', selfiePayload())->assertRedirect();
@@ -133,18 +133,20 @@ test('the self check-in stores the selfie and the coordinates as proof', functio
         ->and($today->clock_in_accuracy_m)->toBe(18)
         ->and($today->clock_out_accuracy_m)->toBe(25);
 
-    Storage::disk('public')->assertExists($today->clock_in_photo_path);
-    Storage::disk('public')->assertExists($today->clock_out_photo_path);
+    Storage::disk('local')->assertExists($today->clock_in_photo_path);
+    Storage::disk('local')->assertExists($today->clock_out_photo_path);
 
-    // Buktinya tampil kembali di halaman: thumbnail foto + tautan ke titik petanya.
+    // Buktinya tampil kembali di halaman lewat rute berotorisasi — bukan URL berkas,
+    // karena disknya privat dan tidak bisa dijangkau langsung dari web.
     $this->actingAs($user)->get('/my-attendance')
         ->assertOk()
-        ->assertSee(Storage::disk('public')->url($today->clock_in_photo_path))
+        ->assertSee(route('attendance.selfie', ['attendance' => $today->id, 'side' => 'in']))
+        ->assertDontSee('/storage/attendance/selfies', escape: false)
         ->assertSee('google.com/maps/search/?api=1&query=-6.9147444,107.6098111');
 });
 
 test('the self check-in is rejected without a selfie or without coordinates', function () {
-    Storage::fake('public');
+    Storage::fake('local');
     ['user' => $user, 'employee' => $employee] = wfhFixture();
 
     $this->actingAs($user)->post('/my-attendance/check-in', [
@@ -159,7 +161,7 @@ test('the self check-in is rejected without a selfie or without coordinates', fu
 });
 
 test('self check-in is refused on a day that is not approved WFH', function () {
-    Storage::fake('public');
+    Storage::fake('local');
     app(PermissionRegistrar::class)->forgetCachedPermissions();
     Permission::findOrCreate('my-attendance.view', 'web');
 
@@ -177,7 +179,7 @@ test('self check-in is refused on a day that is not approved WFH', function () {
         ->assertSessionHas('error');
 
     expect(App\Models\Attendance::query()->count())->toBe(0);
-    expect(Storage::disk('public')->allFiles())->toBeEmpty();
+    expect(Storage::disk('local')->allFiles())->toBeEmpty();
 });
 
 test('a scheduled WFH day counts as worked hours without any leave request', function () {
@@ -271,7 +273,7 @@ test('a business trip without a check-in is Dinas Luar with zero hours, never Ab
 });
 
 test('the self check-in is offered on an approved business-trip day too', function () {
-    Storage::fake('public');
+    Storage::fake('local');
     ['user' => $user, 'employee' => $employee] = wfhFixture();
 
     $trip = LeaveType::query()->create([
@@ -312,7 +314,7 @@ function superAdminFixture(): array
 }
 
 test('a superadmin gets the dry-run panel on an ordinary day, and it records nothing', function () {
-    Storage::fake('public');
+    Storage::fake('local');
     ['user' => $user, 'employee' => $employee] = superAdminFixture();
 
     $this->actingAs($user)->get('/my-attendance')
@@ -333,41 +335,41 @@ test('a superadmin gets the dry-run panel on an ordinary day, and it records not
 });
 
 test('the dry-run reuses one file per superadmin instead of piling up', function () {
-    Storage::fake('public');
+    Storage::fake('local');
     ['user' => $user] = superAdminFixture();
 
     $this->actingAs($user)->post('/my-attendance/selfie-test', selfiePayload())->assertRedirect();
     $this->actingAs($user)->post('/my-attendance/selfie-test', selfiePayload())->assertRedirect();
     $this->actingAs($user)->post('/my-attendance/selfie-test', selfiePayload())->assertRedirect();
 
-    expect(Storage::disk('public')->files('attendance/selfie-tests'))
+    expect(Storage::disk('local')->files('attendance/selfie-tests'))
         ->toBe(['attendance/selfie-tests/'.$user->id.'.jpg']);
 });
 
 test('the dry-run validates the selfie and coordinates exactly like a real check-in', function () {
-    Storage::fake('public');
+    Storage::fake('local');
     ['user' => $user] = superAdminFixture();
 
     $this->actingAs($user)->post('/my-attendance/selfie-test', [
         'latitude' => -6.9147444, 'longitude' => 107.6098111,
     ])->assertRedirect()->assertSessionHasErrors('photo', null, 'selfie');
 
-    expect(Storage::disk('public')->allFiles())->toBeEmpty();
+    expect(Storage::disk('local')->allFiles())->toBeEmpty();
 });
 
 test('the dry-run is closed to everyone who is not a superadmin', function () {
-    Storage::fake('public');
+    Storage::fake('local');
     ['user' => $user] = wfhFixture();
 
     $this->actingAs($user)->get('/my-attendance')->assertOk()->assertDontSee('Mode Uji Coba');
 
     $this->actingAs($user)->post('/my-attendance/selfie-test', selfiePayload())->assertForbidden();
 
-    expect(Storage::disk('public')->allFiles())->toBeEmpty();
+    expect(Storage::disk('local')->allFiles())->toBeEmpty();
 });
 
 test('a superadmin on a real WFH day gets the real panel, not the dry-run', function () {
-    Storage::fake('public');
+    Storage::fake('local');
     ['user' => $user, 'employee' => $employee] = superAdminFixture();
 
     $shift = Shift::query()->create([

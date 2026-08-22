@@ -11,9 +11,11 @@ use App\Models\Employee;
 use App\Services\AttendanceResolver;
 use App\Support\ApprovalNotifier;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\View\View;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class MyAttendanceController extends Controller
 {
@@ -62,18 +64,34 @@ class MyAttendanceController extends Controller
 
         // Satu berkas per superadmin, ditimpa tiap kali diuji — hasil uji lama tidak
         // perlu disimpan dan tidak boleh menumpuk di storage.
-        $path = $photo->storeAs('attendance/selfie-tests', $request->user()->id.'.jpg', 'public');
+        $path = $photo->storeAs('attendance/selfie-tests', $request->user()->id.'.jpg', Attendance::SELFIE_DISK);
 
         return back()->with('selfie_test', [
             // Nama berkasnya tetap, jadi tambahkan penanda versi agar browser tidak
             // menampilkan foto uji sebelumnya dari cache.
-            'photo_url' => Storage::disk('public')->url($path).'?v='.now()->timestamp,
+            'photo_url' => route('my-attendance.selfie-test.show').'?v='.now()->timestamp,
             'photo_kb' => $sizeKb,
             'latitude' => $request->float('latitude'),
             'longitude' => $request->float('longitude'),
             'accuracy' => $request->filled('accuracy') ? (int) round($request->float('accuracy')) : null,
             'tested_at' => now()->format('H:i:s'),
         ]);
+    }
+
+    /**
+     * Menyajikan foto hasil uji coba superadmin. Tiap superadmin hanya bisa melihat
+     * berkas miliknya sendiri, dan berkasnya ada di disk privat seperti selfie absensi.
+     */
+    public function selfieTestShow(Request $request): StreamedResponse
+    {
+        abort_unless($request->user()->isSuperAdmin(), 403);
+
+        $disk = Storage::disk(Attendance::SELFIE_DISK);
+        $path = 'attendance/selfie-tests/'.$request->user()->id.'.jpg';
+
+        abort_unless($disk->exists($path), 404);
+
+        return $disk->response($path, 'uji-selfie.jpg', ['Content-Type' => 'image/jpeg']);
     }
 
     /**
@@ -139,7 +157,7 @@ class MyAttendanceController extends Controller
         /** @var UploadedFile $photo */
         $photo = $request->file('photo');
 
-        $path = $photo->store('attendance/selfies/'.$attendance->work_date->format('Y/m'), 'public');
+        $path = $photo->store('attendance/selfies/'.$attendance->work_date->format('Y/m'), Attendance::SELFIE_DISK);
 
         $old = $attendance->{"clock_{$side}_photo_path"};
 
@@ -153,7 +171,7 @@ class MyAttendanceController extends Controller
         // Tidak seharusnya terjadi (absen dua kali sudah ditolak di atas), tapi jangan
         // sampai file yatim menumpuk kalau toh terjadi.
         if ($old && $old !== $path) {
-            Storage::disk('public')->delete($old);
+            Storage::disk(Attendance::SELFIE_DISK)->delete($old);
         }
     }
 

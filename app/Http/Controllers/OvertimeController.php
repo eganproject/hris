@@ -27,6 +27,8 @@ class OvertimeController extends Controller
 
         // Basis (bulan + lokasi + divisi + pencarian) tanpa filter status, agar angka
         // ringkasan di atas tetap mencerminkan seluruh lembur bulan itu.
+        $perPage = min(max((int) $request->input('per_page', 50), 25), 200);
+
         $base = fn () => OvertimeApproval::query()
             ->whereBetween('work_date', [$from->toDateString(), $to->toDateString()])
             ->whereHas('employee', fn ($q) => $q
@@ -41,10 +43,12 @@ class OvertimeController extends Controller
             ->when($status, fn ($q, $s) => $q->where('status', $s))
             ->with(['employee', 'supervisor'])
             ->orderBy('work_date')
-            ->get();
+            ->paginate($perPage)
+            ->withQueryString();
 
         return view('attendance.overtime.index', [
             'requests' => $requests,
+            'perPage' => $perPage,
             'month' => $month,
             'prevMonth' => $month->copy()->subMonth()->format('Y-m'),
             'nextMonth' => $month->copy()->addMonth()->format('Y-m'),

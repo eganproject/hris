@@ -7,7 +7,6 @@ use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Support\Carbon;
-use Illuminate\Support\Facades\Storage;
 
 class Attendance extends Model
 {
@@ -98,8 +97,16 @@ class Attendance extends Model
     }
 
     /**
+     * Disk privat: foto selfie hanya boleh keluar lewat rute berotorisasi.
+     */
+    public const SELFIE_DISK = 'local';
+
+    /**
      * Bukti absen mandiri untuk satu sisi punch ('in' atau 'out'): URL foto, titik
      * koordinat dan tautan petanya. Null bila sisi itu tidak diabsen lewat selfie.
+     *
+     * URL fotonya menunjuk ke rute berotorisasi, bukan ke berkas di disk — berkasnya
+     * memang tidak bisa dijangkau langsung dari web.
      *
      * @return array{photo_url: string, latitude: ?float, longitude: ?float, accuracy: ?int, map_url: ?string}|null
      */
@@ -115,7 +122,7 @@ class Attendance extends Model
         $lng = $side === 'in' ? $this->clock_in_longitude : $this->clock_out_longitude;
 
         return [
-            'photo_url' => Storage::disk('public')->url($path),
+            'photo_url' => route('attendance.selfie', ['attendance' => $this->id, 'side' => $side]),
             'latitude' => $lat,
             'longitude' => $lng,
             'accuracy' => $side === 'in' ? $this->clock_in_accuracy_m : $this->clock_out_accuracy_m,

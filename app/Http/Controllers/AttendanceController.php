@@ -33,35 +33,41 @@ class AttendanceController extends Controller
         $departmentId = $request->integer('department_id') ?: null;
         $search = $request->string('search')->toString() ?: null;
         $statusFilter = $request->string('status')->toString() ?: null;
+        $perPage = min(max((int) $request->input('per_page', 50), 25), 200);
         $scope = DataScope::forAttendance($request->user());
 
-        $employees = $scope->employees()
+        $population = fn () => $scope->employees()
             ->active()
             ->when($branchId, fn ($query) => $query->where('branch_id', $branchId))
             ->byDepartment($departmentId)
             ->when($search, fn ($query, $s) => $query->where(fn ($q) => $q
                 ->where('full_name', 'like', "%{$s}%")
-                ->orWhere('employee_number', 'like', "%{$s}%")))
+                ->orWhere('employee_number', 'like', "%{$s}%")));
+
+        // Ringkasan dihitung di database atas seluruh populasi (lokasi + divisi +
+        // pencarian), sebelum filter status menyempitkannya dan tanpa bergantung pada
+        // halaman yang kebetulan sedang dibuka.
+        $summary = Attendance::query()
+            ->whereDate('work_date', $date->toDateString())
+            ->whereIn('employee_id', $population()->select('employees.id'))
+            ->groupBy('status')
+            ->selectRaw('status, COUNT(*) as total')
+            ->pluck('total', 'status');
+
+        // Filter status juga dikerjakan di query, supaya paginasinya tidak menghasilkan
+        // halaman yang setengah kosong.
+        $employees = $population()
+            ->when($statusFilter, fn ($query, $s) => $query->whereHas(
+                'attendances',
+                fn ($q) => $q->whereDate('work_date', $date->toDateString())->where('status', $s),
+            ))
             ->with([
                 'attendances' => fn ($query) => $query->whereDate('work_date', $date->toDateString())->with('shift'),
                 'schedules' => fn ($query) => $query->whereDate('work_date', $date->toDateString())->with('shift'),
             ])
             ->orderBy('full_name')
-            ->get();
-
-        // Status tally for the summary strip — computed across the population (lokasi +
-        // divisi + pencarian), before the status filter narrows the visible rows.
-        $summary = $employees
-            ->map(fn (Employee $e) => $e->attendances->first()?->status)
-            ->filter()
-            ->countBy(fn (AttendanceStatus $status) => $status->value);
-
-        // The status filter only narrows the table itself.
-        if ($statusFilter) {
-            $employees = $employees
-                ->filter(fn (Employee $e) => $e->attendances->first()?->status?->value === $statusFilter)
-                ->values();
-        }
+            ->paginate($perPage)
+            ->withQueryString();
 
         return view('attendance.daily.index', [
             'employees' => $employees,
@@ -75,6 +81,7 @@ class AttendanceController extends Controller
             'departmentId' => $departmentId,
             'search' => $search,
             'statusFilter' => $statusFilter,
+            'perPage' => $perPage,
             'hasNoScope' => $scope->isEmpty(),
             'shifts' => Shift::query()->where('is_active', true)->orderBy('start_time')->get(),
             'statuses' => AttendanceStatus::options(),

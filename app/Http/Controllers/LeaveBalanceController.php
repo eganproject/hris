@@ -21,6 +21,7 @@ class LeaveBalanceController extends Controller
         $year = $this->resolveYear($request->input('year'));
         $branchId = $request->integer('branch_id') ?: null;
         $departmentId = $request->integer('department_id') ?: null;
+        $perPage = min(max((int) $request->input('per_page', 50), 25), 200);
 
         $types = LeaveType::query()
             ->where('is_active', true)
@@ -36,7 +37,8 @@ class LeaveBalanceController extends Controller
             ->when($departmentId, fn ($q) => $q->where('department_id', $departmentId))
             ->with(['branch', 'department'])
             ->orderBy('full_name')
-            ->get();
+            ->paginate($perPage)
+            ->withQueryString();
 
         $overrides = LeaveBalance::query()
             ->whereIn('employee_id', $employees->pluck('id'))
@@ -48,6 +50,7 @@ class LeaveBalanceController extends Controller
         return view('attendance.leave-balances.index', [
             'types' => $types,
             'employees' => $employees,
+            'perPage' => $perPage,
             'overrides' => $overrides,
             'year' => $year,
             'branches' => $scope->branches(),

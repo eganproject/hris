@@ -31,6 +31,8 @@
         {{-- Date navigation + filters --}}
         <section class="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
             <form method="GET" action="{{ route('attendance.daily.index') }}" class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5 lg:items-center">
+                {{-- Jumlah baris per halaman ikut terbawa saat filter diganti --}}
+                <input type="hidden" name="per_page" value="{{ $perPage }}">
                 <div class="flex items-center gap-2">
                     <a href="{{ route('attendance.daily.index', array_merge(request()->query(), ['date' => $prevDate])) }}" class="rounded-md border border-gray-200 px-3 py-2 text-sm text-gray-600 hover:bg-gray-50" aria-label="Hari sebelumnya">‹</a>
                     <input type="date" name="date" value="{{ $date->toDateString() }}" onchange="this.form.submit()" class="w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-xs outline-none focus:border-primary focus:ring-2 focus:ring-primary/20">
@@ -113,6 +115,25 @@
                     </tbody>
                 </table>
             </div>
+            @if ($employees->total() > 0)
+                <div class="flex flex-col gap-3 border-t border-gray-200 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
+                    <div class="flex items-center gap-3">
+                        <form method="GET" action="{{ route('attendance.daily.index') }}" class="flex items-center gap-2">
+                            @foreach (request()->except(['per_page', 'page']) as $key => $value)
+                                <input type="hidden" name="{{ $key }}" value="{{ $value }}">
+                            @endforeach
+                            <label for="daily_per_page" class="text-xs text-gray-500">Per halaman</label>
+                            <select id="daily_per_page" name="per_page" onchange="this.form.submit()" class="rounded-md border border-gray-300 px-2 py-1.5 text-xs shadow-xs outline-none focus:border-primary focus:ring-2 focus:ring-primary/20">
+                                @foreach ([25, 50, 100, 200] as $option)
+                                    <option value="{{ $option }}" @selected(($perPage ?? 50) === $option)>{{ $option }}</option>
+                                @endforeach
+                            </select>
+                        </form>
+                        <span class="text-xs text-gray-500">{{ $employees->firstItem() }}–{{ $employees->lastItem() }} dari {{ number_format($employees->total()) }} karyawan</span>
+                    </div>
+                    <div>{{ $employees->links() }}</div>
+                </div>
+            @endif
         </section>
     </div>
 
