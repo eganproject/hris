@@ -108,6 +108,7 @@
                                 </td>
                                 <td>
                                     {{ $leaveRequest->leaveType?->name ?? '-' }}
+                                    <x-leave-attachment :request="$leaveRequest" class="flex" />
                                     <p class="mt-0.5 text-xs text-gray-500">{{ $leaveRequest->leaveType?->attendance_status?->label() }}</p>
                                 </td>
                                 <td>

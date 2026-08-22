@@ -6,6 +6,7 @@ use App\Enums\LeaveRequestStatus;
 use App\Models\Employee;
 use App\Models\LeaveRequest;
 use App\Models\User;
+use Illuminate\Http\UploadedFile;
 use App\Support\ApprovalNotifier;
 use Carbon\CarbonPeriod;
 use Illuminate\Support\Carbon;
@@ -19,7 +20,11 @@ class LeaveWorkflow
     public function __construct(private readonly AttendanceResolver $resolver) {}
 
     /**
-     * @param  array{leave_type_id:int, start_date:string, end_date:string, reason?:?string}  $data
+     * Membuat pengajuan baru. Lampiran (bila ada) ikut disimpan di sini, bukan di
+     * masing-masing controller, supaya pengajuan dari karyawan dan yang dibuatkan HR
+     * memperlakukan berkasnya persis sama.
+     *
+     * @param  array{leave_type_id:int, start_date:string, end_date:string, reason?:?string, attachment?:?UploadedFile}  $data
      */
     public function submit(Employee $employee, array $data): LeaveRequest
     {
@@ -35,11 +40,33 @@ class LeaveWorkflow
             'status' => $employee->manager_id
                 ? LeaveRequestStatus::PendingSupervisor
                 : LeaveRequestStatus::PendingHr,
+            ...$this->attachmentColumns($employee, $data['attachment'] ?? null),
         ]);
 
         app(ApprovalNotifier::class)->leaveSubmitted($request);
 
         return $request;
+    }
+
+    /**
+     * Simpan lampiran ke disk privat dan kembalikan kolom-kolomnya. Berkas ditaruh
+     * per karyawan agar mudah ditelusuri, dengan nama acak dari Laravel — nama asli
+     * dari pengguna tidak pernah dipakai sebagai nama berkas di disk.
+     *
+     * @return array<string, mixed>
+     */
+    private function attachmentColumns(Employee $employee, ?UploadedFile $attachment): array
+    {
+        if (! $attachment) {
+            return [];
+        }
+
+        return [
+            'attachment_path' => $attachment->store("leave-attachments/{$employee->id}", LeaveRequest::ATTACHMENT_DISK),
+            'attachment_name' => $attachment->getClientOriginalName(),
+            'attachment_mime' => $attachment->getClientMimeType(),
+            'attachment_size' => $attachment->getSize(),
+        ];
     }
 
     public function supervisorApprove(LeaveRequest $request, User $actor): void

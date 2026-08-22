@@ -15,6 +15,7 @@ use App\Http\Controllers\HolidayController;
 use App\Http\Controllers\IclockController;
 use App\Http\Controllers\JobPositionController;
 use App\Http\Controllers\LeaveBalanceController;
+use App\Http\Controllers\LeaveAttachmentController;
 use App\Http\Controllers\LeaveController;
 use App\Http\Controllers\LeaveTypeController;
 use App\Http\Controllers\MyAttendanceController;
@@ -309,6 +310,11 @@ Route::middleware('auth')->group(function () {
         Route::put('leave-types/{leaveType}', [LeaveTypeController::class, 'update'])->middleware('permission:leave-types.update')->name('leave-types.update');
         Route::delete('leave-types/{leaveType}', [LeaveTypeController::class, 'destroy'])->middleware('permission:leave-types.delete')->name('leave-types.destroy');
     });
+
+    // Lampiran pengajuan cuti. Sengaja tanpa middleware permission: pengaju dan
+    // atasannya belum tentu punya leave.view, jadi siapa yang boleh melihat diperiksa
+    // di dalam controller.
+    Route::get('leave-attachments/{leaveRequest}', LeaveAttachmentController::class)->name('leave.attachment');
 
     // Employee self-service: request own leave, and (as a supervisor) approve subordinates.
     Route::prefix('my-leave')->name('my-leave.')->middleware('permission:my-leave.view')->group(function () {

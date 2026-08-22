@@ -17,6 +17,10 @@ class LeaveRequest extends Model
     'start_date',
     'end_date',
     'reason',
+    'attachment_path',
+    'attachment_name',
+    'attachment_mime',
+    'attachment_size',
     'status',
     'supervisor_approved_by',
     'supervisor_decided_at',
@@ -33,7 +37,31 @@ class LeaveRequest extends Model
             'status' => LeaveRequestStatus::class,
             'supervisor_decided_at' => 'datetime',
             'decided_at' => 'datetime',
+            'attachment_size' => 'integer',
         ];
+    }
+
+    /** Disk privat: lampiran hanya boleh keluar lewat rute berotorisasi. */
+    public const ATTACHMENT_DISK = 'local';
+
+    public function hasAttachment(): bool
+    {
+        return $this->attachment_path !== null;
+    }
+
+    /** Gambar bisa dipratinjau langsung di tab baru; PDF diserahkan ke viewer browser. */
+    public function attachmentIsImage(): bool
+    {
+        return str_starts_with((string) $this->attachment_mime, 'image/');
+    }
+
+    public function attachmentSizeLabel(): string
+    {
+        $bytes = (int) $this->attachment_size;
+
+        return $bytes >= 1048576
+            ? round($bytes / 1048576, 1).' MB'
+            : max(1, (int) round($bytes / 1024)).' KB';
     }
 
     public function employee(): BelongsTo

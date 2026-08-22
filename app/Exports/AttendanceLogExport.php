@@ -7,10 +7,11 @@ use Illuminate\Support\Collection;
 use Maatwebsite\Excel\Concerns\WithMultipleSheets;
 
 /**
- * Berkas Excel log absensi: bukan satu tabel mentah, melainkan empat lembar yang
+ * Berkas Excel log absensi: bukan satu tabel mentah, melainkan lima lembar yang
  * menjawab pertanyaan berbeda — ringkasan per orang untuk penggajian dan evaluasi,
- * log harian untuk penelusuran kasus, rekap per tanggal untuk melihat pola, dan
- * lembar keterangan supaya berkas yang beredar lewat email tidak kehilangan konteks.
+ * log harian untuk penelusuran kasus, rekap per tanggal untuk melihat pola, info shift
+ * sebagai kunci pembacaan angka telat & jam kerja, dan lembar keterangan supaya berkas
+ * yang beredar lewat email tidak kehilangan konteks.
  *
  * Urutannya sengaja dari yang paling sering dibuka ke yang paling jarang.
  */
@@ -34,6 +35,7 @@ class AttendanceLogExport implements WithMultipleSheets
             new AttendanceLogEmployeeSheet($summary),
             new AttendanceLogDetailSheet($this->rows),
             new AttendanceLogDailySheet($summary),
+            new AttendanceLogShiftSheet($this->rows),
             new AttendanceLogInfoSheet($this->meta, $this->rows->count(), $summary->employeeCount()),
         ];
     }

@@ -109,13 +109,13 @@ test('the search and status filters narrow the query at the database', function 
         ->and($byStatus->first()->employee->full_name)->toBe('Budi Santoso');
 });
 
-test('the excel export carries four sheets, summary first', function () {
+test('the excel export carries five sheets, summary first', function () {
     $rows = collect();
     $export = new AttendanceLogExport($rows, ['periode' => 'Juni 2026']);
 
     $titles = array_map(fn ($sheet) => $sheet->title(), $export->sheets());
 
-    expect($titles)->toBe(['Ringkasan Karyawan', 'Log Harian', 'Rekap Harian', 'Keterangan']);
+    expect($titles)->toBe(['Ringkasan Karyawan', 'Log Harian', 'Rekap Harian', 'Info Shift', 'Keterangan']);
 });
 
 test('the per-employee summary tallies statuses, hours and attendance rate', function () {
@@ -191,4 +191,51 @@ test('the export route really produces a workbook', function () {
 
     // Benar-benar dirender PhpSpreadsheet, bukan sekadar respons kosong.
     expect(strlen($response->streamedContent() ?: $response->getContent()))->toBeGreaterThan(5000);
+});
+
+test('the shift sheet lists only shifts present in the exported data', function () {
+    $pagi = App\Models\Shift::query()->create([
+        'code' => 'P', 'name' => 'Pagi', 'start_time' => '08:00', 'end_time' => '17:00',
+        'break_minutes' => 60, 'late_tolerance_minutes' => 10, 'early_leave_tolerance_minutes' => 5,
+        'overtime_starts_after_minutes' => 30, 'overtime_min_minutes' => 30, 'is_active' => true,
+    ]);
+    // Shift malam yang menyeberang tengah malam — durasinya harus tetap benar.
+    $malam = App\Models\Shift::query()->create([
+        'code' => 'M', 'name' => 'Malam', 'start_time' => '22:00', 'end_time' => '06:00',
+        'crosses_midnight' => true, 'break_minutes' => 30, 'is_active' => true,
+    ]);
+    // Sengaja tidak dipakai baris mana pun: tidak boleh muncul di sheet.
+    App\Models\Shift::query()->create([
+        'code' => 'X', 'name' => 'Tak Terpakai', 'start_time' => '09:00', 'end_time' => '18:00', 'is_active' => true,
+    ]);
+
+    $employee = logEmployee('Ana', 2, 'present', ['shift_id' => $pagi->id]);
+    logEmployee('Budi', 1, 'present', ['shift_id' => $malam->id]);
+    // Hari libur tanpa shift sama sekali.
+    Attendance::query()->create([
+        'employee_id' => $employee->id, 'work_date' => '2026-06-07', 'status' => 'day_off',
+    ]);
+
+    $sheet = new App\Exports\AttendanceLogShiftSheet(Attendance::with('shift')->get());
+    $rows = $sheet->collection();
+
+    expect($rows->pluck('kode')->all())->toBe(['M', 'P', '(tanpa shift)']);
+
+    $pagiRow = $rows->firstWhere('kode', 'P');
+    expect($pagiRow['mulai'])->toBe('08:00')
+        ->and($pagiRow['selesai'])->toBe('17:00')
+        ->and($pagiRow['durasi_jam'])->toBe(9.0)
+        ->and($pagiRow['efektif_jam'])->toBe(8.0)   // 9 jam - 1 jam istirahat
+        ->and($pagiRow['toleransi_telat'])->toBe(10)
+        ->and($pagiRow['hari'])->toBe(2)
+        ->and($pagiRow['karyawan'])->toBe(1);
+
+    // Shift malam: 22:00-06:00 = 8 jam, bukan negatif.
+    $malamRow = $rows->firstWhere('kode', 'M');
+    expect($malamRow['durasi_jam'])->toBe(8.0)
+        ->and($malamRow['lintas_malam'])->toBe('Ya')
+        ->and($malamRow['efektif_jam'])->toBe(7.5);
+
+    // Baris penutup berdamai dengan total log harian.
+    expect($rows->sum('hari'))->toBe(Attendance::query()->count());
 });

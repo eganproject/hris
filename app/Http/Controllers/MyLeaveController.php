@@ -10,6 +10,7 @@ use App\Models\LeaveType;
 use App\Services\LeaveBalanceService;
 use App\Services\LeaveWorkflow;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\View\View;
 
 class MyLeaveController extends Controller
@@ -79,6 +80,12 @@ class MyLeaveController extends Controller
 
         abort_unless($leaveRequest->employee_id === $employee->id, 403);
         abort_if($leaveRequest->status === LeaveRequestStatus::Approved, 403, 'Cuti yang sudah disetujui tidak bisa dihapus.');
+
+        // Buang juga lampirannya; kalau tidak, berkasnya tertinggal di disk tanpa ada
+        // lagi baris yang menunjuknya.
+        if ($leaveRequest->hasAttachment()) {
+            Storage::disk(LeaveRequest::ATTACHMENT_DISK)->delete($leaveRequest->attachment_path);
+        }
 
         $leaveRequest->delete();
 

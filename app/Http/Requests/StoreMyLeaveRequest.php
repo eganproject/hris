@@ -24,6 +24,16 @@ class StoreMyLeaveRequest extends FormRequest
             'start_date' => ['required', 'date', 'after_or_equal:today'],
             'end_date' => ['required', 'date', 'after_or_equal:start_date'],
             'reason' => ['nullable', 'string', 'max:1000'],
+            // Bukti pendukung: surat sakit, surat tugas, dsb. Maksimum 2 MB.
+            'attachment' => ['nullable', 'file', 'mimes:jpg,jpeg,png,webp,pdf', 'max:2048'],
+        ];
+    }
+
+    public function messages(): array
+    {
+        return [
+            'attachment.max' => 'Ukuran lampiran maksimal 2 MB.',
+            'attachment.mimes' => 'Lampiran harus berupa gambar (JPG, PNG, WEBP) atau PDF.',
         ];
     }
 
@@ -33,6 +43,7 @@ class StoreMyLeaveRequest extends FormRequest
             'leave_type_id' => 'jenis cuti',
             'start_date' => 'tanggal mulai',
             'end_date' => 'tanggal selesai',
+            'attachment' => 'lampiran',
         ];
     }
 

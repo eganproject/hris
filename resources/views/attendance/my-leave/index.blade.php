@@ -35,7 +35,10 @@
                             @foreach ($pendingForMe as $req)
                                 <tr>
                                     <td class="font-medium text-gray-950">{{ $req->employee?->full_name }}</td>
-                                    <td>{{ $req->leaveType?->name }}</td>
+                                    <td>
+                                        <p>{{ $req->leaveType?->name }}</p>
+                                        <x-leave-attachment :request="$req" />
+                                    </td>
                                     <td>{{ $req->start_date->format('d M Y') }} – {{ $req->end_date->format('d M Y') }} <span class="text-xs text-gray-500">({{ $req->days }} hari)</span></td>
                                     <td class="text-right">
                                         <x-action-menu>
@@ -61,7 +64,10 @@
                     <tbody>
                         @forelse ($myRequests as $req)
                             <tr>
-                                <td class="font-medium text-gray-950">{{ $req->leaveType?->name }}</td>
+                                <td class="font-medium text-gray-950">
+                                    <p>{{ $req->leaveType?->name }}</p>
+                                    <x-leave-attachment :request="$req" />
+                                </td>
                                 <td>{{ $req->start_date->format('d M Y') }} – {{ $req->end_date->format('d M Y') }} <span class="text-xs text-gray-500">({{ $req->days }} hari)</span></td>
                                 <td>
                                     <x-status-badge :tone="$req->status->tone()">{{ $req->status->label() }}</x-status-badge>

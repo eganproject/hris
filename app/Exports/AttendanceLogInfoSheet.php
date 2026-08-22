@@ -63,6 +63,7 @@ class AttendanceLogInfoSheet implements FromArray, ShouldAutoSize, WithEvents, W
             ['Jam Kerja & Lembur', 'Dalam satuan jam desimal (mis. 8,5 = 8 jam 30 menit) agar bisa langsung dijumlahkan.'],
             ['Lembur', 'Angka hasil perhitungan shift, bukan lembur yang sudah disetujui. Untuk penggajian, pakai rekap Lembur.'],
             ['Jam kosong', 'Berarti tidak ada punch pada hari itu, misalnya Alfa, Cuti, atau Libur.'],
+            ['Info Shift', 'Jam kerja tiap shift yang muncul di data ini. Kolom Terlambat dan Jam Kerja hanya bisa dibaca dengan benar bersama lembar itu.'],
         ];
     }
 
