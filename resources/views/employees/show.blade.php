@@ -23,7 +23,7 @@
                 <div>
                     <dt class="text-gray-500">Status Kepegawaian</dt>
                     <dd class="mt-2">
-                        <x-status-badge :tone="$employee->kepegawaian_status_tone">{{ $employee->kepegawaian_status_label }}</x-status-badge>
+                        <x-status-badge :tone="$employee->employment_status_tone">{{ $employee->employment_status_label }}</x-status-badge>
                     </dd>
                     <p class="mt-2 text-xs text-gray-500">Apakah orang ini masih menjadi karyawan.</p>
                 </div>
@@ -350,7 +350,7 @@
                             <dl class="mt-5 space-y-4 text-sm">
                                 <div>
                                     <dt class="text-gray-500">Status Kepegawaian</dt>
-                                    <dd class="mt-1"><x-status-badge :tone="$employee->kepegawaian_status_tone">{{ $employee->kepegawaian_status_label }}</x-status-badge></dd>
+                                    <dd class="mt-1"><x-status-badge :tone="$employee->employment_status_tone">{{ $employee->employment_status_label }}</x-status-badge></dd>
                                 </div>
                                 <div>
                                     <dt class="text-gray-500">Alasan Keluar</dt>

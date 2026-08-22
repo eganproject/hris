@@ -27,7 +27,7 @@
                 <h2 class="text-sm font-semibold text-gray-950">Data Karyawan</h2>
                 <div class="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
                     <div><p class="text-xs font-medium text-gray-500">Nomor Karyawan</p><p class="mt-1 text-sm text-gray-900">{{ $employee->employee_number }}</p></div>
-                    <div><p class="text-xs font-medium text-gray-500">Status</p><p class="mt-1 text-sm text-gray-900">{{ $employee->kepegawaian_status_label }}</p></div>
+                    <div><p class="text-xs font-medium text-gray-500">Status</p><p class="mt-1 text-sm text-gray-900">{{ $employee->employment_status_label }}</p></div>
                     <div><p class="text-xs font-medium text-gray-500">Lokasi</p><p class="mt-1 text-sm text-gray-900">{{ $employee->branch?->name ?? '—' }}</p></div>
                     <div><p class="text-xs font-medium text-gray-500">Divisi</p><p class="mt-1 text-sm text-gray-900">{{ $employee->department?->name ?? '—' }}</p></div>
                     <div><p class="text-xs font-medium text-gray-500">Jabatan</p><p class="mt-1 text-sm text-gray-900">{{ $employee->jobPosition?->name ?? '—' }}</p></div>

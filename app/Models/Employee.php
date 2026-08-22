@@ -435,9 +435,28 @@ class Employee extends Model
         return $this->photo_url ?? asset('img/company-logo.svg');
     }
 
+    /**
+     * Status kepegawaian orangnya: "Aktif" atau "Nonaktif". Menjawab satu pertanyaan
+     * saja — apakah orang ini masih karyawan? Sengaja terpisah dari status kontrak,
+     * karena seseorang bisa tetap aktif walau kontraknya sudah lewat tanggal.
+     *
+     * Dua accessor "status" lain di kelas ini menjawab hal yang berbeda:
+     * - hr_status_label      : status kepegawaian DIGABUNG kondisi kontraknya
+     * - contract_needs_attention : kontraknya lewat tanggal dan menunggu keputusan HR
+     */
     public function getEmploymentStatusLabelAttribute(): string
     {
         return self::employmentStatusLabels()[$this->employment_status] ?? str($this->employment_status)->headline()->toString();
+    }
+
+    /** Warna lencana untuk employment_status_label. */
+    public function getEmploymentStatusToneAttribute(): string
+    {
+        return match ($this->employment_status) {
+            'active' => 'success',
+            'inactive' => 'danger',
+            default => 'neutral',
+        };
     }
 
     public function getExitReasonLabelAttribute(): ?string
@@ -547,28 +566,6 @@ class Employee extends Model
         if ($this->user) {
             $this->user->forceFill(['is_active' => true])->save();
         }
-    }
-
-    /**
-     * Employment (person) status, decoupled from the contract. Answers the single
-     * question "is this person still an employee?".
-     */
-    public function getKepegawaianStatusLabelAttribute(): string
-    {
-        return match ($this->employment_status) {
-            'active' => 'Aktif',
-            'inactive' => 'Nonaktif',
-            default => $this->employment_status_label,
-        };
-    }
-
-    public function getKepegawaianStatusToneAttribute(): string
-    {
-        return match ($this->employment_status) {
-            'active' => 'success',
-            'inactive' => 'danger',
-            default => 'neutral',
-        };
     }
 
     /**

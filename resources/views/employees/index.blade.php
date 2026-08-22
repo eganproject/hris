@@ -241,7 +241,7 @@
                                     @endif
                                 </td>
                                 <td>
-                                    <x-status-badge :tone="$employee->kepegawaian_status_tone">{{ $employee->kepegawaian_status_label }}</x-status-badge>
+                                    <x-status-badge :tone="$employee->employment_status_tone">{{ $employee->employment_status_label }}</x-status-badge>
                                     @if ($employee->isInactive())
                                         <p class="mt-1.5 text-xs text-gray-500">
                                             {{ $employee->exit_reason_label ?? 'Alasan belum diisi' }}@if ($employee->exit_date) · {{ $employee->exit_date->format('d M Y') }}@endif
