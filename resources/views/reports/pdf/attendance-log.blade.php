@@ -23,6 +23,7 @@
     <p class="meta">Periode: {{ $month->translatedFormat('F Y') }}
         @if ($branchName) &middot; Lokasi: {{ $branchName }} @endif
         @if ($departmentName) &middot; Divisi: {{ $departmentName }} @endif
+        @if ($jobPositionName ?? null) &middot; Jabatan: {{ $jobPositionName }} @endif
         &middot; {{ $rows->count() }} baris &middot; Dicetak: {{ now()->translatedFormat('d M Y H:i') }}
     </p>
 

@@ -47,6 +47,7 @@ class AttendanceLogInfoSheet implements FromArray, ShouldAutoSize, WithEvents, W
             ['Periode', (string) ($this->meta['periode'] ?? '-')],
             ['Lokasi', (string) ($this->meta['lokasi'] ?? 'Semua lokasi')],
             ['Divisi', (string) ($this->meta['divisi'] ?? 'Semua divisi')],
+            ['Jabatan', (string) ($this->meta['jabatan'] ?? 'Semua jabatan')],
             ['Filter status', $statusLabel ? (AttendanceStatus::tryFrom($statusLabel)?->label() ?? $statusLabel) : 'Semua status'],
             ['Kata kunci pencarian', (string) ($this->meta['pencarian'] ?? '-')],
             ['', ''],
@@ -75,10 +76,10 @@ class AttendanceLogInfoSheet implements FromArray, ShouldAutoSize, WithEvents, W
                 $sheet = $event->sheet->getDelegate();
 
                 $sheet->getStyle('A1')->getFont()->setBold(true)->setSize(14);
-                $sheet->getStyle('A14')->getFont()->setBold(true);
-                $sheet->getStyle('A1:A22')->getFont()->setBold(true);
+                $sheet->getStyle('A15')->getFont()->setBold(true);
+                $sheet->getStyle('A1:A23')->getFont()->setBold(true);
                 $sheet->getColumnDimension('B')->setWidth(95);
-                $sheet->getStyle('B1:B22')->getAlignment()->setWrapText(true);
+                $sheet->getStyle('B1:B23')->getAlignment()->setWrapText(true);
             },
         ];
     }

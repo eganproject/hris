@@ -25,7 +25,7 @@
                     <input type="month" name="month" value="{{ $month->format('Y-m') }}" onchange="this.form.submit()" class="rounded-md border border-gray-300 px-3 py-2 text-sm shadow-xs outline-none focus:border-primary focus:ring-2 focus:ring-primary/20">
                     <a href="{{ route('reports.attendance-log', array_merge(request()->query(), ['month' => $nextMonth])) }}" class="rounded-md border border-gray-200 px-3 py-2 text-sm text-gray-600 hover:bg-gray-50">›</a>
                 </div>
-                <div class="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-4">
+                <div class="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-5">
                     <select name="branch_id" onchange="this.form.submit()" class="rounded-md border border-gray-300 px-3 py-2 text-sm shadow-xs outline-none focus:border-primary focus:ring-2 focus:ring-primary/20">
                         <option value="">Semua lokasi</option>
                         @foreach ($branches as $branch)
@@ -36,6 +36,12 @@
                         <option value="">Semua divisi</option>
                         @foreach ($departments as $department)
                             <option value="{{ $department->id }}" @selected($departmentId === $department->id)>{{ $department->name }}</option>
+                        @endforeach
+                    </select>
+                    <select name="job_position_id" onchange="this.form.submit()" class="rounded-md border border-gray-300 px-3 py-2 text-sm shadow-xs outline-none focus:border-primary focus:ring-2 focus:ring-primary/20">
+                        <option value="">Semua jabatan</option>
+                        @foreach ($jobPositions as $position)
+                            <option value="{{ $position->id }}" @selected($jobPositionId === $position->id)>{{ $position->name }}</option>
                         @endforeach
                     </select>
                     <select name="status" onchange="this.form.submit()" class="rounded-md border border-gray-300 px-3 py-2 text-sm shadow-xs outline-none focus:border-primary focus:ring-2 focus:ring-primary/20">

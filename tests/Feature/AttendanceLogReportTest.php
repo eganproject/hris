@@ -239,3 +239,37 @@ test('the shift sheet lists only shifts present in the exported data', function 
     // Baris penutup berdamai dengan total log harian.
     expect($rows->sum('hari'))->toBe(Attendance::query()->count());
 });
+
+test('the job position filter narrows the log, the export and the pdf alike', function () {
+    $user = logViewer();
+
+    $spv = App\Models\JobPosition::query()->create(['code' => 'SPV', 'name' => 'Supervisor', 'is_active' => true]);
+    $staf = App\Models\JobPosition::query()->create(['code' => 'STF', 'name' => 'Staf', 'is_active' => true]);
+
+    logEmployee('Ana', 3)->update(['job_position_id' => $spv->id]);
+    logEmployee('Budi', 4)->update(['job_position_id' => $staf->id]);
+
+    // Halaman: hanya baris milik jabatan terpilih.
+    $response = $this->actingAs($user)
+        ->get('/reports/attendance-log?month=2026-06&job_position_id='.$spv->id)
+        ->assertOk();
+
+    expect($response->viewData('rows')->total())->toBe(3)
+        ->and($response->viewData('rows')->first()->employee->full_name)->toBe('Ana')
+        ->and($response->viewData('jobPositionId'))->toBe($spv->id)
+        // Ringkasan ikut menyempit, bukan menghitung seluruh periode tanpa filter.
+        ->and($response->viewData('summary')['present'])->toBe(3);
+
+    // Pilihan jabatan tersedia di formulir filter.
+    $response->assertSee('Semua jabatan')->assertSee('Supervisor');
+
+    // Ekspor mengikuti filter yang sama.
+    $this->actingAs($user)
+        ->get('/reports/attendance-log/export?month=2026-06&job_position_id='.$staf->id)
+        ->assertOk();
+
+    // PDF juga tidak boleh mengabaikannya.
+    $this->actingAs($user)
+        ->get('/reports/attendance-log/pdf?month=2026-06&job_position_id='.$staf->id)
+        ->assertOk();
+});

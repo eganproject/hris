@@ -11,6 +11,7 @@ use App\Models\Attendance;
 use App\Models\Branch;
 use App\Models\Department;
 use App\Models\Employee;
+use App\Models\JobPosition;
 use App\Models\LeaveRequest;
 use App\Support\AttendanceReport;
 use App\Support\DataScope;
@@ -88,11 +89,12 @@ class ReportController extends Controller
     {
         [$month, $from, $to, $branchId, $departmentId] = $this->filters($request);
         $scope = DataScope::forAttendance($request->user());
+        $jobPositionId = $request->integer('job_position_id') ?: null;
         $search = $request->string('search')->toString() ?: null;
         $status = $request->string('status')->toString() ?: null;
         $perPage = min(max((int) $request->input('per_page', 50), 25), 200);
 
-        $query = $this->attendanceLogQuery($from, $to, $branchId, $departmentId, $scope, $search, $status);
+        $query = $this->attendanceLogQuery($from, $to, $branchId, $departmentId, $jobPositionId, $scope, $search, $status);
 
         return view('reports.attendance-log', [
             // Dipaginasi di database: sebulan penuh untuk satu perusahaan bisa ribuan
@@ -100,15 +102,17 @@ class ReportController extends Controller
             'rows' => $query->paginate($perPage)->withQueryString(),
             // Ringkasan dihitung dari seluruh periode, bukan dari halaman yang tampil.
             'summary' => $this->attendanceLogSummary(
-                $this->attendanceLogQuery($from, $to, $branchId, $departmentId, $scope, $search, null),
+                $this->attendanceLogQuery($from, $to, $branchId, $departmentId, $jobPositionId, $scope, $search, null),
             ),
             'month' => $month,
             'prevMonth' => $month->copy()->subMonth()->format('Y-m'),
             'nextMonth' => $month->copy()->addMonth()->format('Y-m'),
             'branches' => $scope->branches(),
             'departments' => $scope->departments(),
+            'jobPositions' => JobPosition::query()->where('is_active', true)->orderBy('name')->get(),
             'branchId' => $branchId,
             'departmentId' => $departmentId,
+            'jobPositionId' => $jobPositionId,
             'search' => $search,
             'statusFilter' => $status,
             'statuses' => AttendanceStatus::options(),
@@ -126,6 +130,9 @@ class ReportController extends Controller
                 'periode' => $month->translatedFormat('F Y'),
                 'lokasi' => $branchId ? Branch::find($branchId)?->name : null,
                 'divisi' => $departmentId ? Department::find($departmentId)?->name : null,
+                'jabatan' => $request->integer('job_position_id')
+                    ? JobPosition::find($request->integer('job_position_id'))?->name
+                    : null,
                 'pencarian' => $request->string('search')->toString() ?: null,
                 'status' => $request->string('status')->toString() ?: null,
                 'dibuat_oleh' => $request->user()?->name,
@@ -144,6 +151,9 @@ class ReportController extends Controller
             'month' => $month,
             'branchName' => $branchId ? Branch::find($branchId)?->name : null,
             'departmentName' => $departmentId ? Department::find($departmentId)?->name : null,
+            'jobPositionName' => $request->integer('job_position_id')
+                ? JobPosition::find($request->integer('job_position_id'))?->name
+                : null,
         ])->setPaper('a4', 'landscape');
 
         return $pdf->download('log-absensi-'.$month->format('Y-m').'.pdf');
@@ -162,6 +172,7 @@ class ReportController extends Controller
             $to,
             $branchId,
             $departmentId,
+            $request->integer('job_position_id') ?: null,
             DataScope::forAttendance($request->user()),
             $request->string('search')->toString() ?: null,
             $request->string('status')->toString() ?: null,
@@ -178,6 +189,7 @@ class ReportController extends Controller
         string $to,
         ?int $branchId,
         ?int $departmentId,
+        ?int $jobPositionId = null,
         ?DataScope $scope = null,
         ?string $search = null,
         ?string $status = null,
@@ -188,6 +200,7 @@ class ReportController extends Controller
             ->whereBetween('attendances.work_date', [$from, $to])
             ->when($branchId, fn ($q) => $q->where('employees.branch_id', $branchId))
             ->when($departmentId, fn ($q) => $q->whereHas('employee', fn ($e) => $e->byDepartment($departmentId)))
+            ->when($jobPositionId, fn ($q) => $q->where('employees.job_position_id', $jobPositionId))
             ->when($search, fn ($q, $s) => $q->where(fn ($w) => $w
                 ->where('employees.full_name', 'like', "%{$s}%")
                 ->orWhere('employees.employee_number', 'like', "%{$s}%")))
