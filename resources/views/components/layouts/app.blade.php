@@ -117,7 +117,7 @@
                     @endcanany
 
                     @canany(['attendance-daily.view', 'devices.view', 'corrections.view'])
-                        @php $g = request()->routeIs('attendance.daily.*', 'attendance.devices.*', 'attendance.punches.*', 'attendance.corrections.*'); @endphp
+                        @php $g = request()->routeIs('attendance.daily.*', 'attendance.map', 'attendance.devices.*', 'attendance.punches.*', 'attendance.corrections.*'); @endphp
                         <div @class(['sidebar-group', 'is-open' => $g]) data-sidebar-group="absensi">
                             <button type="button" data-sidebar-group-toggle aria-expanded="{{ $g ? 'true' : 'false' }}" class="sidebar-group-toggle flex w-full items-center gap-2.5 rounded px-2.5 py-1.5 text-left transition hover:bg-white/70">
                                 <svg class="size-4 shrink-0 text-gray-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 11l3 3L22 4"></path><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path></svg>
@@ -129,6 +129,12 @@
                                     <a href="{{ route('attendance.daily.index') }}" @class(['sidebar-nav-link flex items-center gap-2.5 rounded px-2.5 py-1.5 text-[13px] font-medium transition', 'bg-white text-gray-950 shadow-xs ring-1 ring-gray-200' => request()->routeIs('attendance.daily.*'), 'text-gray-600 hover:bg-white hover:text-gray-950' => ! request()->routeIs('attendance.daily.*')]) title="Absensi Harian">
                                         <svg class="size-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 11l3 3L22 4"></path><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path></svg>
                                         <span class="sidebar-label truncate">Absensi Harian</span>
+                                    </a>
+                                @endcan
+                                @can('attendance-daily.view')
+                                    <a href="{{ route('attendance.map') }}" @class(['sidebar-nav-link flex items-center gap-2.5 rounded px-2.5 py-1.5 text-[13px] font-medium transition', 'bg-white text-gray-950 shadow-xs ring-1 ring-gray-200' => request()->routeIs('attendance.map'), 'text-gray-600 hover:bg-white hover:text-gray-950' => ! request()->routeIs('attendance.map')]) title="Peta Absensi WFH">
+                                        <svg class="size-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"></path><circle cx="12" cy="10" r="3"></circle></svg>
+                                        <span class="sidebar-label truncate">Peta Absensi WFH</span>
                                     </a>
                                 @endcan
                                 @can('devices.view')
