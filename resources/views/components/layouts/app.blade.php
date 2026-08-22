@@ -338,9 +338,6 @@
             <div class="admin-content min-w-0">
                 <header class="sticky top-0 z-10 flex h-[52px] items-center justify-between border-b border-gray-200 bg-white/90 px-4 backdrop-blur sm:px-5">
                     <div class="flex min-w-0 items-center gap-3">
-                        <button type="button" data-mobile-nav-toggle class="flex size-9 shrink-0 items-center justify-center rounded-md border border-gray-200 bg-white text-gray-700 transition hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-primary/20 lg:hidden" aria-label="Buka menu">
-                            <svg class="size-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18M3 12h18M3 18h18"></path></svg>
-                        </button>
                         <div class="min-w-0">
                             <p class="truncate text-[13px] font-semibold text-gray-900">{{ $heading ?? 'Dashboard' }}</p>
                             <x-breadcrumbs />
@@ -419,6 +416,8 @@
                     </div>
                 </footer>
             </div>
+
+            <x-mobile-nav />
         </div>
 
         @can('employees.view')
