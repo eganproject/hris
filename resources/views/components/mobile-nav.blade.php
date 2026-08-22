@@ -1,15 +1,27 @@
 @php
     /**
-     * Navigasi bawah untuk layar kecil. Isinya menyesuaikan hak akses: kandidat
-     * diurutkan dari yang paling sering dipakai di ponsel — self-service dulu, karena
-     * di ponsel yang dibuka biasanya absen dan cuti, bukan menu HR — lalu diambil
-     * empat teratas yang boleh diakses. Slot kelima selalu "Lainnya", yang membuka
-     * laci menu lengkap lewat penangan [data-mobile-nav-toggle] yang sudah ada.
+     * Navigasi bawah untuk layar kecil.
      *
-     * Empat, bukan lima: dengan tombol Lainnya jadi lima kolom, dan lebih dari itu
-     * label akan terpotong di layar 360px.
+     * Absensi Saya diangkat jadi tombol bundar menonjol di tengah, karena itulah yang
+     * paling sering ditekan dari ponsel — absen WFH, absen dinas luar — dan tombol
+     * timbul lebih mudah dijangkau ibu jari daripada ikon kecil di deretan datar.
+     *
+     * Sisanya menyesuaikan hak akses: dua slot di kiri, dua di kanan, dengan slot
+     * terakhir selalu "Lainnya" yang membuka laci menu lengkap lewat penangan
+     * [data-mobile-nav-toggle] yang sudah ada.
+     *
+     * Bila akun itu tidak punya akses Absensi Saya (mis. petugas yang tidak tertaut
+     * data karyawan), bilahnya kembali datar berisi lima pintasan biasa — tombol
+     * tengah tidak dipaksakan ke menu yang bukan tujuan utamanya.
      */
     $user = auth()->user();
+
+    $center = $user?->can('my-attendance.view') ? [
+        'label' => 'Absensi',
+        'route' => 'my-attendance.index',
+        'active' => ['my-attendance.*'],
+        'icon' => '<circle cx="12" cy="12" r="9"></circle><path d="m8.5 12.5 2.5 2.5 4.5-5"></path>',
+    ] : null;
 
     $candidates = [
         [
@@ -18,13 +30,6 @@
             'active' => ['dashboard'],
             'permission' => 'dashboard.view',
             'icon' => '<path d="M3 10.5 12 3l9 7.5"></path><path d="M5 9.5V21h14V9.5"></path><path d="M9.5 21v-6h5v6"></path>',
-        ],
-        [
-            'label' => 'Absensi',
-            'route' => 'my-attendance.index',
-            'active' => ['my-attendance.*'],
-            'permission' => 'my-attendance.view',
-            'icon' => '<path d="M9 11l3 3L22 4"></path><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path>',
         ],
         [
             'label' => 'Cuti',
@@ -56,25 +61,41 @@
         ],
     ];
 
-    $items = collect($candidates)
+    // Dengan tombol tengah: 3 pintasan + Lainnya, dibagi 2 kiri & 2 kanan.
+    // Tanpa tombol tengah: 4 pintasan + Lainnya dalam satu deret datar.
+    $sides = collect($candidates)
         ->filter(fn (array $item) => $item['permission'] === null || $user?->can($item['permission']))
-        ->take(4)
+        ->take($center ? 3 : 4)
         ->values();
+
+    $left = $center ? $sides->take(2) : $sides;
+    $right = $center ? $sides->slice(2) : collect();
 @endphp
 
-@if ($items->isNotEmpty())
-    <nav class="mobile-bottom-nav lg:hidden" aria-label="Navigasi utama">
+@if ($sides->isNotEmpty() || $center)
+    <nav @class(['mobile-bottom-nav', 'lg:hidden', 'has-center' => (bool) $center]) aria-label="Navigasi utama">
         <ul class="mobile-bottom-nav-list">
-            @foreach ($items as $item)
-                @php $isActive = request()->routeIs(...$item['active']); @endphp
-                <li>
-                    <a href="{{ route($item['route']) }}"
-                       @class(['mobile-bottom-nav-link', 'is-active' => $isActive])
-                       @if ($isActive) aria-current="page" @endif>
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">{!! $item['icon'] !!}</svg>
-                        <span>{{ $item['label'] }}</span>
+            @foreach ($left as $item)
+                <x-mobile-nav-item :item="$item" />
+            @endforeach
+
+            @if ($center)
+                @php $centerActive = request()->routeIs(...$center['active']); @endphp
+                <li class="mobile-bottom-nav-center">
+                    <a href="{{ route($center['route']) }}"
+                       @class(['mobile-bottom-nav-fab-link', 'is-active' => $centerActive])
+                       @if ($centerActive) aria-current="page" @endif
+                       aria-label="Absensi Saya">
+                        <span class="mobile-bottom-nav-fab">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">{!! $center['icon'] !!}</svg>
+                        </span>
+                        <span class="mobile-bottom-nav-fab-label">{{ $center['label'] }}</span>
                     </a>
                 </li>
+            @endif
+
+            @foreach ($right as $item)
+                <x-mobile-nav-item :item="$item" />
             @endforeach
 
             <li>

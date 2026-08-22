@@ -899,6 +899,70 @@
         position: relative;
     }
 
+    /* Tombol tengah yang timbul. Bilahnya sengaja tidak meng-clip apa pun supaya
+       lingkarannya bisa keluar melewati tepi atas. */
+    .mobile-bottom-nav.has-center {
+        overflow: visible;
+    }
+
+    .mobile-bottom-nav-center {
+        display: flex;
+        justify-content: center;
+    }
+
+    .mobile-bottom-nav-fab-link {
+        display: flex;
+        width: 100%;
+        flex-direction: column;
+        align-items: center;
+        justify-content: flex-end;
+        gap: 3px;
+        min-height: 56px;
+        padding-bottom: 7px;
+        color: #6b7280;
+        font-size: 10.5px;
+        font-weight: 500;
+        line-height: 1.1;
+        -webkit-tap-highlight-color: transparent;
+    }
+
+    .mobile-bottom-nav-fab {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 52px;
+        height: 52px;
+        /* Ditarik ke atas agar separuhnya menyembul di luar bilah. */
+        margin-top: -26px;
+        border-radius: 999px;
+        /* Cincin putih membuatnya terbaca "mengambang" di atas bilah. */
+        border: 4px solid #fff;
+        background: var(--color-primary, #000);
+        color: #fff;
+        box-shadow: 0 8px 18px rgb(2 6 23 / 0.28);
+        transition: transform 150ms ease, background-color 150ms ease;
+    }
+
+    .mobile-bottom-nav-fab > svg {
+        width: 24px;
+        height: 24px;
+    }
+
+    .mobile-bottom-nav-fab-link:active .mobile-bottom-nav-fab {
+        transform: scale(0.94);
+    }
+
+    .mobile-bottom-nav-fab-link.is-active {
+        color: var(--color-primary, #000);
+        font-weight: 600;
+    }
+
+    /* Saat halamannya sedang dibuka, tombolnya diberi lingkar tipis alih-alih
+       garis penanda seperti item biasa — bentuknya memang sudah menonjol. */
+    .mobile-bottom-nav-fab-link.is-active .mobile-bottom-nav-fab {
+        box-shadow: 0 8px 18px rgb(2 6 23 / 0.28), 0 0 0 2px var(--color-primary, #000);
+    }
+
     /* Konten tidak boleh tertutup bilah navigasi. */
     .admin-content {
         padding-bottom: calc(56px + env(safe-area-inset-bottom, 0px));
