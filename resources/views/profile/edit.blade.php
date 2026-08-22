@@ -21,6 +21,60 @@
             <p class="mt-3 text-xs text-gray-400">Nama & email login dikelola oleh HR. Hubungi HR bila perlu diubah.</p>
         </section>
 
+        {{-- Foto profil --}}
+        @if ($employee)
+            <section class="rounded-lg border border-gray-200 bg-white p-6 shadow-sm">
+                <h2 class="text-sm font-semibold text-gray-950">Foto Profil</h2>
+                <p class="mt-1 text-sm text-gray-500">Foto ini tampil di daftar karyawan, struktur organisasi, dan halaman Anda sendiri.</p>
+
+                @if (session('status') === 'photo-updated')
+                    <p class="mt-4 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">Foto profil berhasil diperbarui.</p>
+                @elseif (session('status') === 'photo-removed')
+                    <p class="mt-4 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">Foto profil dihapus.</p>
+                @endif
+
+                {{-- Markup pratinjaunya sama dengan form karyawan, jadi penangan
+                     [data-image-input] di app.js langsung bekerja tanpa skrip baru. --}}
+                <form method="POST" action="{{ route('profile.photo.update') }}" enctype="multipart/form-data" data-no-confirm="true" class="mt-4" data-image-field>
+                    @csrf
+                    <div class="flex flex-col gap-4 sm:flex-row sm:items-center">
+                        <img
+                            @if ($employee->photo_url) src="{{ $employee->photo_url }}" @else hidden @endif
+                            alt="Foto profil {{ $employee->full_name }}"
+                            data-image-preview
+                            class="size-24 rounded-full border border-gray-200 object-cover">
+                        <div
+                            data-image-placeholder
+                            @if ($employee->photo_url) hidden @endif
+                            class="flex size-24 items-center justify-center rounded-full border border-gray-200 bg-gray-50 text-2xl font-semibold text-gray-400">
+                            {{ str($employee->full_name ?? '?')->substr(0, 1)->upper() }}
+                        </div>
+
+                        <div class="min-w-0 flex-1">
+                            <label for="photo" class="sr-only">Pilih foto baru</label>
+                            <input id="photo" name="photo" type="file" accept="image/jpeg,image/png,image/webp" data-image-input required
+                                class="block w-full rounded-md border border-gray-300 bg-white px-3 py-2.5 text-sm shadow-xs outline-none file:mr-3 file:rounded-sm file:border-0 file:bg-gray-100 file:px-3 file:py-1.5 file:text-xs file:font-semibold file:text-gray-700 hover:file:bg-gray-200 focus:border-primary focus:ring-2 focus:ring-primary/20">
+                            <p class="mt-2 text-xs text-gray-500">Format JPG, PNG, atau WebP. Maksimal 2 MB. Resolusi minimal 300x300 px dan maksimal 3000x3000 px.</p>
+                            @error('photo', 'updatePhoto')<p class="mt-2 text-sm text-red-600">{{ $message }}</p>@enderror
+                        </div>
+                    </div>
+
+                    <div class="mt-4 flex items-center justify-end gap-2">
+                        @if ($employee->photo_path)
+                            <button type="submit" form="remove-photo" class="rounded-md border border-gray-200 px-4 py-2.5 text-sm font-medium text-red-600 transition hover:bg-red-50">Hapus Foto</button>
+                        @endif
+                        <button type="submit" class="rounded-md bg-primary px-4 py-2.5 text-sm font-semibold text-white shadow-xs transition hover:bg-primary-hover">Simpan Foto</button>
+                    </div>
+                </form>
+
+                @if ($employee->photo_path)
+                    <form id="remove-photo" method="POST" action="{{ route('profile.photo.destroy') }}" onsubmit="return confirm('Hapus foto profil Anda?')" class="hidden">
+                        @csrf @method('DELETE')
+                    </form>
+                @endif
+            </section>
+        @endif
+
         {{-- Data karyawan --}}
         @if ($employee)
             <section class="rounded-lg border border-gray-200 bg-white p-6 shadow-sm">
