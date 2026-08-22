@@ -50,6 +50,22 @@ enum AttendanceStatus: string
     }
 
     /**
+     * Warna solid (hex) untuk penanda yang tidak bisa memakai kelas Tailwind —
+     * penanda peta, ikon SVG. Diturunkan dari tone() supaya satu status tidak
+     * pernah tampil hijau di lencana tetapi biru di peta.
+     */
+    public function color(): string
+    {
+        return match ($this->tone()) {
+            'success' => '#059669',
+            'warning' => '#d97706',
+            'danger' => '#dc2626',
+            'info' => '#2563eb',
+            default => '#6b7280',
+        };
+    }
+
+    /**
      * @return array<string, string>
      */
     public static function options(): array

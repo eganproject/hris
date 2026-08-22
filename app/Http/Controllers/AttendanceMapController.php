@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Attendance;
 use App\Models\Employee;
 use App\Models\EmployeeSchedule;
+use App\Models\Holiday;
 use App\Models\LeaveRequest;
 use App\Services\AttendanceResolver;
 use App\Support\DataScope;
@@ -77,6 +78,11 @@ class AttendanceMapController extends Controller
      * disetujui. Sumber kedua & ketiga dipakai agar yang belum absen tetap terdaftar
      * meski barisnya belum dibuat resolver.
      *
+     * Hasilnya lalu dikurangi mereka yang hari itu memang tidak bekerja, mengikuti
+     * urutan prioritas AttendanceResolver: libur nasional dan cuti/izin/sakit
+     * mengalahkan jadwal WFH. Tanpa pengurangan ini, orang yang sedang sakit ikut
+     * muncul sebagai "belum absen" dan daftar itu kehilangan artinya.
+     *
      * @param  \Illuminate\Support\Collection<int, Employee>  $employees
      * @return list<int>
      */
@@ -109,7 +115,51 @@ class AttendanceMapController extends Controller
             ->whereHas('leaveType', fn ($query) => $query->whereIn('attendance_status', $statuses))
             ->pluck('employee_id');
 
-        return $fromAttendance->merge($fromRoster)->merge($fromLeave)->unique()->values()->all();
+        return $fromAttendance->merge($fromRoster)->merge($fromLeave)
+            ->unique()
+            ->diff($this->notWorkingIds($employees, $day, $statuses))
+            ->values()
+            ->all();
+    }
+
+    /**
+     * Karyawan yang hari itu tidak bekerja sama sekali, sehingga tidak pantas ditagih
+     * absen mandiri: hari libur yang berlaku untuk lokasinya, cuti/izin/sakit yang
+     * disetujui, atau baris absensi yang sudah ter-resolve ke status non-kerja-jauh.
+     *
+     * @param  \Illuminate\Support\Collection<int, Employee>  $employees
+     * @param  list<string>  $remoteStatuses
+     * @return \Illuminate\Support\Collection<int, int>
+     */
+    private function notWorkingIds($employees, string $day, array $remoteStatuses)
+    {
+        $ids = $employees->modelKeys();
+
+        // Resolver sudah memutuskan hari itu bukan kerja jarak jauh — hormati.
+        $resolved = Attendance::query()
+            ->whereIn('employee_id', $ids)
+            ->whereDate('work_date', $day)
+            ->whereNotIn('status', $remoteStatuses)
+            ->pluck('employee_id');
+
+        // Cuti/izin/sakit disetujui mengalahkan jadwal WFH, walau barisnya belum ada.
+        $onLeave = LeaveRequest::query()
+            ->whereIn('employee_id', $ids)
+            ->approvedOn($day)
+            ->whereHas('leaveType', fn ($query) => $query->whereNotIn('attendance_status', $remoteStatuses))
+            ->pluck('employee_id');
+
+        // Libur menang lebih dulu lagi. Cakupannya per lokasi, jadi dicocokkan dengan
+        // branch_id tiap karyawan — sekali query untuk seluruh halaman.
+        $holidays = Holiday::query()->whereDate('date', $day)->get(['is_national', 'branch_id']);
+
+        $onHoliday = $holidays->isEmpty() ? collect() : $employees
+            ->filter(fn (Employee $employee) => $holidays->contains(
+                fn (Holiday $holiday) => $holiday->is_national || $holiday->branch_id === $employee->branch_id,
+            ))
+            ->map(fn (Employee $employee) => $employee->id);
+
+        return $resolved->merge($onLeave)->merge($onHoliday)->unique();
     }
 
     /**
@@ -124,6 +174,7 @@ class AttendanceMapController extends Controller
             'branch' => $employee->branch?->name,
             'status' => $attendance->status->value,
             'status_label' => $attendance->status->label(),
+            'color' => $attendance->status->color(),
             'lat' => (float) $attendance->clock_in_latitude,
             'lng' => (float) $attendance->clock_in_longitude,
             'accuracy' => $attendance->clock_in_accuracy_m,

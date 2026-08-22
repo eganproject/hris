@@ -5,6 +5,9 @@ use App\Models\Attendance;
 use App\Models\Branch;
 use App\Models\Employee;
 use App\Models\EmployeeSchedule;
+use App\Models\Holiday;
+use App\Models\LeaveRequest;
+use App\Models\LeaveType;
 use App\Models\Shift;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -178,10 +181,60 @@ test('the flag colour distinguishes WFH from a business trip', function () {
 
     $response = $this->actingAs($user)->get('/attendance/map?date='.$date)->assertOk();
 
-    // Hijau untuk WFH, biru untuk dinas luar — dipakai bendera di daftar samping,
-    // dan warna yang sama dikirim ke Leaflet lewat data-points.
-    $response->assertSee('#059669', escape: false)->assertSee('#2563eb', escape: false);
+    // Warnanya berasal dari AttendanceStatus::color(), sumber yang sama dengan
+    // lencana status — bukan hex yang ditulis ulang di peta.
+    $response->assertSee(AttendanceStatus::Wfh->color(), escape: false)
+        ->assertSee(AttendanceStatus::BusinessTrip->color(), escape: false);
+
+    expect(AttendanceStatus::Wfh->color())->not->toBe(AttendanceStatus::BusinessTrip->color());
 
     expect($response->viewData('points')->pluck('status')->sort()->values()->all())
         ->toBe(['business_trip', 'wfh']);
+});
+
+test('the pending list leaves out people whose WFH day is beaten by leave or a holiday', function () {
+    $date = '2026-08-20';
+    $user = mapViewer();
+
+    // Ketiganya dijadwalkan WFH dan belum absen; hanya yang pertama yang benar-benar
+    // perlu ditagih HR.
+    $expected = wfhEmployee('Harus Absen', $date);
+    $sick = wfhEmployee('Sedang Sakit', $date);
+    $holiday = wfhEmployee('Kena Libur', $date);
+
+    $sickType = LeaveType::query()->create([
+        'code' => 'SK', 'name' => 'Sakit', 'attendance_status' => 'sick',
+        'is_paid' => true, 'counts_against_balance' => false, 'is_active' => true,
+    ]);
+    LeaveRequest::query()->create([
+        'employee_id' => $sick->id, 'leave_type_id' => $sickType->id,
+        'start_date' => $date, 'end_date' => $date, 'reason' => 'Sakit.',
+        'status' => \App\Enums\LeaveRequestStatus::Approved->value,
+    ]);
+
+    $branch = Branch::query()->create(['code' => 'BDG', 'name' => 'Bandung', 'is_active' => true]);
+    $holiday->update(['branch_id' => $branch->id]);
+    Holiday::query()->create(['date' => $date, 'name' => 'Libur Lokal', 'is_national' => false, 'branch_id' => $branch->id]);
+
+    $pending = $this->actingAs($user)->get('/attendance/map?date='.$date)->assertOk()->viewData('pending');
+
+    expect($pending)->toHaveCount(1)
+        ->and($pending[0]['employee']->full_name)->toBe('Harus Absen');
+});
+
+test('a resolved non-remote status keeps someone off the pending list', function () {
+    $date = '2026-08-20';
+    $user = mapViewer();
+    $employee = wfhEmployee('Sudah Diproses Alfa', $date);
+
+    // Resolver sudah memutuskan hari itu Alfa; peta tidak boleh menagihnya lagi.
+    Attendance::query()->create([
+        'employee_id' => $employee->id, 'work_date' => $date,
+        'status' => AttendanceStatus::Absent->value,
+    ]);
+
+    $response = $this->actingAs($user)->get('/attendance/map?date='.$date)->assertOk();
+
+    expect($response->viewData('pending'))->toHaveCount(0)
+        ->and($response->viewData('points'))->toHaveCount(0);
 });

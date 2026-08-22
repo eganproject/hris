@@ -20,10 +20,10 @@ if (root) {
         '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
     }[char]));
 
-    // Bendera hijau = WFH, biru = dinas luar. Lingkaran di sekitarnya menggambarkan
-    // akurasi GPS yang dilaporkan perangkat, supaya titik tidak terbaca lebih presisi
-    // daripada kenyataannya.
-    const COLORS = { wfh: '#059669', business_trip: '#2563eb' };
+    // Warna bendera datang dari AttendanceStatus::color() di server, satu sumber yang
+    // sama dengan lencana status di seluruh aplikasi. Lingkaran di sekitar bendera
+    // menggambarkan akurasi GPS yang dilaporkan perangkat, supaya titik tidak terbaca
+    // lebih presisi daripada kenyataannya.
 
     // Bentuknya harus sama dengan <x-map-flag> agar keterangan warna, daftar samping,
     // dan penanda di peta terbaca sebagai satu hal yang sama.
@@ -34,7 +34,7 @@ if (root) {
         </svg>`;
 
     const markers = points.map((point) => {
-        const color = COLORS[point.status] ?? '#6b7280';
+        const color = point.color || '#6b7280';
 
         if (point.accuracy) {
             L.circle([point.lat, point.lng], {
@@ -69,7 +69,7 @@ if (root) {
                 <p style="margin:6px 0 0;font-size:12px;color:${color};font-weight:600">${escapeHtml(point.status_label)}</p>
                 <p style="margin:2px 0 0;font-size:12px;color:#374151">Masuk ${escapeHtml(point.clock_in)} · Pulang ${escapeHtml(point.clock_out)}</p>
                 <p style="margin:2px 0 0;font-size:11px;color:#6b7280">${point.accuracy ? `Akurasi ±${escapeHtml(point.accuracy)} m` : 'Akurasi tidak dilaporkan'}</p>
-                <a href="${escapeHtml(point.history_url)}" style="display:inline-block;margin-top:6px;font-size:12px;color:#2563eb">Lihat riwayat</a>
+                <a href="${escapeHtml(point.history_url)}" style="display:inline-block;margin-top:6px;font-size:12px;color:#374151;text-decoration:underline">Lihat riwayat</a>
             </div>
         `);
 

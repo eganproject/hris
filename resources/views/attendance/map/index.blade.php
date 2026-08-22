@@ -1,8 +1,8 @@
-<x-layouts.app title="Peta Absensi WFH - {{ config('app.name', 'HRIS') }}" heading="Peta Absensi WFH">
+<x-layouts.app title="Peta Absen Mandiri - {{ config('app.name', 'HRIS') }}" heading="Peta Absen Mandiri">
     <div class="mx-auto max-w-7xl space-y-6">
         <section>
             <p class="text-sm font-medium text-gray-500">Absensi · {{ $date->translatedFormat('l, d F Y') }}</p>
-            <h1 class="mt-1 text-2xl font-semibold text-gray-950">Peta Absensi WFH</h1>
+            <h1 class="mt-1 text-2xl font-semibold text-gray-950">Peta Absen Mandiri</h1>
             <p class="mt-1 text-sm text-gray-500">Lokasi karyawan WFH dan dinas luar, diambil dari koordinat saat mereka absen masuk.</p>
         </section>
 
@@ -40,8 +40,9 @@
         <section class="flex flex-wrap items-center gap-3">
             <x-status-badge tone="success">Sudah absen: {{ $points->count() }}</x-status-badge>
             <x-status-badge tone="warning">Belum absen: {{ $pending->count() }}</x-status-badge>
-            <span class="inline-flex items-center gap-1.5 text-xs text-gray-500"><x-map-flag color="#059669" /> WFH</span>
-            <span class="inline-flex items-center gap-1.5 text-xs text-gray-500"><x-map-flag color="#2563eb" /> Dinas Luar</span>
+            @foreach (\App\Services\AttendanceResolver::REMOTE_STATUSES as $remoteStatus)
+                <span class="inline-flex items-center gap-1.5 text-xs text-gray-500"><x-map-flag :color="$remoteStatus->color()" /> {{ $remoteStatus->label() }}</span>
+            @endforeach
             <span class="text-xs text-gray-400">Bendera menancap tepat di titik koordinat; lingkaran pucat = akurasi GPS yang dilaporkan perangkat.</span>
         </section>
 
@@ -76,7 +77,7 @@
                                     <p class="truncate text-sm font-medium text-gray-900">{{ $point['name'] }}</p>
                                     <p class="truncate text-xs text-gray-500">{{ $point['status_label'] }} · masuk {{ $point['clock_in'] }}</p>
                                 </div>
-                                <x-map-flag :color="$point['status'] === 'wfh' ? '#059669' : '#2563eb'" />
+                                <x-map-flag :color="$point['color']" />
                             </li>
                         @empty
                             <li class="px-4 py-6 text-center text-sm text-gray-400">Belum ada.</li>
