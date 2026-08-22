@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Storage;
 
 class Attendance extends Model
 {
@@ -25,6 +26,14 @@ class Attendance extends Model
     'leave_request_id',
     'holiday_id',
     'note',
+    'clock_in_photo_path',
+    'clock_in_latitude',
+    'clock_in_longitude',
+    'clock_in_accuracy_m',
+    'clock_out_photo_path',
+    'clock_out_latitude',
+    'clock_out_longitude',
+    'clock_out_accuracy_m',
     ];
 
     protected function casts(): array
@@ -37,6 +46,12 @@ class Attendance extends Model
             'early_leave_minutes' => 'integer',
             'work_minutes' => 'integer',
             'overtime_minutes' => 'integer',
+            'clock_in_latitude' => 'float',
+            'clock_in_longitude' => 'float',
+            'clock_in_accuracy_m' => 'integer',
+            'clock_out_latitude' => 'float',
+            'clock_out_longitude' => 'float',
+            'clock_out_accuracy_m' => 'integer',
         ];
     }
 
@@ -80,5 +95,38 @@ class Attendance extends Model
     public function getClockOutLabelAttribute(): string
     {
         return $this->clock_out?->format('H:i') ?? '–';
+    }
+
+    /**
+     * Bukti absen mandiri untuk satu sisi punch ('in' atau 'out'): URL foto, titik
+     * koordinat dan tautan petanya. Null bila sisi itu tidak diabsen lewat selfie.
+     *
+     * @return array{photo_url: string, latitude: ?float, longitude: ?float, accuracy: ?int, map_url: ?string}|null
+     */
+    public function selfieFor(string $side): ?array
+    {
+        $path = $side === 'in' ? $this->clock_in_photo_path : $this->clock_out_photo_path;
+
+        if (! $path) {
+            return null;
+        }
+
+        $lat = $side === 'in' ? $this->clock_in_latitude : $this->clock_out_latitude;
+        $lng = $side === 'in' ? $this->clock_in_longitude : $this->clock_out_longitude;
+
+        return [
+            'photo_url' => Storage::disk('public')->url($path),
+            'latitude' => $lat,
+            'longitude' => $lng,
+            'accuracy' => $side === 'in' ? $this->clock_in_accuracy_m : $this->clock_out_accuracy_m,
+            'map_url' => ($lat !== null && $lng !== null)
+                ? "https://www.google.com/maps/search/?api=1&query={$lat},{$lng}"
+                : null,
+        ];
+    }
+
+    public function hasSelfie(): bool
+    {
+        return $this->clock_in_photo_path !== null || $this->clock_out_photo_path !== null;
     }
 }

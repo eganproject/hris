@@ -31,6 +31,10 @@ Schedule::call(function () {
     DeviceCommunication::query()->where('created_at', '<', now()->subDays(14))->delete();
 })->dailyAt('00:10')->name('prune-device-communications');
 
+// Pangkas foto selfie absen mandiri yang sudah lewat 6 bulan; datanya tetap ada,
+// hanya gambarnya yang dibuang agar storage tidak menumpuk.
+Schedule::command('attendance:prune-selfies')->monthlyOn(1, '00:25');
+
 // Pangkas notifikasi yang sudah dibaca lebih dari 30 hari agar tabel tetap ramping.
 Schedule::call(function () {
     Illuminate\Notifications\DatabaseNotification::query()

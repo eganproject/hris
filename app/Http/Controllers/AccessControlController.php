@@ -65,7 +65,7 @@ class AccessControlController extends Controller
      * Role yang dikunci penuh: namanya dipakai di kode & seeder, jadi tidak boleh
      * diubah/dihapus/dikurangi haknya agar tidak ada yang mengunci diri sendiri.
      */
-    private const PROTECTED_ROLES = ['superadmin', 'super-admin'];
+    private const PROTECTED_ROLES = User::SUPER_ADMIN_ROLES;
 
     public function storeRole(Request $request): RedirectResponse
     {

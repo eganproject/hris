@@ -40,6 +40,7 @@
                             <th class="text-center">Masuk</th><th class="text-center">Pulang</th>
                             <th class="text-right">Telat</th><th class="text-right">Plg Cepat</th>
                             <th class="text-right">Jam Kerja</th><th class="text-right">Lembur Disetujui</th>
+                            <th>Bukti</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -56,9 +57,10 @@
                                 <td class="text-right text-sm text-gray-700">{{ intdiv($record->work_minutes, 60) }}j {{ $record->work_minutes % 60 }}m</td>
                                 @php $otMenit = (int) ($approvedOvertime[$record->work_date->toDateString()] ?? 0); @endphp
                                 <td class="text-right text-sm {{ $otMenit > 0 ? 'font-medium text-gray-800' : 'text-gray-400' }}">{{ intdiv($otMenit, 60) }}j {{ $otMenit % 60 }}m</td>
+                                <td><x-attendance-proof :attendance="$record" /></td>
                             </tr>
                         @empty
-                            <tr><td colspan="9" class="cell-empty">Belum ada data kehadiran pada bulan ini.</td></tr>
+                            <tr><td colspan="10" class="cell-empty">Belum ada data kehadiran pada bulan ini.</td></tr>
                         @endforelse
                     </tbody>
                 </table>

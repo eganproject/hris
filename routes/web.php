@@ -323,6 +323,8 @@ Route::middleware('auth')->group(function () {
         Route::get('/', [MyAttendanceController::class, 'index'])->name('index');
         Route::post('check-in', [MyAttendanceController::class, 'checkIn'])->name('check-in');
         Route::post('check-out', [MyAttendanceController::class, 'checkOut'])->name('check-out');
+        // Uji coba kamera + lokasi untuk superadmin; tidak mencatat absensi apa pun.
+        Route::post('selfie-test', [MyAttendanceController::class, 'selfieTest'])->name('selfie-test');
         Route::post('corrections', [MyAttendanceController::class, 'store'])->name('corrections.store');
         Route::delete('corrections/{correction}', [MyAttendanceController::class, 'cancel'])->name('corrections.cancel');
     });

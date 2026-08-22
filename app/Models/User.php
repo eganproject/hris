@@ -25,6 +25,14 @@ class User extends Authenticatable
 
     public const SCOPE_BYPASS_ATTENDANCE = 'attendance.view.all';
 
+    /**
+     * Nama peran yang diperlakukan sebagai superadmin. Dua ejaan dipertahankan
+     * karena keduanya sudah ada di data lama.
+     *
+     * @var list<string>
+     */
+    public const SUPER_ADMIN_ROLES = ['superadmin', 'super-admin'];
+
     /** @var list<string> */
     protected $fillable = ['name', 'email', 'password', 'is_active', 'limit_to_subordinates'];
 
@@ -34,6 +42,11 @@ class User extends Authenticatable
     public function employee(): HasOne
     {
         return $this->hasOne(Employee::class);
+    }
+
+    public function isSuperAdmin(): bool
+    {
+        return $this->hasRole(self::SUPER_ADMIN_ROLES);
     }
 
     /** When set, the user's data scope is their reporting subtree, not lokasi/divisi. */

@@ -56,7 +56,7 @@
                 <p data-filter-empty hidden class="px-5 py-8 text-center text-sm text-gray-500">Tidak ada role yang cocok.</p>
                 @foreach ($roles as $role)
                     @php
-                        $isProtected = in_array($role->name, ['superadmin', 'super-admin'], true);
+                        $isProtected = in_array($role->name, App\Models\User::SUPER_ADMIN_ROLES, true);
                         $locked = ! auth()->user()->can('access-control.update') || $isProtected;
                         $held = $role->permissions->pluck('name')->all();
                     @endphp

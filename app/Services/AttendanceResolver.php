@@ -19,6 +19,15 @@ use Illuminate\Support\Carbon;
  */
 class AttendanceResolver
 {
+    /**
+     * Status yang berarti "tetap bekerja, hanya tidak dari kantor". Hari seperti ini
+     * ikut perhitungan shift biasa (jam kerja, telat, lembur) dan cuma mempertahankan
+     * labelnya — beda dengan cuti/izin/sakit yang memang nol jam.
+     *
+     * @var list<AttendanceStatus>
+     */
+    public const REMOTE_STATUSES = [AttendanceStatus::Wfh, AttendanceStatus::BusinessTrip];
+
     public function __construct(private readonly DefaultOfficeSchedule $officeSchedule) {}
 
     /**
@@ -79,45 +88,45 @@ class AttendanceResolver
             return $result;
         }
 
-        // 2. Approved leave. WFH is a WORKING arrangement (the employee clocks in from
-        // home via self check-in), so it flows through the normal shift computation and
-        // only keeps the WFH label. Every other leave type (cuti/izin/sakit/dinas) is
-        // non-working and stops here.
+        // 2. Approved leave. WFH dan dinas luar adalah cara BEKERJA (karyawannya absen
+        // mandiri lewat selfie di aplikasi), jadi keduanya lanjut ke perhitungan shift
+        // biasa dan hanya mempertahankan labelnya. Cuti/izin/sakit non-kerja, berhenti
+        // di sini.
         $leave = $employee->leaveRequests()->approvedOn($date->toDateString())->with('leaveType')->first();
-        $isWfh = $scheduledWfh;
+        $remote = $scheduledWfh ? AttendanceStatus::Wfh : null;
 
         if ($leave) {
             $result['leave_request_id'] = $leave->id;
             $leaveStatus = $leave->leaveType?->attendance_status ?? AttendanceStatus::Leave;
 
-            // Cuti/izin/sakit/dinas mengalahkan jadwal WFH (orangnya memang tidak
-            // bekerja hari itu). WFH yang diajukan menegaskan status WFH.
-            if ($leaveStatus !== AttendanceStatus::Wfh) {
+            // Cuti/izin/sakit mengalahkan jadwal WFH (orangnya memang tidak bekerja
+            // hari itu). Pengajuan WFH/dinas luar menegaskan status kerja jarak jauh.
+            if (! in_array($leaveStatus, self::REMOTE_STATUSES, true)) {
                 $result['status'] = $leaveStatus;
 
                 return $result;
             }
 
-            $isWfh = true;
+            $remote = $leaveStatus;
         }
 
         // 3. No shift scheduled (day off or nothing). Punches = worked on a rest day.
         if (! $shift) {
             if ($in && $out) {
-                $result['status'] = $isWfh ? AttendanceStatus::Wfh : AttendanceStatus::Present;
+                $result['status'] = $remote ?? AttendanceStatus::Present;
                 $result['work_minutes'] = $this->minutes($in, $out);
                 $result['overtime_minutes'] = $result['work_minutes'];
             } else {
-                $result['status'] = $isWfh ? AttendanceStatus::Wfh : AttendanceStatus::DayOff;
+                $result['status'] = $remote ?? AttendanceStatus::DayOff;
             }
 
             return $result;
         }
 
-        // 4. Scheduled shift with no punch. On a WFH day that just means the employee
-        // has not clocked in from home yet (still WFH, nol jam); otherwise = absent.
+        // 4. Scheduled shift with no punch. Pada hari WFH/dinas luar itu cuma berarti
+        // karyawannya belum absen mandiri (status tetap, nol jam); selain itu = alfa.
         if (! $in) {
-            $result['status'] = $isWfh ? AttendanceStatus::Wfh : AttendanceStatus::Absent;
+            $result['status'] = $remote ?? AttendanceStatus::Absent;
 
             return $result;
         }
@@ -136,9 +145,9 @@ class AttendanceResolver
             $result['overtime_minutes'] = $shift->overtimeMinutesFor($out, $date);
         }
 
-        // A WFH day keeps the WFH label even when late/early — the worked minutes and
-        // overtime above are still computed and count for payroll.
-        $result['status'] = $isWfh ? AttendanceStatus::Wfh : match (true) {
+        // Hari WFH/dinas luar mempertahankan labelnya walau telat atau pulang cepat —
+        // jam kerja dan lembur di atas tetap dihitung dan ikut masuk penggajian.
+        $result['status'] = $remote ?? match (true) {
             $lateMinutes > (int) $shift->late_tolerance_minutes => AttendanceStatus::Late,
             $earlyMinutes > (int) $shift->early_leave_tolerance_minutes => AttendanceStatus::EarlyLeave,
             default => AttendanceStatus::Present,

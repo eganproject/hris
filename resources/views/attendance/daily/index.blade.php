@@ -71,7 +71,7 @@
         <section class="overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm">
             <div class="overflow-x-auto">
                 <table class="data-table">
-                    <thead><tr><th>Karyawan</th><th>Jadwal</th><th>Masuk</th><th>Pulang</th><th>Telat</th><th>Lembur</th><th>Status</th><th class="text-right">Aksi</th></tr></thead>
+                    <thead><tr><th>Karyawan</th><th>Jadwal</th><th>Masuk</th><th>Pulang</th><th>Telat</th><th>Lembur</th><th>Status</th><th>Bukti</th><th class="text-right">Aksi</th></tr></thead>
                     <tbody>
                         @forelse ($employees as $employee)
                             @php
@@ -96,6 +96,7 @@
                                         <span class="text-xs text-gray-400">Belum diproses</span>
                                     @endif
                                 </td>
+                                <td>@if ($att)<x-attendance-proof :attendance="$att" />@else<span class="text-sm text-gray-300">—</span>@endif</td>
                                 <td class="text-right">
                                     @can('attendance-daily.update')
                                         <button type="button" data-punch
@@ -107,7 +108,7 @@
                                 </td>
                             </tr>
                         @empty
-                            <tr><td colspan="8" class="cell-empty">Tidak ada karyawan aktif pada lokasi ini.</td></tr>
+                            <tr><td colspan="9" class="cell-empty">Tidak ada karyawan aktif pada lokasi ini.</td></tr>
                         @endforelse
                     </tbody>
                 </table>

@@ -3,12 +3,16 @@
 namespace App\Http\Controllers;
 
 use App\Enums\AttendanceStatus;
+use App\Http\Requests\SelfAttendanceRequest;
 use App\Http\Requests\StoreAttendanceCorrectionRequest;
+use App\Models\Attendance;
 use App\Models\AttendanceCorrection;
 use App\Models\Employee;
 use App\Services\AttendanceResolver;
 use App\Support\ApprovalNotifier;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\View\View;
 
 class MyAttendanceController extends Controller
@@ -32,22 +36,58 @@ class MyAttendanceController extends Controller
                 ->with('reviewer')
                 ->latest('id')
                 ->get(),
-            // WFH self check-in: only offered when today is an approved WFH day.
-            'wfhToday' => $this->isWfhApprovedToday($employee),
+            // Absen mandiri: hanya ditawarkan saat hari ini memang hari kerja jarak
+            // jauh (WFH terjadwal/disetujui, atau dinas luar disetujui).
+            'remoteToday' => $remote = $this->remoteStatusToday($employee),
             'todayAttendance' => $employee->attendances()->whereDate('work_date', now()->toDateString())->first(),
+            // Superadmin boleh mencoba alat absennya di hari biasa untuk memastikan
+            // kamera & lokasi berfungsi. Pada hari WFH/dinas luar tidak perlu — panel
+            // absen sungguhannya sudah muncul.
+            'selfieTestMode' => ! $remote && (bool) auth()->user()?->isSuperAdmin(),
         ]);
     }
 
     /**
-     * Record the WFH clock-in for today, straight into the attendance row (no machine
-     * needed at home). Only allowed on a day the employee is approved to work from home.
+     * Uji coba alat absen selfie untuk superadmin: memvalidasi foto dan koordinat
+     * persis seperti absen sungguhan, lalu memantulkan hasilnya kembali ke layar.
+     * Sengaja TIDAK menulis baris absensi apa pun — ini cuma pemeriksaan perangkat.
      */
-    public function checkIn(): RedirectResponse
+    public function selfieTest(SelfAttendanceRequest $request): RedirectResponse
+    {
+        abort_unless($request->user()->isSuperAdmin(), 403);
+
+        /** @var UploadedFile $photo */
+        $photo = $request->file('photo');
+        $sizeKb = (int) round($photo->getSize() / 1024); // dibaca sebelum berkas dipindah
+
+        // Satu berkas per superadmin, ditimpa tiap kali diuji — hasil uji lama tidak
+        // perlu disimpan dan tidak boleh menumpuk di storage.
+        $path = $photo->storeAs('attendance/selfie-tests', $request->user()->id.'.jpg', 'public');
+
+        return back()->with('selfie_test', [
+            // Nama berkasnya tetap, jadi tambahkan penanda versi agar browser tidak
+            // menampilkan foto uji sebelumnya dari cache.
+            'photo_url' => Storage::disk('public')->url($path).'?v='.now()->timestamp,
+            'photo_kb' => $sizeKb,
+            'latitude' => $request->float('latitude'),
+            'longitude' => $request->float('longitude'),
+            'accuracy' => $request->filled('accuracy') ? (int) round($request->float('accuracy')) : null,
+            'tested_at' => now()->format('H:i:s'),
+        ]);
+    }
+
+    /**
+     * Record today's clock-in straight into the attendance row (no machine needed away
+     * from the office), together with the selfie and coordinates taken at that moment.
+     * Only allowed on an approved WFH / business-trip day.
+     */
+    public function checkIn(SelfAttendanceRequest $request): RedirectResponse
     {
         $employee = $this->employee();
+        $status = $this->remoteStatusToday($employee);
 
-        if (! $this->isWfhApprovedToday($employee)) {
-            return back()->with('error', 'Absen mandiri hanya untuk hari WFH yang sudah disetujui.');
+        if (! $status) {
+            return back()->with('error', 'Absen mandiri hanya untuk hari WFH atau dinas luar yang sudah disetujui.');
         }
 
         $today = now();
@@ -57,17 +97,19 @@ class MyAttendanceController extends Controller
             return back()->with('error', 'Anda sudah absen masuk hari ini pukul '.$existing->clock_in->format('H:i').'.');
         }
 
-        $this->resolver->resolve($employee, $today, $today->format('H:i'), $existing?->clock_out?->format('H:i'), $existing?->note);
+        $attendance = $this->resolver->resolve($employee, $today, $today->format('H:i'), $existing?->clock_out?->format('H:i'), $existing?->note);
+        $this->attachProof($attendance, 'in', $request);
 
-        return back()->with('status', 'Absen masuk WFH tercatat pukul '.$today->format('H:i').'.');
+        return back()->with('status', 'Absen masuk '.$status->label().' tercatat pukul '.$today->format('H:i').'.');
     }
 
-    public function checkOut(): RedirectResponse
+    public function checkOut(SelfAttendanceRequest $request): RedirectResponse
     {
         $employee = $this->employee();
+        $status = $this->remoteStatusToday($employee);
 
-        if (! $this->isWfhApprovedToday($employee)) {
-            return back()->with('error', 'Absen mandiri hanya untuk hari WFH yang sudah disetujui.');
+        if (! $status) {
+            return back()->with('error', 'Absen mandiri hanya untuk hari WFH atau dinas luar yang sudah disetujui.');
         }
 
         $today = now();
@@ -81,16 +123,46 @@ class MyAttendanceController extends Controller
             return back()->with('error', 'Anda sudah absen pulang hari ini pukul '.$existing->clock_out->format('H:i').'.');
         }
 
-        $this->resolver->resolve($employee, $today, $existing->clock_in->format('H:i'), $today->format('H:i'), $existing->note);
+        $attendance = $this->resolver->resolve($employee, $today, $existing->clock_in->format('H:i'), $today->format('H:i'), $existing->note);
+        $this->attachProof($attendance, 'out', $request);
 
-        return back()->with('status', 'Absen pulang WFH tercatat pukul '.$today->format('H:i').'.');
+        return back()->with('status', 'Absen pulang '.$status->label().' tercatat pukul '.$today->format('H:i').'.');
     }
 
     /**
-     * Is today a WFH day for this employee — whether from the roster (a scheduled
-     * WFH day) or from an approved WFH request?
+     * Simpan selfie + koordinat ke baris absensi yang baru saja di-resolve. Kolom ini
+     * tidak ikut dihitung resolver, jadi aman dari penulisan ulang saat hari itu
+     * diproses ulang oleh HR.
      */
-    private function isWfhApprovedToday(Employee $employee): bool
+    private function attachProof(Attendance $attendance, string $side, SelfAttendanceRequest $request): void
+    {
+        /** @var UploadedFile $photo */
+        $photo = $request->file('photo');
+
+        $path = $photo->store('attendance/selfies/'.$attendance->work_date->format('Y/m'), 'public');
+
+        $old = $attendance->{"clock_{$side}_photo_path"};
+
+        $attendance->forceFill([
+            "clock_{$side}_photo_path" => $path,
+            "clock_{$side}_latitude" => $request->float('latitude'),
+            "clock_{$side}_longitude" => $request->float('longitude'),
+            "clock_{$side}_accuracy_m" => $request->filled('accuracy') ? (int) round($request->float('accuracy')) : null,
+        ])->save();
+
+        // Tidak seharusnya terjadi (absen dua kali sudah ditolak di atas), tapi jangan
+        // sampai file yatim menumpuk kalau toh terjadi.
+        if ($old && $old !== $path) {
+            Storage::disk('public')->delete($old);
+        }
+    }
+
+    /**
+     * Hari ini karyawan bekerja jarak jauh dengan status apa — WFH dari roster (hari
+     * WFH terjadwal), atau WFH/dinas luar dari pengajuan yang disetujui? Null berarti
+     * hari kantor biasa, absen mandiri tidak berlaku.
+     */
+    private function remoteStatusToday(Employee $employee): ?AttendanceStatus
     {
         $today = now()->toDateString();
 
@@ -100,13 +172,18 @@ class MyAttendanceController extends Controller
             ->exists();
 
         if ($scheduled) {
-            return true;
+            return AttendanceStatus::Wfh;
         }
 
-        return $employee->leaveRequests()
+        $remoteValues = array_map(fn (AttendanceStatus $s) => $s->value, AttendanceResolver::REMOTE_STATUSES);
+
+        $leave = $employee->leaveRequests()
             ->approvedOn($today)
-            ->whereHas('leaveType', fn ($query) => $query->where('attendance_status', AttendanceStatus::Wfh->value))
-            ->exists();
+            ->whereHas('leaveType', fn ($query) => $query->whereIn('attendance_status', $remoteValues))
+            ->with('leaveType')
+            ->first();
+
+        return $leave?->leaveType?->attendance_status;
     }
 
     public function store(StoreAttendanceCorrectionRequest $request): RedirectResponse
