@@ -64,6 +64,9 @@ class AttendanceController extends Controller
             ->with([
                 'attendances' => fn ($query) => $query->whereDate('work_date', $date->toDateString())->with('shift'),
                 'schedules' => fn ($query) => $query->whereDate('work_date', $date->toDateString())->with('shift'),
+                // Dipakai kolom "Jadwal" untuk menandai hari WFH/dinas luar yang
+                // berasal dari pengajuan, bukan dari roster.
+                'leaveRequests' => fn ($query) => $query->approvedOn($date->toDateString())->with('leaveType'),
             ])
             ->orderBy('full_name')
             ->paginate($perPage)

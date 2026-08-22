@@ -3,6 +3,10 @@
     override, supaya sel yang diperbarui tanpa reload persis sama dengan hasil
     render server.
 
+    Mode kerjanya ditentukan App\Support\WorkMode, yang mengikuti urutan prioritas
+    AttendanceResolver — jadi hari WFH tampil sebagai hari kerja, baik WFH-nya
+    berasal dari roster maupun dari pengajuan yang disetujui.
+
     @var \App\Models\Employee $employee
     @var \Illuminate\Support\Carbon $day
     @var \App\Models\EmployeeSchedule|null $sched
@@ -10,13 +14,14 @@
 --}}
 @php
     $key = $day->toDateString();
+    $mode = \App\Support\WorkMode::for($sched, $leave);
     $isManual = $sched && $sched->source === \App\Enums\ScheduleSource::Manual;
-    $isWfh = $sched && ! $sched->is_day_off && $sched->is_wfh;
-    // Approved leave wins the cell: the shift may still be on the roster, but the
-    // person will not be at work that day.
-    $title = $leave
-        ? ($leave->leaveType?->name ?? 'Cuti').' (disetujui)'.($sched && ! $sched->is_day_off ? ' — jadwal '.$sched->shift?->name : '')
-        : ($sched && ! $sched->is_day_off ? $sched->shift?->name.($isWfh ? ' (WFH)' : '') : ($sched && $sched->is_day_off ? 'Libur' : 'Belum dijadwalkan')).($isManual ? ' (manual)' : '');
+
+    // Sumber-nya penting bagi HR: yang berasal dari pengajuan tidak bisa disunting
+    // dari sel ini, harus lewat menu Cuti & Izin.
+    $title = $mode->describe($sched)
+        .($leave ? ' (disetujui)' : '')
+        .($isManual ? ' (manual)' : '');
 @endphp
 <button type="button"
     @can('schedules.update') data-cell
@@ -24,26 +29,18 @@
         data-date="{{ $key }}" data-date-label="{{ $day->translatedFormat('l, d M Y') }}"
         data-shift="{{ $sched && ! $sched->is_day_off ? $sched->shift_id : '' }}"
         data-off="{{ $sched && $sched->is_day_off ? 1 : 0 }}"
-        data-wfh="{{ $isWfh ? 1 : 0 }}"
+        data-wfh="{{ $sched && ! $sched->is_day_off && $sched->is_wfh ? 1 : 0 }}"
         data-leave="{{ $leave ? ($leave->leaveType?->name ?? 'Cuti') : '' }}"
     @else disabled @endcan
     @class([
         'flex h-9 w-full items-center justify-center rounded text-[11px] font-semibold transition',
         'cursor-pointer hover:ring-2 hover:ring-primary/40' => auth()->user()->can('schedules.update'),
-        'bg-amber-100 text-amber-800' => $leave,
-        'bg-indigo-100 text-indigo-700' => ! $leave && $isWfh,
-        'bg-primary/10 text-primary' => ! $leave && ! $isWfh && $sched && ! $sched->is_day_off,
-        'text-gray-300' => ! $leave && (! $sched || $sched->is_day_off),
+        $mode->chipClasses(),
+        // Garis tepi menandai asal-usulnya: biru = override manual, kuning = dari
+        // pengajuan yang disetujui (tidak bisa disunting dari sini).
+        'ring-1 ring-amber-400' => (bool) $leave,
         'ring-1 ring-blue-400' => ! $leave && $isManual,
     ])
     title="{{ $title }}">
-    @if ($leave)
-        {{ $leave->leaveType?->code ?? 'C' }}
-    @elseif ($sched && ! $sched->is_day_off)
-        {{ $isWfh ? '🏠' : ($sched->shift?->code ?? '?') }}
-    @elseif ($sched && $sched->is_day_off)
-        —
-    @else
-        ·
-    @endif
+    {{ $mode->short }}
 </button>

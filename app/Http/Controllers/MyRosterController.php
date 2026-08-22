@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Enums\LeaveRequestStatus;
 use App\Models\Employee;
 use App\Models\Holiday;
 use Carbon\CarbonPeriod;
@@ -11,7 +12,8 @@ use Illuminate\View\View;
 
 /**
  * Read-only self-service roster: lets any logged-in employee check their own work
- * schedule (shift / day off) for a month, plus a quick list of upcoming work days.
+ * schedule for a month — shift, hari libur, dan cara kerjanya hari itu (kantor /
+ * WFH / dinas luar) — plus daftar singkat hari kerja berikutnya.
  * Available to every authenticated user with a linked employee record — no special
  * permission required (unlike the shift-swap page).
  */
@@ -40,6 +42,23 @@ class MyRosterController extends Controller
             ->get()
             ->keyBy(fn (Holiday $holiday) => $holiday->date->toDateString());
 
+        // Pengajuan yang disetujui menimpa jadwal: cuti membuat harinya kosong, WFH
+        // dan dinas luar tetap hari kerja tapi berubah tempatnya. Tanpa ini, halaman
+        // jadwal karyawan sendiri tidak pernah memperlihatkan hari WFH-nya.
+        $leaves = $employee->leaveRequests()
+            ->where('status', LeaveRequestStatus::Approved->value)
+            ->whereDate('start_date', '<=', $to->toDateString())
+            ->whereDate('end_date', '>=', $from->toDateString())
+            ->with('leaveType')
+            ->get();
+
+        $leaveByDate = [];
+        foreach ($leaves as $leave) {
+            foreach (CarbonPeriod::create($leave->start_date, $leave->end_date) as $day) {
+                $leaveByDate[$day->toDateString()] = $leave;
+            }
+        }
+
         $upcoming = $employee->schedules()
             ->whereDate('work_date', '>=', now()->toDateString())
             ->where('is_day_off', false)
@@ -57,6 +76,7 @@ class MyRosterController extends Controller
             'days' => collect(CarbonPeriod::create($from, $to)->toArray()),
             'schedules' => $schedules,
             'holidays' => $holidays,
+            'leaves' => collect($leaveByDate),
             'upcoming' => $upcoming,
             'workDays' => $workDays,
             'offDays' => $schedules->count() - $workDays,

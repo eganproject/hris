@@ -80,13 +80,22 @@
                                 $att = $employee->attendances->first();
                                 $sched = $employee->schedules->first();
                                 $schedLabel = $sched ? ($sched->is_day_off ? 'Libur' : ($sched->shift?->code ?? '—')) : 'Belum dijadwalkan';
+                                // Hari WFH/dinas luar perlu terlihat SEBELUM absensinya diproses;
+                                // kolom Status baru terisi setelah resolver berjalan.
+                                $mode = \App\Support\WorkMode::for($sched, $employee->leaveRequests->first());
                             @endphp
                             <tr>
                                 <td>
                                     <a href="{{ route('attendance.daily.history', ['employee' => $employee, 'month' => $date->format('Y-m'), 'branch_id' => $branchId]) }}" class="font-medium text-primary hover:underline">{{ $employee->full_name }}</a>
                                     <p class="mt-0.5 text-xs text-gray-500">{{ $employee->employee_number }}</p>
                                 </td>
-                                <td class="text-sm text-gray-600">{{ $schedLabel }}@if ($sched && ! $sched->is_day_off && $sched->shift)<span class="ml-1 text-xs text-gray-400">{{ $sched->shift->time_range_label }}</span>@endif</td>
+                                <td class="text-sm text-gray-600">
+                                    {{ $schedLabel }}
+                                    @if ($sched && ! $sched->is_day_off && $sched->shift)<span class="ml-1 text-xs text-gray-400">{{ $sched->shift->time_range_label }}</span>@endif
+                                    @if ($mode->isRemote())
+                                        <span class="ml-1 rounded px-1.5 py-0.5 text-[10px] font-semibold {{ $mode->chipClasses() }}">{{ $mode->short }} {{ $mode->label }}</span>
+                                    @endif
+                                </td>
                                 <td class="text-sm {{ $att && $att->late_minutes > 0 ? 'text-amber-600 font-medium' : 'text-gray-700' }}">{{ $att?->clock_in_label ?? '–' }}</td>
                                 <td class="text-sm text-gray-700">{{ $att?->clock_out_label ?? '–' }}</td>
                                 <td class="text-sm text-gray-600">{{ $att && $att->late_minutes > 0 ? $att->late_minutes.'m' : '–' }}</td>

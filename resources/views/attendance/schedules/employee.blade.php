@@ -83,7 +83,7 @@
         <section class="overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm">
             <div class="border-b border-gray-200 px-5 py-3">
                 <h2 class="text-sm font-semibold text-gray-950">Jadwal Harian {{ $month->translatedFormat('F Y') }}</h2>
-                <p class="mt-0.5 text-xs text-gray-500">Cuti/izin yang sudah disetujui ditandai kuning — pada hari itu karyawan tidak masuk meski ada shift di jadwal.</p>
+                <p class="mt-0.5 text-xs text-gray-500">Cuti/izin yang disetujui ditandai kuning — pada hari itu karyawan tidak bekerja meski ada shift di jadwal. WFH dan dinas luar ditandai biru: karyawan tetap bekerja dengan jam shift yang sama, hanya tidak dari kantor.</p>
             </div>
             <div class="overflow-x-auto">
                 <table class="data-table">
@@ -97,25 +97,34 @@
                                 $leave = $leaves[$key] ?? null;
                                 $isManual = $schedule && $schedule->source === \App\Enums\ScheduleSource::Manual;
                             @endphp
-                            <tr @class(['bg-amber-50/70' => $leave, 'bg-red-50/50' => ! $leave && $holiday])>
+                            @php $mode = \App\Support\WorkMode::for($schedule, $leave); @endphp
+                            <tr @class([
+                                'bg-amber-50/70' => $mode->key === 'leave',
+                                'bg-indigo-50/60' => $mode->isRemote(),
+                                'bg-red-50/50' => ! $leave && $holiday,
+                            ])>
                                 <td class="whitespace-nowrap">
                                     <span class="font-medium text-gray-900">{{ $day->translatedFormat('d M Y') }}</span>
                                     <span class="ml-1 text-xs text-gray-500">{{ $day->translatedFormat('l') }}</span>
                                 </td>
                                 <td>
-                                    @if ($leave)
-                                        <span class="inline-flex items-center rounded-md bg-amber-100 px-2 py-0.5 text-xs font-semibold text-amber-800">{{ $leave->leaveType?->code ?? 'CUTI' }}</span>
-                                    @elseif ($schedule && ! $schedule->is_day_off)
-                                        <span class="inline-flex items-center rounded-md bg-primary/10 px-2 py-0.5 text-xs font-semibold text-primary">{{ $schedule->shift?->code ?? '?' }}</span>
-                                        <span class="ml-1 text-sm text-gray-700">{{ $schedule->shift?->name }}</span>
-                                    @elseif ($schedule)
+                                    @if ($mode->key === 'none')
+                                        <span class="text-sm text-gray-400">Belum dijadwalkan</span>
+                                    @elseif ($mode->key === 'off')
                                         <span class="text-sm text-gray-500">Libur</span>
                                     @else
-                                        <span class="text-sm text-gray-400">Belum dijadwalkan</span>
+                                        <span class="inline-flex items-center rounded-md px-2 py-0.5 text-xs font-semibold {{ $mode->chipClasses() }}">{{ $mode->short }}</span>
+                                        <span class="ml-1 text-sm text-gray-700">
+                                            {{ $mode->label }}
+                                            {{-- Hari kerja jarak jauh tetap punya shift; jamnya tetap berlaku --}}
+                                            @if ($mode->isRemote() && $schedule?->shift)
+                                                <span class="text-xs text-gray-500">· {{ $schedule->shift->name }}</span>
+                                            @endif
+                                        </span>
                                     @endif
                                 </td>
                                 <td class="whitespace-nowrap text-sm text-gray-600">
-                                    @if (! $leave && $schedule && ! $schedule->is_day_off && $schedule->shift)
+                                    @if ($mode->isWorking && $schedule && ! $schedule->is_day_off && $schedule->shift)
                                         {{ \Illuminate\Support\Str::substr($schedule->shift->start_time, 0, 5) }}–{{ \Illuminate\Support\Str::substr($schedule->shift->end_time, 0, 5) }}
                                     @else
                                         <span class="text-gray-400">—</span>

@@ -134,7 +134,8 @@
             </div>
             <div class="flex flex-wrap items-center gap-4 border-t border-gray-200 px-4 py-3 text-[11px] text-gray-500">
                 <span class="inline-flex items-center gap-1.5"><span class="inline-block size-3 rounded bg-primary/10 ring-1 ring-primary/20"></span> Ada shift (kode)</span>
-                <span class="inline-flex items-center gap-1.5"><span class="inline-block size-3 rounded bg-indigo-100 ring-1 ring-indigo-200"></span> WFH (🏠)</span>
+                <span class="inline-flex items-center gap-1.5"><span class="inline-block size-3 rounded bg-indigo-100 ring-1 ring-indigo-200"></span> WFH (🏠) — tetap bekerja</span>
+                <span class="inline-flex items-center gap-1.5"><span class="inline-block size-3 rounded bg-blue-100 ring-1 ring-blue-200"></span> Dinas luar (DL) — tetap bekerja</span>
                 <span class="inline-flex items-center gap-1.5"><span class="inline-block size-3 rounded bg-amber-100 ring-1 ring-amber-200"></span> Cuti/izin disetujui (kode jenis)</span>
                 <span class="inline-flex items-center gap-1.5"><span class="inline-block size-3 rounded text-gray-300">—</span> Libur</span>
                 <span class="inline-flex items-center gap-1.5"><span class="inline-block size-3 rounded ring-1 ring-blue-400"></span> Override manual</span>

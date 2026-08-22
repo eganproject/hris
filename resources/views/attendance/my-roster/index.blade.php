@@ -48,10 +48,12 @@
                         $key = $day->toDateString();
                         $holiday = $holidays[$key] ?? null;
                         $sched = $schedules[$key] ?? null;
+                        $leave = $leaves[$key] ?? null;
                         $isToday = $day->isSameDay($today);
                         $isSunday = (int) $day->dayOfWeekIso === 7;
 
-                        $working = ! $holiday && $sched && ! $sched->is_day_off && $sched->shift;
+                        $mode = \App\Support\WorkMode::for($sched, $leave);
+                        $working = ! $holiday && $mode->isWorking;
                     @endphp
                     <div @class([
                         'min-h-[76px] rounded-md border p-1.5 transition sm:p-2',
@@ -67,8 +69,18 @@
                             @if ($holiday)
                                 <span class="block rounded bg-rose-50 px-1.5 py-1 text-[10px] font-medium leading-tight text-rose-600" title="{{ $holiday->name }}">{{ \Illuminate\Support\Str::limit($holiday->name, 22) }}</span>
                             @elseif ($working)
-                                <span class="block rounded bg-emerald-50 px-1.5 py-1 text-[10px] font-semibold leading-tight text-emerald-700">{{ $sched->shift->name }}</span>
-                                <span class="mt-0.5 block text-[10px] text-gray-500">{{ \Carbon\Carbon::parse($sched->shift->start_time)->format('H:i') }}–{{ \Carbon\Carbon::parse($sched->shift->end_time)->format('H:i') }}</span>
+                                {{-- Hari kerja: tempatnya bisa kantor, rumah, atau luar kota --}}
+                                <span @class([
+                                    'block rounded px-1.5 py-1 text-[10px] font-semibold leading-tight',
+                                    'bg-emerald-50 text-emerald-700' => ! $mode->isRemote(),
+                                    'bg-indigo-100 text-indigo-700' => $mode->key === 'wfh',
+                                    'bg-blue-100 text-blue-700' => $mode->key === 'trip',
+                                ])>{{ $mode->isRemote() ? $mode->short.' '.$mode->label : $sched?->shift?->name }}</span>
+                                @if ($sched?->shift)
+                                    <span class="mt-0.5 block text-[10px] text-gray-500">{{ \Carbon\Carbon::parse($sched->shift->start_time)->format('H:i') }}–{{ \Carbon\Carbon::parse($sched->shift->end_time)->format('H:i') }}</span>
+                                @endif
+                            @elseif ($mode->key === 'leave')
+                                <span class="block rounded bg-amber-100 px-1.5 py-1 text-[10px] font-semibold leading-tight text-amber-800" title="{{ $mode->label }}">{{ \Illuminate\Support\Str::limit($mode->label, 16) }}</span>
                             @elseif ($sched)
                                 <span class="block rounded bg-gray-100 px-1.5 py-1 text-[10px] font-medium leading-tight text-gray-500">Libur</span>
                             @else
@@ -81,6 +93,9 @@
 
             <div class="mt-4 flex flex-wrap items-center gap-x-4 gap-y-1 border-t border-gray-100 pt-3 text-[11px] text-gray-500">
                 <span class="inline-flex items-center gap-1.5"><span class="size-2.5 rounded-sm bg-emerald-100 ring-1 ring-emerald-300"></span> Masuk (shift)</span>
+                <span class="inline-flex items-center gap-1.5"><span class="size-2.5 rounded-sm bg-indigo-100 ring-1 ring-indigo-300"></span> WFH</span>
+                <span class="inline-flex items-center gap-1.5"><span class="size-2.5 rounded-sm bg-blue-100 ring-1 ring-blue-300"></span> Dinas luar</span>
+                <span class="inline-flex items-center gap-1.5"><span class="size-2.5 rounded-sm bg-amber-100 ring-1 ring-amber-300"></span> Cuti/izin</span>
                 <span class="inline-flex items-center gap-1.5"><span class="size-2.5 rounded-sm bg-gray-100 ring-1 ring-gray-300"></span> Libur</span>
                 <span class="inline-flex items-center gap-1.5"><span class="size-2.5 rounded-sm bg-rose-100 ring-1 ring-rose-300"></span> Hari libur nasional</span>
                 <span class="inline-flex items-center gap-1.5"><span class="size-2.5 rounded-sm bg-white ring-1 ring-primary"></span> Hari ini</span>
@@ -99,9 +114,15 @@
                 <ul class="mt-4 divide-y divide-gray-100">
                     @foreach ($upcoming as $row)
                         <li class="flex items-center justify-between gap-3 py-2.5">
+                            @php $rowMode = \App\Support\WorkMode::for($row, $leaves[$row->work_date->toDateString()] ?? null); @endphp
                             <div class="min-w-0">
                                 <p class="text-sm font-medium text-gray-900">{{ $row->work_date->translatedFormat('l, d F Y') }}</p>
-                                <p class="text-xs text-gray-500">{{ $row->shift?->name ?? 'Shift' }}</p>
+                                <p class="text-xs text-gray-500">
+                                    {{ $row->shift?->name ?? 'Shift' }}
+                                    @if ($rowMode->isRemote())
+                                        <span class="ml-1 rounded px-1.5 py-0.5 text-[10px] font-semibold {{ $rowMode->chipClasses() }}">{{ $rowMode->short }} {{ $rowMode->label }}</span>
+                                    @endif
+                                </p>
                             </div>
                             <span class="shrink-0 rounded-md bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700">
                                 {{ \Carbon\Carbon::parse($row->shift->start_time)->format('H:i') }}–{{ \Carbon\Carbon::parse($row->shift->end_time)->format('H:i') }}
