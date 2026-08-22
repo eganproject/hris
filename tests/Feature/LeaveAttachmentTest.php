@@ -227,3 +227,28 @@ test('HR filing on behalf of an employee can attach the document too', function 
         ->and($leave->attachmentIsImage())->toBeTrue();
     Storage::disk('local')->assertExists($leave->attachment_path);
 });
+
+test('both leave forms render the attachment field with its live preview', function () {
+    [$user] = requester();
+
+    // Formulir karyawan.
+    $this->actingAs($user)->get('/my-leave/create')
+        ->assertOk()
+        ->assertSee('data-attachment-input', escape: false)
+        ->assertSee('data-attachment-preview', escape: false)
+        ->assertSee('enctype="multipart/form-data"', escape: false)
+        ->assertSee('maksimal 2 MB');
+
+    // Formulir HR (dibuatkan atas nama karyawan).
+    app(PermissionRegistrar::class)->forgetCachedPermissions();
+    Permission::findOrCreate('leave.create', 'web');
+    Permission::findOrCreate(User::SCOPE_BYPASS_ATTENDANCE, 'web');
+    $hr = User::factory()->create();
+    $hr->givePermissionTo(['leave.create', User::SCOPE_BYPASS_ATTENDANCE]);
+
+    $this->actingAs($hr)->get('/attendance/leave/create')
+        ->assertOk()
+        ->assertSee('data-attachment-input', escape: false)
+        ->assertSee('data-attachment-preview', escape: false)
+        ->assertSee('enctype="multipart/form-data"', escape: false);
+});

@@ -43,12 +43,7 @@
                     <textarea id="reason" name="reason" rows="3" class="mt-2 block w-full rounded-md border border-gray-300 px-3 py-2.5 text-sm shadow-xs outline-none focus:border-primary focus:ring-2 focus:ring-primary/20">{{ old('reason') }}</textarea>
                     @error('reason')<p class="mt-2 text-sm text-red-600">{{ $message }}</p>@enderror
                 </div>
-                <div class="sm:col-span-2">
-                    <label for="attachment" class="block text-sm font-medium text-gray-700">Lampiran</label>
-                    <input id="attachment" name="attachment" type="file" accept=".jpg,.jpeg,.png,.webp,.pdf,image/jpeg,image/png,image/webp,application/pdf" class="mt-2 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-xs file:mr-3 file:rounded file:border-0 file:bg-gray-100 file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-gray-700 outline-none focus:border-primary focus:ring-2 focus:ring-primary/20">
-                    <p class="mt-1 text-xs text-gray-500">Opsional. Gambar (JPG, PNG, WEBP) atau PDF, maksimal 2 MB. Misalnya surat keterangan sakit atau surat tugas.</p>
-                    @error('attachment')<p class="mt-1 text-sm text-red-600">{{ $message }}</p>@enderror
-                </div>
+                <x-attachment-field name="attachment" />
             </div>
         </section>
 
