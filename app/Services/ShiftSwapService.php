@@ -9,6 +9,7 @@ use App\Support\ApprovalNotifier;
 use Carbon\CarbonInterface;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 
 /**
  * Validates and applies employee-initiated schedule changes (swap / cover / day-off
@@ -151,15 +152,24 @@ class ShiftSwapService
             return $conflicts; // caller reports; request stays pending
         }
 
-        $this->apply($request);
+        // Menyetujui satu tukar jadwal menulis sampai empat override sekaligus (lihat
+        // apply()) lalu menyimpan statusnya. Tanpa transaksi, kegagalan di tengah
+        // meninggalkan roster dua karyawan tertukar setengah sementara permintaannya
+        // masih menunggu HR — dan penekanan "Setujui" berikutnya akan menerapkannya
+        // untuk kedua kalinya di atas jadwal yang sudah berubah.
+        DB::transaction(function () use ($request, $notes) {
+            $this->apply($request);
 
-        $request->forceFill([
-            'status' => ShiftSwapRequest::STATUS_APPROVED,
-            'reviewed_by' => Auth::id(),
-            'decided_at' => now(),
-            'decision_notes' => $notes,
-        ])->save();
+            $request->forceFill([
+                'status' => ShiftSwapRequest::STATUS_APPROVED,
+                'reviewed_by' => Auth::id(),
+                'decided_at' => now(),
+                'decision_notes' => $notes,
+            ])->save();
+        });
 
+        // Diberitahukan setelah commit: notifikasi tidak boleh terkirim untuk
+        // persetujuan yang ternyata di-rollback.
         app(ApprovalNotifier::class)->swapDecidedByHr($request);
 
         return [];

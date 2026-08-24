@@ -3,9 +3,12 @@
 use App\Enums\LeaveRequestStatus;
 use App\Models\AttendanceCorrection;
 use App\Models\Employee;
+use App\Models\EmployeeSchedule;
 use App\Models\LeaveRequest;
 use App\Models\LeaveType;
 use App\Models\OvertimeApproval;
+use App\Models\Shift;
+use App\Models\ShiftSwapRequest;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Spatie\Permission\Models\Permission;
@@ -138,4 +141,99 @@ test('HR cannot backdate a leave earlier than the start of last month', function
     ])->assertRedirect('/attendance/leave');
 
     expect(LeaveRequest::query()->count())->toBe(1);
+});
+
+/**
+ * Tukar jadwal melibatkan DUA pihak, jadi aturannya lebih luas daripada cuti/koreksi:
+ * pemegang wewenang tidak boleh memutuskan permintaan yang ia sendiri jadi pengaju
+ * MAUPUN yang ia jadi rekan tukarnya.
+ */
+function swapHrEmployee(string $name): array
+{
+    app(PermissionRegistrar::class)->forgetCachedPermissions();
+    foreach (['swaps.view', 'swaps.update', 'attendance.view.all'] as $p) {
+        Permission::findOrCreate($p, 'web');
+    }
+
+    $user = User::factory()->create();
+    $user->givePermissionTo(['swaps.view', 'swaps.update', 'attendance.view.all']);
+    $employee = Employee::query()->create(['user_id' => $user->id, 'full_name' => $name, 'employment_status' => 'active']);
+
+    return [$user, $employee];
+}
+
+test('HR cannot decide a shift swap they filed themselves', function () {
+    [$user, $me] = swapHrEmployee('HR Pengaju');
+    [, $partner] = swapHrEmployee('Rekan');
+
+    $swap = ShiftSwapRequest::query()->create([
+        'requester_id' => $me->id, 'requester_date' => now()->addDays(3)->toDateString(),
+        'partner_id' => $partner->id, 'partner_date' => now()->addDays(3)->toDateString(),
+        'type' => 'swap', 'status' => ShiftSwapRequest::STATUS_PENDING_HR,
+    ]);
+
+    $this->actingAs($user)->patch(route('attendance.swaps.approve', $swap))->assertForbidden();
+    $this->actingAs($user)->patch(route('attendance.swaps.reject', $swap))->assertForbidden();
+    expect($swap->fresh()->status)->toBe(ShiftSwapRequest::STATUS_PENDING_HR);
+});
+
+test('HR cannot decide a shift swap where they are the partner', function () {
+    [, $requester] = swapHrEmployee('Pengaju');
+    [$user, $me] = swapHrEmployee('HR Rekan');
+
+    $swap = ShiftSwapRequest::query()->create([
+        'requester_id' => $requester->id, 'requester_date' => now()->addDays(3)->toDateString(),
+        'partner_id' => $me->id, 'partner_date' => now()->addDays(3)->toDateString(),
+        'type' => 'swap', 'status' => ShiftSwapRequest::STATUS_PENDING_HR,
+    ]);
+
+    $this->actingAs($user)->patch(route('attendance.swaps.approve', $swap))->assertForbidden();
+    $this->actingAs($user)->patch(route('attendance.swaps.reject', $swap))->assertForbidden();
+    expect($swap->fresh()->status)->toBe(ShiftSwapRequest::STATUS_PENDING_HR);
+});
+
+test('bulk approve skips a swap the deciding HR is party to', function () {
+    [$user, $me] = swapHrEmployee('HR Pengaju');
+    [, $partner] = swapHrEmployee('Rekan');
+
+    // Jadwal keduanya diisi sungguhan: tanpa ini permintaannya tertahan sebagai
+    // "bentrok" dan tesnya lulus tanpa pernah menyentuh aturan pemisahan wewenang.
+    $pagi = Shift::query()->create(['code' => 'PG', 'name' => 'Pagi', 'start_time' => '07:00', 'end_time' => '15:00', 'is_active' => true]);
+    $siang = Shift::query()->create(['code' => 'SG', 'name' => 'Siang', 'start_time' => '15:00', 'end_time' => '23:00', 'is_active' => true]);
+    $date = now()->addDays(3)->toDateString();
+
+    foreach ([[$me, $pagi], [$partner, $siang]] as [$employee, $shift]) {
+        EmployeeSchedule::query()->create([
+            'employee_id' => $employee->id, 'work_date' => $date,
+            'shift_id' => $shift->id, 'is_day_off' => false, 'source' => 'generated',
+        ]);
+    }
+
+    $mine = ShiftSwapRequest::query()->create([
+        'requester_id' => $me->id, 'requester_date' => $date,
+        'partner_id' => $partner->id, 'partner_date' => $date,
+        'type' => 'swap', 'status' => ShiftSwapRequest::STATUS_PENDING_HR,
+    ]);
+
+    $this->actingAs($user)->post(route('attendance.swaps.bulk-approve'), ['ids' => [$mine->id]])->assertRedirect();
+
+    // Dilewati, bukan diterapkan: status tetap menunggu DAN jadwal tidak tertukar.
+    expect($mine->fresh()->status)->toBe(ShiftSwapRequest::STATUS_PENDING_HR)
+        ->and(EmployeeSchedule::query()->where('employee_id', $me->id)->where('work_date', $date)->value('shift_id'))->toBe($pagi->id)
+        ->and(EmployeeSchedule::query()->where('employee_id', $partner->id)->where('work_date', $date)->value('shift_id'))->toBe($siang->id);
+});
+
+test('an uninvolved HR can still decide the swap', function () {
+    [, $requester] = swapHrEmployee('Pengaju');
+    [, $partner] = swapHrEmployee('Rekan');
+    [$otherHr] = swapHrEmployee('HR Netral');
+
+    $swap = ShiftSwapRequest::query()->create([
+        'requester_id' => $requester->id, 'requester_date' => now()->addDays(3)->toDateString(),
+        'partner_id' => $partner->id, 'partner_date' => now()->addDays(3)->toDateString(),
+        'type' => 'swap', 'status' => ShiftSwapRequest::STATUS_PENDING_HR,
+    ]);
+
+    $this->actingAs($otherHr)->patch(route('attendance.swaps.reject', $swap))->assertRedirect();
+    expect($swap->fresh()->status)->toBe(ShiftSwapRequest::STATUS_REJECTED);
 });

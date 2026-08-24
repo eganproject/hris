@@ -10,6 +10,7 @@ use Illuminate\Http\UploadedFile;
 use App\Support\ApprovalNotifier;
 use Carbon\CarbonPeriod;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\DB;
 
 /**
  * Two-level leave approval: employee → direct supervisor → HR.
@@ -82,13 +83,18 @@ class LeaveWorkflow
 
     public function hrApprove(LeaveRequest $request, User $actor): void
     {
-        $request->update([
-            'status' => LeaveRequestStatus::Approved,
-            'approved_by' => $actor->id,
-            'decided_at' => now(),
-        ]);
+        // Status cuti dan absensi hari-hari yang ditutupinya harus berubah bersama:
+        // kalau syncAttendance() gagal di tengah, cutinya sudah berstatus "Disetujui"
+        // tapi sebagian harinya masih terhitung Alfa di rekap kehadiran.
+        DB::transaction(function () use ($request, $actor) {
+            $request->update([
+                'status' => LeaveRequestStatus::Approved,
+                'approved_by' => $actor->id,
+                'decided_at' => now(),
+            ]);
 
-        $this->syncAttendance($request);
+            $this->syncAttendance($request);
+        });
 
         app(ApprovalNotifier::class)->leaveDecided($request, 'HR');
     }
@@ -144,11 +150,15 @@ class LeaveWorkflow
     {
         $wasApproved = $request->status === LeaveRequestStatus::Approved;
 
-        $request->update(['status' => LeaveRequestStatus::Cancelled]);
+        // Sama seperti hrApprove(): pembatalan cuti yang sudah disetujui juga
+        // mengembalikan hari-harinya ke absensi, jadi keduanya satu kesatuan.
+        DB::transaction(function () use ($request, $wasApproved) {
+            $request->update(['status' => LeaveRequestStatus::Cancelled]);
 
-        if ($wasApproved) {
-            $this->syncAttendance($request);
-        }
+            if ($wasApproved) {
+                $this->syncAttendance($request);
+            }
+        });
 
         app(ApprovalNotifier::class)->leaveCancelled($request, $wasApproved);
     }

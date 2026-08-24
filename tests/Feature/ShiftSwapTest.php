@@ -1,10 +1,16 @@
 <?php
 
+use App\Models\Branch;
+use App\Models\Department;
 use App\Models\Employee;
 use App\Models\EmployeeSchedule;
 use App\Models\Shift;
 use App\Models\ShiftSwapRequest;
 use App\Models\User;
+use App\Services\ScheduleAttendanceSynchronizer;
+use App\Services\ScheduleGenerator;
+use App\Services\ShiftSwapService;
+use Carbon\CarbonInterface;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Spatie\Permission\Models\Permission;
 use Spatie\Permission\PermissionRegistrar;
@@ -68,9 +74,9 @@ test('an employee submits a shift swap and it awaits the partner', function () {
 });
 
 test('the colleague list and the swap are limited to the same location and division', function () {
-    $sby = App\Models\Branch::query()->create(['code' => 'SBY', 'name' => 'Surabaya', 'is_active' => true]);
-    $ops = App\Models\Department::query()->create(['code' => 'OPS', 'name' => 'Operasional', 'is_active' => true]);
-    $acc = App\Models\Department::query()->create(['code' => 'ACC', 'name' => 'Accounting', 'is_active' => true]);
+    $sby = Branch::query()->create(['code' => 'SBY', 'name' => 'Surabaya', 'is_active' => true]);
+    $ops = Department::query()->create(['code' => 'OPS', 'name' => 'Operasional', 'is_active' => true]);
+    $acc = Department::query()->create(['code' => 'ACC', 'name' => 'Accounting', 'is_active' => true]);
 
     $pagi = Shift::query()->create(['code' => 'PG', 'name' => 'Pagi', 'start_time' => '07:00', 'end_time' => '15:00', 'is_active' => true]);
     $siang = Shift::query()->create(['code' => 'SG', 'name' => 'Siang', 'start_time' => '15:00', 'end_time' => '23:00', 'is_active' => true]);
@@ -193,4 +199,62 @@ test('the self-service and review pages render', function () {
 
     $hr = swapHr();
     $this->actingAs($hr)->get('/attendance/swaps')->assertOk();
+});
+
+/**
+ * Menyetujui satu tukar jadwal lintas tanggal menulis empat override berurutan lalu
+ * menyimpan statusnya. Kalau penulisan gagal di tengah, TIDAK BOLEH ada yang tersisa:
+ * roster setengah tertukar dengan permintaan yang masih "menunggu HR" berarti HR akan
+ * menekan Setujui lagi dan menerapkannya untuk kedua kalinya.
+ */
+test('a failure midway through applying a swap leaves nothing behind', function () {
+    $pagi = Shift::query()->create(['code' => 'PG', 'name' => 'Pagi', 'start_time' => '07:00', 'end_time' => '15:00', 'is_active' => true]);
+    $siang = Shift::query()->create(['code' => 'SG', 'name' => 'Siang', 'start_time' => '15:00', 'end_time' => '23:00', 'is_active' => true]);
+    [, $me] = swapEmployee('Andi');
+    [, $partner] = swapEmployee('Budi');
+    $hr = swapHr();
+
+    $d1 = now()->addDays(3)->toDateString();
+    $d2 = now()->addDays(4)->toDateString();
+    scheduleRow($me, $d1, $pagi);
+    scheduleRow($me, $d2, null);        // requester libur di tanggal rekan
+    scheduleRow($partner, $d1, null);   // rekan libur di tanggal pengaju
+    scheduleRow($partner, $d2, $siang);
+
+    $swap = ShiftSwapRequest::query()->create([
+        'requester_id' => $me->id, 'requester_date' => $d1,
+        'partner_id' => $partner->id, 'partner_date' => $d2,
+        'type' => 'swap', 'status' => 'pending_hr',
+    ]);
+
+    // Generator yang jatuh pada penulisan ketiga: dua override pertama sudah masuk,
+    // sisanya tidak — persis bentuk kegagalan yang dikhawatirkan.
+    $generator = new class(app(ScheduleAttendanceSynchronizer::class)) extends ScheduleGenerator
+    {
+        public int $calls = 0;
+
+        public function override(Employee $employee, CarbonInterface $date, ?int $shiftId, bool $isDayOff, ?string $note = null, bool $isWfh = false): EmployeeSchedule
+        {
+            if (++$this->calls === 3) {
+                throw new RuntimeException('kegagalan simulasi di tengah penerapan');
+            }
+
+            return parent::override($employee, $date, $shiftId, $isDayOff, $note, $isWfh);
+        }
+    };
+    app()->instance(ScheduleGenerator::class, $generator);
+
+    $this->actingAs($hr);
+
+    expect(fn () => app(ShiftSwapService::class)->hrApprove($swap))
+        ->toThrow(RuntimeException::class);
+
+    expect($generator->calls)->toBe(3);
+
+    // Permintaannya masih menunggu HR, dan KEEMPAT baris jadwal utuh seperti semula.
+    expect($swap->fresh()->status)->toBe('pending_hr')
+        ->and(EmployeeSchedule::query()->where('employee_id', $me->id)->where('work_date', $d1)->value('shift_id'))->toBe($pagi->id)
+        ->and((bool) EmployeeSchedule::query()->where('employee_id', $me->id)->where('work_date', $d2)->value('is_day_off'))->toBeTrue()
+        ->and((bool) EmployeeSchedule::query()->where('employee_id', $partner->id)->where('work_date', $d1)->value('is_day_off'))->toBeTrue()
+        ->and(EmployeeSchedule::query()->where('employee_id', $partner->id)->where('work_date', $d2)->value('shift_id'))->toBe($siang->id);
 });

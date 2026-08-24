@@ -60,6 +60,7 @@ class ShiftSwapController extends Controller
     public function approve(Request $request, ShiftSwapRequest $swap): RedirectResponse
     {
         $this->authorizeScope($request, $swap);
+        $this->denySelfDecision($request, $swap);
         abort_unless($swap->isPendingHr(), 403);
 
         $conflicts = $this->swaps->hrApprove($swap, request()->string('decision_notes')->toString() ?: null);
@@ -75,6 +76,7 @@ class ShiftSwapController extends Controller
     public function reject(Request $request, ShiftSwapRequest $swap): RedirectResponse
     {
         $this->authorizeScope($request, $swap);
+        $this->denySelfDecision($request, $swap);
         abort_unless($swap->isPendingHr(), 403);
 
         $this->swaps->hrReject($swap, $request->string('decision_notes')->toString() ?: null);
@@ -96,6 +98,7 @@ class ShiftSwapController extends Controller
         }
 
         $scope = DataScope::forAttendance($request->user());
+        $userId = $request->user()->id;
 
         $swaps = ShiftSwapRequest::query()->whereIn('id', $ids)->with(['requester', 'partner'])->get();
 
@@ -104,7 +107,9 @@ class ShiftSwapController extends Controller
         $conflicted = 0;
 
         foreach ($swaps as $swap) {
-            if (! $scope->allows($swap->requester) || ! $scope->allows($swap->partner) || ! $swap->isPendingHr()) {
+            $isSelf = $this->isParty($swap, $userId);
+
+            if (! $scope->allows($swap->requester) || ! $scope->allows($swap->partner) || ! $swap->isPendingHr() || $isSelf) {
                 $skipped++;
 
                 continue;
@@ -128,10 +133,31 @@ class ShiftSwapController extends Controller
         }
 
         if ($skipped > 0) {
-            $message .= " {$skipped} dilewati (di luar cakupan atau sudah diputuskan).";
+            $message .= " {$skipped} dilewati (di luar cakupan, sudah diputuskan, atau Anda salah satu pihaknya).";
         }
 
         return redirect()->route('attendance.swaps.index')->with('status', $message);
+    }
+
+    /**
+     * Pemisahan wewenang: tidak bisa memutuskan tukar jadwal yang Anda sendiri jadi
+     * salah satu pihaknya — baik sebagai pengaju maupun sebagai rekan tukar. Sejalan
+     * dengan aturan yang sama di cuti, koreksi absensi, dan lembur.
+     */
+    private function denySelfDecision(Request $request, ShiftSwapRequest $swap): void
+    {
+        abort_if(
+            $this->isParty($swap, $request->user()->id),
+            403,
+            'Anda tidak bisa memutuskan tukar jadwal yang melibatkan Anda sendiri.',
+        );
+    }
+
+    /** Apakah pengguna ini salah satu dari dua pihak dalam permintaan tukar. */
+    private function isParty(ShiftSwapRequest $swap, int $userId): bool
+    {
+        return ($swap->requester?->user_id !== null && $swap->requester->user_id === $userId)
+            || ($swap->partner?->user_id !== null && $swap->partner->user_id === $userId);
     }
 
     /** Both sides of the swap must be inside the user's scope. */

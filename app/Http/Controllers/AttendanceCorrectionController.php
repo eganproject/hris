@@ -8,6 +8,7 @@ use App\Support\ApprovalNotifier;
 use App\Support\DataScope;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
 
 class AttendanceCorrectionController extends Controller
@@ -64,19 +65,12 @@ class AttendanceCorrectionController extends Controller
         $this->denySelfDecision($request, $correction);
         abort_unless($correction->isPending(), 403);
 
-        $this->resolver->resolve(
-            $correction->employee,
-            $correction->work_date,
-            $correction->requested_clock_in,
-            $correction->requested_clock_out,
-            'Koreksi disetujui: '.$correction->reason,
-        );
-
-        $correction->forceFill([
-            'status' => AttendanceCorrection::STATUS_APPROVED,
-            'reviewed_by' => auth()->id(),
-            'decided_at' => now(),
-        ])->save();
+        // Absensi diubah lebih dulu, status koreksi menyusul. Tanpa transaksi,
+        // kegagalan di antaranya meninggalkan jam absensi yang sudah berubah dengan
+        // koreksi yang masih "menunggu" — sehingga bisa disetujui untuk kedua kalinya.
+        DB::transaction(function () use ($correction) {
+            $this->applyCorrection($correction);
+        });
 
         app(ApprovalNotifier::class)->correctionDecided($correction);
 
@@ -131,19 +125,11 @@ class AttendanceCorrectionController extends Controller
                 continue;
             }
 
-            $this->resolver->resolve(
-                $correction->employee,
-                $correction->work_date,
-                $correction->requested_clock_in,
-                $correction->requested_clock_out,
-                'Koreksi disetujui: '.$correction->reason,
-            );
-
-            $correction->forceFill([
-                'status' => AttendanceCorrection::STATUS_APPROVED,
-                'reviewed_by' => $userId,
-                'decided_at' => now(),
-            ])->save();
+            // Satu transaksi per baris, bukan satu untuk seluruh daftar: baris yang
+            // gagal tidak boleh ikut membatalkan baris lain yang sudah sah diproses.
+            DB::transaction(function () use ($correction, $userId) {
+                $this->applyCorrection($correction, $userId);
+            });
 
             app(ApprovalNotifier::class)->correctionDecided($correction);
 
@@ -157,6 +143,28 @@ class AttendanceCorrectionController extends Controller
         }
 
         return redirect()->route('attendance.corrections.index')->with('status', $message);
+    }
+
+    /**
+     * Terapkan koreksi ke absensi hari itu lalu tandai koreksinya disetujui. Dipakai
+     * oleh approve() satuan maupun bulkApprove(), supaya keduanya tidak bisa berbeda
+     * dalam apa yang ditulis. Pemanggil yang membungkusnya dalam transaksi.
+     */
+    private function applyCorrection(AttendanceCorrection $correction, ?int $reviewerId = null): void
+    {
+        $this->resolver->resolve(
+            $correction->employee,
+            $correction->work_date,
+            $correction->requested_clock_in,
+            $correction->requested_clock_out,
+            'Koreksi disetujui: '.$correction->reason,
+        );
+
+        $correction->forceFill([
+            'status' => AttendanceCorrection::STATUS_APPROVED,
+            'reviewed_by' => $reviewerId ?? auth()->id(),
+            'decided_at' => now(),
+        ])->save();
     }
 
     /** Pemisahan wewenang: tidak bisa memutuskan koreksi absensi milik sendiri. */
