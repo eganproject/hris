@@ -42,15 +42,20 @@
                     <thead><tr><th>Tanggal</th><th>Shift</th><th>Jam</th><th>Keterangan</th></tr></thead>
                     <tbody>
                         @forelse ($schedule as $row)
-                            @php $leave = $leaveByDate[$row->work_date->format('Y-m-d')] ?? null; @endphp
-                            <tr @class(['bg-emerald-50/40' => $leave && $leave['status'] === \App\Enums\LeaveRequestStatus::Approved])>
+                            @php
+                                $key = $row->work_date->toDateString();
+                                $approved = $calendar->approvedOn($key);
+                                $pending = $calendar->pendingOn($key);
+                                $leave = $approved ?? $pending;
+                            @endphp
+                            <tr @class(['bg-emerald-50/40' => (bool) $approved])>
                                 <td class="text-sm text-gray-700">{{ $row->work_date->translatedFormat('D, d M Y') }}</td>
                                 <td class="text-sm">@if ($row->is_day_off || ! $row->shift)<span class="text-gray-400">Libur</span>@else<span class="font-medium text-gray-900">{{ $row->shift->code }}</span> <span class="text-gray-500">{{ $row->shift->name }}</span>@endif</td>
                                 <td class="text-sm text-gray-500">{{ $row->shift && ! $row->is_day_off ? $row->shift->time_range_label : '—' }}</td>
                                 <td class="text-sm">
                                     @if ($leave)
-                                        <x-status-badge :tone="$leave['status']->tone()">
-                                            {{ $leave['status'] === \App\Enums\LeaveRequestStatus::Approved ? $leave['label'] : $leave['label'] . ' (diajukan)' }}
+                                        <x-status-badge :tone="$leave->status->tone()">
+                                            {{ $leave->leaveType?->name ?? 'Cuti/Izin' }}{{ $approved ? '' : ' (diajukan)' }}
                                         </x-status-badge>
                                     @else
                                         <span class="text-gray-300">—</span>

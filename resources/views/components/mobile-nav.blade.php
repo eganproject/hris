@@ -16,7 +16,13 @@
      */
     $user = auth()->user();
 
-    $center = $user?->can('my-attendance.view') ? [
+    // Semua menu self-service memerlukan akun yang tertaut ke data karyawan —
+    // tanpa itu halamannya menjawab 403. Jadi keterkaitan itu ikut menentukan apa
+    // yang muncul di bilah, bukan hak akses saja. (Sidebar sudah begitu untuk
+    // "Jadwal Saya"; di sini dulu belum, sehingga tombolnya tampil lalu menolak.)
+    $selfServiceEmployee = $user?->employee;
+
+    $center = $selfServiceEmployee && $user?->can('my-attendance.view') ? [
         'label' => 'Absensi',
         'route' => 'my-attendance.index',
         'active' => ['my-attendance.*'],
@@ -36,13 +42,15 @@
             'route' => 'my-leave.index',
             'active' => ['my-leave.*'],
             'permission' => 'my-leave.view',
+            'needsEmployee' => true,
             'icon' => '<rect x="3" y="4" width="18" height="18" rx="2"></rect><path d="M8 2v4M16 2v4M3 10h18"></path>',
         ],
         [
             'label' => 'Jadwal',
             'route' => 'my-roster.index',
             'active' => ['my-roster.*'],
-            'permission' => null, // terbuka untuk semua akun yang login
+            'permission' => null, // tanpa hak akses khusus, tapi tetap butuh data karyawan
+            'needsEmployee' => true,
             'icon' => '<rect x="3" y="4" width="18" height="16" rx="2"></rect><path d="M3 9h18M8 4v3M16 4v3"></path>',
         ],
         [
@@ -64,7 +72,8 @@
     // Dengan tombol tengah: 3 pintasan + Lainnya, dibagi 2 kiri & 2 kanan.
     // Tanpa tombol tengah: 4 pintasan + Lainnya dalam satu deret datar.
     $sides = collect($candidates)
-        ->filter(fn (array $item) => $item['permission'] === null || $user?->can($item['permission']))
+        ->filter(fn (array $item) => ($item['permission'] === null || $user?->can($item['permission']))
+            && (! ($item['needsEmployee'] ?? false) || $selfServiceEmployee))
         ->take($center ? 3 : 4)
         ->values();
 

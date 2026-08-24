@@ -2,20 +2,17 @@
 
 namespace App\Http\Controllers;
 
-use App\Enums\LeaveRequestStatus;
 use App\Http\Requests\StoreShiftSwapRequest;
 use App\Models\Employee;
 use App\Models\ShiftSwapRequest;
 use App\Services\ShiftSwapService;
-use Carbon\CarbonPeriod;
+use App\Support\LeaveCalendar;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\View\View;
 
 class MyScheduleController extends Controller
 {
-    public function __construct(private readonly ShiftSwapService $swaps)
-    {
-    }
+    public function __construct(private readonly ShiftSwapService $swaps) {}
 
     public function index(): View
     {
@@ -32,9 +29,9 @@ class MyScheduleController extends Controller
                 ->with('shift')
                 ->orderBy('work_date')
                 ->get(),
-            // Cuti/izin milik akun yang login yang menyentuh window 14 hari, dipetakan
-            // per tanggal agar bisa ditumpangkan (overlay) ke tiap baris jadwal.
-            'leaveByDate' => $this->leaveByDate($employee, $windowStart, $windowEnd),
+            // Cuti/izin yang menyentuh window 14 hari, dari sumber yang sama dengan
+            // halaman "Jadwal Saya" agar hari yang sama tidak tampil berbeda.
+            'calendar' => LeaveCalendar::for($employee, $windowStart, $windowEnd),
             'myRequests' => $employee->swapRequests()
                 ->with(['partner', 'reviewer'])
                 ->latest('id')
@@ -92,51 +89,5 @@ class MyScheduleController extends Controller
         abort_unless($employee, 403, 'Akun Anda belum tertaut ke data karyawan.');
 
         return $employee;
-    }
-
-    /**
-     * Peta tanggal (Y-m-d) => cuti/izin yang menutupinya, untuk window jadwal.
-     * Menyertakan yang disetujui maupun masih menunggu; bila tanggalnya bertumpuk,
-     * cuti yang sudah disetujui diprioritaskan atas yang masih pending.
-     *
-     * @return array<string, array{label: string, status: LeaveRequestStatus}>
-     */
-    private function leaveByDate(Employee $employee, \Illuminate\Support\Carbon $windowStart, \Illuminate\Support\Carbon $windowEnd): array
-    {
-        $leaves = $employee->leaveRequests()
-            ->whereIn('status', [
-                LeaveRequestStatus::Approved->value,
-                LeaveRequestStatus::PendingSupervisor->value,
-                LeaveRequestStatus::PendingHr->value,
-            ])
-            ->whereDate('start_date', '<=', $windowEnd->toDateString())
-            ->whereDate('end_date', '>=', $windowStart->toDateString())
-            ->with('leaveType')
-            ->get();
-
-        $byDate = [];
-
-        foreach ($leaves as $leave) {
-            $from = $leave->start_date->greaterThan($windowStart) ? $leave->start_date->copy() : $windowStart->copy();
-            $to = $leave->end_date->lessThan($windowEnd) ? $leave->end_date->copy() : $windowEnd->copy();
-
-            foreach (CarbonPeriod::create($from, $to) as $date) {
-                $key = $date->format('Y-m-d');
-
-                // Jangan timpa cuti yang sudah disetujui dengan pengajuan yang masih pending.
-                if (isset($byDate[$key])
-                    && $byDate[$key]['status'] === LeaveRequestStatus::Approved
-                    && $leave->status !== LeaveRequestStatus::Approved) {
-                    continue;
-                }
-
-                $byDate[$key] = [
-                    'label' => $leave->leaveType?->name ?? 'Cuti/Izin',
-                    'status' => $leave->status,
-                ];
-            }
-        }
-
-        return $byDate;
     }
 }

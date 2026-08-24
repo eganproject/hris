@@ -48,7 +48,10 @@
                         $key = $day->toDateString();
                         $holiday = $holidays[$key] ?? null;
                         $sched = $schedules[$key] ?? null;
-                        $leave = $leaves[$key] ?? null;
+                        $leave = $calendar->approvedOn($key);
+                        // Pengajuan yang belum diputuskan: tidak mengubah mode kerja
+                        // hari itu, hanya ditandai di bawahnya.
+                        $pending = $calendar->pendingOn($key);
                         $isToday = $day->isSameDay($today);
                         $isSunday = (int) $day->dayOfWeekIso === 7;
 
@@ -86,6 +89,14 @@
                             @else
                                 <span class="block text-[10px] text-gray-300">—</span>
                             @endif
+
+                            @if ($pending)
+                                {{-- Garis putus-putus: sudah diajukan, belum berlaku. --}}
+                                <span class="mt-0.5 block truncate rounded border border-dashed border-amber-400 px-1.5 py-0.5 text-[9px] font-semibold leading-tight text-amber-700"
+                                      title="{{ $pending->leaveType?->name ?? 'Cuti/Izin' }} — {{ $pending->status->label() }}">
+                                    Diajukan
+                                </span>
+                            @endif
                         </div>
                     </div>
                 @endforeach
@@ -96,6 +107,7 @@
                 <span class="inline-flex items-center gap-1.5"><span class="size-2.5 rounded-sm bg-indigo-100 ring-1 ring-indigo-300"></span> WFH</span>
                 <span class="inline-flex items-center gap-1.5"><span class="size-2.5 rounded-sm bg-blue-100 ring-1 ring-blue-300"></span> Dinas luar</span>
                 <span class="inline-flex items-center gap-1.5"><span class="size-2.5 rounded-sm bg-amber-100 ring-1 ring-amber-300"></span> Cuti/izin</span>
+                <span class="inline-flex items-center gap-1.5"><span class="size-2.5 rounded-sm border border-dashed border-amber-400"></span> Diajukan (menunggu)</span>
                 <span class="inline-flex items-center gap-1.5"><span class="size-2.5 rounded-sm bg-gray-100 ring-1 ring-gray-300"></span> Libur</span>
                 <span class="inline-flex items-center gap-1.5"><span class="size-2.5 rounded-sm bg-rose-100 ring-1 ring-rose-300"></span> Hari libur nasional</span>
                 <span class="inline-flex items-center gap-1.5"><span class="size-2.5 rounded-sm bg-white ring-1 ring-primary"></span> Hari ini</span>
@@ -114,7 +126,7 @@
                 <ul class="mt-4 divide-y divide-gray-100">
                     @foreach ($upcoming as $row)
                         <li class="flex items-center justify-between gap-3 py-2.5">
-                            @php $rowMode = \App\Support\WorkMode::for($row, $leaves[$row->work_date->toDateString()] ?? null); @endphp
+                            @php $rowMode = \App\Support\WorkMode::for($row, $calendar->approvedOn($row->work_date->toDateString())); @endphp
                             <div class="min-w-0">
                                 <p class="text-sm font-medium text-gray-900">{{ $row->work_date->translatedFormat('l, d F Y') }}</p>
                                 <p class="text-xs text-gray-500">

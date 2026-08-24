@@ -1,5 +1,6 @@
 <?php
 
+use App\Models\Employee;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Gate;
@@ -10,7 +11,13 @@ test('the sidebar renders collapsible groups without losing any menu item', func
     // See every menu regardless of permissions so the full sidebar renders.
     Gate::before(fn () => true);
 
-    $response = $this->actingAs(User::factory()->create())->get('/dashboard')->assertOk();
+    // Grup Self-service hanya muncul untuk akun yang tertaut ke data karyawan —
+    // seluruh halamannya menjawab 403 tanpa itu. Jadi akun uji "melihat segalanya"
+    // ini pun perlu punya data karyawan agar sidebar penuh benar-benar terender.
+    $user = User::factory()->create();
+    Employee::query()->create(['user_id' => $user->id, 'full_name' => 'Uji Sidebar', 'employment_status' => 'active']);
+
+    $response = $this->actingAs($user)->get('/dashboard')->assertOk();
 
     // New collapsible group headers (Attendance split into three).
     foreach (['Absensi', 'Penjadwalan', 'Cuti &amp; Lembur', 'Karyawan', 'Organization', 'Self-service', 'System'] as $group) {

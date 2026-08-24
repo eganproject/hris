@@ -244,8 +244,11 @@
                         </a>
                     @endcanany
 
+                    {{-- Seluruh grup ini menjawab 403 tanpa data karyawan yang tertaut,
+                         jadi keterkaitan itu yang menentukan grupnya muncul — bukan hak
+                         akses. Hak akses tetap menyaring tiap menunya di dalam. --}}
                     @php $selfServiceEmployee = auth()->user()?->employee; @endphp
-                    @if ($selfServiceEmployee || auth()->user()?->canAny(['my-leave.view', 'my-attendance.view', 'my-schedule.view', 'my-overtime.view']))
+                    @if ($selfServiceEmployee)
                         @php $g = request()->routeIs('my-roster.*', 'my-leave.*', 'my-attendance.*', 'my-schedule.*', 'my-overtime.*'); @endphp
                         <div @class(['sidebar-group', 'is-open' => $g]) data-sidebar-group="self-service">
                             <button type="button" data-sidebar-group-toggle aria-expanded="{{ $g ? 'true' : 'false' }}" class="sidebar-group-toggle flex w-full items-center gap-2.5 rounded px-2.5 py-1.5 text-left transition hover:bg-white/70">
@@ -254,12 +257,10 @@
                                 <svg class="sidebar-group-chevron size-3.5 shrink-0 text-gray-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 6 6 6-6 6"></path></svg>
                             </button>
                             <div class="sidebar-group-items space-y-0.5" data-sidebar-group-items>
-                                @if ($selfServiceEmployee)
-                                    <a href="{{ route('my-roster.index') }}" @class(['sidebar-nav-link flex items-center gap-2.5 rounded px-2.5 py-1.5 text-[13px] font-medium transition', 'bg-white text-gray-950 shadow-xs ring-1 ring-gray-200' => request()->routeIs('my-roster.*'), 'text-gray-600 hover:bg-white hover:text-gray-950' => ! request()->routeIs('my-roster.*')]) title="Jadwal Saya">
-                                        <svg class="size-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"></rect><path d="M3 9h18M8 4v3M16 4v3"></path><path d="M8 14h.01M12 14h.01M16 14h.01"></path></svg>
-                                        <span class="sidebar-label truncate">Jadwal Saya</span>
-                                    </a>
-                                @endif
+                                <a href="{{ route('my-roster.index') }}" @class(['sidebar-nav-link flex items-center gap-2.5 rounded px-2.5 py-1.5 text-[13px] font-medium transition', 'bg-white text-gray-950 shadow-xs ring-1 ring-gray-200' => request()->routeIs('my-roster.*'), 'text-gray-600 hover:bg-white hover:text-gray-950' => ! request()->routeIs('my-roster.*')]) title="Jadwal Saya">
+                                    <svg class="size-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"></rect><path d="M3 9h18M8 4v3M16 4v3"></path><path d="M8 14h.01M12 14h.01M16 14h.01"></path></svg>
+                                    <span class="sidebar-label truncate">Jadwal Saya</span>
+                                </a>
                                 @can('my-leave.view')
                                     <a href="{{ route('my-leave.index') }}" @class(['sidebar-nav-link flex items-center gap-2.5 rounded px-2.5 py-1.5 text-[13px] font-medium transition', 'bg-white text-gray-950 shadow-xs ring-1 ring-gray-200' => request()->routeIs('my-leave.*'), 'text-gray-600 hover:bg-white hover:text-gray-950' => ! request()->routeIs('my-leave.*')]) title="Cuti Saya">
                                         <svg class="size-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 2v4M16 2v4M3 10h18"></path><rect x="3" y="4" width="18" height="18" rx="2"></rect><path d="M8 14h.01M12 14h.01M16 14h.01"></path></svg>

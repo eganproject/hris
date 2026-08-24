@@ -2,9 +2,9 @@
 
 namespace App\Http\Controllers;
 
-use App\Enums\LeaveRequestStatus;
 use App\Models\Employee;
 use App\Models\Holiday;
+use App\Support\LeaveCalendar;
 use Carbon\CarbonPeriod;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
@@ -43,21 +43,9 @@ class MyRosterController extends Controller
             ->keyBy(fn (Holiday $holiday) => $holiday->date->toDateString());
 
         // Pengajuan yang disetujui menimpa jadwal: cuti membuat harinya kosong, WFH
-        // dan dinas luar tetap hari kerja tapi berubah tempatnya. Tanpa ini, halaman
-        // jadwal karyawan sendiri tidak pernah memperlihatkan hari WFH-nya.
-        $leaves = $employee->leaveRequests()
-            ->where('status', LeaveRequestStatus::Approved->value)
-            ->whereDate('start_date', '<=', $to->toDateString())
-            ->whereDate('end_date', '>=', $from->toDateString())
-            ->with('leaveType')
-            ->get();
-
-        $leaveByDate = [];
-        foreach ($leaves as $leave) {
-            foreach (CarbonPeriod::create($leave->start_date, $leave->end_date) as $day) {
-                $leaveByDate[$day->toDateString()] = $leave;
-            }
-        }
+        // dan dinas luar tetap hari kerja tapi berubah tempatnya. Yang masih menunggu
+        // keputusan tidak mengubah jadwal, hanya ditandai — lihat LeaveCalendar.
+        $calendar = LeaveCalendar::for($employee, $from, $to);
 
         $upcoming = $employee->schedules()
             ->whereDate('work_date', '>=', now()->toDateString())
@@ -76,7 +64,7 @@ class MyRosterController extends Controller
             'days' => collect(CarbonPeriod::create($from, $to)->toArray()),
             'schedules' => $schedules,
             'holidays' => $holidays,
-            'leaves' => collect($leaveByDate),
+            'calendar' => $calendar,
             'upcoming' => $upcoming,
             'workDays' => $workDays,
             'offDays' => $schedules->count() - $workDays,

@@ -119,3 +119,40 @@ test('the topbar hamburger is gone, replaced by the "Lainnya" button', function 
     expect(substr_count($content, 'data-mobile-nav-toggle'))->toBe(1)
         ->and($content)->toContain('Buka menu lengkap');
 });
+
+/**
+ * Semua menu self-service menolak akun yang belum tertaut ke data karyawan (403).
+ * Bilah bawah karena itu tidak boleh menawarkannya — dulu "Jadwal" tetap tampil
+ * karena hanya hak akses yang diperiksa, lalu menabrak 403 saat ditekan.
+ */
+test('the bar hides self-service shortcuts an unlinked account cannot open', function () {
+    app(PermissionRegistrar::class)->forgetCachedPermissions();
+    foreach (['dashboard.view', 'my-attendance.view', 'my-leave.view'] as $p) {
+        Permission::findOrCreate($p, 'web');
+    }
+
+    // Akun tanpa data karyawan — mis. petugas admin murni.
+    $user = User::factory()->create();
+    $user->givePermissionTo(['dashboard.view', 'my-attendance.view', 'my-leave.view']);
+
+    $response = $this->actingAs($user)->get(route('dashboard'))->assertOk();
+
+    $response->assertDontSee(route('my-roster.index'), false)
+        ->assertDontSee(route('my-leave.index'), false)
+        ->assertDontSee(route('my-attendance.index'), false);
+});
+
+test('the same account with an employee record does get them', function () {
+    app(PermissionRegistrar::class)->forgetCachedPermissions();
+    foreach (['dashboard.view', 'my-attendance.view', 'my-leave.view'] as $p) {
+        Permission::findOrCreate($p, 'web');
+    }
+
+    $user = User::factory()->create();
+    $user->givePermissionTo(['dashboard.view', 'my-attendance.view', 'my-leave.view']);
+    Employee::query()->create(['user_id' => $user->id, 'full_name' => 'Rina', 'employment_status' => 'active']);
+
+    $this->actingAs($user)->get(route('dashboard'))->assertOk()
+        ->assertSee(route('my-roster.index'), false)
+        ->assertSee(route('my-attendance.index'), false);
+});
