@@ -2,19 +2,19 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class EmployeeEvent extends Model
 {
     /** @var list<string> */
     protected $fillable = [
-    'employee_id',
-    'type',
-    'description',
-    'occurred_at',
-    'causer_id',
-    'properties',
+        'employee_id',
+        'type',
+        'description',
+        'occurred_at',
+        'causer_id',
+        'properties',
     ];
 
     /**
@@ -25,6 +25,7 @@ class EmployeeEvent extends Model
         'contract_created' => ['label' => 'Kontrak dibuat', 'tone' => 'info'],
         'contract_renewed' => ['label' => 'Kontrak diperpanjang', 'tone' => 'info'],
         'contract_ended' => ['label' => 'Kontrak berakhir', 'tone' => 'warning'],
+        'contract_deleted' => ['label' => 'Kontrak dihapus', 'tone' => 'danger'],
         'exited' => ['label' => 'Karyawan keluar', 'tone' => 'danger'],
         'reactivated' => ['label' => 'Diaktifkan kembali', 'tone' => 'success'],
     ];

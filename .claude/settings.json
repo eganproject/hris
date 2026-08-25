@@ -18,7 +18,16 @@
       "Bash(node timeprobe.mjs)",
       "Bash(node interact.mjs)",
       "Bash(node --check resources/js/app.js)",
-      "Bash(node final.mjs)"
+      "Bash(node final.mjs)",
+      "PowerShell(php artisan migrate --force)",
+      "PowerShell(php artisan test --filter=WfhAttendanceTest)",
+      "PowerShell(php artisan test)",
+      "PowerShell(npm run build 2>&1)",
+      "PowerShell(.\\\\vendor\\\\bin\\\\pint --test app/Http/Controllers/MyAttendanceController.php app/Http/Requests/SelfAttendanceRequest.php app/Models/Attendance.php app/Services/AttendanceResolver.php app/Console/Commands/PruneAttendanceSelfies.php database/migrations/2026_08_22_090000_add_selfie_to_attendances.php tests/Feature/WfhAttendanceTest.php)",
+      "PowerShell(.\\\\vendor\\\\bin\\\\pint --test app/Models/LeaveType.php app/Models/AttendancePunch.php app/Http/Controllers/ScheduleController.php)",
+      "PowerShell($tmp = New-Item -ItemType Directory -Force -Path \"$env:TEMP\\\\pint-baseline\\\\tests\\\\Feature\", \"$env:TEMP\\\\pint-baseline\\\\app\\\\Models\", \"$env:TEMP\\\\pint-baseline\\\\app\\\\Http\\\\Controllers\"; git show HEAD:tests/Feature/WfhAttendanceTest.php | Out-File -Encoding utf8 \"$env:TEMP\\\\pint-baseline\\\\tests\\\\Feature\\\\WfhAttendanceTest.php\"; git show HEAD:app/Models/Attendance.php | Out-File -Encoding utf8 \"$env:TEMP\\\\pint-baseline\\\\app\\\\Models\\\\Attendance.php\"; git show HEAD:app/Http/Controllers/MyAttendanceController.php | Out-File -Encoding utf8 \"$env:TEMP\\\\pint-baseline\\\\app\\\\Http\\\\Controllers\\\\MyAttendanceController.php\"; .\\\\vendor\\\\bin\\\\pint --test \"$env:TEMP\\\\pint-baseline\")",
+      "Bash(php -r ' *)",
+      "PowerShell(php artisan test --filter=\"stores the selfie\")"
     ]
   }
 }

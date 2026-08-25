@@ -21,7 +21,7 @@
             $cardUrl = fn (string $filter) => request()->fullUrlWithQuery(['filter' => $filter === 'all' ? null : $filter, 'page' => null]);
         @endphp
 
-        <section class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
+        <section class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7">
             <x-stat-card label="Total Kontrak" :value="number_format($summary['total'])" tone="primary"
                 :href="$cardUrl('all')" :active="$activeFilter === 'all'" hint="Semua kontrak">
                 <x-icon name="layers" class="size-5"/>
@@ -46,7 +46,18 @@
                 :href="$cardUrl('expired')" :active="$activeFilter === 'expired'" hint="Lewat & belum diperbarui">
                 <x-icon name="alert-triangle" class="size-5"/>
             </x-stat-card>
+            <x-stat-card label="Tumpang Tindih" :value="number_format($summary['overlapping'])" tone="rose"
+                :href="$cardUrl('overlapping')" :active="$activeFilter === 'overlapping'" hint="Periode beririsan — cek duplikat">
+                <x-icon name="layers" class="size-5"/>
+            </x-stat-card>
         </section>
+
+        @if ($activeFilter === 'overlapping')
+            <div class="rounded-md border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800">
+                Kontrak di bawah ini periodenya beririsan dengan kontrak lain milik karyawan yang sama — biasanya duplikat dari salah input atau impor ganda. Barisnya dikelompokkan per karyawan agar mudah dibandingkan.
+                <span class="mt-1 block text-rose-700">Perpanjangan yang wajar tidak muncul di sini, karena periodenya berurutan dan tidak bertindihan.</span>
+            </div>
+        @endif
 
         <section class="rounded-lg border border-gray-200 bg-white p-5 shadow-sm">
             <form method="GET" action="{{ route('employees.contracts.index') }}" class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
@@ -115,6 +126,7 @@
                             <th>Periode</th>
                             <th>Status</th>
                             <th>Sisa</th>
+                            @can('employees.delete')<th class="text-right">Aksi</th>@endcan
                         </tr>
                     </thead>
                     <tbody>
@@ -150,9 +162,27 @@
                                         <span @class(['font-medium', 'text-amber-600' => $remaining <= 30, 'text-gray-700' => $remaining > 30])>{{ $remaining }} hari</span>
                                     @endif
                                 </td>
+                                @can('employees.delete')
+                                    <td class="text-right">
+                                        {{-- Hapus di sini hanya untuk membersihkan baris duplikat. Kontrak
+                                             yang sah ditutup lewat statusnya, bukan dibuang. --}}
+                                        @php $blocker = $contract->deletionBlocker(); @endphp
+                                        @if ($blocker)
+                                            <span class="inline-flex cursor-not-allowed items-center gap-1.5 text-sm text-gray-300" title="{{ $blocker }}"><x-icon name="trash"/> Hapus</span>
+                                        @else
+                                            <form method="POST" action="{{ route('employees.contracts.destroy', $contract) }}" class="inline"
+                                                  data-confirm-message="Hapus kontrak {{ $contract->contract_number }} milik {{ $contract->employee?->full_name ?? 'karyawan ini' }}? Baris ini akan hilang permanen; penghapusannya dicatat di riwayat karyawan."
+                                                  data-confirm-approve="Ya, hapus kontrak">
+                                                @csrf
+                                                @method('DELETE')
+                                                <button type="submit" class="inline-flex items-center gap-1.5 text-sm font-medium text-red-600 transition hover:text-red-700"><x-icon name="trash"/> Hapus</button>
+                                            </form>
+                                        @endif
+                                    </td>
+                                @endcan
                             </tr>
                         @empty
-                            <tr><td colspan="7" class="cell-empty">Tidak ada kontrak yang cocok dengan filter ini.</td></tr>
+                            <tr><td colspan="{{ auth()->user()?->can('employees.delete') ? 8 : 7 }}" class="cell-empty">Tidak ada kontrak yang cocok dengan filter ini.</td></tr>
                         @endforelse
                     </tbody>
                 </table>

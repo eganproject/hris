@@ -7,17 +7,21 @@ use App\Models\Branch;
 use App\Models\Department;
 use App\Models\EmployeeContract;
 use App\Models\User;
+use App\Support\DataScope;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
 use Maatwebsite\Excel\Facades\Excel;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
 
 /**
- * Read-only cross-employee view of contracts, centred on the "about to end"
- * question HR keeps asking. All actions (renew, edit) still live on the employee
- * record; this page only surfaces and filters. Everything is scoped to the
- * employees the signed-in user is allowed to see.
+ * Cross-employee view of contracts, centred on the "about to end" question HR keeps
+ * asking. Perpanjang & ubah kontrak tetap di halaman karyawan; di sini hanya ada
+ * satu aksi tulis — hapus baris kontrak duplikat (lihat destroy()). Semuanya dibatasi
+ * ke karyawan yang boleh dilihat pengguna yang login.
  */
 class ContractController extends Controller
 {
@@ -30,11 +34,21 @@ class ContractController extends Controller
         // A fresh base query per use so each summary card counts independently.
         $base = fn (): Builder => $this->baseQuery($filters, $user);
 
-        $contracts = $this->applyRange($base(), $filters['filter'] ?? 'all')
-            ->with(['employee.branch', 'employee.departments'])
-            // Soonest-ending first; open-ended (no end date) contracts sink to the bottom.
-            ->orderByRaw('end_date is null')
-            ->orderBy('end_date')
+        $range = $filters['filter'] ?? 'all';
+
+        $contracts = $this->applyRange($base(), $range)
+            // employee.contracts dipakai EmployeeContract::deletionBlocker() untuk
+            // menilai tiap baris tanpa query tambahan per baris.
+            ->with(['employee.branch', 'employee.departments', 'employee.contracts'])
+            // Daftar tumpang tindih diurutkan per karyawan lalu per tanggal mulai:
+            // pasangan yang beririsan harus bersebelahan agar bisa dibandingkan. Urutan
+            // "paling cepat berakhir" justru memisahkan keduanya, kadang beda halaman.
+            ->when(
+                $range === 'overlapping',
+                fn (Builder $query) => $query->orderBy('employee_id')->orderBy('start_date')->orderBy('id'),
+                // Soonest-ending first; open-ended (no end date) contracts sink to the bottom.
+                fn (Builder $query) => $query->orderByRaw('end_date is null')->orderBy('end_date'),
+            )
             ->paginate($perPage)
             ->withQueryString();
 
@@ -52,8 +66,44 @@ class ContractController extends Controller
                 'expiring_60' => $base()->expiringWithin(60)->count(),
                 'expiring_90' => $base()->expiringWithin(90)->count(),
                 'expired' => $base()->lapsed()->count(),
+                'overlapping' => $base()->overlapping()->count(),
             ],
         ]);
+    }
+
+    /**
+     * Hapus satu baris kontrak. Disediakan untuk membersihkan duplikat hasil salah
+     * input atau impor — bukan untuk membuang riwayat. Aturan boleh/tidaknya ada di
+     * EmployeeContract::deletionBlocker(), satu tempat, supaya tombol yang tampil di
+     * layar dan penjaga di sini tidak bisa berbeda pendapat.
+     */
+    public function destroy(Request $request, EmployeeContract $contract): RedirectResponse
+    {
+        $contract->loadMissing('employee');
+
+        DataScope::forEmployees($request->user())->authorize($contract->employee);
+
+        if ($blocker = $contract->deletionBlocker()) {
+            return back()->with('error', 'Kontrak tidak bisa dihapus. '.$blocker);
+        }
+
+        $employee = $contract->employee;
+        $number = $contract->contract_number;
+
+        DB::transaction(function () use ($contract, $employee, $number) {
+            // Jejaknya dicatat lebih dulu: begitu barisnya hilang, tidak ada lagi yang
+            // bisa menjelaskan kenapa nomor kontrak itu lenyap dari daftar.
+            $employee?->recordEvent(
+                'contract_deleted',
+                "Kontrak {$number} dihapus (pembersihan data duplikat).",
+                now(),
+                ['contract_number' => $number, 'contract_type' => $contract->contract_type, 'status' => $contract->status],
+            );
+
+            $contract->delete();
+        });
+
+        return back()->with('status', "Kontrak {$number} dihapus.");
     }
 
     /**
@@ -102,12 +152,13 @@ class ContractController extends Controller
             'expiring_60' => $query->expiringWithin(60),
             'expiring_90' => $query->expiringWithin(90),
             'expired' => $query->lapsed(),
+            'overlapping' => $query->overlapping(),
             default => $query,
         };
     }
 
     /**
-     * @return \Illuminate\Database\Eloquent\Collection<int, Branch>
+     * @return Collection<int, Branch>
      */
     private function scopedBranches(User $user)
     {
@@ -122,7 +173,7 @@ class ContractController extends Controller
     }
 
     /**
-     * @return \Illuminate\Database\Eloquent\Collection<int, Department>
+     * @return Collection<int, Department>
      */
     private function scopedDepartments(User $user)
     {

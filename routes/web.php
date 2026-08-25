@@ -1,11 +1,11 @@
 <?php
 
-use App\Http\Controllers\Auth\AuthenticatedSessionController;
 use App\Http\Controllers\AccessControlController;
 use App\Http\Controllers\AttendanceController;
-use App\Http\Controllers\AttendanceSelfieController;
-use App\Http\Controllers\AttendanceMapController;
 use App\Http\Controllers\AttendanceCorrectionController;
+use App\Http\Controllers\AttendanceMapController;
+use App\Http\Controllers\AttendanceSelfieController;
+use App\Http\Controllers\Auth\AuthenticatedSessionController;
 use App\Http\Controllers\BranchController;
 use App\Http\Controllers\ContractController;
 use App\Http\Controllers\DashboardController;
@@ -15,8 +15,8 @@ use App\Http\Controllers\EmployeeManagementController;
 use App\Http\Controllers\HolidayController;
 use App\Http\Controllers\IclockController;
 use App\Http\Controllers\JobPositionController;
-use App\Http\Controllers\LeaveBalanceController;
 use App\Http\Controllers\LeaveAttachmentController;
+use App\Http\Controllers\LeaveBalanceController;
 use App\Http\Controllers\LeaveController;
 use App\Http\Controllers\LeaveTypeController;
 use App\Http\Controllers\MyAttendanceController;
@@ -29,14 +29,15 @@ use App\Http\Controllers\OrganizationController;
 use App\Http\Controllers\OrgChartController;
 use App\Http\Controllers\OvertimeController;
 use App\Http\Controllers\ProfileController;
-use App\Http\Controllers\SettingsController;
 use App\Http\Controllers\PunchController;
 use App\Http\Controllers\ReportController;
 use App\Http\Controllers\ScheduleController;
 use App\Http\Controllers\SchedulePatternController;
 use App\Http\Controllers\SearchController;
+use App\Http\Controllers\SettingsController;
 use App\Http\Controllers\ShiftController;
 use App\Http\Controllers\ShiftSwapController;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', function () {
@@ -45,7 +46,7 @@ Route::get('/', function () {
 
 // ZKTeco iclock push protocol (Solution X100-C). Public, gated by device serial
 // allowlist inside the controller; must run over HTTPS in production.
-Route::match(['GET', 'POST'], 'iclock/cdata', function (\Illuminate\Http\Request $request, IclockController $controller) {
+Route::match(['GET', 'POST'], 'iclock/cdata', function (Request $request, IclockController $controller) {
     return $request->isMethod('post') ? $controller->receive($request) : $controller->handshake($request);
 });
 Route::get('iclock/getrequest', [IclockController::class, 'getrequest']);
@@ -146,6 +147,12 @@ Route::middleware('auth')->group(function () {
         Route::get('contracts/export', [ContractController::class, 'export'])
             ->middleware('permission:employees.export')
             ->name('contracts.export');
+        // Hapus baris kontrak duplikat (pembersihan data). Aturan boleh/tidaknya ada
+        // di EmployeeContract::deletionBlocker(); memakai hak "hapus karyawan" karena
+        // sama-sama membuang catatan kepegawaian.
+        Route::delete('contracts/{contract}', [ContractController::class, 'destroy'])
+            ->middleware('permission:employees.delete')
+            ->name('contracts.destroy');
         // Bulk actions on selected rows (checklist): declared before the "{employee}"
         // wildcard so the literal segments are not captured as an employee.
         Route::post('bulk/exit', [EmployeeManagementController::class, 'bulkExit'])

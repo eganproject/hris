@@ -61,8 +61,14 @@ class ContractsExport implements FromQuery, ShouldAutoSize, WithHeadings, WithMa
             'expiring_60' => $query->expiringWithin(60),
             'expiring_90' => $query->expiringWithin(90),
             'expired' => $query->lapsed(),
+            'overlapping' => $query->overlapping(),
             default => $query,
         };
+
+        // Sama seperti di layar: yang beririsan dikelompokkan per karyawan.
+        if (($this->filters['filter'] ?? 'all') === 'overlapping') {
+            return $query->orderBy('employee_id')->orderBy('start_date')->orderBy('id');
+        }
 
         return $query->orderByRaw('end_date is null')->orderBy('end_date');
     }

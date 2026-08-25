@@ -3,20 +3,20 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class EmployeeContract extends Model
 {
     /** @var list<string> */
     protected $fillable = [
-    'employee_id',
-    'contract_number',
-    'contract_type',
-    'start_date',
-    'end_date',
-    'status',
-    'notes',
+        'employee_id',
+        'contract_number',
+        'contract_type',
+        'start_date',
+        'end_date',
+        'status',
+        'notes',
     ];
 
     public const STATUS_LABELS = [
@@ -35,6 +35,49 @@ class EmployeeContract extends Model
      */
     public const CLOSING_STATUSES = ['completed', 'ended_early', 'expired', 'cancelled'];
 
+    /**
+     * Kenapa kontrak ini TIDAK boleh dihapus, atau null bila boleh.
+     *
+     * Hapus di sini hanya untuk membersihkan baris sampah — duplikat hasil salah
+     * input atau impor. Riwayat kontrak yang sah tidak pernah dihapus; kontrak yang
+     * sudah tidak berlaku ditutup lewat statusnya (Selesai/Dibatalkan/dst).
+     *
+     * Dua pagarnya menutup satu kondisi yang sama: karyawan yang "menggantung" —
+     * berstatus Aktif tapi tanpa kontrak aktif. Formulir karyawan tidak pernah
+     * mengizinkan kondisi itu, dan DeactivateExpiredContracts menyaring lewat
+     * whereHas('contracts'), jadi karyawan tanpa kontrak tidak akan pernah
+     * dinonaktifkan otomatis — ia aktif selamanya tanpa ada yang menyadarinya.
+     */
+    public function deletionBlocker(): ?string
+    {
+        $employee = $this->employee;
+
+        if (! $employee) {
+            return null; // kontrak yatim: tidak ada yang bisa menggantung.
+        }
+
+        // Lewat koleksi, bukan query: daftar kontrak memanggil ini sekali per baris,
+        // jadi controller cukup meng-eager-load employee.contracts dan seluruh
+        // halaman tetap satu query — bukan dua query tambahan per baris.
+        $siblings = $employee->contracts->reject(fn (self $other) => $other->getKey() === $this->getKey());
+
+        if ($siblings->isEmpty()) {
+            return 'Ini satu-satunya kontrak karyawan tersebut. Karyawan tanpa kontrak tidak akan pernah dinonaktifkan otomatis saat masa kerjanya berakhir.';
+        }
+
+        if (! $employee->isInactive() && $this->status === 'active'
+            && $siblings->every(fn (self $other) => $other->status !== 'active')) {
+            return 'Ini satu-satunya kontrak aktif milik karyawan yang masih aktif. Tutup atau ganti kontraknya lebih dulu.';
+        }
+
+        return null;
+    }
+
+    public function isDeletable(): bool
+    {
+        return $this->deletionBlocker() === null;
+    }
+
     public function employee(): BelongsTo
     {
         return $this->belongsTo(Employee::class);
@@ -51,6 +94,34 @@ class EmployeeContract extends Model
             ->active()
             ->whereNotNull('end_date')
             ->whereBetween('end_date', [now()->toDateString(), now()->addDays($days)->toDateString()]);
+    }
+
+    /**
+     * Kontrak yang periodenya beririsan dengan kontrak lain milik karyawan yang sama.
+     *
+     * Inilah tanda duplikat yang sebenarnya. Sekadar "punya lebih dari satu kontrak"
+     * tidak berguna sebagai penyaring: karyawan lama yang kontraknya berkali-kali
+     * diperpanjang memang punya banyak kontrak, dan itu wajar — periodenya berurutan,
+     * tidak bertindihan. Yang tidak wajar adalah dua kontrak yang berlaku pada rentang
+     * tanggal yang sama; itu tidak pernah benar, dan hanya muncul dari salah input,
+     * impor ganda, atau bug penyimpanan.
+     *
+     * Kontrak tanpa tanggal selesai (PKWTT) dianggap berlaku sampai kapan pun.
+     */
+    public function scopeOverlapping(Builder $query): void
+    {
+        $query
+            ->whereNotNull('employee_id')
+            ->whereNotNull('start_date')
+            ->whereExists(function ($sub) {
+                $sub->selectRaw('1')
+                    ->from('employee_contracts as sibling')
+                    ->whereColumn('sibling.employee_id', 'employee_contracts.employee_id')
+                    ->whereColumn('sibling.id', '!=', 'employee_contracts.id')
+                    ->whereNotNull('sibling.start_date')
+                    ->whereRaw("sibling.start_date <= coalesce(employee_contracts.end_date, '9999-12-31')")
+                    ->whereRaw("coalesce(sibling.end_date, '9999-12-31') >= employee_contracts.start_date");
+            });
     }
 
     /**
