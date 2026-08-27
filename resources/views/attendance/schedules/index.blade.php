@@ -45,8 +45,18 @@
 
         {{-- Month navigation + filters --}}
         <section class="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
-            @php $q = fn ($extra = []) => array_merge(['month' => $month->format('Y-m')], array_filter($filters), $extra); @endphp
+            @php
+                // Navigasi bulan & reset harus mempertahankan tab dan ukuran halaman,
+                // tapi selalu kembali ke halaman 1 (baris yang ditampilkan berubah).
+                $q = fn ($extra = []) => array_merge(
+                    ['month' => $month->format('Y-m'), 'tab' => $tab, 'per_page' => $perPage],
+                    array_filter($filters),
+                    $extra,
+                );
+            @endphp
             <form method="GET" action="{{ route('attendance.schedules.index') }}" class="flex flex-col gap-3">
+                <input type="hidden" name="tab" value="{{ $tab }}">
+                <input type="hidden" name="per_page" value="{{ $perPage }}">
                 <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                     <div class="flex items-center gap-2">
                         <a href="{{ route('attendance.schedules.index', $q(['month' => $prevMonth])) }}" class="rounded-md border border-gray-200 px-3 py-2 text-sm text-gray-600 hover:bg-gray-50" aria-label="Bulan sebelumnya">‹</a>
@@ -77,23 +87,75 @@
                     <div class="flex gap-2">
                         <button type="submit" class="flex-1 rounded-md bg-primary px-4 py-2 text-sm font-semibold text-white shadow-xs transition hover:bg-primary-hover">Terapkan</button>
                         @if (array_filter($filters))
-                            <a href="{{ route('attendance.schedules.index', ['month' => $month->format('Y-m')]) }}" class="rounded-md border border-gray-200 px-4 py-2 text-center text-sm font-medium text-gray-700 transition hover:bg-gray-50">Reset</a>
+                            <a href="{{ route('attendance.schedules.index', ['month' => $month->format('Y-m'), 'tab' => $tab, 'per_page' => $perPage]) }}" class="rounded-md border border-gray-200 px-4 py-2 text-center text-sm font-medium text-gray-700 transition hover:bg-gray-50">Reset</a>
                         @endif
                     </div>
                 </div>
             </form>
         </section>
 
+        {{-- Roster (kalender) dan daftar penugasan dipisah ke dua tab: menumpuknya
+             memaksa pengguna menggulir melewati sebulan penuh jadwal hanya untuk
+             sampai ke yang kedua. Tab dipilih di server, jadi yang tidak dibuka tidak
+             ikut dimuat sama sekali. --}}
+        @php
+            $tabLink = fn (string $target) => route('attendance.schedules.index', array_merge(
+                ['month' => $month->format('Y-m'), 'per_page' => $perPage],
+                array_filter($filters),
+                ['tab' => $target],
+            ));
+
+            $tabs = [
+                'roster' => ['label' => 'Roster Bulanan', 'count' => $employeeCount],
+                'assignments' => ['label' => 'Penugasan Pola', 'count' => $assignmentCount],
+            ];
+        @endphp
+        {{-- Nav dan panelnya dikelompokkan sendiri supaya terbaca sebagai satu unit,
+             bukan dua kartu terpisah seperti jarak default halaman ini. --}}
+        <div class="space-y-3">
+        <nav class="flex items-end gap-1 border-b border-gray-200" aria-label="Tampilan jadwal">
+            @foreach ($tabs as $key => $meta)
+                <a href="{{ $tabLink($key) }}"
+                    @if ($tab === $key) aria-current="page" @endif
+                    @class([
+                        '-mb-px inline-flex items-center gap-2 border-b-2 px-4 py-2.5 text-sm font-medium transition',
+                        'border-primary text-primary' => $tab === $key,
+                        'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700' => $tab !== $key,
+                    ])>
+                    {{ $meta['label'] }}
+                    <span @class([
+                        'rounded-full px-2 py-0.5 text-[11px] font-semibold tabular-nums',
+                        'bg-primary/10 text-primary' => $tab === $key,
+                        'bg-gray-100 text-gray-600' => $tab !== $key,
+                    ])>{{ number_format($meta['count']) }}</span>
+                </a>
+            @endforeach
+        </nav>
+
+        @if ($tab === 'roster')
         {{-- Roster grid --}}
         <section class="overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm">
-            <div class="overflow-x-auto" data-roster-grid>
+            {{-- Tinggi dibatasi supaya halaman tidak ikut memanjang mengikuti jumlah
+                 baris; baris tanggal dan kolom nama menempel saat digulir. --}}
+            <div class="max-h-[clamp(280px,56vh,640px)] overflow-auto" data-roster-grid>
                 <table class="w-full border-collapse text-center text-xs">
                     <thead>
-                        <tr class="bg-gray-50">
-                            <th class="sticky left-0 z-10 min-w-[180px] border-b border-r border-gray-200 bg-gray-50 px-3 py-2 text-left font-semibold text-gray-700">Karyawan</th>
+                        <tr>
+                            {{-- Sel yang menempel butuh latar sendiri: latar baris tidak
+                                 ikut tercetak di bawahnya. Garis bawahnya pakai inset
+                                 shadow karena border-collapse tidak menggambar border
+                                 pada sel sticky. --}}
+                            <th class="sticky left-0 top-0 z-30 min-w-[180px] border-r border-gray-200 bg-gray-50 px-3 py-2 text-left font-semibold text-gray-700 shadow-[inset_0_-1px_0_#e5e7eb]">Karyawan</th>
                             @foreach ($days as $day)
-                                @php $hol = $holidays[$day->toDateString()] ?? null; @endphp
-                                <th @class(['min-w-[38px] border-b border-gray-200 px-1 py-1.5 font-medium', 'bg-red-50 text-red-600' => $hol || $day->isWeekend(), 'text-gray-500' => ! $hol && ! $day->isWeekend()]) title="{{ $hol?->name }}">
+                                @php
+                                    $hol = $holidays[$day->toDateString()] ?? null;
+                                    $rest = $hol || $day->isWeekend();
+                                @endphp
+                                <th @class([
+                                        'sticky top-0 z-20 min-w-[38px] px-1 py-1.5 font-medium shadow-[inset_0_-1px_0_#e5e7eb]',
+                                        'bg-red-50 text-red-600' => $rest,
+                                        'bg-gray-50 text-gray-500' => ! $rest,
+                                    ]) title="{{ $hol?->name }}">
                                     <div class="text-[10px] uppercase">{{ $day->translatedFormat('D') }}</div>
                                     <div class="text-[13px] font-semibold text-gray-800">{{ $day->format('d') }}</div>
                                 </th>
@@ -132,21 +194,33 @@
                     </tbody>
                 </table>
             </div>
-            <div class="flex flex-wrap items-center gap-4 border-t border-gray-200 px-4 py-3 text-[11px] text-gray-500">
-                <span class="inline-flex items-center gap-1.5"><span class="inline-block size-3 rounded bg-primary/10 ring-1 ring-primary/20"></span> Ada shift (kode)</span>
-                <span class="inline-flex items-center gap-1.5"><span class="inline-block size-3 rounded bg-indigo-100 ring-1 ring-indigo-200"></span> WFH (🏠) — tetap bekerja</span>
-                <span class="inline-flex items-center gap-1.5"><span class="inline-block size-3 rounded bg-blue-100 ring-1 ring-blue-200"></span> Dinas luar (DL) — tetap bekerja</span>
-                <span class="inline-flex items-center gap-1.5"><span class="inline-block size-3 rounded bg-amber-100 ring-1 ring-amber-200"></span> Cuti/izin disetujui (kode jenis)</span>
-                <span class="inline-flex items-center gap-1.5"><span class="inline-block size-3 rounded text-gray-300">—</span> Libur</span>
-                <span class="inline-flex items-center gap-1.5"><span class="inline-block size-3 rounded ring-1 ring-blue-400"></span> Override manual</span>
-                <span class="inline-flex items-center gap-1.5"><span class="inline-block size-3 rounded bg-red-50"></span> Hari libur nasional</span>
-                <span class="ml-auto">Klik nama karyawan untuk melihat jadwal per karyawan.</span>
-            </div>
-        </section>
+            {{-- Keterangan warna dilipat: cepat jadi hafalan, dan melipatnya
+                 mengembalikan ruang layar untuk gridnya sendiri. --}}
+            <details class="border-t border-gray-200 px-4 py-2.5">
+                <summary class="cursor-pointer text-[11px] font-medium text-gray-600 transition hover:text-gray-800">Keterangan warna &amp; cara pakai</summary>
+                <div class="mt-2.5 flex flex-wrap items-center gap-4 text-[11px] text-gray-500">
+                    <span class="inline-flex items-center gap-1.5"><span class="inline-block size-3 rounded bg-primary/10 ring-1 ring-primary/20"></span> Ada shift (kode)</span>
+                    <span class="inline-flex items-center gap-1.5"><span class="inline-block size-3 rounded bg-indigo-100 ring-1 ring-indigo-200"></span> WFH (🏠) — tetap bekerja</span>
+                    <span class="inline-flex items-center gap-1.5"><span class="inline-block size-3 rounded bg-blue-100 ring-1 ring-blue-200"></span> Dinas luar (DL) — tetap bekerja</span>
+                    <span class="inline-flex items-center gap-1.5"><span class="inline-block size-3 rounded bg-amber-100 ring-1 ring-amber-200"></span> Cuti/izin disetujui (kode jenis)</span>
+                    <span class="inline-flex items-center gap-1.5"><span class="inline-block size-3 rounded text-gray-300">—</span> Libur</span>
+                    <span class="inline-flex items-center gap-1.5"><span class="inline-block size-3 rounded ring-1 ring-blue-400"></span> Override manual</span>
+                    <span class="inline-flex items-center gap-1.5"><span class="inline-block size-3 rounded bg-red-50"></span> Hari libur nasional</span>
+                    <span class="ml-auto">Klik satu sel untuk ubah manual, atau klik nama karyawan untuk jadwal per karyawan.</span>
+                </div>
+            </details>
 
+            @include('attendance.schedules._paginator', ['paginator' => $employees, 'unit' => 'karyawan'])
+        </section>
+        @else
         {{-- Active assignments --}}
         <section class="overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm">
-            <div class="border-b border-gray-200 px-5 py-3"><h2 class="text-sm font-semibold text-gray-950">Penugasan Pola Aktif</h2></div>
+            <div class="border-b border-gray-200 px-5 py-3">
+                <h2 class="text-sm font-semibold text-gray-950">Penugasan Pola Aktif</h2>
+                {{-- Hindari menyebut label statusnya persis: ada tes yang menghitung
+                     berapa baris berstatus mana dari isi halaman. --}}
+                <p class="mt-0.5 text-xs text-gray-500">Pola yang menyentuh {{ $month->translatedFormat('F Y') }}, terbaru di atas. Penugasan yang seluruh harinya sudah diambil alih penugasan lebih baru ditandai pada kolom Status.</p>
+            </div>
             <div class="overflow-x-auto">
                 <table class="data-table">
                     <thead><tr><th>Karyawan</th><th>Pola</th><th>Periode</th><th>Status</th><th class="text-right">Aksi</th></tr></thead>
@@ -178,10 +252,17 @@
                     </tbody>
                 </table>
             </div>
+
+            @include('attendance.schedules._paginator', ['paginator' => $assignments, 'unit' => 'penugasan'])
         </section>
+        @endif
+        </div>
     </div>
 
     @can('schedules.update')
+        {{-- Hanya tab roster yang punya sel untuk diklik; import tetap tersedia di
+             kedua tab karena tombolnya ada di header halaman. --}}
+        @if ($tab === 'roster')
         <dialog id="override-dialog" class="w-full max-w-md rounded-lg p-0 backdrop:bg-black/40">
             <form method="POST" action="{{ route('attendance.schedules.override') }}" data-override-form data-no-confirm="true" class="space-y-4 p-6">
                 @csrf
@@ -221,6 +302,7 @@
                 </div>
             </form>
         </dialog>
+        @endif
 
         {{-- Import roster bulanan dari Excel --}}
         @php

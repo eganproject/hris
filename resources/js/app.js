@@ -1809,9 +1809,14 @@ document.querySelectorAll('[data-approve-scope]').forEach((scope) => {
 // membalas JSON (sel dirender dari partial yang sama dengan grid) sehingga hanya
 // bagian yang berubah yang disentuh.
 (() => {
+    // Roster dan daftar penugasan tinggal di tab terpisah, jadi hanya satu dari
+    // keduanya ada di halaman. Keluar hanya kalau dua-duanya tidak ada — dulu
+    // penjaganya cuma grid, sehingga di tab penugasan tombol hapus kehilangan
+    // konfirmasinya dan jatuh ke submit biasa.
     const grid = document.querySelector('[data-roster-grid]');
+    const assignmentsBody = document.querySelector('[data-assignments-body]');
 
-    if (!grid) {
+    if (!grid && !assignmentsBody) {
         return;
     }
 
@@ -1851,6 +1856,12 @@ document.querySelectorAll('[data-approve-scope]').forEach((scope) => {
     // Roster bisa berubah menyeluruh setelah generate: ambil ulang halaman ini lalu
     // tukar isi gridnya saja.
     const refreshGrid = async () => {
+        // Di tab penugasan tidak ada grid yang perlu disegarkan; generate tetap
+        // jalan, cukup toast-nya saja.
+        if (!grid) {
+            return;
+        }
+
         const response = await fetch(window.location.href, {
             credentials: 'same-origin',
             headers: { 'X-Requested-With': 'XMLHttpRequest' },
@@ -1869,7 +1880,7 @@ document.querySelectorAll('[data-approve-scope]').forEach((scope) => {
     const dialog = document.getElementById('override-dialog');
     const overrideForm = document.querySelector('[data-override-form]');
 
-    if (dialog && overrideForm) {
+    if (dialog && overrideForm && grid) {
         const field = (id) => document.getElementById(id);
         const dayOff = field('ov-day-off');
         const shift = field('ov-shift');

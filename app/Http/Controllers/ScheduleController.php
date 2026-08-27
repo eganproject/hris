@@ -41,8 +41,17 @@ class ScheduleController extends Controller
         private readonly DefaultOfficeSchedule $officeSchedule,
     ) {}
 
+    /** Pilihan jumlah baris per halaman, dipakai grid roster dan daftar penugasan. */
+    private const PER_PAGE_OPTIONS = [25, 50, 100];
+
     /**
      * Monthly roster grid: employees × days, showing the materialized schedule.
+     *
+     * Roster dan daftar penugasan tinggal di dua tab. Keduanya panjang, dan
+     * menumpuknya memaksa pengguna menggulir melewati satu bulan penuh jadwal hanya
+     * untuk sampai ke yang kedua. Tab dipilih di server, bukan di klien, supaya tab
+     * yang tidak dibuka tidak ikut di-query sama sekali — dulu satu kali buka halaman
+     * ini selalu memuat SELURUH karyawan dalam cakupan beserta jadwal sebulannya.
      */
     public function index(Request $request): View
     {
@@ -50,34 +59,65 @@ class ScheduleController extends Controller
         $from = $month->copy()->startOfMonth();
         $to = $month->copy()->endOfMonth();
         $branchId = $request->integer('branch_id') ?: null;
-        $departmentId = $request->integer('department_id') ?: null;
-        $jobPositionId = $request->integer('job_position_id') ?: null;
-        $search = $request->string('search')->toString();
         $scope = DataScope::forAttendance($request->user());
 
-        $applyFilters = fn ($query) => $query
-            ->when($branchId, fn ($q) => $q->where('branch_id', $branchId))
-            ->when($departmentId, fn ($q) => $q->byDepartment($departmentId))
-            ->when($jobPositionId, fn ($q) => $q->where('job_position_id', $jobPositionId))
-            ->when($search, fn ($q, $s) => $q->where(fn ($q) => $q
-                ->where('full_name', 'like', "%{$s}%")->orWhere('employee_number', 'like', "%{$s}%")));
+        $tab = $request->input('tab') === 'assignments' ? 'assignments' : 'roster';
+        $perPage = $this->resolvePerPage($request);
+        $days = collect(CarbonPeriod::create($from, $to)->toArray());
 
-        $employees = $applyFilters($scope->employees()->active())
+        $employeeQuery = $this->filtered($scope->employees()->active(), $request);
+        $assignmentQuery = $this->assignmentQuery($request, $scope, $from, $to);
+
+        // Dipakai kedua tab: aksi di header (import, generate) dan badge jumlah pada
+        // tab yang sedang tidak aktif.
+        $shared = [
+            'tab' => $tab,
+            'days' => $days,
+            'month' => $month,
+            'prevMonth' => $month->copy()->subMonth()->format('Y-m'),
+            'nextMonth' => $month->copy()->addMonth()->format('Y-m'),
+            'branches' => $scope->branches(),
+            'departments' => $scope->departments(),
+            'jobPositions' => JobPosition::query()->where('is_active', true)->orderBy('name')->get(),
+            'filters' => [
+                'branch_id' => $branchId,
+                'department_id' => $request->integer('department_id') ?: null,
+                'job_position_id' => $request->integer('job_position_id') ?: null,
+                'search' => $request->string('search')->toString(),
+            ],
+            'branchId' => $branchId,
+            'hasNoScope' => $scope->isEmpty(),
+            'shifts' => Shift::query()->where('is_active', true)->orderBy('start_time')->get(),
+            'patternCount' => SchedulePattern::query()->visibleTo($request->user())->where('is_active', true)->count(),
+            'perPage' => $perPage,
+            'perPageOptions' => self::PER_PAGE_OPTIONS,
+        ];
+
+        if ($tab === 'assignments') {
+            $assignments = $assignmentQuery
+                ->with(['employee', 'pattern'])
+                // Newest first, matching the precedence the generator applies — the
+                // assignment actually governing an overlap is the one listed on top.
+                ->orderByDesc('id')
+                ->paginate($perPage)
+                ->withQueryString();
+
+            return view('attendance.schedules.index', $shared + [
+                'assignments' => $assignments,
+                'governingAssignments' => $this->governingFor($assignments->items(), $from, $to, $days),
+                'employeeCount' => $employeeQuery->count(),
+                'assignmentCount' => $assignments->total(),
+            ]);
+        }
+
+        $employees = $employeeQuery
             ->with(['schedules' => fn ($query) => $query
                 ->whereBetween('work_date', [$from->toDateString(), $to->toDateString()])
                 ->with('shift'),
             ])
             ->orderBy('full_name')
-            ->get();
-
-        // National holidays overlay the grid so users see why a day may be off.
-        $holidays = Holiday::query()
-            ->whereBetween('date', [$from->toDateString(), $to->toDateString()])
-            ->where(fn ($query) => $query->where('is_national', true)->orWhere('branch_id', $branchId))
-            ->get()
-            ->keyBy(fn (Holiday $holiday) => $holiday->date->toDateString());
-
-        $days = collect(CarbonPeriod::create($from, $to)->toArray());
+            ->paginate($perPage)
+            ->withQueryString();
 
         // Karyawan "jam kantor" tidak punya baris roster; isi selnya dari pola jam
         // kantor yang berlaku baginya agar grid menampilkan jadwal mereka (bukan sel
@@ -89,36 +129,73 @@ class ScheduleController extends Controller
             }
         }
 
-        $assignments = ScheduleAssignment::query()
-            ->with(['employee', 'pattern'])
-            ->overlapping($from, $to)
-            ->when($branchId, fn ($query) => $query->whereHas('employee', fn ($q) => $q->where('branch_id', $branchId)))
-            ->tap(fn ($query) => $scope->constrain($query))
-            ->visibleToCreator($request->user())
-            // Newest first, matching the precedence the generator applies — the
-            // assignment actually governing an overlap is the one listed on top.
-            ->orderByDesc('id')
-            ->get();
+        // National holidays overlay the grid so users see why a day may be off.
+        $holidays = Holiday::query()
+            ->whereBetween('date', [$from->toDateString(), $to->toDateString()])
+            ->where(fn ($query) => $query->where('is_national', true)->orWhere('branch_id', $branchId))
+            ->get()
+            ->keyBy(fn (Holiday $holiday) => $holiday->date->toDateString());
 
-        return view('attendance.schedules.index', [
+        return view('attendance.schedules.index', $shared + [
             'employees' => $employees,
-            'days' => $days,
             'holidays' => $holidays,
-            'leaves' => $this->approvedLeaveByDate($from, $to, $branchId, null, $scope),
-            'assignments' => $assignments,
-            'month' => $month,
-            'prevMonth' => $month->copy()->subMonth()->format('Y-m'),
-            'nextMonth' => $month->copy()->addMonth()->format('Y-m'),
-            'branches' => $scope->branches(),
-            'departments' => $scope->departments(),
-            'jobPositions' => JobPosition::query()->where('is_active', true)->orderBy('name')->get(),
-            'filters' => ['branch_id' => $branchId, 'department_id' => $departmentId, 'job_position_id' => $jobPositionId, 'search' => $search],
-            'branchId' => $branchId,
-            'hasNoScope' => $scope->isEmpty(),
-            'shifts' => Shift::query()->where('is_active', true)->orderBy('start_time')->get(),
-            'patternCount' => SchedulePattern::query()->visibleTo($request->user())->where('is_active', true)->count(),
-            'governingAssignments' => $this->generator->governingAssignmentIds($assignments, $days),
+            // Cuti dibatasi ke karyawan yang benar-benar tampil, bukan seluruh cakupan.
+            'leaves' => $this->approvedLeaveByDate(
+                $from, $to, $branchId, null, $scope,
+                $employees->getCollection()->pluck('id')->all(),
+            ),
+            'employeeCount' => $employees->total(),
+            'assignmentCount' => $assignmentQuery->count(),
         ]);
+    }
+
+    /**
+     * Penugasan pola yang terlihat oleh pengguna pada periode ini, sebelum diurutkan
+     * atau dihalamankan. Dipisah agar tab roster bisa memakainya untuk menghitung
+     * badge tanpa menyalin ulang aturan cakupan & kepemilikannya.
+     */
+    private function assignmentQuery(Request $request, DataScope $scope, Carbon $from, Carbon $to): Builder
+    {
+        return ScheduleAssignment::query()
+            ->overlapping($from, $to)
+            ->when(
+                $request->integer('branch_id') ?: null,
+                fn ($query, $id) => $query->whereHas('employee', fn ($q) => $q->where('branch_id', $id)),
+            )
+            ->tap(fn ($query) => $scope->constrain($query))
+            ->visibleToCreator($request->user());
+    }
+
+    /**
+     * Penugasan mana yang benar-benar berlaku, untuk baris yang sedang ditampilkan.
+     *
+     * Presedensi harus dihitung dari SELURUH penugasan milik karyawan yang tampil,
+     * bukan hanya baris di halaman ini: penugasan lain milik orang yang sama bisa
+     * jatuh di halaman berikutnya, dan menghitung tanpa itu membuat baris ini
+     * mengaku "Berlaku" padahal sudah tergantikan.
+     *
+     * @param  array<int, ScheduleAssignment>  $shown
+     * @return array<int, true>
+     */
+    private function governingFor(array $shown, Carbon $from, Carbon $to, Collection $days): array
+    {
+        $employeeIds = collect($shown)->pluck('employee_id')->unique()->all();
+
+        if ($employeeIds === []) {
+            return [];
+        }
+
+        return $this->generator->governingAssignmentIds(
+            ScheduleAssignment::query()->overlapping($from, $to)->whereIn('employee_id', $employeeIds)->get(),
+            $days,
+        );
+    }
+
+    private function resolvePerPage(Request $request): int
+    {
+        $perPage = (int) $request->input('per_page', self::PER_PAGE_OPTIONS[0]);
+
+        return in_array($perPage, self::PER_PAGE_OPTIONS, true) ? $perPage : self::PER_PAGE_OPTIONS[0];
     }
 
     /**
@@ -293,15 +370,18 @@ class ScheduleController extends Controller
      * Approved leave expanded per day, so a roster cell can answer "is this person
      * off on leave today?" with a single lookup.
      *
+     * @param  list<int>|null  $employeeIds  batasi ke karyawan ini saja (baris yang
+     *                                       sedang tampil), alih-alih seluruh cakupan
      * @return Collection<int, Collection<string, LeaveRequest>> employee id => date => leave
      */
-    private function approvedLeaveByDate(Carbon $from, Carbon $to, ?int $branchId = null, ?Employee $employee = null, ?DataScope $scope = null): Collection
+    private function approvedLeaveByDate(Carbon $from, Carbon $to, ?int $branchId = null, ?Employee $employee = null, ?DataScope $scope = null, ?array $employeeIds = null): Collection
     {
         $leaves = LeaveRequest::query()
             ->where('status', LeaveRequestStatus::Approved->value)
             ->whereDate('start_date', '<=', $to->toDateString())
             ->whereDate('end_date', '>=', $from->toDateString())
             ->when($employee, fn ($query) => $query->where('employee_id', $employee->id))
+            ->when($employeeIds !== null, fn ($query) => $query->whereIn('employee_id', $employeeIds))
             ->when($branchId, fn ($query) => $query->whereHas('employee', fn ($q) => $q->where('branch_id', $branchId)))
             ->when($scope, fn ($query) => $scope->constrain($query))
             ->with('leaveType')

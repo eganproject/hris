@@ -86,7 +86,8 @@ test('the roster active-assignments are limited to the users own creations', fun
 
     app(PermissionRegistrar::class)->forgetCachedPermissions();
 
-    $this->actingAs($mine)->get('/attendance/schedules')
+    // Daftar penugasan ada di tabnya sendiri, terpisah dari grid roster.
+    $this->actingAs($mine)->get('/attendance/schedules?tab=assignments')
         ->assertOk()
         ->assertSee('Pola PM')
         ->assertDontSee('Pola PO');

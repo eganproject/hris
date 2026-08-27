@@ -653,7 +653,8 @@ test('the roster marks which of two overlapping assignments is actually in force
         'start_date' => '2026-09-01', 'end_date' => '2026-09-30', 'created_by' => $user->id,
     ]);
 
-    $response = $this->actingAs($user)->get('/attendance/schedules?month=2026-09')->assertOk();
+    // Daftar penugasan ada di tabnya sendiri, terpisah dari grid roster.
+    $response = $this->actingAs($user)->get('/attendance/schedules?month=2026-09&tab=assignments')->assertOk();
 
     // Both rows are listed, but only the newer one decides any day of the month.
     $response->assertSee('Berlaku')->assertSee('Tergantikan');
@@ -677,7 +678,7 @@ test('an older assignment still counts as in force where the newer one does not 
         'start_date' => '2026-09-10', 'end_date' => '2026-09-20', 'created_by' => $user->id,
     ]);
 
-    $content = $this->actingAs($user)->get('/attendance/schedules?month=2026-09')->assertOk()->getContent();
+    $content = $this->actingAs($user)->get('/attendance/schedules?month=2026-09&tab=assignments')->assertOk()->getContent();
 
     // The standing pattern still owns 1-9 and 21-30, so neither is superseded.
     expect(substr_count($content, 'Berlaku'))->toBe(2)
@@ -713,4 +714,72 @@ test('regenerating the roster only touches the employees the filters leave on sc
 
     expect(EmployeeSchedule::query()->where('employee_id', $inScope->id)->count())->toBe(30)
         ->and(EmployeeSchedule::query()->where('employee_id', $outOfScope->id)->count())->toBe(0);
+});
+
+test('the roster grid paginates instead of listing every employee at once', function () {
+    $user = scheduleManager();
+
+    foreach (range(1, 30) as $i) {
+        Employee::query()->create([
+            'full_name' => sprintf('Karyawan %02d', $i), 'employment_status' => 'active',
+        ]);
+    }
+
+    $this->actingAs($user)->get('/attendance/schedules?month=2026-09')
+        ->assertOk()
+        ->assertSee('Karyawan 01')
+        ->assertSee('dari 30 karyawan')
+        // Baris ke-26 dan seterusnya tidak ikut dirender maupun di-query.
+        ->assertDontSee('Karyawan 30');
+
+    $this->actingAs($user)->get('/attendance/schedules?month=2026-09&page=2')
+        ->assertOk()
+        ->assertSee('Karyawan 30');
+});
+
+test('each tab renders only its own dataset', function () {
+    $user = scheduleManager();
+    $shift = Shift::query()->create(['code' => 'PG', 'name' => 'Pagi', 'start_time' => '07:00', 'end_time' => '15:00', 'is_active' => true]);
+    $employee = Employee::query()->create(['full_name' => 'Budi', 'employment_status' => 'active']);
+
+    ScheduleAssignment::query()->create([
+        'employee_id' => $employee->id, 'schedule_pattern_id' => everydayPattern($shift->id)->id,
+        'start_date' => '2026-09-01', 'end_date' => '2026-09-30', 'created_by' => $user->id,
+    ]);
+
+    $this->actingAs($user)->get('/attendance/schedules?month=2026-09')
+        ->assertOk()
+        ->assertSee('data-roster-grid', escape: false)
+        ->assertDontSee('data-assignments-body', escape: false);
+
+    $this->actingAs($user)->get('/attendance/schedules?month=2026-09&tab=assignments')
+        ->assertOk()
+        ->assertSee('data-assignments-body', escape: false)
+        ->assertDontSee('data-roster-grid', escape: false);
+});
+
+test('an assignment listed on a later page still shows the status the whole set implies', function () {
+    $user = scheduleManager();
+    $shift = Shift::query()->create(['code' => 'PG', 'name' => 'Pagi', 'start_time' => '07:00', 'end_time' => '15:00', 'is_active' => true]);
+    $employee = Employee::query()->create(['full_name' => 'Budi', 'employment_status' => 'active']);
+    $pattern = everydayPattern($shift->id);
+
+    // 26 penugasan menutupi bulan yang sama: yang terbaru menguasai seluruh hari dan
+    // sisanya tergantikan. Dengan 25 baris per halaman, yang tertua jatuh ke halaman 2.
+    foreach (range(1, 26) as $i) {
+        ScheduleAssignment::query()->create([
+            'employee_id' => $employee->id, 'schedule_pattern_id' => $pattern->id,
+            'start_date' => '2026-09-01', 'end_date' => '2026-09-30', 'created_by' => $user->id,
+        ]);
+    }
+
+    $content = $this->actingAs($user)
+        ->get('/attendance/schedules?month=2026-09&tab=assignments&page=2')
+        ->assertOk()
+        ->getContent();
+
+    // Menghitung presedensi hanya dari baris di halaman ini akan membuat satu-satunya
+    // baris di sini mengaku berlaku, padahal sudah lama diambil alih.
+    expect(substr_count($content, 'Tergantikan'))->toBe(1)
+        ->and(substr_count($content, 'Berlaku'))->toBe(0);
 });
