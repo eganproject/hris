@@ -76,9 +76,12 @@ class LeaveController extends Controller
     }
 
     /**
-     * HR override: advance whichever step the request is currently on. A request
-     * that already has a final decision is never touched again — two HR users with
-     * the list open at the same time must not both "decide" it.
+     * Jalan keluar HR: putuskan pengajuan yang belum final, langsung selesai.
+     *
+     * Alur normalnya diputuskan atasan; layar ini tetap ada untuk karyawan yang belum
+     * punya atasan dan untuk membereskan pengajuan lama yang terlanjur mengantre di
+     * HR. Pengajuan yang sudah final tidak pernah disentuh lagi — dua pengguna HR
+     * yang membuka daftar bersamaan tidak boleh sama-sama "memutuskan".
      */
     public function approve(Request $request, LeaveRequest $leaveRequest): RedirectResponse
     {
@@ -86,11 +89,7 @@ class LeaveController extends Controller
         $this->denySelfDecision($request, $leaveRequest);
         abort_unless($leaveRequest->status->isPending(), 403);
 
-        if ($leaveRequest->status === LeaveRequestStatus::PendingSupervisor) {
-            $this->workflow->supervisorApprove($leaveRequest, auth()->user());
-        } else {
-            $this->workflow->hrApprove($leaveRequest, auth()->user());
-        }
+        $this->workflow->approve($leaveRequest, auth()->user());
 
         return redirect()->route('attendance.leave.index')->with('status', 'Pengajuan disetujui.');
     }
@@ -137,11 +136,7 @@ class LeaveController extends Controller
                 continue;
             }
 
-            if ($leaveRequest->status === LeaveRequestStatus::PendingSupervisor) {
-                $this->workflow->supervisorApprove($leaveRequest, $request->user());
-            } else {
-                $this->workflow->hrApprove($leaveRequest, $request->user());
-            }
+            $this->workflow->approve($leaveRequest, $request->user());
 
             $approved++;
         }

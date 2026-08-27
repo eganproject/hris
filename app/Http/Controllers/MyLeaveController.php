@@ -96,9 +96,9 @@ class MyLeaveController extends Controller
     {
         $this->authorizeSupervisor($leaveRequest);
 
-        $this->workflow->supervisorApprove($leaveRequest, auth()->user());
+        $this->workflow->approve($leaveRequest, auth()->user());
 
-        return redirect()->route('my-leave.index')->with('status', 'Pengajuan bawahan disetujui, diteruskan ke HR.');
+        return redirect()->route('my-leave.index')->with('status', 'Pengajuan bawahan disetujui.');
     }
 
     public function reject(LeaveRequest $leaveRequest): RedirectResponse

@@ -13,8 +13,12 @@ use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 
 /**
- * Two-level leave approval: employee → direct supervisor → HR.
- * If the employee has no supervisor the request starts at the HR step.
+ * Persetujuan cuti satu tahap: karyawan → atasan langsung, dan keputusan atasan
+ * bersifat final. HR tidak lagi menjadi tahap kedua.
+ *
+ * HR tetap bisa memutuskan, tapi sebagai jalan keluar, bukan tahap: karyawan yang
+ * belum punya atasan tidak akan pernah punya yang bisa menyetujui, dan pengajuan
+ * lama yang terlanjur berhenti di antrean HR tetap harus bisa diselesaikan.
  */
 class LeaveWorkflow
 {
@@ -70,18 +74,15 @@ class LeaveWorkflow
         ];
     }
 
-    public function supervisorApprove(LeaveRequest $request, User $actor): void
-    {
-        $request->update([
-            'status' => LeaveRequestStatus::PendingHr,
-            'supervisor_approved_by' => $actor->id,
-            'supervisor_decided_at' => now(),
-        ]);
-
-        app(ApprovalNotifier::class)->leavePendingHr($request);
-    }
-
-    public function hrApprove(LeaveRequest $request, User $actor): void
+    /**
+     * Setujui pengajuan — langsung final, tanpa tahap berikutnya.
+     *
+     * Siapa pun yang memutuskan (atasan atau HR sebagai jalan keluar) dicatat di
+     * approved_by/decided_at. Kolom supervisor_* tidak lagi diisi: sejak alurnya satu
+     * tahap, tidak ada lagi keputusan antara yang perlu dibedakan dari keputusan
+     * akhir — kolomnya dipertahankan hanya untuk membaca pengajuan lama.
+     */
+    public function approve(LeaveRequest $request, User $actor): void
     {
         // Status cuti dan absensi hari-hari yang ditutupinya harus berubah bersama:
         // kalau syncAttendance() gagal di tengah, cutinya sudah berstatus "Disetujui"
@@ -96,7 +97,18 @@ class LeaveWorkflow
             $this->syncAttendance($request);
         });
 
-        app(ApprovalNotifier::class)->leaveDecided($request, 'HR');
+        app(ApprovalNotifier::class)->leaveDecided($request, $this->deciderLabel($request, $actor));
+    }
+
+    /**
+     * Sebutan pengambil keputusan untuk notifikasi ke karyawan: "atasan" bila yang
+     * memutuskan memang atasannya, selain itu "HR".
+     */
+    private function deciderLabel(LeaveRequest $request, User $actor): string
+    {
+        return $request->supervisor_id !== null && $request->supervisor_id === $actor->employee?->id
+            ? 'atasan'
+            : 'HR';
     }
 
     /**
@@ -127,18 +139,14 @@ class LeaveWorkflow
 
     public function reject(LeaveRequest $request, User $actor, ?string $notes = null): void
     {
-        $atSupervisorStep = $request->status === LeaveRequestStatus::PendingSupervisor;
-
         $request->update([
             'status' => LeaveRequestStatus::Rejected,
             'decision_notes' => $notes,
-            'supervisor_approved_by' => $atSupervisorStep ? $actor->id : $request->supervisor_approved_by,
-            'supervisor_decided_at' => $atSupervisorStep ? now() : $request->supervisor_decided_at,
-            'approved_by' => $atSupervisorStep ? $request->approved_by : $actor->id,
-            'decided_at' => $atSupervisorStep ? $request->decided_at : now(),
+            'approved_by' => $actor->id,
+            'decided_at' => now(),
         ]);
 
-        app(ApprovalNotifier::class)->leaveDecided($request, $atSupervisorStep ? 'atasan' : 'HR');
+        app(ApprovalNotifier::class)->leaveDecided($request, $this->deciderLabel($request, $actor));
     }
 
     /**
@@ -150,7 +158,7 @@ class LeaveWorkflow
     {
         $wasApproved = $request->status === LeaveRequestStatus::Approved;
 
-        // Sama seperti hrApprove(): pembatalan cuti yang sudah disetujui juga
+        // Sama seperti approve(): pembatalan cuti yang sudah disetujui juga
         // mengembalikan hari-harinya ke absensi, jadi keduanya satu kesatuan.
         DB::transaction(function () use ($request, $wasApproved) {
             $request->update(['status' => LeaveRequestStatus::Cancelled]);

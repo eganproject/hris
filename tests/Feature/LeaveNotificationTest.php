@@ -1,5 +1,6 @@
 <?php
 
+use App\Enums\LeaveRequestStatus;
 use App\Models\Employee;
 use App\Models\LeaveRequest;
 use App\Models\LeaveType;
@@ -80,26 +81,19 @@ test('the whole leave flow tells each side what they need to know', function () 
         ->and($supervisorInbox[0]['message'])->toContain('('.$period.')')
         ->and($supervisorInbox[0]['message'])->toContain('Demam tinggi.');
 
-    // 2. Atasan setuju → HR diberi tahu, lengkap dengan jenis & periodenya.
+    // 2. Atasan setuju → langsung final, karyawan tahu siapa yang menyetujui.
+    //    Tidak ada lagi tahap HR, jadi kotak masuk HR tetap kosong.
     $this->actingAs($supervisorUser)->patch("/my-leave/{$leave->id}/approve")->assertRedirect();
 
-    $hrInbox = notificationsOf($hr);
-
-    expect($hrInbox)->toHaveCount(1)
-        ->and($hrInbox[0]['title'])->toBe('Sakit menunggu persetujuan HR')
-        ->and($hrInbox[0]['message'])->toContain('Budi Staf')
-        ->and($hrInbox[0]['message'])->toContain('('.$period.')')
-        ->and($hrInbox[0]['message'])->toContain('disetujui atasan');
-
-    // 3. HR setuju → karyawan tahu siapa yang menyetujui.
-    $this->actingAs($hr)->patch("/attendance/leave/{$leave->id}/approve")->assertRedirect();
+    expect(notificationsOf($hr))->toHaveCount(0);
 
     $employeeInbox = notificationsOf($employeeUser);
 
     expect($employeeInbox)->toHaveCount(1)
         ->and($employeeInbox[0]['title'])->toBe('Sakit disetujui')
         ->and($employeeInbox[0]['message'])->toContain('('.$period.')')
-        ->and($employeeInbox[0]['message'])->toContain('disetujui oleh HR');
+        ->and($employeeInbox[0]['message'])->toContain('disetujui oleh atasan')
+        ->and(LeaveRequest::query()->firstOrFail()->status)->toBe(LeaveRequestStatus::Approved);
 });
 
 test('a rejection says at which step it was rejected, and why', function () {
@@ -138,12 +132,12 @@ test('an approved leave can no longer be cancelled by HR', function () {
 
     $leave = LeaveRequest::query()->firstOrFail();
 
+    // Persetujuan atasan sudah final; tidak ada tahap HR yang menyusul.
     $this->actingAs($supervisorUser)->patch("/my-leave/{$leave->id}/approve")->assertRedirect();
-    $this->actingAs($hr)->patch("/attendance/leave/{$leave->id}/approve")->assertRedirect();
 
     // Rute pembatalan cuti sudah tidak ada — pengajuan yang disetujui bersifat final.
     $this->actingAs($hr)->patch("/attendance/leave/{$leave->id}/cancel")->assertNotFound();
-    expect($leave->fresh()->status)->toBe(App\Enums\LeaveRequestStatus::Approved);
+    expect($leave->fresh()->status)->toBe(LeaveRequestStatus::Approved);
 });
 
 test('an employee cancelling their own request tells the supervisor waiting on it', function () {

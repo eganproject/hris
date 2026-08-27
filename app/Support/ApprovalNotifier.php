@@ -144,21 +144,6 @@ class ApprovalNotifier
         ));
     }
 
-    public function leavePendingHr(LeaveRequest $leave): void
-    {
-        $leave->loadMissing('employee', 'leaveType', 'supervisorApprover');
-
-        $approver = $leave->supervisorApprover?->name;
-
-        $this->toPermission(self::LEAVE_APPROVER, new ApprovalNotification(
-            title: $this->leaveType($leave).' menunggu persetujuan HR',
-            message: $leave->employee?->full_name.' — '.$this->leaveType($leave).' '.$this->leavePeriod($leave).'.'
-                .' Sudah disetujui atasan'.($approver ? ' ('.$approver.')' : '').', menunggu keputusan HR.',
-            url: route('attendance.leave.index'),
-            category: 'leave',
-        ), $leave->employee);
-    }
-
     /** "Sen, 10 Feb 2026 (masuk 08:00, keluar 17:00)" */
     private function correctionPeriod(AttendanceCorrection $correction): string
     {

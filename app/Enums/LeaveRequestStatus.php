@@ -2,10 +2,17 @@
 
 namespace App\Enums;
 
+/**
+ * Persetujuan cuti satu tahap: keputusan atasan bersifat final.
+ *
+ * PendingHr bukan tahap kedua, melainkan jalan keluar — dipakai untuk karyawan yang
+ * belum punya atasan (tidak ada yang bisa memutuskan) dan untuk pengajuan lama yang
+ * terlanjur mengantre di HR sebelum alurnya diringkas. Lihat LeaveWorkflow.
+ */
 enum LeaveRequestStatus: string
 {
-    case PendingSupervisor = 'pending_supervisor'; // menunggu atasan
-    case PendingHr = 'pending_hr';                 // menunggu HR
+    case PendingSupervisor = 'pending_supervisor'; // menunggu atasan — jalur normal
+    case PendingHr = 'pending_hr';                 // menunggu HR — tanpa atasan / sisa antrean lama
     case Approved = 'approved';
     case Rejected = 'rejected';
     case Cancelled = 'cancelled';

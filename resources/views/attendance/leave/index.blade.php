@@ -133,7 +133,7 @@
                                         <x-action-menu>
                                             <form method="POST" action="{{ route('attendance.leave.approve', $leaveRequest) }}" data-no-confirm="true">
                                                 @csrf @method('PATCH')
-                                                <button type="submit" class="action-menu-item"><x-icon name="user-check"/> {{ $leaveRequest->status === \App\Enums\LeaveRequestStatus::PendingSupervisor ? 'Setujui (Atasan)' : 'Setujui (HR)' }}</button>
+                                                <button type="submit" class="action-menu-item"><x-icon name="user-check"/> Setujui</button>
                                             </form>
                                             <form method="POST" action="{{ route('attendance.leave.reject', $leaveRequest) }}" data-no-confirm="true">
                                                 @csrf @method('PATCH')

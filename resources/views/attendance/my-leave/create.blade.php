@@ -45,7 +45,7 @@
                 </div>
                 <x-attachment-field name="attachment" />
             </div>
-            <p class="mt-4 rounded-md bg-gray-50 px-3 py-2 text-xs text-gray-500">Pengajuan akan diteruskan ke atasan Anda, lalu ke HR untuk persetujuan akhir.</p>
+            <p class="mt-4 rounded-md bg-gray-50 px-3 py-2 text-xs text-gray-500">Pengajuan akan diteruskan ke atasan Anda, dan keputusan atasan bersifat final. Bila Anda belum punya atasan, HR yang memutuskan.</p>
         </section>
 
         <div class="flex justify-end">

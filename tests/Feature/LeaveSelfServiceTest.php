@@ -77,9 +77,10 @@ test('the supervisor approves a subordinate request from self-service', function
 
     $leave = LeaveRequest::query()->firstOrFail();
 
-    // The boss sees & approves it.
+    // Atasan menyetujui, dan keputusannya langsung final.
     $this->actingAs($bossUser)->patch(route('my-leave.approve', $leave))->assertRedirect(route('my-leave.index'));
-    expect($leave->refresh()->status)->toBe(LeaveRequestStatus::PendingHr);
+    expect($leave->refresh()->status)->toBe(LeaveRequestStatus::Approved)
+        ->and($leave->approved_by)->toBe($bossUser->id);
 
     // A different employee cannot act on it.
     [$otherUser] = employeeAccount(name: 'Orang Lain');
@@ -180,10 +181,69 @@ test('a failure while syncing attendance rolls the leave approval back', functio
 
     $this->actingAs($hr);
 
-    expect(fn () => app(LeaveWorkflow::class)->hrApprove($leave->fresh(), $hr))
+    expect(fn () => app(LeaveWorkflow::class)->approve($leave->fresh(), $hr))
         ->toThrow(RuntimeException::class);
 
     expect($resolver->calls)->toBe(2)
         ->and($leave->fresh()->status)->toBe(LeaveRequestStatus::PendingHr)
         ->and(Attendance::query()->where('employee_id', $employee->id)->count())->toBe(0);
+});
+
+test('a supervisor decision is final — HR gets no second turn', function () {
+    [$bossUser, $boss] = employeeAccount(name: 'Bos');
+    [$user] = employeeAccount(manager: $boss, name: 'Budi');
+    $type = LeaveType::query()->create(['code' => 'IZ', 'name' => 'Izin', 'attendance_status' => 'leave', 'is_paid' => true, 'is_active' => true]);
+
+    app(PermissionRegistrar::class)->forgetCachedPermissions();
+    foreach (['leave.view', 'leave.update', 'attendance.view.all'] as $p) {
+        Permission::findOrCreate($p, 'web');
+    }
+    $hr = User::factory()->create();
+    $hr->givePermissionTo(['leave.view', 'leave.update', 'attendance.view.all']);
+
+    $this->actingAs($user)->post('/my-leave', [
+        'leave_type_id' => $type->id,
+        'start_date' => now()->addDays(3)->format('Y-m-d'),
+        'end_date' => now()->addDays(3)->format('Y-m-d'),
+    ])->assertRedirect(route('my-leave.index'));
+
+    $leave = LeaveRequest::query()->firstOrFail();
+
+    $this->actingAs($bossUser)->patch(route('my-leave.approve', $leave))->assertRedirect();
+
+    expect($leave->refresh()->status)->toBe(LeaveRequestStatus::Approved);
+
+    // Sudah final: HR tidak bisa memutuskannya lagi.
+    $this->actingAs($hr)->patch("/attendance/leave/{$leave->id}/approve")->assertForbidden();
+    $this->actingAs($hr)->patch("/attendance/leave/{$leave->id}/reject")->assertForbidden();
+});
+
+test('an employee with no supervisor still has HR as the decider', function () {
+    // Tanpa atasan tidak ada yang bisa memutuskan, jadi HR tetap jadi jalan keluarnya
+    // — kalau tidak, pengajuannya menggantung selamanya.
+    [$user, $employee] = employeeAccount(name: 'Tanpa Atasan');
+    $type = LeaveType::query()->create(['code' => 'IZ', 'name' => 'Izin', 'attendance_status' => 'leave', 'is_paid' => true, 'is_active' => true]);
+
+    app(PermissionRegistrar::class)->forgetCachedPermissions();
+    foreach (['leave.view', 'leave.update', 'attendance.view.all'] as $p) {
+        Permission::findOrCreate($p, 'web');
+    }
+    $hr = User::factory()->create();
+    $hr->givePermissionTo(['leave.view', 'leave.update', 'attendance.view.all']);
+
+    $this->actingAs($user)->post('/my-leave', [
+        'leave_type_id' => $type->id,
+        'start_date' => now()->addDays(3)->format('Y-m-d'),
+        'end_date' => now()->addDays(3)->format('Y-m-d'),
+    ])->assertRedirect(route('my-leave.index'));
+
+    $leave = LeaveRequest::query()->firstOrFail();
+
+    expect($leave->supervisor_id)->toBeNull()
+        ->and($leave->status)->toBe(LeaveRequestStatus::PendingHr);
+
+    $this->actingAs($hr)->patch("/attendance/leave/{$leave->id}/approve")->assertRedirect();
+
+    expect($leave->refresh()->status)->toBe(LeaveRequestStatus::Approved)
+        ->and($leave->approved_by)->toBe($hr->id);
 });

@@ -159,7 +159,7 @@ test('a national holiday can be created and applies to a branch', function () {
         ->and(Holiday::query()->appliesTo(123)->whereDate('date', '2026-08-17')->exists())->toBeTrue();
 });
 
-test('an admin leave request for an employee with a manager needs two approvals', function () {
+test('an admin leave request for an employee with a manager is decided in one step', function () {
     $user = attendanceManager();
     $manager = Employee::query()->create(['full_name' => 'Bos', 'employment_status' => 'active']);
     $employee = Employee::query()->create(['full_name' => 'Budi', 'employment_status' => 'active', 'manager_id' => $manager->id]);
@@ -183,11 +183,7 @@ test('an admin leave request for an employee with a manager needs two approvals'
         ->and($leave->days)->toBe(3)
         ->and($leave->leaveType->attendance_status)->toBe(AttendanceStatus::Leave);
 
-    // First approval advances to HR step.
-    $this->actingAs($user)->patch("/attendance/leave/{$leave->id}/approve")->assertRedirect('/attendance/leave');
-    expect($leave->refresh()->status)->toBe(LeaveRequestStatus::PendingHr);
-
-    // Second approval finalises.
+    // Satu persetujuan langsung final — tidak ada lagi tahap kedua.
     $this->actingAs($user)->patch("/attendance/leave/{$leave->id}/approve")->assertRedirect('/attendance/leave');
     $leave->refresh();
 
