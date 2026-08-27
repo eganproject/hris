@@ -122,3 +122,98 @@ test('the overtime monitor filters by status and division', function () {
     $this->actingAs($user)->get(route('attendance.overtime.index', ['month' => $month, 'status' => OvertimeApproval::STATUS_PENDING]))
         ->assertOk()->assertSee('Keuangan Kevin')->assertDontSee('Operasional Otto');
 });
+
+test('the employee list filters by job position and by role', function () {
+    $user = employeeManager();
+    ['branch' => $branch, 'department' => $department, 'position' => $staff] = hrMasterData();
+
+    $manager = App\Models\JobPosition::query()->create(['name' => 'Manajer Produksi', 'is_active' => true]);
+    $hrRole = Spatie\Permission\Models\Role::findOrCreate('hr-manager', 'web');
+
+    $make = function (string $name, App\Models\JobPosition $position, ?Spatie\Permission\Models\Role $role = null) use ($branch, $department) {
+        $account = null;
+
+        if ($role) {
+            $account = User::factory()->create();
+            $account->assignRole($role);
+        }
+
+        return Employee::query()->create([
+            'user_id' => $account?->id,
+            'branch_id' => $branch->id,
+            'department_id' => $department->id,
+            'job_position_id' => $position->id,
+            'full_name' => $name,
+            'join_date' => now()->subMonth()->toDateString(),
+            'employment_status' => 'active',
+        ]);
+    };
+
+    $make('Staf Biasa', $staff);
+    $make('Bos Produksi', $manager);
+    $make('Staf Ber-HR', $staff, $hrRole);
+
+    // Jabatan menyaring tanpa menyentuh yang lain.
+    $this->actingAs($user)->get('/employees?job_position_id='.$manager->id)
+        ->assertOk()
+        ->assertSee('Bos Produksi')
+        ->assertDontSee('Staf Biasa');
+
+    // Role hanya cocok pada karyawan yang punya akun login dengan role itu.
+    $this->actingAs($user)->get('/employees?role_id='.$hrRole->id)
+        ->assertOk()
+        ->assertSee('Staf Ber-HR')
+        ->assertDontSee('Bos Produksi');
+
+    // Keduanya bisa dipakai bersama, dan menyempit dengan benar.
+    $this->actingAs($user)->get('/employees?job_position_id='.$staff->id.'&role_id='.$hrRole->id)
+        ->assertOk()
+        ->assertSee('Staf Ber-HR')
+        ->assertDontSee('Staf Biasa');
+});
+
+test('the employee filters stay collapsed until one of them is in use', function () {
+    $user = employeeManager();
+    ['position' => $position] = hrMasterData();
+
+    // Tanpa penyaring: panelnya tertutup, dan tidak ada chip yang ditampilkan.
+    $plain = $this->actingAs($user)->get('/employees')->assertOk()->getContent();
+
+    // Ambil tag panelnya saja: kata "hidden" muncul di banyak tempat lain.
+    $panelTag = function (string $html): string {
+        preg_match('/<div id="employee-filters"[^>]*>/', $html, $matches);
+
+        return $matches[0] ?? '';
+    };
+
+    expect($panelTag($plain))->toContain('hidden')
+        ->and($plain)->not->toContain('Filter aktif');
+
+    // Dengan penyaring aktif: panel terbuka sendiri dan chipnya menyebut nilainya.
+    $filtered = $this->actingAs($user)->get('/employees?job_position_id='.$position->id)->assertOk()->getContent();
+
+    expect($panelTag($filtered))->not->toContain('hidden')
+        ->and($filtered)->toContain('Filter aktif')
+        ->and($filtered)->toContain($position->name);
+});
+
+test('the employee export narrows by the same filters as the list', function () {
+    $user = employeeManager();
+    ['branch' => $branch, 'department' => $department, 'position' => $staff] = hrMasterData();
+
+    $manager = App\Models\JobPosition::query()->create(['name' => 'Manajer Produksi', 'is_active' => true]);
+
+    foreach ([['Staf Biasa', $staff], ['Bos Produksi', $manager]] as [$name, $position]) {
+        Employee::query()->create([
+            'branch_id' => $branch->id, 'department_id' => $department->id,
+            'job_position_id' => $position->id, 'full_name' => $name,
+            'join_date' => now()->subMonth()->toDateString(), 'employment_status' => 'active',
+        ]);
+    }
+
+    // Dulu export menyusun kondisinya sendiri dan tidak mengenal jabatan, sehingga
+    // file yang diunduh berisi lebih banyak baris daripada yang tampil di layar.
+    $rows = (new App\Exports\EmployeesExport(['job_position_id' => $manager->id], $user))->query()->get();
+
+    expect($rows->pluck('full_name')->all())->toBe(['Bos Produksi']);
+});

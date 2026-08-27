@@ -39,17 +39,9 @@ class EmployeesExport implements FromQuery, ShouldAutoSize, WithHeadings, WithMa
         return Employee::query()
             ->with(['branch', 'department', 'jobPosition', 'manager', 'currentContract', 'deviceMappings'])
             ->when($this->user, fn ($q) => $q->visibleTo($this->user))
-            ->byBranch($this->filters['branch_id'] ?? null)
-            ->byDepartment($this->filters['department_id'] ?? null)
-            ->when($this->filters['status'] ?? null, fn ($q, $status) => $q->where('employment_status', $status))
-            ->when($this->filters['exit_reason'] ?? null, fn ($q, $reason) => $q->where('exit_reason', $reason))
-            ->when($this->filters['search'] ?? null, function ($q, string $search) {
-                $q->where(function ($q) use ($search) {
-                    $q->where('employee_number', 'like', "%{$search}%")
-                        ->orWhere('full_name', 'like', "%{$search}%")
-                        ->orWhere('email', 'like', "%{$search}%");
-                });
-            })
+            // Aturannya sama persis dengan yang dipakai halaman daftar, bukan salinan
+            // — lihat Employee::scopeMatchingFilters().
+            ->matchingFilters($this->filters)
             ->latest('join_date');
     }
 

@@ -70,70 +70,191 @@
             </x-stat-card>
         </section>
 
-        <section class="rounded-lg border border-gray-200 bg-white p-5 shadow-sm">
-            <form method="GET" action="{{ route('employees.index') }}" class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-7">
-                <div class="xl:col-span-2">
-                    <label for="search" class="block text-sm font-medium text-gray-700">Cari</label>
-                    <input id="search" name="search" value="{{ $filters['search'] ?? '' }}" class="mt-2 block w-full rounded-md border border-gray-300 bg-white px-3 py-2.5 text-sm shadow-xs outline-none focus:border-primary focus:ring-2 focus:ring-primary/20" placeholder="Nama, kode karyawan, email">
+        {{-- Pencarian selalu terlihat; penyaring lain dilipat di panel bawahnya supaya
+             halaman tidak dipenuhi delapan kotak sekaligus. Yang sedang aktif tetap
+             terbaca sebagai chip, jadi tidak ada penyaring yang menyempitkan hasil
+             diam-diam dari balik panel yang tertutup. --}}
+        @php
+            $chipFor = function (string $key, string $label, ?string $value) {
+                return $value === null || $value === '' ? null : [
+                    'label' => $label,
+                    'value' => $value,
+                    // Buang satu penyaring saja, sisanya dipertahankan.
+                    'remove' => request()->fullUrlWithQuery([$key => null, 'page' => null]),
+                ];
+            };
+
+            $named = fn ($collection, $id) => $id ? optional($collection->firstWhere('id', (int) $id))->name : null;
+
+            $activeFilters = array_values(array_filter([
+                $chipFor('search', 'Cari', $filters['search'] ?? null),
+                $chipFor('branch_id', 'Lokasi', $named($branches, $filters['branch_id'] ?? null)),
+                $chipFor('department_id', 'Divisi', $named($departments, $filters['department_id'] ?? null)),
+                $chipFor('job_position_id', 'Jabatan', $named($jobPositions, $filters['job_position_id'] ?? null)),
+                $chipFor('role_id', 'Role', $named($roles, $filters['role_id'] ?? null)),
+                $chipFor('status', 'Status', $statuses[$filters['status'] ?? ''] ?? null),
+                $chipFor('exit_reason', 'Alasan keluar', $exitReasons[$filters['exit_reason'] ?? ''] ?? null),
+                ($filters['contract'] ?? '') === 'expiring'
+                    ? ['label' => 'Kontrak', 'value' => 'Berakhir ≤ 30 hari', 'remove' => request()->fullUrlWithQuery(['contract' => null, 'page' => null])]
+                    : null,
+            ]));
+
+            // Pencarian punya kotaknya sendiri di luar panel, jadi tidak ikut dihitung.
+            $panelCount = count(array_filter([
+                $filters['branch_id'] ?? null, $filters['department_id'] ?? null,
+                $filters['job_position_id'] ?? null, $filters['role_id'] ?? null,
+                $filters['status'] ?? null, $filters['exit_reason'] ?? null,
+            ]));
+
+            $selectClass = 'mt-2 block w-full rounded-md border border-gray-300 bg-white px-3 py-2.5 text-sm shadow-xs outline-none focus:border-primary focus:ring-2 focus:ring-primary/20';
+        @endphp
+
+        <section class="overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm">
+            <form method="GET" action="{{ route('employees.index') }}">
+                <div class="flex flex-col gap-3 p-4 sm:flex-row sm:items-center">
+                    <div class="flex-1">
+                        <label for="search" class="sr-only">Cari karyawan</label>
+                        <input id="search" name="search" value="{{ $filters['search'] ?? '' }}"
+                            class="block w-full rounded-md border border-gray-300 bg-white px-3 py-2.5 text-sm shadow-xs outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
+                            placeholder="Cari nama, kode karyawan, atau email">
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <button type="submit" class="rounded-md bg-primary px-4 py-2.5 text-sm font-semibold text-white shadow-xs transition hover:bg-primary-hover focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2">
+                            Cari
+                        </button>
+                        <button type="button" data-filter-toggle aria-controls="employee-filters" aria-expanded="{{ $panelCount > 0 ? 'true' : 'false' }}"
+                            class="inline-flex items-center gap-1.5 rounded-md border border-gray-200 bg-white px-4 py-2.5 text-sm font-medium text-gray-700 shadow-xs transition hover:bg-gray-50">
+                            <x-icon name="filter" class="size-4"/> Filter
+                            @if ($panelCount > 0)
+                                <span class="rounded-full bg-primary/10 px-1.5 py-0.5 text-[11px] font-semibold text-primary">{{ $panelCount }}</span>
+                            @endif
+                            <x-icon name="chevron-down" class="size-4 text-gray-400 transition" data-filter-chevron/>
+                        </button>
+                    </div>
                 </div>
-                <div>
-                    <label for="branch_id" class="block text-sm font-medium text-gray-700">Lokasi</label>
-                    <select id="branch_id" name="branch_id" class="mt-2 block w-full rounded-md border border-gray-300 bg-white px-3 py-2.5 text-sm shadow-xs outline-none focus:border-primary focus:ring-2 focus:ring-primary/20">
-                        <option value="">Semua lokasi</option>
-                        @foreach ($branches as $branch)
-                            <option value="{{ $branch->id }}" @selected(($filters['branch_id'] ?? '') == $branch->id)>
-                                {{ $branch->name }}
-                            </option>
+
+                @if ($activeFilters)
+                    <div class="flex flex-wrap items-center gap-2 border-t border-gray-100 bg-gray-50/60 px-4 py-3">
+                        <span class="text-xs font-medium text-gray-500">Filter aktif</span>
+                        @foreach ($activeFilters as $chip)
+                            <a href="{{ $chip['remove'] }}" title="Hapus filter {{ $chip['label'] }}"
+                                class="group inline-flex items-center gap-1.5 rounded-full border border-gray-200 bg-white py-1 pl-2.5 pr-1.5 text-xs text-gray-700 shadow-xs transition hover:border-red-200 hover:bg-red-50 hover:text-red-700">
+                                <span class="text-gray-400 group-hover:text-red-400">{{ $chip['label'] }}:</span>
+                                <span class="font-medium">{{ $chip['value'] }}</span>
+                                <x-icon name="x" class="size-3.5 text-gray-400 group-hover:text-red-500"/>
+                            </a>
                         @endforeach
-                    </select>
-                </div>
-                <div>
-                    <label for="department_id" class="block text-sm font-medium text-gray-700">Divisi</label>
-                    <select id="department_id" name="department_id" class="mt-2 block w-full rounded-md border border-gray-300 bg-white px-3 py-2.5 text-sm shadow-xs outline-none focus:border-primary focus:ring-2 focus:ring-primary/20">
-                        <option value="">Semua divisi</option>
-                        @foreach ($departments as $department)
-                            <option value="{{ $department->id }}" @selected(($filters['department_id'] ?? '') == $department->id)>
-                                {{ $department->name }}
-                            </option>
-                        @endforeach
-                    </select>
-                </div>
-                <div>
-                    <label for="status" class="block text-sm font-medium text-gray-700">Status</label>
-                    <select id="status" name="status" class="mt-2 block w-full rounded-md border border-gray-300 bg-white px-3 py-2.5 text-sm shadow-xs outline-none focus:border-primary focus:ring-2 focus:ring-primary/20">
-                        <option value="">Semua status</option>
-                        @foreach ($statuses as $value => $label)
-                            <option value="{{ $value }}" @selected(($filters['status'] ?? '') === $value)>{{ $label }}</option>
-                        @endforeach
-                    </select>
-                </div>
-                <div>
-                    <label for="exit_reason" class="block text-sm font-medium text-gray-700">Alasan Keluar</label>
-                    <select id="exit_reason" name="exit_reason" class="mt-2 block w-full rounded-md border border-gray-300 bg-white px-3 py-2.5 text-sm shadow-xs outline-none focus:border-primary focus:ring-2 focus:ring-primary/20">
-                        <option value="">Semua alasan</option>
-                        @foreach ($exitReasons as $value => $label)
-                            <option value="{{ $value }}" @selected(($filters['exit_reason'] ?? '') === $value)>{{ $label }}</option>
-                        @endforeach
-                    </select>
-                </div>
-                <div>
-                    <label for="per_page" class="block text-sm font-medium text-gray-700">Per halaman</label>
-                    <select id="per_page" name="per_page" class="mt-2 block w-full rounded-md border border-gray-300 bg-white px-3 py-2.5 text-sm shadow-xs outline-none focus:border-primary focus:ring-2 focus:ring-primary/20">
-                        @foreach ([10, 15, 25, 50, 100] as $option)
-                            <option value="{{ $option }}" @selected(($perPage ?? 15) === $option)>{{ $option }}</option>
-                        @endforeach
-                    </select>
-                </div>
-                <div class="col-span-full flex flex-col gap-2 border-t border-gray-100 pt-4 sm:flex-row sm:justify-end">
-                    <button type="submit" class="w-full rounded-md bg-primary px-4 py-2.5 text-sm font-semibold text-white shadow-xs transition hover:bg-primary-hover focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 sm:w-auto">
-                        Filter
-                    </button>
-                    <a href="{{ route('employees.index') }}" class="w-full rounded-md border border-gray-200 px-4 py-2.5 text-center text-sm font-medium text-gray-700 transition hover:bg-gray-50 sm:w-auto">
-                        Reset
-                    </a>
+                        <a href="{{ route('employees.index') }}" class="ml-1 text-xs font-medium text-gray-500 underline decoration-dotted underline-offset-2 transition hover:text-gray-800">Hapus semua</a>
+                    </div>
+                @endif
+
+                {{-- Terbuka sendiri saat ada penyaring aktif di dalamnya, supaya
+                     pengguna langsung melihat apa yang sedang menyempitkan hasil. --}}
+                <div id="employee-filters" data-filter-panel @unless ($panelCount > 0) hidden @endunless class="border-t border-gray-100 p-4">
+                    <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                        <div>
+                            <label for="branch_id" class="block text-sm font-medium text-gray-700">Lokasi</label>
+                            <select id="branch_id" name="branch_id" class="{{ $selectClass }}">
+                                <option value="">Semua lokasi</option>
+                                @foreach ($branches as $branch)
+                                    <option value="{{ $branch->id }}" @selected(($filters['branch_id'] ?? '') == $branch->id)>{{ $branch->name }}</option>
+                                @endforeach
+                            </select>
+                        </div>
+                        <div>
+                            <label for="department_id" class="block text-sm font-medium text-gray-700">Divisi</label>
+                            <select id="department_id" name="department_id" class="{{ $selectClass }}">
+                                <option value="">Semua divisi</option>
+                                @foreach ($departments as $department)
+                                    <option value="{{ $department->id }}" @selected(($filters['department_id'] ?? '') == $department->id)>{{ $department->name }}</option>
+                                @endforeach
+                            </select>
+                        </div>
+                        <div>
+                            <label for="job_position_id" class="block text-sm font-medium text-gray-700">Jabatan</label>
+                            <select id="job_position_id" name="job_position_id" class="{{ $selectClass }}">
+                                <option value="">Semua jabatan</option>
+                                @foreach ($jobPositions as $position)
+                                    <option value="{{ $position->id }}" @selected(($filters['job_position_id'] ?? '') == $position->id)>{{ $position->name }}</option>
+                                @endforeach
+                            </select>
+                        </div>
+                        <div>
+                            <label for="role_id" class="block text-sm font-medium text-gray-700">Role</label>
+                            <select id="role_id" name="role_id" class="{{ $selectClass }}">
+                                <option value="">Semua role</option>
+                                @foreach ($roles as $role)
+                                    <option value="{{ $role->id }}" @selected(($filters['role_id'] ?? '') == $role->id)>{{ $role->name }}</option>
+                                @endforeach
+                            </select>
+                            <p class="mt-1 text-xs text-gray-400">Hanya karyawan yang punya akun login.</p>
+                        </div>
+                        <div>
+                            <label for="status" class="block text-sm font-medium text-gray-700">Status</label>
+                            <select id="status" name="status" class="{{ $selectClass }}">
+                                <option value="">Semua status</option>
+                                @foreach ($statuses as $value => $label)
+                                    <option value="{{ $value }}" @selected(($filters['status'] ?? '') === $value)>{{ $label }}</option>
+                                @endforeach
+                            </select>
+                        </div>
+                        <div>
+                            <label for="exit_reason" class="block text-sm font-medium text-gray-700">Alasan Keluar</label>
+                            <select id="exit_reason" name="exit_reason" class="{{ $selectClass }}">
+                                <option value="">Semua alasan</option>
+                                @foreach ($exitReasons as $value => $label)
+                                    <option value="{{ $value }}" @selected(($filters['exit_reason'] ?? '') === $value)>{{ $label }}</option>
+                                @endforeach
+                            </select>
+                        </div>
+                        <div>
+                            <label for="per_page" class="block text-sm font-medium text-gray-700">Per halaman</label>
+                            <select id="per_page" name="per_page" class="{{ $selectClass }}">
+                                @foreach ([10, 15, 25, 50, 100] as $option)
+                                    <option value="{{ $option }}" @selected(($perPage ?? 15) === $option)>{{ $option }}</option>
+                                @endforeach
+                            </select>
+                        </div>
+                    </div>
+                    <div class="mt-4 flex flex-col gap-2 border-t border-gray-100 pt-4 sm:flex-row sm:justify-end">
+                        <a href="{{ route('employees.index') }}" class="w-full rounded-md border border-gray-200 px-4 py-2.5 text-center text-sm font-medium text-gray-700 transition hover:bg-gray-50 sm:w-auto">Reset</a>
+                        <button type="submit" class="w-full rounded-md bg-primary px-4 py-2.5 text-sm font-semibold text-white shadow-xs transition hover:bg-primary-hover sm:w-auto">Terapkan Filter</button>
+                    </div>
                 </div>
             </form>
         </section>
+
+        {{-- Di luar blok aksi massal: menyaring daftar tidak butuh hak ubah/hapus,
+             jadi tombolnya harus tetap berfungsi bagi pengguna yang hanya melihat. --}}
+        @push('scripts')
+        <script>
+            // Panel filter dilipat secara bawaan, dan terbuka sendiri saat ada
+            // penyaring aktif di dalamnya (ditentukan server — lihat $panelCount).
+            (function () {
+                const toggle = document.querySelector('[data-filter-toggle]');
+                const panel = document.querySelector('[data-filter-panel]');
+                const chevron = document.querySelector('[data-filter-chevron]');
+
+                if (!toggle || !panel) return;
+
+                const sync = () => {
+                    toggle.setAttribute('aria-expanded', panel.hidden ? 'false' : 'true');
+                    chevron?.classList.toggle('rotate-180', !panel.hidden);
+                };
+
+                toggle.addEventListener('click', () => {
+                    panel.hidden = !panel.hidden;
+                    sync();
+
+                    if (!panel.hidden) {
+                        panel.querySelector('select')?.focus();
+                    }
+                });
+
+                sync();
+            })();
+        </script>
+        @endpush
 
         @can('employees.update')
             @if ($bulkError = session('bulk_error'))

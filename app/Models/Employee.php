@@ -409,6 +409,39 @@ class Employee extends Model
         }));
     }
 
+    /**
+     * Seluruh penyaring daftar karyawan dalam satu tempat, dipakai bersama oleh
+     * tabelnya, kartu ringkasan di atasnya, dan export Excel.
+     *
+     * Dulu ketiganya menyusun kondisinya sendiri-sendiri, dan sudah mulai menyimpang:
+     * export tidak pernah ikut menyaring "kontrak akan berakhir", sehingga file yang
+     * diunduh berisi lebih banyak baris daripada yang tampil di layar.
+     *
+     * Kunci yang tidak dikenali diabaikan, jadi pemanggil boleh meneruskan seluruh
+     * query string apa adanya.
+     *
+     * @param  array<string, mixed>  $filters
+     */
+    public function scopeMatchingFilters(Builder $query, array $filters): void
+    {
+        $value = fn (string $key) => $filters[$key] ?? null;
+
+        $query
+            ->byBranch($value('branch_id'))
+            ->byDepartment($value('department_id'))
+            ->when($value('job_position_id'), fn (Builder $q, $id) => $q->where('job_position_id', $id))
+            // Role menempel pada akun login, bukan pada karyawan: karyawan tanpa akun
+            // memang tidak pernah cocok dengan penyaring ini.
+            ->when($value('role_id'), fn (Builder $q, $id) => $q->whereHas('user.roles', fn (Builder $r) => $r->where('roles.id', $id)))
+            ->when($value('status'), fn (Builder $q, $status) => $q->where('employment_status', $status))
+            ->when($value('exit_reason'), fn (Builder $q, $reason) => $q->where('exit_reason', $reason))
+            ->when($value('contract') === 'expiring', fn (Builder $q) => $q->whereHas('contracts', fn ($c) => $c->expiringWithin(30)))
+            ->when($value('search'), fn (Builder $q, string $search) => $q->where(fn (Builder $inner) => $inner
+                ->where('employee_number', 'like', "%{$search}%")
+                ->orWhere('full_name', 'like', "%{$search}%")
+                ->orWhere('email', 'like', "%{$search}%")));
+    }
+
     public function getContractTenureAttribute(): ?string
     {
         $contract = $this->currentContract;

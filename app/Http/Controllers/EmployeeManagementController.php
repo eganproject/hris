@@ -35,32 +35,29 @@ use Symfony\Component\HttpFoundation\BinaryFileResponse;
 
 class EmployeeManagementController extends Controller
 {
+    /**
+     * Penyaring daftar karyawan. Satu daftar dipakai bersama halaman daftar dan
+     * export, supaya file yang diunduh selalu berisi baris yang sama dengan layar.
+     */
+    private const LIST_FILTERS = [
+        'search', 'branch_id', 'department_id', 'job_position_id',
+        'role_id', 'status', 'exit_reason', 'contract',
+    ];
+
     public function index(Request $request): View
     {
         $this->deactivateExpiredContractsDaily();
 
         $user = $request->user();
-        $filters = $request->only(['branch_id', 'department_id', 'status', 'exit_reason', 'search', 'contract']);
+        $filters = $request->only(self::LIST_FILTERS);
         $perPage = min(max((int) $request->input('per_page', 15), 10), 100);
 
         // Shared filtering so the summary cards always reflect the same dataset the
         // table shows. Applied to a fresh query for each card count. The scope comes
-        // first: the branch/department filters can only narrow it further, never widen it.
+        // first: the filters can only narrow it further, never widen it.
         $applyFilters = fn (Builder $query): Builder => $query
             ->visibleTo($user)
-            ->byBranch($filters['branch_id'] ?? null)
-            ->byDepartment($filters['department_id'] ?? null)
-            ->when($filters['status'] ?? null, fn ($query, string $status) => $query->where('employment_status', $status))
-            ->when($filters['exit_reason'] ?? null, fn ($query, string $exitReason) => $query->where('exit_reason', $exitReason))
-            ->when(($filters['contract'] ?? null) === 'expiring', fn ($query) => $query->whereHas('contracts', fn ($c) => $c->expiringWithin(30)))
-            ->when($filters['search'] ?? null, function ($query, string $search) {
-                $query->where(function ($query) use ($search) {
-                    $query
-                        ->where('employee_number', 'like', "%{$search}%")
-                        ->orWhere('full_name', 'like', "%{$search}%")
-                        ->orWhere('email', 'like', "%{$search}%");
-                });
-            });
+            ->matchingFilters($filters);
 
         $employees = $applyFilters(
             Employee::query()
@@ -76,6 +73,8 @@ class EmployeeManagementController extends Controller
             'employees' => $employees,
             'branches' => $this->scopedBranches($user),
             'departments' => $this->scopedDepartments($user),
+            'jobPositions' => JobPosition::query()->where('is_active', true)->orderBy('name')->get(),
+            'roles' => Role::query()->where('guard_name', 'web')->orderBy('name')->get(),
             'hasNoScope' => $user->hasNoDataScope(User::SCOPE_BYPASS_EMPLOYEES),
             'summary' => [
                 'total' => $applyFilters(Employee::query())->count(),
@@ -213,11 +212,9 @@ class EmployeeManagementController extends Controller
      */
     public function export(Request $request): BinaryFileResponse
     {
-        $filters = $request->only(['branch_id', 'department_id', 'status', 'exit_reason', 'search']);
-
         // The export must never be a way around the scope the list applies.
         return Excel::download(
-            new EmployeesExport($filters, $request->user()),
+            new EmployeesExport($request->only(self::LIST_FILTERS), $request->user()),
             'data-karyawan-'.now()->format('Y-m-d').'.xlsx',
         );
     }
