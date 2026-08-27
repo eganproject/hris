@@ -291,7 +291,9 @@
 
                 @can('employees.update')
                     @php
-                        $renewHasErrors = $errors->hasAny(['contract_number', 'contract_type', 'start_date', 'end_date']);
+                        // contract_document ikut didaftar: kalau tidak, berkas yang
+                        // ditolak membuat panelnya tetap tertutup tanpa pesan apa pun.
+                        $renewHasErrors = $errors->hasAny(['contract_number', 'contract_type', 'start_date', 'end_date', 'contract_document']);
                         $isReactivation = $employee->isInactive();
                     @endphp
                     <section class="rounded-lg border border-gray-200 bg-white p-6 shadow-sm" data-renew-form>

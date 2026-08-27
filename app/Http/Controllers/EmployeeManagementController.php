@@ -616,6 +616,12 @@ class EmployeeManagementController extends Controller
             'entries.*.start_date' => ['required', 'date'],
             'entries.*.end_date' => ['nullable', 'date'],
             'entries.*.notes' => ['nullable', 'string', 'max:1000'],
+            // Opsional, dan berbeda per karyawan: wizard-nya memang mengumpulkan data
+            // satu per satu, jadi tiap entri boleh membawa dokumennya sendiri.
+            'entries.*.contract_document' => ['nullable', 'file', 'mimes:pdf', 'max:'.(EmployeeContract::DOCUMENT_MAX_MB * 1024)],
+        ], [
+            'entries.*.contract_document.mimes' => 'Dokumen kontrak harus berupa berkas PDF.',
+            'entries.*.contract_document.max' => 'Ukuran dokumen kontrak maksimal '.EmployeeContract::DOCUMENT_MAX_MB.' MB.',
         ]);
 
         if ($validator->fails()) {
@@ -683,6 +689,9 @@ class EmployeeManagementController extends Controller
                     'status' => 'active',
                     'notes' => $entry['notes'] ?? null,
                 ]);
+
+                // Dokumen menempel pada kontrak baru milik karyawan ini saja.
+                $this->syncContractDocument($new, $entry['contract_document'] ?? null);
 
                 $employee->recordEvent(
                     $wasInactive ? 'reactivated' : 'contract_renewed',

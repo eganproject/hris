@@ -64,6 +64,192 @@ test('both the add and edit pages offer the upload, and never demand it', functi
     $expectOptionalField($this->actingAs($user)->get("/employees/{$employee->id}/edit"));
 });
 
+test('every renew surface offers the upload too, not just the employee form', function () {
+    Storage::fake('local');
+
+    $user = employeeManager();
+    $master = hrMasterData();
+
+    $this->actingAs($user)
+        ->post('/employees', contractFormPayload($master, 'Berkontrak', 'CTR-DOC-SURF'))
+        ->assertRedirect('/employees');
+
+    $employee = Employee::query()->where('full_name', 'Berkontrak')->firstOrFail();
+
+    // Panel "Perpanjang Kontrak" di halaman detail, dan modal perpanjang di daftar
+    // karyawan — keduanya membuat kontrak baru, jadi keduanya harus bisa melampirkan.
+    $this->actingAs($user)->get("/employees/{$employee->id}")
+        ->assertOk()
+        ->assertSee('name="contract_document"', escape: false);
+
+    $this->actingAs($user)->get('/employees')
+        ->assertOk()
+        ->assertSee('name="contract_document"', escape: false);
+});
+
+test('renewing from the employee list attaches the document as well', function () {
+    Storage::fake('local');
+
+    $user = employeeManager();
+    $master = hrMasterData();
+
+    $this->actingAs($user)
+        ->post('/employees', contractFormPayload($master, 'Berkontrak', 'CTR-DOC-LIST'))
+        ->assertRedirect('/employees');
+
+    $employee = Employee::query()->where('full_name', 'Berkontrak')->firstOrFail();
+
+    $this->actingAs($user)
+        ->post("/employees/{$employee->id}/renew-contract", [
+            'from_list' => '1',
+            'contract_number' => 'CTR-DOC-LIST-R',
+            'contract_type' => 'PKWT',
+            'start_date' => '2027-07-05',
+            'end_date' => '2028-07-04',
+            'contract_document' => contractPdf('dari-daftar.pdf'),
+        ])
+        ->assertRedirect('/employees');
+
+    $new = EmployeeContract::query()->where('contract_number', 'CTR-DOC-LIST-R')->firstOrFail();
+
+    expect($new->document_name)->toBe('dari-daftar.pdf');
+
+    Storage::disk('local')->assertExists($new->document_path);
+});
+
+test('a rejected document reopens the renew modal instead of vanishing silently', function () {
+    Storage::fake('local');
+
+    $user = employeeManager();
+    $master = hrMasterData();
+
+    $this->actingAs($user)
+        ->post('/employees', contractFormPayload($master, 'Berkontrak', 'CTR-DOC-REJ'))
+        ->assertRedirect('/employees');
+
+    $employee = Employee::query()->where('full_name', 'Berkontrak')->firstOrFail();
+
+    $this->actingAs($user)
+        ->post("/employees/{$employee->id}/renew-contract", [
+            'from_list' => '1',
+            'contract_number' => 'CTR-DOC-REJ-R',
+            'contract_type' => 'PKWT',
+            'start_date' => '2027-07-05',
+            'end_date' => '2028-07-04',
+            'contract_document' => UploadedFile::fake()->image('bukan-pdf.jpg'),
+        ])
+        ->assertSessionHasErrors('contract_document')
+        // Tanpa flash ini modalnya tertutup dan galatnya tak pernah terlihat.
+        ->assertSessionHas('renew_employee');
+
+    expect(EmployeeContract::query()->where('contract_number', 'CTR-DOC-REJ-R')->exists())->toBeFalse();
+});
+
+test('bulk renew accepts a different document per employee', function () {
+    Storage::fake('local');
+
+    $user = employeeManager();
+    $master = hrMasterData();
+
+    foreach (['A', 'B'] as $suffix) {
+        $this->actingAs($user)
+            ->post('/employees', contractFormPayload($master, "Karyawan {$suffix}", "CTR-BULK-{$suffix}"))
+            ->assertRedirect('/employees');
+    }
+
+    $a = Employee::query()->where('full_name', 'Karyawan A')->firstOrFail();
+    $b = Employee::query()->where('full_name', 'Karyawan B')->firstOrFail();
+
+    $this->actingAs($user)
+        ->post('/employees/bulk/renew', [
+            'entries' => [
+                [
+                    'employee_id' => $a->id, 'contract_number' => 'CTR-BULK-A-R',
+                    'contract_type' => 'PKWT', 'start_date' => '2027-07-05', 'end_date' => '2028-07-04',
+                    'contract_document' => contractPdf('punya-a.pdf'),
+                ],
+                [
+                    'employee_id' => $b->id, 'contract_number' => 'CTR-BULK-B-R',
+                    'contract_type' => 'PKWT', 'start_date' => '2027-07-05', 'end_date' => '2028-07-04',
+                    'contract_document' => contractPdf('punya-b.pdf'),
+                ],
+            ],
+        ])
+        ->assertRedirect();
+
+    $newA = EmployeeContract::query()->where('contract_number', 'CTR-BULK-A-R')->firstOrFail();
+    $newB = EmployeeContract::query()->where('contract_number', 'CTR-BULK-B-R')->firstOrFail();
+
+    // Tiap karyawan memegang berkasnya sendiri — tidak tertukar dan tidak berbagi.
+    expect($newA->document_name)->toBe('punya-a.pdf')
+        ->and($newB->document_name)->toBe('punya-b.pdf')
+        ->and($newA->document_path)->not->toBe($newB->document_path);
+
+    Storage::disk('local')->assertExists($newA->document_path);
+    Storage::disk('local')->assertExists($newB->document_path);
+});
+
+test('bulk renew still works for entries that carry no document', function () {
+    Storage::fake('local');
+
+    $user = employeeManager();
+    $master = hrMasterData();
+
+    foreach (['C', 'D'] as $suffix) {
+        $this->actingAs($user)
+            ->post('/employees', contractFormPayload($master, "Karyawan {$suffix}", "CTR-BULK-{$suffix}"))
+            ->assertRedirect('/employees');
+    }
+
+    $c = Employee::query()->where('full_name', 'Karyawan C')->firstOrFail();
+    $d = Employee::query()->where('full_name', 'Karyawan D')->firstOrFail();
+
+    // Campuran: satu melampirkan, satu tidak. Keduanya harus tetap diproses.
+    $this->actingAs($user)
+        ->post('/employees/bulk/renew', [
+            'entries' => [
+                [
+                    'employee_id' => $c->id, 'contract_number' => 'CTR-BULK-C-R',
+                    'contract_type' => 'PKWT', 'start_date' => '2027-07-05', 'end_date' => '2028-07-04',
+                    'contract_document' => contractPdf('punya-c.pdf'),
+                ],
+                [
+                    'employee_id' => $d->id, 'contract_number' => 'CTR-BULK-D-R',
+                    'contract_type' => 'PKWT', 'start_date' => '2027-07-05', 'end_date' => '2028-07-04',
+                ],
+            ],
+        ])
+        ->assertRedirect();
+
+    expect(EmployeeContract::query()->where('contract_number', 'CTR-BULK-C-R')->firstOrFail()->hasDocument())->toBeTrue()
+        ->and(EmployeeContract::query()->where('contract_number', 'CTR-BULK-D-R')->firstOrFail()->hasDocument())->toBeFalse();
+});
+
+test('bulk renew rejects a non-PDF and saves no contract at all', function () {
+    Storage::fake('local');
+
+    $user = employeeManager();
+    $master = hrMasterData();
+
+    $this->actingAs($user)
+        ->post('/employees', contractFormPayload($master, 'Karyawan E', 'CTR-BULK-E'))
+        ->assertRedirect('/employees');
+
+    $e = Employee::query()->where('full_name', 'Karyawan E')->firstOrFail();
+
+    $this->actingAs($user)
+        ->post('/employees/bulk/renew', [
+            'entries' => [[
+                'employee_id' => $e->id, 'contract_number' => 'CTR-BULK-E-R',
+                'contract_type' => 'PKWT', 'start_date' => '2027-07-05', 'end_date' => '2028-07-04',
+                'contract_document' => UploadedFile::fake()->image('bukan-pdf.jpg'),
+            ]],
+        ])
+        ->assertSessionHas('bulk_error');
+
+    expect(EmployeeContract::query()->where('contract_number', 'CTR-BULK-E-R')->exists())->toBeFalse();
+});
+
 test('a contract document can be attached when the employee is created', function () {
     Storage::fake('local');
 

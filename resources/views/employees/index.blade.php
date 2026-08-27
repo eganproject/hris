@@ -303,7 +303,9 @@
         @can('employees.update')
             @php
                 $renewFlash = session('renew_employee');
-                $renewOpen = $renewFlash && $errors->hasAny(['contract_number', 'contract_type', 'start_date', 'end_date']);
+                // contract_document ikut didaftar: kalau tidak, berkas yang ditolak
+                // (bukan PDF / terlalu besar) menutup modal tanpa pesan apa pun.
+                $renewOpen = $renewFlash && $errors->hasAny(['contract_number', 'contract_type', 'start_date', 'end_date', 'contract_document']);
                 $renewMode = $renewFlash['mode'] ?? 'renew';
                 $exitFlash = session('resign_employee');
                 $exitOpen = $exitFlash && $errors->hasAny(['exit_reason', 'exit_date', 'exit_notes']);
@@ -316,7 +318,7 @@
                         <span data-renew-heading>{{ $renewMode === 'reactivate' ? 'Aktifkan Kembali' : 'Perpanjang Kontrak' }}</span><span class="font-normal text-gray-500" data-renew-name>{{ $renewOpen ? ' — '.$renewFlash['name'] : '' }}</span>
                     </h2>
                     <p class="mt-1 text-sm text-gray-500" data-renew-desc>Kontrak baru dibuat sebagai kontrak aktif. Kontrak sebelumnya ditandai "Diperpanjang".</p>
-                    <form method="POST" data-list-renew-form data-no-confirm="true" action="{{ $renewOpen ? route('employees.renew-contract', $renewFlash['id']) : '' }}" class="mt-5 space-y-4">
+                    <form method="POST" data-list-renew-form data-no-confirm="true" enctype="multipart/form-data" action="{{ $renewOpen ? route('employees.renew-contract', $renewFlash['id']) : '' }}" class="mt-5 space-y-4">
                         @csrf
                         <input type="hidden" name="from_list" value="1">
                         <div>
@@ -349,6 +351,18 @@
                             <label for="lm_renew_notes" class="block text-sm font-medium text-gray-700">Catatan</label>
                             <textarea id="lm_renew_notes" name="notes" rows="2" class="mt-2 block w-full rounded-md border border-gray-300 px-3 py-2.5 text-sm shadow-xs outline-none focus:border-primary focus:ring-2 focus:ring-primary/20">{{ old('notes') }}</textarea>
                         </div>
+                        {{-- Dokumen menempel pada kontrak baru ini; kontrak lama tetap
+                             memegang dokumennya sendiri sebagai riwayat. --}}
+                        <x-attachment-field
+                            name="contract_document"
+                            label="Dokumen Kontrak"
+                            :max-mb="\App\Models\EmployeeContract::DOCUMENT_MAX_MB"
+                            accept=".pdf,application/pdf"
+                            :mimes="['application/pdf']"
+                            type-error="Dokumen kontrak harus berupa berkas PDF."
+                            :hint="'Opsional. Hasil pindai kontrak baru yang sudah ditandatangani, PDF, maksimal '.\App\Models\EmployeeContract::DOCUMENT_MAX_MB.' MB.'"
+                            wrapper-class=""
+                        />
                         <div class="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
                             <button type="button" data-modal-close class="rounded-md border border-gray-200 px-4 py-2.5 text-sm font-medium text-gray-700 transition hover:bg-gray-50">Batal</button>
                             <button type="submit" data-renew-submit class="rounded-md bg-primary px-4 py-2.5 text-sm font-semibold text-white shadow-xs transition hover:bg-primary-hover">{{ $renewMode === 'reactivate' ? 'Aktifkan Kembali & Simpan' : 'Simpan Kontrak Baru' }}</button>
@@ -412,7 +426,7 @@
                                 <p class="truncate text-xs text-gray-500" data-bulk-emp-number></p>
                             </div>
                         </div>
-                        <form method="POST" action="{{ route('employees.bulk.renew') }}" data-no-confirm="true" data-bulk-form class="mt-5 space-y-4">
+                        <form method="POST" action="{{ route('employees.bulk.renew') }}" data-no-confirm="true" enctype="multipart/form-data" data-bulk-form class="mt-5 space-y-4">
                             @csrf
                             <div data-bulk-entries></div>
                             <div>
@@ -441,6 +455,16 @@
                             <div>
                                 <label class="block text-sm font-medium text-gray-700">Catatan</label>
                                 <textarea data-field="notes" rows="2" class="mt-2 block w-full rounded-md border border-gray-300 px-3 py-2.5 text-sm shadow-xs outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"></textarea>
+                            </div>
+                            {{-- Dokumen per karyawan. Tidak ikut FIELDS di wizard karena
+                                 berkas tidak bisa dititipkan lewat hidden input: yang
+                                 dipindahkan antar langkah adalah FileList-nya. --}}
+                            <div>
+                                <label for="bulk_renew_document" class="block text-sm font-medium text-gray-700">Dokumen Kontrak</label>
+                                <input id="bulk_renew_document" type="file" data-bulk-file accept=".pdf,application/pdf"
+                                    class="mt-2 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-xs file:mr-3 file:rounded file:border-0 file:bg-gray-100 file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-gray-700 outline-none focus:border-primary focus:ring-2 focus:ring-primary/20">
+                                <p class="mt-1 text-xs text-gray-500">Opsional, PDF maksimal {{ \App\Models\EmployeeContract::DOCUMENT_MAX_MB }} MB. Berlaku untuk karyawan pada langkah ini saja.</p>
+                                <p data-bulk-file-error class="mt-1 hidden text-sm text-red-600"></p>
                             </div>
                             <div class="flex flex-col-reverse gap-2 pt-1 sm:flex-row sm:items-center sm:justify-between">
                                 <div class="flex gap-2">
@@ -620,7 +644,44 @@
                         const empInitialEl = modal.querySelector('[data-bulk-emp-initial]');
                         const prevBtn = modal.querySelector('[data-bulk-prev]');
                         const nextBtn = modal.querySelector('[data-bulk-next]');
-                        let queue = [], idx = 0, collected = {};
+                        // Hanya wizard perpanjang yang punya kolom berkas.
+                        const fileEl = modal.querySelector('[data-bulk-file]');
+                        const fileErrorEl = modal.querySelector('[data-bulk-file-error]');
+                        const MAX_DOC_BYTES = {{ \App\Models\EmployeeContract::DOCUMENT_MAX_MB }} * 1024 * 1024;
+                        // Berkas tidak bisa dititipkan lewat hidden input seperti kolom
+                        // lain: input.value untuk file hanya string semu dan tak bisa
+                        // diisi dari kode. Yang disimpan di sini FileList-nya sendiri,
+                        // lalu dipasang ke input file baru saat dikirim.
+                        let queue = [], idx = 0, collected = {}, collectedFiles = {};
+
+                        const noFiles = () => new DataTransfer().files;
+                        const stashFile = (id) => {
+                            if (!fileEl) return;
+                            if (fileEl.files.length) collectedFiles[id] = fileEl.files;
+                            else delete collectedFiles[id];
+                        };
+                        const restoreFile = (id) => {
+                            if (!fileEl) return;
+                            fileEl.files = collectedFiles[id] ?? noFiles();
+                            fileErrorEl?.classList.add('hidden');
+                        };
+                        const fileIsValid = () => {
+                            if (!fileEl || !fileEl.files.length) return true;
+
+                            const file = fileEl.files[0];
+                            const fail = (message) => {
+                                if (!fileErrorEl) return false;
+                                fileErrorEl.textContent = message;
+                                fileErrorEl.classList.remove('hidden');
+                                return false;
+                            };
+
+                            if (file.type !== 'application/pdf') return fail('Dokumen kontrak harus berupa berkas PDF.');
+                            if (file.size > MAX_DOC_BYTES) return fail('Ukuran dokumen melebihi batas {{ \App\Models\EmployeeContract::DOCUMENT_MAX_MB }} MB.');
+
+                            fileErrorEl?.classList.add('hidden');
+                            return true;
+                        };
 
                         const syncEnd = () => {
                             if (action !== 'renew') return;
@@ -643,6 +704,7 @@
                             if (empNumberEl) empNumberEl.textContent = cur.number ? 'Kode: ' + cur.number : 'Kode belum dibuat';
                             if (empInitialEl) empInitialEl.textContent = (cur.name || 'K').trim().charAt(0).toUpperCase();
                             writeFields(collected[cur.id] ?? defaultsFor(action, cur.box));
+                            restoreFile(cur.id);
                             prevBtn.hidden = idx === 0;
                             nextBtn.textContent = idx === queue.length - 1 ? 'Proses' : 'Berikutnya';
                         };
@@ -652,7 +714,9 @@
                                 const el = fieldEl(f);
                                 if (el && !el.checkValidity()) { el.reportValidity(); return false; }
                             }
-                            return true;
+                            // Dicegat di sini supaya berkas yang salah ketahuan pada
+                            // langkahnya, bukan setelah seluruh antrean diisi.
+                            return fileIsValid();
                         };
                         const finish = () => {
                             const holder = form.querySelector('[data-bulk-entries]');
@@ -669,6 +733,17 @@
                                 };
                                 add('employee_id', id);
                                 FIELDS[action].forEach((f) => add(f, collected[id][f]));
+
+                                // Elemen input file baru per entri: FileList boleh
+                                // di-assign walau value-nya tidak.
+                                if (collectedFiles[id]) {
+                                    const doc = document.createElement('input');
+                                    doc.type = 'file';
+                                    doc.name = 'entries[' + i + '][contract_document]';
+                                    doc.files = collectedFiles[id];
+                                    doc.hidden = true;
+                                    holder.appendChild(doc);
+                                }
                             });
                             // Each collected entry was already validated per step; submit()
                             // (vs requestSubmit) avoids re-validating the leftover visible fields.
@@ -677,14 +752,19 @@
                         const next = () => {
                             if (!validateCurrent()) return;
                             collected[queue[idx].id] = readCurrent();
+                            stashFile(queue[idx].id);
                             if (idx < queue.length - 1) { idx++; render(); } else { finish(); }
                         };
                         const prev = () => {
                             collected[queue[idx].id] = readCurrent();
+                            stashFile(queue[idx].id);
                             if (idx > 0) { idx--; render(); }
                         };
                         const skip = () => {
+                            // Dilewati berarti tidak ada kontrak baru sama sekali, jadi
+                            // berkas yang sempat dipilih ikut dibuang.
                             delete collected[queue[idx].id];
+                            delete collectedFiles[queue[idx].id];
                             if (idx < queue.length - 1) { idx++; render(); } else { finish(); }
                         };
 
@@ -699,7 +779,7 @@
                             start() {
                                 queue = checked().map((b) => ({ id: b.value, name: b.dataset.name, number: b.dataset.number, box: b }));
                                 if (!queue.length) return;
-                                idx = 0; collected = {};
+                                idx = 0; collected = {}; collectedFiles = {};
                                 render();
                                 modal.hidden = false;
                             },
