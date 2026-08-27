@@ -144,7 +144,14 @@
                                     <p class="text-gray-800">{{ $contract->employee?->branch?->name ?? '-' }}</p>
                                     <p class="mt-0.5 text-xs text-gray-500">{{ $contract->employee?->departments->pluck('name')->implode(', ') ?: '-' }}</p>
                                 </td>
-                                <td class="text-sm font-medium text-gray-800">{{ $contract->contract_number }}</td>
+                                {{-- Dokumen diletakkan di bawah nomornya, bukan sebagai
+                                     kolom sendiri: tabel ini sudah delapan kolom. --}}
+                                <td class="text-sm font-medium text-gray-800">
+                                    {{ $contract->contract_number }}
+                                    @if ($contract->hasDocument())
+                                        <x-contract-document :contract="$contract" class="mt-1 flex"/>
+                                    @endif
+                                </td>
                                 <td class="text-sm text-gray-700">{{ $contract->contract_type }}</td>
                                 <td class="text-sm text-gray-600">
                                     {{ $contract->start_date?->format('d M Y') ?? '-' }} – {{ $contract->end_date?->format('d M Y') ?? 'Tidak terbatas' }}

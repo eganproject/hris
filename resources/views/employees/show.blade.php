@@ -148,6 +148,7 @@
                                     <th>Jenis</th>
                                     <th>Periode</th>
                                     <th>Status</th>
+                                    <th>Dokumen</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -161,10 +162,11 @@
                                         <td>
                                             <x-status-badge :tone="$contract->effective_status_tone">{{ $contract->effective_status_label }}</x-status-badge>
                                         </td>
+                                        <td><x-contract-document :contract="$contract"/></td>
                                     </tr>
                                 @empty
                                     <tr>
-                                        <td colspan="4" class="cell-empty">Belum ada kontrak.</td>
+                                        <td colspan="5" class="cell-empty">Belum ada kontrak.</td>
                                     </tr>
                                 @endforelse
                             </tbody>
@@ -303,7 +305,7 @@
                                     ? 'Karyawan akan diaktifkan kembali (status Aktif) dan kontrak baru dibuat sebagai kontrak aktif.'
                                     : 'Kontrak aktif saat ini akan ditandai "Diperpanjang" dan kontrak baru dibuat sebagai kontrak aktif.' }}
                             </p>
-                            <form method="POST" action="{{ route('employees.renew-contract', $employee) }}" class="mt-4 space-y-4">
+                            <form method="POST" action="{{ route('employees.renew-contract', $employee) }}" enctype="multipart/form-data" class="mt-4 space-y-4">
                                 @csrf
                                 <div>
                                     <label for="renew_contract_number" class="block text-sm font-medium text-gray-700">Nomor Kontrak Baru <span class="field-requirement is-required" aria-label="Wajib diisi">*</span></label>
@@ -336,6 +338,18 @@
                                     <textarea id="renew_notes" name="notes" rows="2" class="mt-2 block w-full rounded-md border border-gray-300 px-3 py-2.5 text-sm shadow-xs outline-none focus:border-primary focus:ring-2 focus:ring-primary/20">{{ old('notes') }}</textarea>
                                     @error('notes')<p class="mt-2 text-sm text-red-600">{{ $message }}</p>@enderror
                                 </div>
+                                {{-- Dokumen menempel pada kontrak baru ini; kontrak lama
+                                     tetap memegang dokumennya sendiri sebagai riwayat. --}}
+                                <x-attachment-field
+                                    name="contract_document"
+                                    label="Dokumen Kontrak"
+                                    :max-mb="\App\Models\EmployeeContract::DOCUMENT_MAX_MB"
+                                    accept=".pdf,application/pdf"
+                                    :mimes="['application/pdf']"
+                                    type-error="Dokumen kontrak harus berupa berkas PDF."
+                                    :hint="'Opsional. Hasil pindai kontrak baru yang sudah ditandatangani, PDF, maksimal '.\App\Models\EmployeeContract::DOCUMENT_MAX_MB.' MB.'"
+                                    wrapper-class=""
+                                />
                                 <button type="submit" class="w-full rounded-md bg-primary px-4 py-2.5 text-sm font-semibold text-white shadow-xs transition hover:bg-primary-hover">
                                     {{ $isReactivation ? 'Aktifkan Kembali & Simpan Kontrak' : 'Simpan Kontrak Baru' }}
                                 </button>

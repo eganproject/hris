@@ -325,6 +325,35 @@
                     <textarea id="contract_notes" name="contract_notes" rows="3" class="mt-2 block w-full rounded-md border border-gray-300 px-3 py-2.5 text-sm shadow-xs outline-none focus:border-primary focus:ring-2 focus:ring-primary/20">{{ old('contract_notes', $contract?->notes) }}</textarea>
                     @error('contract_notes')<p class="mt-2 text-sm text-red-600">{{ $message }}</p>@enderror
                 </div>
+
+                <div class="md:col-span-2">
+                    {{-- Dokumen kontrak yang sudah ditandatangani. Menempel pada baris
+                         kontrak yang sedang disunting, jadi tiap perpanjangan menyimpan
+                         berkasnya sendiri. --}}
+                    @if ($contract?->hasDocument())
+                        <div class="mb-3 flex flex-wrap items-center justify-between gap-3 rounded-md border border-gray-200 bg-gray-50 px-4 py-3">
+                            <span class="min-w-0">
+                                <span class="block text-sm font-medium text-gray-800">Dokumen tersimpan</span>
+                                <x-contract-document :contract="$contract" class="mt-1"/>
+                            </span>
+                            <label class="flex items-center gap-2 text-xs text-gray-600">
+                                <input type="checkbox" name="contract_document_remove" value="1" @checked(old('contract_document_remove')) class="size-4 rounded border-gray-300 text-red-600 focus:ring-red-500">
+                                Hapus dokumen ini
+                            </label>
+                        </div>
+                    @endif
+
+                    <x-attachment-field
+                        name="contract_document"
+                        :label="$contract?->hasDocument() ? 'Ganti Dokumen Kontrak' : 'Dokumen Kontrak'"
+                        :max-mb="\App\Models\EmployeeContract::DOCUMENT_MAX_MB"
+                        accept=".pdf,application/pdf"
+                        :mimes="['application/pdf']"
+                        type-error="Dokumen kontrak harus berupa berkas PDF."
+                        :hint="'Opsional. Hasil pindai kontrak yang sudah ditandatangani, format PDF, maksimal '.\App\Models\EmployeeContract::DOCUMENT_MAX_MB.' MB.'.($contract?->hasDocument() ? ' Mengunggah berkas baru akan menggantikan dokumen yang tersimpan.' : '')"
+                        wrapper-class=""
+                    />
+                </div>
             </div>
     </section>
 

@@ -22,6 +22,7 @@ use App\Support\ImportErrorStore;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
@@ -161,6 +162,7 @@ class EmployeeManagementController extends Controller
             $this->syncDepartments($request, $employee);
 
             $contract = $employee->contracts()->create($this->contractPayload($request));
+            $this->syncContractDocument($contract, $request->file('contract_document'));
             $this->syncLoginAccount($request, $employee);
             $this->syncMachinePins($employee, $request->validated('machine_pins', []));
             $this->syncLeaveBalances($employee, $request->input('leave_balance', []));
@@ -341,6 +343,12 @@ class EmployeeManagementController extends Controller
             $contract->fill($this->contractPayload($request));
             $contract->save();
 
+            $this->syncContractDocument(
+                $contract,
+                $request->file('contract_document'),
+                $request->boolean('contract_document_remove'),
+            );
+
             $this->syncLoginAccount($request, $employee);
             $this->syncMachinePins($employee, $request->validated('machine_pins', []));
             $this->syncLeaveBalances($employee, $request->input('leave_balance', []));
@@ -453,8 +461,11 @@ class EmployeeManagementController extends Controller
             'start_date' => ['required', 'date'],
             'end_date' => [Rule::requiredIf(fn () => $request->input('contract_type') !== 'PKWTT'), 'nullable', 'date', 'after_or_equal:start_date'],
             'notes' => ['nullable', 'string', 'max:1000'],
+            'contract_document' => ['nullable', 'file', 'mimes:pdf', 'max:'.(EmployeeContract::DOCUMENT_MAX_MB * 1024)],
         ], [
             'end_date.required' => 'Tanggal selesai kontrak wajib diisi untuk jenis kontrak selain PKWTT.',
+            'contract_document.mimes' => 'Dokumen kontrak harus berupa berkas PDF.',
+            'contract_document.max' => 'Ukuran dokumen kontrak maksimal '.EmployeeContract::DOCUMENT_MAX_MB.' MB.',
         ]);
 
         if ($validator->fails()) {
@@ -471,7 +482,9 @@ class EmployeeManagementController extends Controller
 
         $validated = $validator->validated();
 
-        DB::transaction(function () use ($validated, $employee, $wasInactive) {
+        $document = $request->file('contract_document');
+
+        DB::transaction(function () use ($validated, $employee, $wasInactive, $document) {
             $employee->loadMissing('currentContract', 'user');
 
             // Renewing a contract for someone who has left = rehire: reactivate them
@@ -494,6 +507,10 @@ class EmployeeManagementController extends Controller
                 'status' => 'active',
                 'notes' => $validated['notes'] ?? null,
             ]);
+
+            // Dokumen menempel pada kontrak barunya; kontrak lama tetap memegang
+            // dokumennya sendiri sebagai riwayat.
+            $this->syncContractDocument($new, $document);
 
             if ($wasInactive) {
                 $employee->recordEvent(
@@ -999,6 +1016,31 @@ class EmployeeManagementController extends Controller
         }
 
         return $payload;
+    }
+
+    /**
+     * Pasang, ganti, atau lepas dokumen kontrak.
+     *
+     * Dipanggil setelah kontraknya tersimpan, bukan lewat contractPayload(): berkas
+     * disimpan per karyawan, dan pada pembuatan karyawan baru id-nya belum ada saat
+     * payload disusun. Tanpa berkas baru dan tanpa permintaan hapus, dokumen yang
+     * sudah ada sengaja dibiarkan — menyimpan ulang formulir tidak boleh menghapus
+     * kontrak yang sudah diunggah hanya karena kolom berkasnya kosong.
+     */
+    private function syncContractDocument(EmployeeContract $contract, ?UploadedFile $file, bool $remove = false): void
+    {
+        if (! $file && ! $remove) {
+            return;
+        }
+
+        // Berkas lama dibuang lebih dulu, baik saat diganti maupun saat dilepas, agar
+        // disk tidak menyimpan berkas yatim yang tak bisa dijangkau rute mana pun.
+        $contract->deleteDocumentFile();
+
+        $contract->forceFill($file
+            ? EmployeeContract::documentColumnsFor($file, $contract->employee_id)
+            : EmployeeContract::emptyDocumentColumns()
+        )->save();
     }
 
     /**

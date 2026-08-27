@@ -8,6 +8,7 @@ use App\Http\Controllers\AttendanceSelfieController;
 use App\Http\Controllers\Auth\AuthenticatedSessionController;
 use App\Http\Controllers\BranchController;
 use App\Http\Controllers\ContractController;
+use App\Http\Controllers\ContractDocumentController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\DepartmentController;
 use App\Http\Controllers\DeviceController;
@@ -147,6 +148,11 @@ Route::middleware('auth')->group(function () {
         Route::get('contracts/export', [ContractController::class, 'export'])
             ->middleware('permission:employees.export')
             ->name('contracts.export');
+        // Dokumen kontrak ada di disk privat; rute ini satu-satunya jalan keluarnya.
+        // Tanpa middleware permission: karyawan yang bersangkutan juga boleh membuka
+        // kontraknya sendiri — pemeriksaannya ada di controller.
+        Route::get('contracts/{contract}/document', ContractDocumentController::class)
+            ->name('contracts.document');
         // Hapus baris kontrak duplikat (pembersihan data). Aturan boleh/tidaknya ada
         // di EmployeeContract::deletionBlocker(); memakai hak "hapus karyawan" karena
         // sama-sama membuang catatan kepegawaian.

@@ -103,6 +103,10 @@ class ContractController extends Controller
             $contract->delete();
         });
 
+        // Setelah commit: berkas di disk tidak ikut transaksi, jadi menghapusnya lebih
+        // dulu akan menyisakan baris tanpa dokumen bila transaksinya batal.
+        $contract->deleteDocumentFile();
+
         return back()->with('status', "Kontrak {$number} dihapus.");
     }
 

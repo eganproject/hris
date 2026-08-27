@@ -96,6 +96,10 @@ class EmployeeRequest extends FormRequest
             ],
             'contract_status' => ['required', 'string', Rule::in(array_keys(EmployeeContract::statusLabels()))],
             'contract_notes' => ['nullable', 'string', 'max:1000'],
+            // Dokumen kontrak yang sudah ditandatangani. Hanya PDF: yang diarsipkan
+            // di sini adalah kontrak final, bukan foto tangkapan layar.
+            'contract_document' => ['nullable', 'file', 'mimes:pdf', 'max:'.(EmployeeContract::DOCUMENT_MAX_MB * 1024)],
+            'contract_document_remove' => ['sometimes', 'boolean'],
             'exit_reason' => [Rule::requiredIf($isClosingExit), 'nullable', 'string', Rule::in(array_keys(Employee::exitReasonLabels()))],
             'exit_date' => array_filter([
                 $isClosingExit ? 'required' : 'nullable',
@@ -119,6 +123,8 @@ class EmployeeRequest extends FormRequest
         return [
             'contract_end_date.required' => 'Tanggal selesai kontrak wajib diisi untuk jenis kontrak selain PKWTT.',
             'office_pattern_id.exists' => 'Pola jam kantor yang dipilih tidak tersedia. Daftarkan dulu polanya di menu Pengaturan.',
+            'contract_document.mimes' => 'Dokumen kontrak harus berupa berkas PDF.',
+            'contract_document.max' => 'Ukuran dokumen kontrak maksimal '.EmployeeContract::DOCUMENT_MAX_MB.' MB.',
         ];
     }
 

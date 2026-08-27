@@ -1,20 +1,35 @@
-@props(['name' => 'attachment', 'label' => 'Lampiran', 'maxMb' => 2])
+@props([
+    'name' => 'attachment',
+    'label' => 'Lampiran',
+    'maxMb' => 2,
+    // Jenis berkas yang diterima. Defaultnya gambar + PDF (lampiran cuti); pemakai
+    // lain — mis. dokumen kontrak — mempersempitnya lewat props ini.
+    'accept' => '.jpg,.jpeg,.png,.webp,.pdf,image/jpeg,image/png,image/webp,application/pdf',
+    'mimes' => ['image/jpeg', 'image/png', 'image/webp', 'application/pdf'],
+    'typeError' => 'Lampiran harus berupa gambar (JPG, PNG, WEBP) atau PDF.',
+    'hint' => null,
+    'wrapperClass' => 'sm:col-span-2',
+])
 
-@php $id = $name.'-field'; @endphp
+@php
+    $id = $name.'-field';
+    $hint = $hint ?? 'Opsional. Gambar (JPG, PNG, WEBP) atau PDF, maksimal '.$maxMb.' MB. Misalnya surat keterangan sakit atau surat tugas.';
+@endphp
 
 {{-- Input lampiran dengan pratinjau langsung. Gambar ditampilkan sebagai thumbnail;
      PDF ditampilkan sebagai kartu berisi nama & ukuran plus tautan buka di tab baru,
      karena penampil PDF di dalam iframe tidak tersedia di semua browser seluler dan
      akan menyisakan kotak kosong. Batas ukuran & jenis juga diperiksa di sini supaya
      kesalahan ketahuan sebelum formulir terkirim. --}}
-<div class="sm:col-span-2" data-attachment-field data-max-mb="{{ $maxMb }}">
+<div class="{{ $wrapperClass }}" data-attachment-field data-max-mb="{{ $maxMb }}"
+    data-mimes="{{ implode(',', $mimes) }}" data-type-error="{{ $typeError }}">
     <label for="{{ $id }}" class="block text-sm font-medium text-gray-700">{{ $label }}</label>
 
     <input id="{{ $id }}" name="{{ $name }}" type="file" data-attachment-input
-        accept=".jpg,.jpeg,.png,.webp,.pdf,image/jpeg,image/png,image/webp,application/pdf"
+        accept="{{ $accept }}"
         class="mt-2 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-xs file:mr-3 file:rounded file:border-0 file:bg-gray-100 file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-gray-700 outline-none focus:border-primary focus:ring-2 focus:ring-primary/20">
 
-    <p class="mt-1 text-xs text-gray-500">Opsional. Gambar (JPG, PNG, WEBP) atau PDF, maksimal {{ $maxMb }} MB. Misalnya surat keterangan sakit atau surat tugas.</p>
+    <p class="mt-1 text-xs text-gray-500">{{ $hint }}</p>
 
     @error($name)<p class="mt-1 text-sm text-red-600">{{ $message }}</p>@enderror
 
@@ -42,7 +57,7 @@
     @push('scripts')
     <script>
         (function () {
-            const MIME = ['image/jpeg', 'image/png', 'image/webp', 'application/pdf'];
+            const FALLBACK_MIME = ['image/jpeg', 'image/png', 'image/webp', 'application/pdf'];
 
             document.querySelectorAll('[data-attachment-field]').forEach((field) => {
                 const input = field.querySelector('[data-attachment-input]');
@@ -54,6 +69,11 @@
                 const errorEl = field.querySelector('[data-attachment-error]');
                 const links = field.querySelectorAll('[data-attachment-open]');
                 const maxBytes = Number(field.dataset.maxMb || 2) * 1024 * 1024;
+                // Tiap field membawa daftar jenisnya sendiri: lampiran cuti menerima
+                // gambar & PDF, dokumen kontrak hanya PDF.
+                const allowed = (field.dataset.mimes || '').split(',').filter(Boolean);
+                const mimes = allowed.length ? allowed : FALLBACK_MIME;
+                const typeError = field.dataset.typeError || 'Jenis berkas tidak didukung.';
 
                 let objectUrl = null;
 
@@ -94,13 +114,13 @@
 
                     // Dicegat di sini supaya penggunanya tahu sebelum menunggu unggahan
                     // selesai lalu ditolak server.
-                    if (!MIME.includes(file.type)) {
-                        fail('Lampiran harus berupa gambar (JPG, PNG, WEBP) atau PDF.');
+                    if (!mimes.includes(file.type)) {
+                        fail(typeError);
                         return;
                     }
 
                     if (file.size > maxBytes) {
-                        fail('Ukuran lampiran ' + humanSize(file.size) + ', melebihi batas ' + field.dataset.maxMb + ' MB.');
+                        fail('Ukuran berkas ' + humanSize(file.size) + ', melebihi batas ' + field.dataset.maxMb + ' MB.');
                         return;
                     }
 

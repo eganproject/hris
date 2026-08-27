@@ -5,6 +5,8 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Storage;
 
 class EmployeeContract extends Model
 {
@@ -17,7 +19,17 @@ class EmployeeContract extends Model
         'end_date',
         'status',
         'notes',
+        'document_path',
+        'document_name',
+        'document_mime',
+        'document_size',
     ];
+
+    /** Disk privat: dokumen kontrak hanya boleh keluar lewat rute berotorisasi. */
+    public const DOCUMENT_DISK = 'local';
+
+    /** Batas ukuran unggahan dokumen kontrak, dalam MB. */
+    public const DOCUMENT_MAX_MB = 5;
 
     public const STATUS_LABELS = [
         'active' => 'Aktif',
@@ -81,6 +93,59 @@ class EmployeeContract extends Model
     public function employee(): BelongsTo
     {
         return $this->belongsTo(Employee::class);
+    }
+
+    public function hasDocument(): bool
+    {
+        return $this->document_path !== null;
+    }
+
+    public function documentSizeLabel(): string
+    {
+        $bytes = (int) $this->document_size;
+
+        return $bytes >= 1048576
+            ? round($bytes / 1048576, 1).' MB'
+            : max(1, (int) round($bytes / 1024)).' KB';
+    }
+
+    /**
+     * Simpan berkas unggahan dan kembalikan kolom-kolomnya. Disimpan per karyawan
+     * supaya berkas satu orang mudah ditelusuri di disk.
+     *
+     * @return array<string, mixed>
+     */
+    public static function documentColumnsFor(UploadedFile $file, int $employeeId): array
+    {
+        return [
+            'document_path' => $file->store("contract-documents/{$employeeId}", self::DOCUMENT_DISK),
+            'document_name' => $file->getClientOriginalName(),
+            'document_mime' => $file->getClientMimeType(),
+            'document_size' => $file->getSize(),
+        ];
+    }
+
+    /** @return array<string, null> */
+    public static function emptyDocumentColumns(): array
+    {
+        return [
+            'document_path' => null,
+            'document_name' => null,
+            'document_mime' => null,
+            'document_size' => null,
+        ];
+    }
+
+    /**
+     * Buang berkasnya dari disk. Dipanggil saat dokumen diganti, dihapus, atau baris
+     * kontraknya dihapus — tanpa ini disk terus menumpuk berkas yatim yang tidak lagi
+     * bisa dijangkau lewat rute mana pun.
+     */
+    public function deleteDocumentFile(): void
+    {
+        if ($this->document_path) {
+            Storage::disk(self::DOCUMENT_DISK)->delete($this->document_path);
+        }
     }
 
     public function scopeActive(Builder $query): void
@@ -240,6 +305,7 @@ class EmployeeContract extends Model
         return [
             'start_date' => 'date',
             'end_date' => 'date',
+            'document_size' => 'integer',
         ];
     }
 }
