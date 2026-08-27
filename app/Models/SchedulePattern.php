@@ -20,6 +20,7 @@ class SchedulePattern extends Model
     'cycle_length',
     'anchor_date',
     'is_active',
+    'is_office_pattern',
     'created_by',
     ];
 
@@ -30,7 +31,18 @@ class SchedulePattern extends Model
             'cycle_length' => 'integer',
             'anchor_date' => 'date',
             'is_active' => 'boolean',
+            'is_office_pattern' => 'boolean',
         ];
+    }
+
+    /**
+     * Pola yang boleh ditawarkan sebagai jam kantor di data karyawan. Sengaja tidak
+     * dipakai saat resolusi jadwal: mencabut tanda dari sebuah pola tidak boleh
+     * diam-diam mengubah jadwal karyawan yang terlanjur memakainya.
+     */
+    public function scopeOfficeCandidates(Builder $query): void
+    {
+        $query->where('is_active', true)->where('is_office_pattern', true);
     }
 
     public function creator(): BelongsTo
@@ -58,6 +70,12 @@ class SchedulePattern extends Model
     public function assignments(): HasMany
     {
         return $this->hasMany(ScheduleAssignment::class);
+    }
+
+    /** Karyawan jam kantor yang secara eksplisit memilih pola ini. */
+    public function officeEmployees(): HasMany
+    {
+        return $this->hasMany(Employee::class, 'office_pattern_id');
     }
 
     /**

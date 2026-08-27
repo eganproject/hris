@@ -80,7 +80,9 @@ class ScheduleController extends Controller
         $days = collect(CarbonPeriod::create($from, $to)->toArray());
 
         // Karyawan "jam kantor" tidak punya baris roster; isi selnya dari pola jam
-        // kantor default agar grid menampilkan jadwal mereka (bukan sel kosong).
+        // kantor yang berlaku baginya agar grid menampilkan jadwal mereka (bukan sel
+        // kosong). Polanya di-cache per id di dalam service, jadi loop ini tetap satu
+        // query per pola yang dipakai — bukan per karyawan.
         foreach ($employees as $employee) {
             if ($employee->follows_office_hours) {
                 $employee->setRelation('schedules', $this->officeSchedule->fill($employee, $employee->schedules, $days));
@@ -258,7 +260,7 @@ class ScheduleController extends Controller
 
         // Karyawan "jam kantor": lengkapi hari tanpa baris jadwal dengan pola jam
         // kantor default supaya bulan tampil terisi, bukan "belum dijadwalkan".
-        if ($employee->follows_office_hours && $this->officeSchedule->isConfigured()) {
+        if ($this->officeSchedule->isConfiguredFor($employee)) {
             foreach ($days as $day) {
                 $key = $day->toDateString();
 

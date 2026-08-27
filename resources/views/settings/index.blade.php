@@ -29,16 +29,47 @@
                 </label>
 
                 <div class="mt-6 border-t border-gray-100 pt-6">
-                    <label for="default_office_pattern_id" class="block text-sm font-medium text-gray-800">Pola jam kantor default</label>
-                    <p class="mt-1 text-xs text-gray-500">Pola acuan untuk karyawan yang ditandai <span class="font-medium">"Ikuti jam kantor (tanpa penjadwalan)"</span> di data karyawan. Absensi mereka dihitung langsung dari pola ini tanpa perlu di-assign atau digenerate roster. Biarkan kosong untuk mematikan fitur.</p>
-                    <select name="default_office_pattern_id" id="default_office_pattern_id" class="mt-2 block w-full max-w-md rounded-md border border-gray-300 px-3 py-2.5 text-sm shadow-xs outline-none focus:border-primary focus:ring-2 focus:ring-primary/20">
-                        <option value="">— Tidak diatur —</option>
-                        @foreach ($officePatterns as $pattern)
-                            <option value="{{ $pattern->id }}" @selected($officePatternId === $pattern->id)>{{ $pattern->name }}</option>
-                        @endforeach
-                    </select>
+                    <span class="block text-sm font-medium text-gray-800">Pola jam kantor</span>
+                    <p class="mt-1 text-xs text-gray-500">Centang pola yang boleh dipilih untuk karyawan bertanda <span class="font-medium">"Ikuti jam kantor (tanpa penjadwalan)"</span>. Absensi mereka dihitung langsung dari pola tersebut tanpa perlu di-assign atau digenerate roster. Kosongkan semua untuk mematikan fitur.</p>
+
+                    @error('office_pattern_ids')<p class="mt-2 text-sm text-red-600">{{ $message }}</p>@enderror
+
                     @if ($officePatterns->isEmpty())
-                        <p class="mt-2 text-xs text-amber-700">Belum ada pola jadwal aktif. Buat dulu di <a href="{{ route('attendance.schedule-patterns.index') }}" class="font-medium underline">Pola Jadwal</a>.</p>
+                        <p class="mt-3 text-xs text-amber-700">Belum ada pola jadwal aktif. Buat dulu di <a href="{{ route('attendance.schedule-patterns.index') }}" class="font-medium underline">Pola Jadwal</a>.</p>
+                    @else
+                        @php $checkedIds = collect(old('office_pattern_ids', $officePatternIds))->map(fn ($id) => (int) $id); @endphp
+                        <div class="mt-3 max-w-md divide-y divide-gray-100 rounded-md border border-gray-200">
+                            @foreach ($officePatterns as $pattern)
+                                <label class="flex items-start gap-3 px-4 py-3 text-sm hover:bg-gray-50">
+                                    <input type="checkbox" name="office_pattern_ids[]" value="{{ $pattern->id }}"
+                                        @checked($checkedIds->contains($pattern->id))
+                                        data-office-pattern
+                                        data-label="{{ $pattern->name }}"
+                                        class="mt-0.5 size-4 shrink-0 rounded border-gray-300 text-primary focus:ring-primary">
+                                    <span class="min-w-0 flex-1">
+                                        <span class="block font-medium text-gray-900">{{ $pattern->name }}</span>
+                                        <span class="mt-0.5 block text-xs text-gray-500">
+                                            {{ $pattern->type->label() }}
+                                            @if ($pattern->office_employees_count > 0)
+                                                <span class="text-gray-300">·</span>
+                                                <span class="font-medium text-gray-600">dipakai {{ $pattern->office_employees_count }} karyawan</span>
+                                            @endif
+                                        </span>
+                                    </span>
+                                </label>
+                            @endforeach
+                        </div>
+                        <p class="mt-2 text-xs text-gray-500">Mencabut centang hanya menghilangkan pola dari pilihan ke depan. Karyawan yang sudah memakainya tetap berjalan dengan pola itu sampai diubah satu per satu.</p>
+
+                        <label for="default_office_pattern_id" class="mt-5 block text-sm font-medium text-gray-800">Pola default</label>
+                        <p class="mt-1 text-xs text-gray-500">Dipakai karyawan jam kantor yang tidak memilih pola sendiri. Harus salah satu pola yang dicentang di atas.</p>
+                        <select name="default_office_pattern_id" id="default_office_pattern_id" data-office-default class="mt-2 block w-full max-w-md rounded-md border border-gray-300 px-3 py-2.5 text-sm shadow-xs outline-none focus:border-primary focus:ring-2 focus:ring-primary/20">
+                            <option value="">— Tidak diatur —</option>
+                            @foreach ($officePatterns as $pattern)
+                                <option value="{{ $pattern->id }}" @selected((int) old('default_office_pattern_id', $officePatternId) === $pattern->id)>{{ $pattern->name }}</option>
+                            @endforeach
+                        </select>
+                        @error('default_office_pattern_id')<p class="mt-2 text-sm text-red-600">{{ $message }}</p>@enderror
                     @endif
                 </div>
 
@@ -48,4 +79,33 @@
             </form>
         </section>
     </div>
+
+    @push('scripts')
+    <script>
+        (function () {
+            const boxes = Array.from(document.querySelectorAll('[data-office-pattern]'));
+            const select = document.querySelector('[data-office-default]');
+
+            if (!boxes.length || !select) return;
+
+            // Dropdown default hanya boleh menawarkan pola yang dicentang — server
+            // menolak yang lain, jadi lebih baik pilihannya tidak pernah muncul.
+            const sync = () => {
+                const allowed = new Set(boxes.filter((b) => b.checked).map((b) => b.value));
+
+                Array.from(select.options).forEach((option) => {
+                    if (option.value === '') return;
+                    const ok = allowed.has(option.value);
+                    option.hidden = !ok;
+                    option.disabled = !ok;
+                    // Pola yang barusan dicabut tidak boleh tetap terpilih diam-diam.
+                    if (!ok && option.selected) select.value = '';
+                });
+            };
+
+            boxes.forEach((box) => box.addEventListener('change', sync));
+            sync();
+        })();
+    </script>
+    @endpush
 </x-layouts.app>

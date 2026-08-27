@@ -12,58 +12,76 @@ use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 use Illuminate\Support\Carbon;
 
 /**
- * Resolves the "jam kantor default" schedule for employees flagged
- * follows_office_hours — people whose weekly pattern never changes and who are
- * therefore never scheduled explicitly. The reference pattern is chosen once in
- * Pengaturan (default_office_pattern_id); each day is derived from it on the fly,
- * so no roster rows are materialized for these employees.
+ * Resolves the "jam kantor" schedule for employees flagged follows_office_hours —
+ * people whose weekly pattern never changes and who are therefore never scheduled
+ * explicitly. Each day is derived from a pattern on the fly, so no roster rows are
+ * materialized for these employees.
+ *
+ * Which pattern applies is resolved in two steps:
+ *   1. the employee's own office_pattern_id, when set;
+ *   2. otherwise the app-wide default chosen in Pengaturan (default_office_pattern_id).
+ *
+ * Step 2 alone is what the app did before per-employee patterns existed, and an
+ * employee with no pattern of their own still lands there — so existing data keeps
+ * behaving exactly as it did.
+ *
+ * Resolution deliberately loads a pattern by id without checking is_active or
+ * is_office_pattern: those flags govern what may be OFFERED in the pickers, not what
+ * an employee already follows. Retiring a pattern must never silently rewrite the
+ * schedule — and therefore the attendance — of everyone still on it.
  */
 class DefaultOfficeSchedule
 {
-    /** Setting key holding the id of the pattern used as the office-hours default. */
+    /** Setting key holding the id of the pattern used as the app-wide default. */
     public const SETTING_KEY = 'default_office_pattern_id';
 
-    private bool $loaded = false;
+    private bool $defaultLoaded = false;
 
-    private ?SchedulePattern $pattern = null;
+    private ?int $defaultId = null;
 
     /**
-     * The configured default office pattern (with its days + shifts eager-loaded),
-     * or null when none is set. Resolved once per instance.
+     * Patterns already fetched this request, keyed by id. The roster grid calls
+     * fill() once per employee, so without this a page of 200 people would issue 200
+     * queries instead of one per distinct pattern in use.
+     *
+     * @var array<int, SchedulePattern|null>
      */
-    public function pattern(): ?SchedulePattern
+    private array $patterns = [];
+
+    /**
+     * The pattern this employee's office hours come from, or null when they are not
+     * on office hours or no pattern applies to them.
+     */
+    public function patternFor(Employee $employee): ?SchedulePattern
     {
-        if (! $this->loaded) {
-            $this->loaded = true;
-
-            $id = Setting::get(self::SETTING_KEY);
-
-            $this->pattern = $id
-                ? SchedulePattern::query()->with('days.shift')->find($id)
-                : null;
+        if (! $employee->follows_office_hours) {
+            return null;
         }
 
-        return $this->pattern;
+        $id = $employee->office_pattern_id ?: $this->defaultPatternId();
+
+        return $id ? $this->pattern((int) $id) : null;
     }
 
-    public function isConfigured(): bool
+    public function isConfiguredFor(Employee $employee): bool
     {
-        return $this->pattern() !== null;
+        return $this->patternFor($employee) !== null;
     }
 
     /**
      * A transient (unsaved) schedule row for the employee-day derived from the
-     * default office pattern, or null when the employee does not follow office
-     * hours or no default pattern is configured. A day with no shift in the pattern
-     * (e.g. Sunday) becomes a day off.
+     * pattern that applies to them, or null when none does. A day with no shift in
+     * the pattern (e.g. Sunday) becomes a day off.
      */
     public function scheduleFor(Employee $employee, CarbonInterface $date): ?EmployeeSchedule
     {
-        if (! $employee->follows_office_hours || ! $this->isConfigured()) {
+        $pattern = $this->patternFor($employee);
+
+        if (! $pattern) {
             return null;
         }
 
-        $patternDay = $this->pattern()->dayFor($date);
+        $patternDay = $pattern->dayFor($date);
         $shift = $patternDay?->shift;
 
         $schedule = new EmployeeSchedule([
@@ -85,8 +103,8 @@ class DefaultOfficeSchedule
     /**
      * Merge synthesized office-hour rows into an existing keyed schedule collection
      * for the given days. Real rows always win (a manual override or leftover
-     * materialized row is never replaced). Returns $existing unchanged when the
-     * employee does not follow office hours or no default pattern is set.
+     * materialized row is never replaced). Returns $existing unchanged when no
+     * office-hours pattern applies to the employee.
      *
      * @param  EloquentCollection<int, EmployeeSchedule>  $existing
      * @param  iterable<CarbonInterface>  $days
@@ -94,7 +112,7 @@ class DefaultOfficeSchedule
      */
     public function fill(Employee $employee, EloquentCollection $existing, iterable $days): EloquentCollection
     {
-        if (! $employee->follows_office_hours || ! $this->isConfigured()) {
+        if (! $this->isConfiguredFor($employee)) {
             return $existing;
         }
 
@@ -113,5 +131,26 @@ class DefaultOfficeSchedule
         }
 
         return new EloquentCollection($byDate->values()->all());
+    }
+
+    /** The app-wide default pattern id, resolved once per instance. */
+    private function defaultPatternId(): ?int
+    {
+        if (! $this->defaultLoaded) {
+            $this->defaultLoaded = true;
+            $this->defaultId = ((int) Setting::get(self::SETTING_KEY)) ?: null;
+        }
+
+        return $this->defaultId;
+    }
+
+    /** Fetch a pattern (with its days + shifts) at most once per instance. */
+    private function pattern(int $id): ?SchedulePattern
+    {
+        if (! array_key_exists($id, $this->patterns)) {
+            $this->patterns[$id] = SchedulePattern::query()->with('days.shift')->find($id);
+        }
+
+        return $this->patterns[$id];
     }
 }

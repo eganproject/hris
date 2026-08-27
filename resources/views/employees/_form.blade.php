@@ -169,18 +169,38 @@
                     @error('department_ids')<p class="mt-2 text-sm text-red-600">{{ $message }}</p>@enderror
                 </div>
                 <div class="md:col-span-3">
-                    <label class="flex items-start justify-between gap-4 rounded-md border border-gray-200 px-4 py-3">
-                        <span>
-                            <span class="block text-sm font-medium text-gray-800">Ikuti jam kantor (tanpa penjadwalan)</span>
-                            <span class="mt-1 block text-xs text-gray-500">Karyawan ini mengikuti pola jam kantor default (diatur di menu <span class="font-medium">Pengaturan</span>) tanpa perlu di-assign pola atau digenerate roster. Biarkan kosong untuk pekerja shift yang jadwalnya diatur manual.</span>
-                        </span>
-                        <span class="relative inline-flex flex-none">
-                            <input type="hidden" name="follows_office_hours" value="0">
-                            <input type="checkbox" name="follows_office_hours" value="1" @checked(old('follows_office_hours', $employee->follows_office_hours)) class="peer sr-only">
-                            <span class="h-6 w-11 rounded-full bg-gray-300 transition peer-checked:bg-primary"></span>
-                            <span class="absolute left-0.5 top-0.5 size-5 rounded-full bg-white shadow transition peer-checked:translate-x-5"></span>
-                        </span>
-                    </label>
+                    <div class="rounded-md border border-gray-200">
+                        <label class="flex items-start justify-between gap-4 px-4 py-3">
+                            <span>
+                                <span class="block text-sm font-medium text-gray-800">Ikuti jam kantor (tanpa penjadwalan)</span>
+                                <span class="mt-1 block text-xs text-gray-500">Karyawan ini mengikuti pola jam kantor tanpa perlu di-assign pola atau digenerate roster. Biarkan kosong untuk pekerja shift yang jadwalnya diatur manual.</span>
+                            </span>
+                            <span class="relative inline-flex flex-none">
+                                <input type="hidden" name="follows_office_hours" value="0">
+                                <input type="checkbox" name="follows_office_hours" value="1" @checked(old('follows_office_hours', $employee->follows_office_hours)) data-office-hours-toggle class="peer sr-only">
+                                <span class="h-6 w-11 rounded-full bg-gray-300 transition peer-checked:bg-primary"></span>
+                                <span class="absolute left-0.5 top-0.5 size-5 rounded-full bg-white shadow transition peer-checked:translate-x-5"></span>
+                            </span>
+                        </label>
+
+                        {{-- Hanya berarti saat toggle menyala; disembunyikan (bukan dihapus)
+                             agar nilainya bertahan kalau toggle dimatikan lalu dinyalakan lagi. --}}
+                        <div data-office-pattern-wrap class="border-t border-gray-100 px-4 py-3" @style(['display:none' => ! old('follows_office_hours', $employee->follows_office_hours)])>
+                            <label for="office_pattern_id" class="block text-sm font-medium text-gray-700">Pola jam kantor</label>
+                            @if ($officePatterns->isEmpty())
+                                <p class="mt-2 text-xs text-amber-700">Belum ada pola jam kantor yang didaftarkan. Atur dulu di menu <span class="font-medium">Pengaturan</span>; sementara itu karyawan ini mengikuti pola default.</p>
+                            @else
+                                <select id="office_pattern_id" name="office_pattern_id" class="mt-2 block w-full rounded-md border border-gray-300 px-3 py-2.5 text-sm shadow-xs outline-none focus:border-primary focus:ring-2 focus:ring-primary/20">
+                                    <option value="">Ikuti pola default (Pengaturan)</option>
+                                    @foreach ($officePatterns as $officePattern)
+                                        <option value="{{ $officePattern->id }}" @selected((int) old('office_pattern_id', $employee->office_pattern_id) === $officePattern->id)>{{ $officePattern->name }} ({{ $officePattern->type->label() }})</option>
+                                    @endforeach
+                                </select>
+                                <p class="mt-2 text-xs text-gray-500">Mengubah pola ikut mengubah cara absensi karyawan ini dihitung, termasuk pada tanggal yang sudah lewat bila absensinya diproses ulang.</p>
+                            @endif
+                            @error('office_pattern_id')<p class="mt-2 text-sm text-red-600">{{ $message }}</p>@enderror
+                        </div>
+                    </div>
                     @error('follows_office_hours')<p class="mt-2 text-sm text-red-600">{{ $message }}</p>@enderror
                 </div>
                 <div class="md:col-span-3" data-pin-repeater>
@@ -217,6 +237,19 @@
 
     @push('scripts')
     <script>
+        // Pilihan pola jam kantor hanya relevan saat toggle-nya menyala.
+        (function () {
+            const toggle = document.querySelector('[data-office-hours-toggle]');
+            const wrap = document.querySelector('[data-office-pattern-wrap]');
+
+            if (!toggle || !wrap) return;
+
+            const sync = () => { wrap.style.display = toggle.checked ? '' : 'none'; };
+
+            toggle.addEventListener('change', sync);
+            sync();
+        })();
+
         (function () {
             const rep = document.querySelector('[data-pin-repeater]');
             if (!rep) return;

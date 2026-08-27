@@ -35,6 +35,7 @@ class Employee extends Model
     'join_date',
     'employment_status',
     'follows_office_hours',
+    'office_pattern_id',
     'exit_reason',
     'exit_date',
     'exit_notes',
@@ -177,6 +178,15 @@ class Employee extends Model
     public function schedules(): HasMany
     {
         return $this->hasMany(EmployeeSchedule::class);
+    }
+
+    /**
+     * Pola jam kantor yang diikuti karyawan ini bila follows_office_hours menyala.
+     * Null berarti ikut pola default global — lihat DefaultOfficeSchedule.
+     */
+    public function officePattern(): BelongsTo
+    {
+        return $this->belongsTo(SchedulePattern::class, 'office_pattern_id');
     }
 
     public function attendances(): HasMany

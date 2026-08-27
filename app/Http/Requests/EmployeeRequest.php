@@ -77,6 +77,13 @@ class EmployeeRequest extends FormRequest
             'join_date' => ['required', 'date'],
             'employment_status' => ['required', 'string', Rule::in(array_keys(Employee::employmentStatusLabels()))],
             'follows_office_hours' => ['nullable', 'boolean'],
+            // Hanya pola yang didaftarkan sebagai pola jam kantor di Pengaturan yang
+            // boleh dipilih. Kosong = ikut pola default global.
+            'office_pattern_id' => [
+                'nullable',
+                'integer',
+                Rule::exists('schedule_patterns', 'id')->where('is_active', true)->where('is_office_pattern', true),
+            ],
             'address' => ['nullable', 'string', 'max:1000'],
             'contract_number' => ['required', 'string', 'max:100', Rule::unique('employee_contracts', 'contract_number')->ignore($contractId)],
             'contract_type' => ['required', 'string', Rule::in(['PKWT', 'PKWTT', 'Probation', 'Internship'])],
@@ -111,6 +118,7 @@ class EmployeeRequest extends FormRequest
     {
         return [
             'contract_end_date.required' => 'Tanggal selesai kontrak wajib diisi untuk jenis kontrak selain PKWTT.',
+            'office_pattern_id.exists' => 'Pola jam kantor yang dipilih tidak tersedia. Daftarkan dulu polanya di menu Pengaturan.',
         ];
     }
 

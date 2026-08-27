@@ -15,6 +15,7 @@ use App\Models\Employee;
 use App\Models\EmployeeContract;
 use App\Models\JobPosition;
 use App\Models\LeaveType;
+use App\Models\SchedulePattern;
 use App\Models\User;
 use App\Services\PunchIngestionService;
 use App\Support\ImportErrorStore;
@@ -85,6 +86,8 @@ class EmployeeManagementController extends Controller
             ],
             'filters' => $filters,
             'perPage' => $perPage,
+            // Feeds the bulk "ikut jam kantor" panel.
+            'officePatterns' => $this->officePatterns(),
             'statuses' => Employee::employmentStatusLabels(),
             'exitReasons' => Employee::exitReasonLabels(),
             'contractTypes' => ['PKWT', 'PKWTT', 'Probation', 'Internship'],
@@ -742,7 +745,14 @@ class EmployeeManagementController extends Controller
             'employee_ids' => ['required', 'array', 'min:1'],
             'employee_ids.*' => ['integer', 'exists:employees,id'],
             'follows' => ['required', 'boolean'],
-        ], [], ['employee_ids' => 'karyawan terpilih']);
+            'office_pattern_id' => [
+                'nullable',
+                'integer',
+                Rule::exists('schedule_patterns', 'id')->where('is_active', true)->where('is_office_pattern', true),
+            ],
+        ], [
+            'office_pattern_id.exists' => 'Pola jam kantor yang dipilih tidak tersedia. Daftarkan dulu polanya di menu Pengaturan.',
+        ], ['employee_ids' => 'karyawan terpilih']);
 
         if ($validator->fails()) {
             return back()->with('bulk_error', $validator->errors()->first());
@@ -750,15 +760,21 @@ class EmployeeManagementController extends Controller
 
         $follows = $request->boolean('follows');
 
+        // Mengembalikan ke penjadwalan manual selalu mengosongkan polanya; menandai
+        // tanpa memilih pola berarti "ikut pola default global".
+        $patternId = $follows ? ($validator->validated()['office_pattern_id'] ?? null) : null;
+
         $updated = Employee::query()
             ->whereIn('id', $validator->validated()['employee_ids'])
             ->visibleTo($request->user())
-            ->update(['follows_office_hours' => $follows]);
+            ->update(['follows_office_hours' => $follows, 'office_pattern_id' => $patternId]);
+
+        $pattern = $patternId ? SchedulePattern::query()->find($patternId) : null;
 
         return redirect()
             ->route('employees.index')
             ->with('status', $follows
-                ? "{$updated} karyawan ditandai mengikuti jam kantor (tanpa penjadwalan)."
+                ? "{$updated} karyawan ditandai mengikuti jam kantor (".($pattern ? "pola {$pattern->name}" : 'pola default').').'
                 : "{$updated} karyawan dikembalikan ke penjadwalan manual.");
     }
 
@@ -784,6 +800,15 @@ class EmployeeManagementController extends Controller
     /**
      * @return array<string, mixed>
      */
+    /**
+     * Pola yang boleh dipilih untuk karyawan "ikut jam kantor" — didaftarkan di
+     * Pengaturan. Dipakai form tambah/ubah karyawan dan panel aksi massal.
+     */
+    private function officePatterns()
+    {
+        return SchedulePattern::query()->officeCandidates()->orderBy('name')->get(['id', 'name', 'type']);
+    }
+
     private function formOptions(): array
     {
         $user = auth()->user();
@@ -826,6 +851,7 @@ class EmployeeManagementController extends Controller
             'leaveTypes' => LeaveType::query()->where('is_active', true)->where('counts_against_balance', true)->orderBy('name')->get(),
             'managers' => Employee::query()->active()->visibleTo($user)->orderBy('full_name')->get(['id', 'full_name', 'employee_number']),
             'devices' => Device::query()->with('branch')->orderBy('name')->get(),
+            'officePatterns' => $this->officePatterns(),
             'statuses' => Employee::employmentStatusLabels(),
             'exitReasons' => Employee::exitReasonLabels(),
             'contractTypes' => ['PKWT', 'PKWTT', 'Probation', 'Internship'],
@@ -961,6 +987,12 @@ class EmployeeManagementController extends Controller
 
         // Checkbox: absen kalau tidak dicentang, jadi selalu tetapkan eksplisit.
         $payload['follows_office_hours'] = $request->boolean('follows_office_hours');
+
+        // Pilihan pola hanya berarti saat karyawannya ikut jam kantor; dikosongkan
+        // saat toggle mati agar tidak diam-diam hidup lagi kalau nanti dinyalakan.
+        $payload['office_pattern_id'] = $payload['follows_office_hours']
+            ? ($request->validated('office_pattern_id') ?: null)
+            : null;
 
         if ($request->hasFile('photo')) {
             $payload['photo_path'] = $request->file('photo')->store('employees/photos', 'public');

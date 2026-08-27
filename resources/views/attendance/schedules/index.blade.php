@@ -110,7 +110,7 @@
                                 <td class="sticky left-0 z-10 border-r border-gray-200 bg-white px-3 py-1.5 text-left">
                                     <a href="{{ route('attendance.schedules.show', ['employee' => $employee, 'month' => $month->format('Y-m')]) }}" class="font-medium text-gray-900 hover:text-primary hover:underline">{{ $employee->full_name }}</a>
                                     @if ($employee->follows_office_hours)
-                                        <span class="ml-1 inline-flex items-center rounded bg-gray-100 px-1.5 py-0.5 text-[10px] font-medium text-gray-600 align-middle" title="Mengikuti pola jam kantor default tanpa penjadwalan">Jam kantor</span>
+                                        <span class="ml-1 inline-flex items-center rounded bg-gray-100 px-1.5 py-0.5 text-[10px] font-medium text-gray-600 align-middle" title="Mengikuti pola jam kantor tanpa penjadwalan">Jam kantor</span>
                                     @endif
                                     <p class="text-[11px] text-gray-500">{{ $employee->employee_number }}</p>
                                 </td>
