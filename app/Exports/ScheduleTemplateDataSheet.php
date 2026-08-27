@@ -193,7 +193,9 @@ class ScheduleTemplateDataSheet implements FromArray, WithEvents, WithTitle
             ->setShowDropDown(true)
             ->setShowErrorMessage(true)
             ->setErrorTitle('Kode tidak dikenali')
-            ->setError('Pilih kode shift yang tersedia, atau "L" untuk libur. Kosongkan bila jadwal hari itu tidak diubah.')
+            // Peringatan informasi, bukan penolakan: jam kerja boleh diketik manual
+            // walau tidak ada di daftar dropdown.
+            ->setError('Pilih kode shift yang tersedia, tulis jam kerjanya (contoh "08:00-17:00"), atau "L" untuk libur. Kosongkan bila jadwal hari itu tidak diubah.')
             ->setFormula1('"'.$options.'"');
 
         $sheet->setDataValidation("C{$firstDataRow}:{$lastColumn}{$lastRow}", $validation);

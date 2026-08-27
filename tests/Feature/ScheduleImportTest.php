@@ -3,6 +3,7 @@
 use App\Enums\AttendanceStatus;
 use App\Enums\ScheduleSource;
 use App\Exports\ScheduleTemplateExport;
+use App\Exports\ScheduleTemplateGuideSheet;
 use App\Imports\ScheduleMatrixImport;
 use App\Models\Attendance;
 use App\Models\Employee;
@@ -194,7 +195,7 @@ test('an unknown shift code cancels the whole file', function () {
     ]);
 
     expect($import->errors())->toHaveCount(1)
-        ->and($import->errors()[0])->toContain('kode shift "ZZ" tidak dikenali')
+        ->and($import->errors()[0])->toContain('"ZZ" tidak dikenali')
         // All-or-nothing: the valid day 1 must not have been written either.
         ->and(EmployeeSchedule::query()->count())->toBe(0);
 });
@@ -427,4 +428,237 @@ test('importing a roster requires the schedules.update permission', function () 
     $this->actingAs($user)
         ->get(route('attendance.schedules.import.template'))
         ->assertForbidden();
+});
+
+test('a shift coded like a day-off token is refused instead of silently becoming a day off', function () {
+    // Sel diperiksa sebagai token libur lebih dulu, jadi shift "X" dulunya tersimpan
+    // sebagai libur tanpa galat — padahal dropdown template menawarkan kode itu.
+    rosterShift('X');
+    $employee = rosterEmployee();
+    $month = rosterMonth();
+
+    $import = runRosterImport([rosterRow($employee, [1 => 'X'], $month->daysInMonth)]);
+
+    expect($import->errors())->toHaveCount(1)
+        ->and($import->errors()[0])->toContain('bentrok dengan kode hari libur')
+        ->and(EmployeeSchedule::query()->count())->toBe(0);
+});
+
+test('an ordinary shift code is unaffected by that guard', function () {
+    $shift = rosterShift('P');
+    $employee = rosterEmployee();
+    $month = rosterMonth();
+
+    $import = runRosterImport([rosterRow($employee, [1 => 'P', 2 => 'L'], $month->daysInMonth)]);
+
+    expect($import->errors())->toBe([]);
+
+    $rows = EmployeeSchedule::query()->orderBy('work_date')->get();
+
+    expect($rows)->toHaveCount(2)
+        ->and($rows[0]->shift_id)->toBe($shift->id)
+        ->and($rows[1]->is_day_off)->toBeTrue();
+});
+
+test('the template guide is sectioned and documents exactly what the importer accepts', function () {
+    $shift = rosterShift('P');
+    $month = CarbonImmutable::parse(rosterMonth());
+
+    $rows = (new ScheduleTemplateGuideSheet($month, Shift::query()->where('is_active', true)->get()))->array();
+    $flat = collect($rows)->map(fn (array $row) => implode(' ', $row))->implode("\n");
+
+    // Berjudul per bagian, bukan satu daftar datar sepanjang belasan baris.
+    foreach ([
+        'LANGKAH PENGISIAN',
+        'CARA MENGISI SEL',
+        'YANG TIDAK BOLEH DIUBAH',
+        'SETELAH IMPORT BERHASIL',
+        'KODE SHIFT AKTIF',
+    ] as $section) {
+        expect($flat)->toContain($section);
+    }
+
+    // Isinya diturunkan dari konstanta importer, jadi tidak bisa menyimpang dari
+    // apa yang benar-benar diterima saat impor.
+    expect($flat)->toContain(ScheduleMatrixImport::WFH_SUFFIX)
+        ->and($flat)->toContain(ScheduleMatrixImport::COLUMN_EMPLOYEE_NUMBER)
+        ->and($flat)->toContain(ScheduleMatrixImport::COLUMN_EMPLOYEE_NAME)
+        ->and($flat)->toContain('"'.ScheduleMatrixImport::DAY_OFF_TOKENS[1].'"')
+        ->and($flat)->toContain($shift->code)
+        ->and($flat)->toContain((string) $month->daysInMonth);
+});
+
+test('month names read in Indonesian, matching the rest of the document', function () {
+    // Seluruh antarmuka berbahasa Indonesia; nama bulan Carbon dulu ikut APP_LOCALE=en.
+    expect(CarbonImmutable::parse('2026-08-01')->translatedFormat('F Y'))->toBe('Agustus 2026');
+});
+
+test('a cell may carry the working hours instead of the shift code', function () {
+    $shift = rosterShift('P', '08:00', '17:00');
+    $employee = rosterEmployee();
+    $month = rosterMonth();
+
+    // Empat penulisan yang semuanya berarti shift yang sama.
+    $import = runRosterImport([rosterRow($employee, [
+        1 => '08:00-17:00',
+        2 => '08.00-17.00',
+        3 => '0800-1700',
+        4 => '8-17',
+    ], $month->daysInMonth)]);
+
+    expect($import->errors())->toBe([]);
+
+    $rows = EmployeeSchedule::query()->orderBy('work_date')->get();
+
+    expect($rows)->toHaveCount(4)
+        ->and($rows->pluck('shift_id')->unique()->all())->toBe([$shift->id])
+        ->and($rows->every(fn ($row) => ! $row->is_day_off))->toBeTrue();
+});
+
+test('hours can be combined with the WFH suffix', function () {
+    $shift = rosterShift('P', '08:00', '17:00');
+    $employee = rosterEmployee();
+    $month = rosterMonth();
+
+    $import = runRosterImport([rosterRow($employee, [1 => '08:00-17:00/WFH'], $month->daysInMonth)]);
+
+    expect($import->errors())->toBe([]);
+
+    $row = EmployeeSchedule::query()->firstOrFail();
+
+    expect($row->shift_id)->toBe($shift->id)
+        ->and($row->is_wfh)->toBeTrue();
+});
+
+test('hours that match no active shift are rejected with the list of what is available', function () {
+    rosterShift('P', '08:00', '17:00');
+    $employee = rosterEmployee();
+    $month = rosterMonth();
+
+    $import = runRosterImport([rosterRow($employee, [1 => '09:00-18:00'], $month->daysInMonth)]);
+
+    expect($import->errors())->toHaveCount(1)
+        ->and($import->errors()[0])->toContain('tidak ada shift aktif dengan jam 09:00-18:00')
+        // Pesannya menyebutkan apa yang boleh dipakai, bukan hanya menolak.
+        ->and($import->errors()[0])->toContain('P (08:00-17:00)')
+        ->and(EmployeeSchedule::query()->count())->toBe(0);
+});
+
+test('hours shared by two shifts are refused so the rules cannot be guessed', function () {
+    // Jam sama, aturan berbeda: hanya kodenya yang bisa memutuskan mana yang dipakai.
+    rosterShift('P', '08:00', '17:00');
+    rosterShift('Q', '08:00', '17:00');
+    $employee = rosterEmployee();
+    $month = rosterMonth();
+
+    $import = runRosterImport([rosterRow($employee, [1 => '08:00-17:00'], $month->daysInMonth)]);
+
+    expect($import->errors())->toHaveCount(1)
+        ->and($import->errors()[0])->toContain('dipakai oleh lebih dari satu shift')
+        ->and(EmployeeSchedule::query()->count())->toBe(0);
+});
+
+test('a shift code shaped like a range still wins over the hours reading', function () {
+    // Kode dicoba lebih dulu, jadi kode "8-17" tetap berarti shift itu sendiri.
+    $odd = rosterShift('8-17', '22:00', '06:00');
+    $employee = rosterEmployee();
+    $month = rosterMonth();
+
+    $import = runRosterImport([rosterRow($employee, [1 => '8-17'], $month->daysInMonth)]);
+
+    expect($import->errors())->toBe([])
+        ->and(EmployeeSchedule::query()->firstOrFail()->shift_id)->toBe($odd->id);
+});
+
+/** Unggah satu sel bermasalah lalu kembalikan file rincian kesalahannya sebagai spreadsheet. */
+function rosterErrorReport(string $cell): PhpOffice\PhpSpreadsheet\Spreadsheet
+{
+    $employee = rosterEmployee();
+    $month = rosterMonth();
+
+    $path = tempnam(sys_get_temp_dir(), 'roster-').'.xlsx';
+    file_put_contents($path, Excel::raw(new class($month, $employee, $cell) implements FromArray
+    {
+        public function __construct(private $month, private $employee, private $cell) {}
+
+        public function array(): array
+        {
+            return [
+                ['Periode', $this->month->format('Y-m')],
+                ['Nomor Karyawan', 'Nama Lengkap', 1, 2],
+                [$this->employee->employee_number, $this->employee->full_name, 'P', $this->cell],
+            ];
+        }
+    }, ExcelWriter::XLSX));
+
+    $response = test()->actingAs(rosterImporter())
+        ->post(route('attendance.schedules.import'), [
+            'file' => new UploadedFile($path, 'roster.xlsx', null, null, true),
+        ]);
+
+    $token = session('import_error_token');
+    expect($token)->not->toBeNull();
+
+    $download = test()->actingAs(rosterImporter())
+        ->get(route('attendance.schedules.import.errors', $token))
+        ->assertOk();
+
+    $out = tempnam(sys_get_temp_dir(), 'report-').'.xlsx';
+    file_put_contents($out, $download->streamedContent());
+
+    return PhpOffice\PhpSpreadsheet\IOFactory::load($out);
+}
+
+test('the error report marks the exact cell whose shift did not match', function () {
+    rosterShift('P', '08:00', '17:00');
+
+    $book = rosterErrorReport('09:00-18:00');
+    $sheet = $book->getSheet(0);
+
+    // Kolom tanggal 2 ada di D, baris datanya baris 3.
+    $fill = $sheet->getStyle('D3')->getFill()->getStartColor()->getRGB();
+
+    expect($fill)->toBe('FFC7CE');
+
+    // Kolom "Kesalahan" di ujung kanan menerangkan apa yang salah pada baris itu.
+    $note = (string) $sheet->getCell('E3')->getValue();
+
+    expect($note)->toContain('tidak ada shift aktif dengan jam 09:00-18:00')
+        ->and($note)->toContain('P (08:00-17:00)');
+
+    // Sel yang benar tidak ikut ditandai.
+    expect($sheet->getStyle('C3')->getFill()->getStartColor()->getRGB())->not->toBe('FFC7CE');
+});
+
+test('the error report also lists every problem on its own sheet', function () {
+    rosterShift('P', '08:00', '17:00');
+
+    $book = rosterErrorReport('ZZ');
+    $sheet = $book->getSheetByName('Kesalahan');
+
+    expect($sheet)->not->toBeNull()
+        ->and((string) $sheet->getCell('A2')->getValue())->toBe('Baris 3')
+        ->and((string) $sheet->getCell('B2')->getValue())->toBe('2')
+        ->and((string) $sheet->getCell('C2')->getValue())->toContain('"ZZ" tidak dikenali');
+});
+
+test('a file-level rejection opens straight on the error sheet, not a clean-looking grid', function () {
+    // Bentrok kode shift tidak menempel pada sel mana pun, jadi sheet datanya tidak
+    // punya satu pun tanda merah — file harus terbuka di daftar kesalahannya.
+    rosterShift('X');
+
+    $book = rosterErrorReport('X');
+
+    expect($book->getActiveSheet()->getTitle())->toBe('Kesalahan')
+        ->and((string) $book->getSheetByName('Kesalahan')->getCell('A2')->getValue())->toBe('File')
+        ->and((string) $book->getSheetByName('Kesalahan')->getCell('C2')->getValue())
+        ->toContain('bentrok dengan kode hari libur');
+});
+
+test('a cell-level rejection still opens on the grid where the marks are', function () {
+    rosterShift('P', '08:00', '17:00');
+
+    $book = rosterErrorReport('ZZ');
+
+    expect($book->getActiveSheet()->getTitle())->not->toBe('Kesalahan');
 });

@@ -60,6 +60,13 @@ class ScheduleMatrixImport implements ToCollection, WithMultipleSheets
     public const WFH_SUFFIX = 'WFH';
 
     /**
+     * Rentang jam yang boleh ditulis sebagai ganti kode shift. Menerima "08:00-17:00",
+     * "08.00-17.00", "0800-1700", dan "8-17"; pemisahnya boleh "-", en/em dash, atau "~".
+     * Jamnya tetap harus persis sama dengan salah satu shift aktif — lihat readDays().
+     */
+    private const TIME_RANGE_PATTERN = '/^(\d{1,2})(?:[:.]?(\d{2}))?\s*[-–—~]\s*(\d{1,2})(?:[:.]?(\d{2}))?$/u';
+
+    /**
      * @var list<array{row: ?int, column: ?string, message: string}>
      */
     private array $rowErrors = [];
@@ -69,6 +76,14 @@ class ScheduleMatrixImport implements ToCollection, WithMultipleSheets
     private int $importedEmployees = 0;
 
     private int $importedDays = 0;
+
+    /**
+     * Shift aktif dikelompokkan menurut jamnya ("08:00-17:00" => shift), supaya sel
+     * yang diisi jam bisa dicocokkan tanpa memindai daftar shift tiap sel.
+     *
+     * @var Collection<string, Collection<int, Shift>>
+     */
+    private Collection $shiftsByHours;
 
     /**
      * @param  User|null  $actor  the importer, whose data scope every row must fall
@@ -159,6 +174,12 @@ class ScheduleMatrixImport implements ToCollection, WithMultipleSheets
         $shifts = Shift::query()->where('is_active', true)->get()
             ->keyBy(fn (Shift $shift) => mb_strtolower(trim((string) $shift->code)));
 
+        if (! $this->shiftCodesAreUnambiguous($shifts)) {
+            return;
+        }
+
+        $this->shiftsByHours = $shifts->groupBy(fn (Shift $shift) => $this->shiftHours($shift));
+
         /** @var array<int, true> $seen employee id => already used by an earlier row */
         $seen = [];
 
@@ -197,6 +218,89 @@ class ScheduleMatrixImport implements ToCollection, WithMultipleSheets
         }
 
         $this->persist($prepared);
+    }
+
+    /**
+     * Tolak file bila ada kode shift aktif yang sama dengan token libur.
+     *
+     * Sel diperiksa sebagai token libur lebih dulu, jadi shift berkode "X" atau
+     * "OFF" tidak akan pernah terbaca sebagai shift — harinya tersimpan sebagai
+     * libur tanpa satu pun galat, padahal dropdown pada template justru menawarkan
+     * kode itu. Diam-diam salah jauh lebih buruk daripada menolak filenya.
+     *
+     * @param  Collection<string, Shift>  $shifts
+     */
+    private function shiftCodesAreUnambiguous(Collection $shifts): bool
+    {
+        $clashing = $shifts->keys()
+            ->filter(fn ($code) => in_array(mb_strtoupper((string) $code), self::DAY_OFF_TOKENS, true))
+            ->map(fn ($code) => '"'.mb_strtoupper((string) $code).'"');
+
+        if ($clashing->isEmpty()) {
+            return true;
+        }
+
+        $tokens = implode(', ', array_map(fn (string $token) => '"'.$token.'"', self::DAY_OFF_TOKENS));
+
+        $this->addError(null, sprintf(
+            'Kode shift %s bentrok dengan kode hari libur (%s), sehingga tidak bisa dibedakan saat impor. '
+            .'Ganti kode shift tersebut di menu Shift Kerja, lalu unduh ulang template dan coba lagi.',
+            $clashing->implode(', '),
+            $tokens,
+        ));
+
+        return false;
+    }
+
+    /** Jam sebuah shift dalam bentuk yang dibandingkan, mis. "08:00-17:00". */
+    private function shiftHours(Shift $shift): string
+    {
+        return substr((string) $shift->start_time, 0, 5).'-'.substr((string) $shift->end_time, 0, 5);
+    }
+
+    /**
+     * Rentang jam yang ditulis pengguna, dinormalkan ke "HH:MM-HH:MM", atau null bila
+     * teksnya memang bukan rentang jam.
+     */
+    private function parseTimeRange(string $value): ?string
+    {
+        if (preg_match(self::TIME_RANGE_PATTERN, trim($value), $matches) !== 1) {
+            return null;
+        }
+
+        $start = $this->clockPart($matches[1], $matches[2] ?? '');
+        $end = $this->clockPart($matches[3], $matches[4] ?? '');
+
+        return ($start !== null && $end !== null) ? $start.'-'.$end : null;
+    }
+
+    private function clockPart(string $hour, string $minute): ?string
+    {
+        $h = (int) $hour;
+        $m = $minute === '' ? 0 : (int) $minute;
+
+        if ($h > 23 || $m > 59) {
+            return null;
+        }
+
+        return sprintf('%02d:%02d', $h, $m);
+    }
+
+    /**
+     * Daftar shift aktif beserta jamnya, untuk ditempelkan pada pesan galat sehingga
+     * pengguna tahu apa saja yang boleh ditulis.
+     *
+     * @param  Collection<string, Shift>  $shifts
+     */
+    private function shiftOptions(Collection $shifts): string
+    {
+        if ($shifts->isEmpty()) {
+            return 'belum ada shift aktif';
+        }
+
+        return $shifts
+            ->map(fn (Shift $shift) => mb_strtoupper((string) $shift->code).' ('.$this->shiftHours($shift).')')
+            ->implode(', ');
     }
 
     /**
@@ -387,12 +491,40 @@ class ScheduleMatrixImport implements ToCollection, WithMultipleSheets
 
             $shift = $shifts->get(mb_strtolower($code));
 
-            if ($shift === null) {
-                $available = $shifts->keys()->map(fn ($c) => mb_strtoupper((string) $c))->implode(', ');
+            // Kode dicoba lebih dulu, baru jamnya: kode shift yang kebetulan berbentuk
+            // seperti rentang jam tidak boleh berubah arti.
+            if ($shift === null && ($hours = $this->parseTimeRange($code)) !== null) {
+                $matching = $this->shiftsByHours->get($hours, collect());
 
+                if ($matching->count() > 1) {
+                    $codes = $matching->map(fn (Shift $s) => mb_strtoupper((string) $s->code))->implode(', ');
+
+                    $this->addError(
+                        $rowNumber,
+                        "Tanggal {$day}: jam \"{$code}\" dipakai oleh lebih dari satu shift ({$codes}), jadi tidak bisa dibedakan. Tulis kode shiftnya saja.",
+                        (string) $day,
+                    );
+
+                    continue;
+                }
+
+                if ($matching->isEmpty()) {
+                    $this->addError(
+                        $rowNumber,
+                        "Tanggal {$day}: tidak ada shift aktif dengan jam {$hours}. Jam yang ditulis harus sama persis dengan salah satu shift: ".$this->shiftOptions($shifts).'.',
+                        (string) $day,
+                    );
+
+                    continue;
+                }
+
+                $shift = $matching->first();
+            }
+
+            if ($shift === null) {
                 $this->addError(
                     $rowNumber,
-                    "Tanggal {$day}: kode shift \"{$code}\" tidak dikenali. Gunakan salah satu kode shift aktif (".($available ?: 'belum ada shift aktif').') atau "L" untuk libur.',
+                    "Tanggal {$day}: \"{$code}\" tidak dikenali. Tulis kode shift atau jam kerjanya (contoh \"08:00-17:00\") dari daftar shift aktif: ".$this->shiftOptions($shifts).'. Untuk hari libur tulis "L".',
                     (string) $day,
                 );
 

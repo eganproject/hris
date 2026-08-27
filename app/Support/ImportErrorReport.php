@@ -36,9 +36,22 @@ class ImportErrorReport
 
         $dataSheet = $spreadsheet->getSheet(0);
         self::annotateDataSheet($dataSheet, $errors, $headerRow);
-        self::addErrorSheet($spreadsheet, $errors);
+        $errorSheet = self::addErrorSheet($spreadsheet, $errors);
 
-        $spreadsheet->setActiveSheetIndex(0);
+        // Masalah tingkat file (periode tak terbaca, kode shift bentrok, cakupan
+        // kosong) tidak menempel pada sel mana pun, jadi sheet datanya tampil bersih
+        // tanpa satu pun tanda merah. Buka langsung di daftar kesalahan supaya yang
+        // mengunduh tidak mengira filenya sudah benar.
+        $hasRowErrors = false;
+        foreach ($errors as $error) {
+            if ($error['row'] !== null) {
+                $hasRowErrors = true;
+
+                break;
+            }
+        }
+
+        $spreadsheet->setActiveSheetIndex($hasRowErrors ? 0 : $spreadsheet->getIndex($errorSheet));
 
         $tmp = tempnam(sys_get_temp_dir(), 'import-error-').'.xlsx';
         IOFactory::createWriter($spreadsheet, 'Xlsx')->save($tmp);
@@ -107,7 +120,7 @@ class ImportErrorReport
      *
      * @param  list<array{row: ?int, column: ?string, message: string}>  $errors
      */
-    private static function addErrorSheet(\PhpOffice\PhpSpreadsheet\Spreadsheet $spreadsheet, array $errors): void
+    private static function addErrorSheet(\PhpOffice\PhpSpreadsheet\Spreadsheet $spreadsheet, array $errors): Worksheet
     {
         $sheet = $spreadsheet->createSheet();
         $sheet->setTitle('Kesalahan');
@@ -127,6 +140,8 @@ class ImportErrorReport
         $sheet->getColumnDimension('B')->setWidth(26);
         $sheet->getColumnDimension('C')->setWidth(80);
         $sheet->getStyle('C2:C'.max(2, $row - 1))->getAlignment()->setWrapText(true);
+
+        return $sheet;
     }
 
     private static function fillRed(Worksheet $sheet, string $cell): void
