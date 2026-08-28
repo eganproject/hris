@@ -43,7 +43,7 @@
                     <textarea id="reason" name="reason" rows="3" class="mt-2 block w-full rounded-md border border-gray-300 px-3 py-2.5 text-sm shadow-xs outline-none focus:border-primary focus:ring-2 focus:ring-primary/20">{{ old('reason') }}</textarea>
                     @error('reason')<p class="mt-2 text-sm text-red-600">{{ $message }}</p>@enderror
                 </div>
-                <x-attachment-field name="attachment" />
+                <x-attachment-field name="attachment" :max-mb="\App\Models\LeaveRequest::ATTACHMENT_MAX_MB" />
             </div>
             <p class="mt-4 rounded-md bg-gray-50 px-3 py-2 text-xs text-gray-500">Pengajuan akan diteruskan ke atasan Anda, dan keputusan atasan bersifat final. Bila Anda belum punya atasan, HR yang memutuskan.</p>
         </section>

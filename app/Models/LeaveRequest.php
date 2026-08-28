@@ -4,29 +4,29 @@ namespace App\Models;
 
 use App\Enums\LeaveRequestStatus;
 use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class LeaveRequest extends Model
 {
     /** @var list<string> */
     protected $fillable = [
-    'employee_id',
-    'leave_type_id',
-    'supervisor_id',
-    'start_date',
-    'end_date',
-    'reason',
-    'attachment_path',
-    'attachment_name',
-    'attachment_mime',
-    'attachment_size',
-    'status',
-    'supervisor_approved_by',
-    'supervisor_decided_at',
-    'approved_by',
-    'decided_at',
-    'decision_notes',
+        'employee_id',
+        'leave_type_id',
+        'supervisor_id',
+        'start_date',
+        'end_date',
+        'reason',
+        'attachment_path',
+        'attachment_name',
+        'attachment_mime',
+        'attachment_size',
+        'status',
+        'supervisor_approved_by',
+        'supervisor_decided_at',
+        'approved_by',
+        'decided_at',
+        'decision_notes',
     ];
 
     protected function casts(): array
@@ -43,6 +43,13 @@ class LeaveRequest extends Model
 
     /** Disk privat: lampiran hanya boleh keluar lewat rute berotorisasi. */
     public const ATTACHMENT_DISK = 'local';
+
+    /**
+     * Batas ukuran lampiran. Disimpan di sini supaya aturan validasi, teks bantuan
+     * pada formulir, dan pemeriksaan di browser selalu menyebut angka yang sama —
+     * sebelumnya angkanya ditulis ulang di empat tempat dan mudah menyimpang.
+     */
+    public const ATTACHMENT_MAX_MB = 5;
 
     public function hasAttachment(): bool
     {

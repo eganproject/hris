@@ -3,6 +3,7 @@
 namespace App\Http\Requests;
 
 use App\Models\Employee;
+use App\Models\LeaveRequest;
 use App\Support\LeaveGuard;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Validator;
@@ -29,8 +30,8 @@ class StoreLeaveRequest extends FormRequest
             'start_date' => ['required', 'date', 'after_or_equal:'.$earliest],
             'end_date' => ['required', 'date', 'after_or_equal:start_date'],
             'reason' => ['nullable', 'string', 'max:1000'],
-            // Bukti pendukung: surat sakit, surat tugas, dsb. Maksimum 2 MB.
-            'attachment' => ['nullable', 'file', 'mimes:jpg,jpeg,png,webp,pdf', 'max:2048'],
+            // Bukti pendukung: surat sakit, surat tugas, dsb.
+            'attachment' => ['nullable', 'file', 'mimes:jpg,jpeg,png,webp,pdf', 'max:'.(LeaveRequest::ATTACHMENT_MAX_MB * 1024)],
         ];
     }
 
@@ -61,7 +62,7 @@ class StoreLeaveRequest extends FormRequest
     public function messages(): array
     {
         return [
-            'attachment.max' => 'Ukuran lampiran maksimal 2 MB.',
+            'attachment.max' => 'Ukuran lampiran maksimal '.LeaveRequest::ATTACHMENT_MAX_MB.' MB.',
             'attachment.mimes' => 'Lampiran harus berupa gambar (JPG, PNG, WEBP) atau PDF.',
             'start_date.after_or_equal' => 'Tanggal mulai tidak boleh lebih awal dari awal bulan lalu.',
         ];

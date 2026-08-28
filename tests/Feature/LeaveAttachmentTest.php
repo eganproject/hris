@@ -1,5 +1,6 @@
 <?php
 
+use App\Enums\LeaveRequestStatus;
 use App\Models\Employee;
 use App\Models\LeaveRequest;
 use App\Models\LeaveType;
@@ -62,7 +63,25 @@ test('an employee can attach a document to their own leave request', function ()
         ->and($leave->attachment_path)->not->toContain('surat-dokter');
 });
 
-test('an attachment over 2 MB or of the wrong type is rejected', function () {
+test('a 3 MB scan is accepted', function () {
+    // Ukurannya sengaja ditulis tetap, bukan diturunkan dari ATTACHMENT_MAX_MB:
+    // berkas yang ikut berubah mengikuti konstanta akan lolos berapa pun batasnya
+    // dan tidak menjaga apa-apa. Angka ini mewakili hasil pindai surat dokter yang
+    // dulu ditolak pada batas 2 MB — menurunkan batas lagi akan menggagalkannya.
+    Storage::fake('local');
+    [$user] = requester();
+
+    $this->actingAs($user)->post('/my-leave', [
+        'leave_type_id' => leaveType()->id,
+        'start_date' => now()->addDay()->toDateString(),
+        'end_date' => now()->addDay()->toDateString(),
+        'attachment' => UploadedFile::fake()->create('pindaian-surat-dokter.pdf', 3 * 1024, 'application/pdf'),
+    ])->assertRedirect()->assertSessionHasNoErrors();
+
+    expect(LeaveRequest::query()->firstOrFail()->hasAttachment())->toBeTrue();
+});
+
+test('an attachment over the size limit or of the wrong type is rejected', function () {
     Storage::fake('local');
     [$user] = requester();
 
@@ -74,7 +93,7 @@ test('an attachment over 2 MB or of the wrong type is rejected', function () {
     ];
 
     $this->actingAs($user)
-        ->post('/my-leave', $payload(UploadedFile::fake()->create('besar.pdf', 2100, 'application/pdf')))
+        ->post('/my-leave', $payload(UploadedFile::fake()->create('besar.pdf', (LeaveRequest::ATTACHMENT_MAX_MB * 1024) + 64, 'application/pdf')))
         ->assertSessionHasErrors('attachment');
 
     $this->actingAs($user)
@@ -108,7 +127,7 @@ test('the requester, their supervisor and HR can each open the attachment', func
         'employee_id' => $staff->id, 'leave_type_id' => leaveType()->id,
         'supervisor_id' => $boss->id,
         'start_date' => now()->toDateString(), 'end_date' => now()->toDateString(),
-        'status' => App\Enums\LeaveRequestStatus::PendingSupervisor->value,
+        'status' => LeaveRequestStatus::PendingSupervisor->value,
         'attachment_path' => 'leave-attachments/'.$staff->id.'/abc.pdf',
         'attachment_name' => 'surat.pdf', 'attachment_mime' => 'application/pdf', 'attachment_size' => 1024,
     ]);
@@ -138,7 +157,7 @@ test('an unrelated employee cannot open someone else attachment', function () {
     $leave = LeaveRequest::query()->create([
         'employee_id' => $owner->id, 'leave_type_id' => leaveType()->id,
         'start_date' => now()->toDateString(), 'end_date' => now()->toDateString(),
-        'status' => App\Enums\LeaveRequestStatus::PendingHr->value,
+        'status' => LeaveRequestStatus::PendingHr->value,
         'attachment_path' => 'leave-attachments/'.$owner->id.'/rahasia.pdf',
         'attachment_name' => 'rahasia.pdf', 'attachment_mime' => 'application/pdf', 'attachment_size' => 1024,
     ]);
@@ -159,7 +178,7 @@ test('a request with no attachment returns 404 rather than an error', function (
     $leave = LeaveRequest::query()->create([
         'employee_id' => $employee->id, 'leave_type_id' => leaveType()->id,
         'start_date' => now()->toDateString(), 'end_date' => now()->toDateString(),
-        'status' => App\Enums\LeaveRequestStatus::PendingHr->value,
+        'status' => LeaveRequestStatus::PendingHr->value,
     ]);
 
     $this->actingAs($user)->get(route('leave.attachment', $leave))->assertNotFound();
@@ -172,7 +191,7 @@ test('a path that outlived its file returns 404, not a 500', function () {
     $leave = LeaveRequest::query()->create([
         'employee_id' => $employee->id, 'leave_type_id' => leaveType()->id,
         'start_date' => now()->toDateString(), 'end_date' => now()->toDateString(),
-        'status' => App\Enums\LeaveRequestStatus::PendingHr->value,
+        'status' => LeaveRequestStatus::PendingHr->value,
         'attachment_path' => 'leave-attachments/hilang.pdf',
         'attachment_name' => 'hilang.pdf', 'attachment_mime' => 'application/pdf', 'attachment_size' => 10,
     ]);
@@ -187,7 +206,7 @@ test('deleting a request takes its attachment off the disk', function () {
     $leave = LeaveRequest::query()->create([
         'employee_id' => $employee->id, 'leave_type_id' => leaveType()->id,
         'start_date' => now()->toDateString(), 'end_date' => now()->toDateString(),
-        'status' => App\Enums\LeaveRequestStatus::PendingHr->value,
+        'status' => LeaveRequestStatus::PendingHr->value,
         'attachment_path' => 'leave-attachments/'.$employee->id.'/buang.pdf',
         'attachment_name' => 'buang.pdf', 'attachment_mime' => 'application/pdf', 'attachment_size' => 10,
     ]);
@@ -237,7 +256,7 @@ test('both leave forms render the attachment field with its live preview', funct
         ->assertSee('data-attachment-input', escape: false)
         ->assertSee('data-attachment-preview', escape: false)
         ->assertSee('enctype="multipart/form-data"', escape: false)
-        ->assertSee('maksimal 2 MB');
+        ->assertSee('maksimal '.LeaveRequest::ATTACHMENT_MAX_MB.' MB');
 
     // Formulir HR (dibuatkan atas nama karyawan).
     app(PermissionRegistrar::class)->forgetCachedPermissions();
