@@ -158,10 +158,12 @@ class ScheduleController extends Controller
     {
         return ScheduleAssignment::query()
             ->overlapping($from, $to)
-            ->when(
-                $request->integer('branch_id') ?: null,
-                fn ($query, $id) => $query->whereHas('employee', fn ($q) => $q->where('branch_id', $id)),
-            )
+            // Penyaring yang sama persis dengan tab Roster, diterapkan lewat
+            // karyawannya. Formulir penyaringnya dipakai bersama kedua tab, jadi
+            // dulu ketika hanya lokasi yang diterapkan di sini, memilih divisi atau
+            // jabatan membuat kotaknya tetap terisi sementara tabelnya diam-diam
+            // menampilkan seluruh penugasan.
+            ->whereHas('employee', fn (Builder $query) => $this->filtered($query, $request))
             ->tap(fn ($query) => $scope->constrain($query))
             ->visibleToCreator($request->user());
     }
