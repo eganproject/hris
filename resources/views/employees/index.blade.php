@@ -94,6 +94,8 @@
                 $chipFor('role_id', 'Role', $named($roles, $filters['role_id'] ?? null)),
                 $chipFor('status', 'Status', $statuses[$filters['status'] ?? ''] ?? null),
                 $chipFor('exit_reason', 'Alasan keluar', $exitReasons[$filters['exit_reason'] ?? ''] ?? null),
+                $chipFor('office_hours', 'Jam kerja', $officeHoursOptions[$filters['office_hours'] ?? ''] ?? null),
+                $chipFor('schedule', 'Jadwal bulan ini', $scheduleOptions[$filters['schedule'] ?? ''] ?? null),
                 ($filters['contract'] ?? '') === 'expiring'
                     ? ['label' => 'Kontrak', 'value' => 'Berakhir ≤ 30 hari', 'remove' => request()->fullUrlWithQuery(['contract' => null, 'page' => null])]
                     : null,
@@ -104,6 +106,7 @@
                 $filters['branch_id'] ?? null, $filters['department_id'] ?? null,
                 $filters['job_position_id'] ?? null, $filters['role_id'] ?? null,
                 $filters['status'] ?? null, $filters['exit_reason'] ?? null,
+                $filters['office_hours'] ?? null, $filters['schedule'] ?? null,
             ]));
 
             $selectClass = 'mt-2 block w-full rounded-md border border-gray-300 bg-white px-3 py-2.5 text-sm shadow-xs outline-none focus:border-primary focus:ring-2 focus:ring-primary/20';
@@ -206,6 +209,26 @@
                                     <option value="{{ $value }}" @selected(($filters['exit_reason'] ?? '') === $value)>{{ $label }}</option>
                                 @endforeach
                             </select>
+                        </div>
+                        <div>
+                            <label for="office_hours" class="block text-sm font-medium text-gray-700">Jam Kerja</label>
+                            <select id="office_hours" name="office_hours" class="{{ $selectClass }}">
+                                <option value="">Semua</option>
+                                @foreach ($officeHoursOptions as $value => $label)
+                                    <option value="{{ $value }}" @selected(($filters['office_hours'] ?? '') === $value)>{{ $label }}</option>
+                                @endforeach
+                            </select>
+                            <p class="mt-1 text-xs text-gray-400">Karyawan jam kantor jadwalnya mengikuti pola, tanpa perlu di-generate.</p>
+                        </div>
+                        <div>
+                            <label for="schedule" class="block text-sm font-medium text-gray-700">Jadwal Bulan Ini</label>
+                            <select id="schedule" name="schedule" class="{{ $selectClass }}">
+                                <option value="">Semua</option>
+                                @foreach ($scheduleOptions as $value => $label)
+                                    <option value="{{ $value }}" @selected(($filters['schedule'] ?? '') === $value)>{{ $label }}</option>
+                                @endforeach
+                            </select>
+                            <p class="mt-1 text-xs text-gray-400">{{ now()->translatedFormat('F Y') }}. Karyawan jam kantor tidak ikut terhitung.</p>
                         </div>
                         <div>
                             <label for="per_page" class="block text-sm font-medium text-gray-700">Per halaman</label>

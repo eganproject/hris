@@ -3,13 +3,16 @@
 namespace App\Models;
 
 use App\Support\EmployeeNumber;
+use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Casts\Attribute;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
-use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 
 class Employee extends Model
@@ -21,25 +24,25 @@ class Employee extends Model
      * @var list<string>
      */
     protected $fillable = [
-    'branch_id',
-    'user_id',
-    'department_id',
-    'job_position_id',
-    'manager_id',
-    'photo_path',
-    'full_name',
-    'email',
-    'phone',
-    'identity_number',
-    'birth_date',
-    'join_date',
-    'employment_status',
-    'follows_office_hours',
-    'office_pattern_id',
-    'exit_reason',
-    'exit_date',
-    'exit_notes',
-    'address',
+        'branch_id',
+        'user_id',
+        'department_id',
+        'job_position_id',
+        'manager_id',
+        'photo_path',
+        'full_name',
+        'email',
+        'phone',
+        'identity_number',
+        'birth_date',
+        'join_date',
+        'employment_status',
+        'follows_office_hours',
+        'office_pattern_id',
+        'exit_reason',
+        'exit_date',
+        'exit_notes',
+        'address',
     ];
 
     /**
@@ -436,10 +439,31 @@ class Employee extends Model
             ->when($value('status'), fn (Builder $q, $status) => $q->where('employment_status', $status))
             ->when($value('exit_reason'), fn (Builder $q, $reason) => $q->where('exit_reason', $reason))
             ->when($value('contract') === 'expiring', fn (Builder $q) => $q->whereHas('contracts', fn ($c) => $c->expiringWithin(30)))
+            ->when($value('office_hours') === 'yes', fn (Builder $q) => $q->where('follows_office_hours', true))
+            ->when($value('office_hours') === 'no', fn (Builder $q) => $q->where('follows_office_hours', false))
+            ->when($value('schedule') === 'none', fn (Builder $q) => $q->withoutScheduleThisMonth())
             ->when($value('search'), fn (Builder $q, string $search) => $q->where(fn (Builder $inner) => $inner
                 ->where('employee_number', 'like', "%{$search}%")
                 ->orWhere('full_name', 'like', "%{$search}%")
                 ->orWhere('email', 'like', "%{$search}%")));
+    }
+
+    /**
+     * Karyawan yang belum punya satu pun baris roster pada bulan berjalan.
+     *
+     * Karyawan bertanda "ikut jam kantor" sengaja dikeluarkan: jadwal mereka
+     * diturunkan dari pola dan memang tidak pernah dimaterialisasi menjadi baris
+     * roster, jadi tanpa pengecualian ini mereka semua akan salah tampil sebagai
+     * belum terjadwal. Aturannya sama persis dengan layar Penjadwalan › Belum
+     * Terjadwal (mode bulanan), supaya kedua halaman tidak pernah berbeda jawaban.
+     */
+    public function scopeWithoutScheduleThisMonth(Builder $query): void
+    {
+        $from = now()->startOfMonth()->toDateString();
+        $to = now()->endOfMonth()->toDateString();
+
+        $query->where('follows_office_hours', false)
+            ->whereDoesntHave('schedules', fn (Builder $q) => $q->whereBetween('work_date', [$from, $to]));
     }
 
     public function getContractTenureAttribute(): ?string
@@ -552,13 +576,13 @@ class Employee extends Model
      *
      * @param  array<string, mixed>  $properties
      */
-    public function recordEvent(string $type, ?string $description = null, ?\Carbon\CarbonInterface $occurredAt = null, array $properties = []): EmployeeEvent
+    public function recordEvent(string $type, ?string $description = null, ?CarbonInterface $occurredAt = null, array $properties = []): EmployeeEvent
     {
         return $this->events()->create([
             'type' => $type,
             'description' => $description,
             'occurred_at' => $occurredAt ?? now(),
-            'causer_id' => \Illuminate\Support\Facades\Auth::id(),
+            'causer_id' => Auth::id(),
             'properties' => $properties === [] ? null : $properties,
         ]);
     }
@@ -571,7 +595,7 @@ class Employee extends Model
      * @param  bool  $syncContract  When false, the caller has already set the contract
      *                              state (e.g. the edit form), so we leave it untouched.
      */
-    public function markAsExited(string $reason, \Carbon\CarbonInterface $exitDate, ?string $notes = null, bool $syncContract = true): void
+    public function markAsExited(string $reason, CarbonInterface $exitDate, ?string $notes = null, bool $syncContract = true): void
     {
         $this->forceFill([
             'employment_status' => 'inactive',
@@ -589,7 +613,7 @@ class Employee extends Model
 
         if ($this->user) {
             $this->user->forceFill(['is_active' => false])->save();
-            \Illuminate\Support\Facades\DB::table('sessions')->where('user_id', $this->user->id)->delete();
+            DB::table('sessions')->where('user_id', $this->user->id)->delete();
         }
     }
 

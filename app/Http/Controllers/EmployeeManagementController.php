@@ -20,9 +20,11 @@ use App\Models\User;
 use App\Services\PunchIngestionService;
 use App\Support\ImportErrorStore;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
@@ -42,6 +44,21 @@ class EmployeeManagementController extends Controller
     private const LIST_FILTERS = [
         'search', 'branch_id', 'department_id', 'job_position_id',
         'role_id', 'status', 'exit_reason', 'contract',
+        'office_hours', 'schedule',
+    ];
+
+    /** Pilihan penyaring "Jam Kerja" — nilainya juga dibaca Employee::matchingFilters. */
+    private const OFFICE_HOURS_OPTIONS = [
+        'yes' => 'Ikut jam kantor',
+        'no' => 'Dijadwalkan / shift',
+    ];
+
+    /**
+     * Pilihan penyaring "Jadwal Bulan Ini". Hanya satu nilai untuk saat ini: yang
+     * dicari HR adalah siapa yang belum terjadwal, bukan siapa yang sudah.
+     */
+    private const SCHEDULE_OPTIONS = [
+        'none' => 'Belum ada jadwal',
     ];
 
     public function index(Request $request): View
@@ -90,6 +107,8 @@ class EmployeeManagementController extends Controller
             'officePatterns' => $this->officePatterns(),
             'statuses' => Employee::employmentStatusLabels(),
             'exitReasons' => Employee::exitReasonLabels(),
+            'officeHoursOptions' => self::OFFICE_HOURS_OPTIONS,
+            'scheduleOptions' => self::SCHEDULE_OPTIONS,
             'contractTypes' => ['PKWT', 'PKWTT', 'Probation', 'Internship'],
         ]);
     }
@@ -117,7 +136,7 @@ class EmployeeManagementController extends Controller
     }
 
     /**
-     * @return \Illuminate\Database\Eloquent\Collection<int, Branch>
+     * @return Collection<int, Branch>
      */
     private function scopedBranches(User $user)
     {
@@ -132,7 +151,7 @@ class EmployeeManagementController extends Controller
     }
 
     /**
-     * @return \Illuminate\Database\Eloquent\Collection<int, Department>
+     * @return Collection<int, Department>
      */
     private function scopedDepartments(User $user)
     {
@@ -569,7 +588,7 @@ class EmployeeManagementController extends Controller
         DB::transaction(function () use ($entries, $employees, &$processed, &$skipped) {
             foreach ($entries as $entry) {
                 $employee = $employees->get((int) $entry['employee_id']);
-                $exitDate = \Illuminate\Support\Carbon::parse($entry['exit_date'])->startOfDay();
+                $exitDate = Carbon::parse($entry['exit_date'])->startOfDay();
 
                 if (! $employee || $employee->isInactive() || ($employee->join_date && $exitDate->lt($employee->join_date))) {
                     $skipped++;
