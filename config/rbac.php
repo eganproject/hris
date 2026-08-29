@@ -41,7 +41,11 @@ return [
 
         'Jadwal' => [
             'schedule-patterns' => ['label' => 'Pola Jadwal', 'actions' => ['view', 'create', 'update', 'delete']],
-            'schedules' => ['label' => 'Jadwal Kerja', 'actions' => ['view', 'create', 'update', 'delete']],
+            // "import" berdiri sendiri: mengunggah roster sebulan penuh dari Excel
+            // berbeda bobotnya dengan mengubah satu sel, dan sebelumnya menumpang pada
+            // "update" sehingga tidak bisa diberikan atau dicabut terpisah — bahkan
+            // tidak kelihatan di matriks Kontrol Akses.
+            'schedules' => ['label' => 'Jadwal Kerja', 'actions' => ['view', 'create', 'update', 'delete', 'import']],
         ],
 
         'Cuti' => [
@@ -118,7 +122,7 @@ return [
             'shifts.view', 'shifts.create', 'shifts.update', 'shifts.delete',
             'holidays.view', 'holidays.create', 'holidays.update', 'holidays.delete',
             'schedule-patterns.view', 'schedule-patterns.create', 'schedule-patterns.update', 'schedule-patterns.delete',
-            'schedules.view', 'schedules.create', 'schedules.update', 'schedules.delete',
+            'schedules.view', 'schedules.create', 'schedules.update', 'schedules.delete', 'schedules.import',
             'leave.view', 'leave.create', 'leave.update', 'leave.delete',
             'leave-types.view', 'leave-types.create', 'leave-types.update', 'leave-types.delete',
             'leave-balances.view', 'leave-balances.update',

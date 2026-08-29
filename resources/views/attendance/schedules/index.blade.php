@@ -8,10 +8,12 @@
             </div>
             <div class="flex flex-wrap items-center gap-2">
                 <a href="{{ route('attendance.schedule-patterns.index') }}" class="rounded-md border border-gray-200 px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50">Pola Jadwal</a>
-                @can('schedules.update')
+                @can('schedules.import')
                     <button type="button" data-open-import class="inline-flex items-center gap-1.5 rounded-md border border-gray-200 bg-white px-4 py-2.5 text-sm font-medium text-gray-700 shadow-xs transition hover:bg-gray-50">
                         <x-icon name="upload" class="size-4"/> Import Excel
                     </button>
+                @endcan
+                @can('schedules.update')
                     {{-- Carries every filter, so regenerating covers exactly the rows on screen. --}}
                     <form method="POST" action="{{ route('attendance.schedules.generate') }}" data-generate-form data-no-confirm="true">
                         @csrf

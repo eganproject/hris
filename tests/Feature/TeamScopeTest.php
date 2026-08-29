@@ -163,3 +163,77 @@ test('an admin can flip the switch from Kontrol Akses', function () {
 
     expect($target->fresh()->bypassesTeamScope())->toBeFalse();
 });
+
+test('every level below the viewer shows up, not just the first two', function () {
+    $user = teamUser();
+
+    $branch = Branch::query()->create(['code' => 'PTJ', 'name' => 'Petojo', 'type' => 'office', 'is_active' => true]);
+    $department = Department::query()->create(['code' => 'AUT', 'name' => 'Automotive', 'is_active' => true]);
+    $common = ['branch_id' => $branch->id, 'department_id' => $department->id, 'employment_status' => 'active'];
+
+    // Charisma → Theresia → Novia → tiga staf. Yang dilaporkan hilang adalah
+    // lapisan ketiga ke bawah.
+    $charisma = Employee::query()->create([...$common, 'user_id' => $user->id, 'full_name' => 'Charisma Eka']);
+    $theresia = Employee::query()->create([...$common, 'manager_id' => $charisma->id, 'full_name' => 'Theresia Audyna']);
+    $novia = Employee::query()->create([...$common, 'manager_id' => $theresia->id, 'full_name' => 'Novia Ridwan']);
+
+    foreach (['Nanda Novita', 'Reva Nopitasari', 'Yebertina Talunohi'] as $name) {
+        Employee::query()->create([...$common, 'manager_id' => $novia->id, 'full_name' => $name]);
+    }
+
+    $response = $this->actingAs($user)->get('/attendance/schedules')->assertOk();
+
+    foreach (['Theresia Audyna', 'Novia Ridwan', 'Nanda Novita', 'Reva Nopitasari', 'Yebertina Talunohi'] as $name) {
+        $response->assertSee($name);
+    }
+});
+
+test('a subordinate in another branch or division still shows up', function () {
+    $user = teamUser();
+
+    $petojo = Branch::query()->create(['code' => 'PTJ', 'name' => 'Petojo', 'type' => 'office', 'is_active' => true]);
+    $gudang = Branch::query()->create(['code' => 'GDG', 'name' => 'Gudang', 'type' => 'warehouse', 'is_active' => true]);
+    $automotive = Department::query()->create(['code' => 'AUT', 'name' => 'Automotive', 'is_active' => true]);
+    $logistik = Department::query()->create(['code' => 'LOG', 'name' => 'Logistik', 'is_active' => true]);
+
+    // Cakupan lokasi/divisi si atasan sengaja dibuat sempit.
+    $user->accessBranches()->sync([$petojo->id]);
+    $user->accessDepartments()->sync([$automotive->id]);
+
+    $manager = Employee::query()->create([
+        'user_id' => $user->id, 'branch_id' => $petojo->id, 'department_id' => $automotive->id,
+        'full_name' => 'Charisma Eka', 'employment_status' => 'active',
+    ]);
+
+    // Bawahan langsung di divisi & lokasi LAIN — struktur organisasi tidak selalu
+    // sejajar dengan pembagian lokasi/divisi.
+    $jauh = Employee::query()->create([
+        'manager_id' => $manager->id, 'branch_id' => $gudang->id, 'department_id' => $logistik->id,
+        'full_name' => 'Novia Ridwan', 'employment_status' => 'active',
+    ]);
+
+    // Dan bawahannya lagi, satu tingkat lebih dalam.
+    Employee::query()->create([
+        'manager_id' => $jauh->id, 'branch_id' => $gudang->id, 'department_id' => $logistik->id,
+        'full_name' => 'Nanda Novita', 'employment_status' => 'active',
+    ]);
+
+    foreach (['/attendance/daily', '/attendance/schedules'] as $url) {
+        $this->actingAs($user)->get($url)
+            ->assertOk()
+            ->assertSee('Novia Ridwan')
+            ->assertSee('Nanda Novita');
+    }
+});
+
+test('a supervisor with a team but no branch scope is not told to ask for one', function () {
+    $user = teamUser();
+
+    $manager = Employee::query()->create(['user_id' => $user->id, 'full_name' => 'Charisma Eka', 'employment_status' => 'active']);
+    Employee::query()->create(['manager_id' => $manager->id, 'full_name' => 'Novia Ridwan', 'employment_status' => 'active']);
+
+    $this->actingAs($user)->get('/attendance/schedules')
+        ->assertOk()
+        ->assertSee('Novia Ridwan')
+        ->assertDontSee('Cakupan akses Anda belum diatur');
+});

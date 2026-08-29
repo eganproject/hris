@@ -307,9 +307,11 @@ Route::middleware('auth')->group(function () {
         Route::post('schedules/unscheduled/assign', [ScheduleController::class, 'bulkAssign'])->middleware('permission:schedules.create')->name('unscheduled.assign');
         // Import roster bulanan dari Excel. Dideklarasikan sebelum rute ber-wildcard
         // di bawahnya, dan memakai izin "update" karena isinya menimpa jadwal.
-        Route::get('schedules/import/template', [ScheduleController::class, 'importTemplate'])->middleware('permission:schedules.update')->name('schedules.import.template');
-        Route::post('schedules/import', [ScheduleController::class, 'import'])->middleware('permission:schedules.update')->name('schedules.import');
-        Route::get('schedules/import/errors/{token}', [ScheduleController::class, 'importErrors'])->middleware('permission:schedules.update')->name('schedules.import.errors');
+        // Ketiganya satu alur: unduh template, unggah isinya, lalu baca laporan
+        // kesalahannya — jadi dijaga satu izin yang sama.
+        Route::get('schedules/import/template', [ScheduleController::class, 'importTemplate'])->middleware('permission:schedules.import')->name('schedules.import.template');
+        Route::post('schedules/import', [ScheduleController::class, 'import'])->middleware('permission:schedules.import')->name('schedules.import');
+        Route::get('schedules/import/errors/{token}', [ScheduleController::class, 'importErrors'])->middleware('permission:schedules.import')->name('schedules.import.errors');
         Route::get('schedules/assign', [ScheduleController::class, 'create'])->middleware('permission:schedules.create')->name('schedules.assign');
         Route::post('schedules/assign', [ScheduleController::class, 'store'])->middleware('permission:schedules.create')->name('schedules.store');
         Route::get('schedules/employees/{employee}', [ScheduleController::class, 'show'])->middleware('permission:schedules.view')->name('schedules.show');

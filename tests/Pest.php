@@ -72,7 +72,14 @@ function attendanceMenuPermissions(array $actions = ['view', 'create', 'update',
     foreach ($menus as $menu) {
         foreach ($catalog->get($menu)['actions'] ?? [] as $action) {
             // "export" hanya relevan untuk laporan, dan ikut aksi "view" pemanggilnya.
-            $wanted = $action === 'export' ? 'view' : $action;
+            // "import" dulunya menumpang pada "update" sebelum jadi izin tersendiri,
+            // jadi ikut aksi itu — persis seperti migrasinya memindahkan hak yang
+            // sudah dimiliki orang, bukan mencabutnya.
+            $wanted = match ($action) {
+                'export' => 'view',
+                'import' => 'update',
+                default => $action,
+            };
 
             if (in_array($wanted, $actions, true)) {
                 $permissions[] = $menu.'.'.$action;

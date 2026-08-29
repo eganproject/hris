@@ -88,17 +88,36 @@ class DataScope
     /** Neither a bypass nor any scope: the user sees nobody until an admin sets one. */
     public function isEmpty(): bool
     {
+        // Bagi pengguna yang dipersempit ke bawahan, cakupannya adalah garis atasannya
+        // — bukan lokasi/divisi. Tanpa syarat ini seorang atasan yang punya tim tapi
+        // belum diberi cakupan lokasi akan disuruh "minta admin menetapkan lokasi
+        // kerja", padahal timnya justru sudah ada.
+        if ($this->subordinatesOnly) {
+            return false;
+        }
+
         return $this->user->hasNoDataScope($this->bypassPermission);
     }
 
     /** Employees this user may see. */
     public function employees(): Builder
     {
-        return Employee::query()
-            ->visibleTo($this->user, $this->bypassPermission)
+        if ($this->subordinatesOnly) {
+            // Garis atasan MENGGANTIKAN cakupan lokasi/divisi, bukan menumpuk di
+            // atasnya — persis seperti mode "Batasi ke bawahan" yang sudah lama ada di
+            // Employee::scopeVisibleTo().
+            //
+            // Menumpuknya membuat bawahan yang kebetulan tercatat di divisi atau lokasi
+            // lain daripada cakupan atasannya menghilang dari layar, padahal mereka
+            // jelas-jelas ada di bawah garisnya. Struktur organisasi tidak selalu
+            // sejajar dengan pembagian lokasi/divisi, dan yang ditanyakan halaman ini
+            // adalah "siapa tim saya", bukan "siapa yang sedivisi dengan saya".
+            //
             // [0] agar yang tanpa bawahan mendapat daftar kosong, bukan seluruh tabel.
-            ->when($this->subordinatesOnly, fn (Builder $query) => $query
-                ->whereIn('id', $this->subordinateIds() ?: [0]));
+            return Employee::query()->whereIn('id', $this->subordinateIds() ?: [0]);
+        }
+
+        return Employee::query()->visibleTo($this->user, $this->bypassPermission);
     }
 
     /**
@@ -120,8 +139,10 @@ class DataScope
             return false;
         }
 
-        if ($this->subordinatesOnly && ! in_array($employee->id, $this->subordinateIds(), true)) {
-            return false;
+        // Sama seperti employees(): garis atasan menggantikan cakupan lokasi/divisi,
+        // jadi keanggotaan di bawah garis itu sudah cukup dan sudah final.
+        if ($this->subordinatesOnly) {
+            return in_array($employee->id, $this->subordinateIds(), true);
         }
 
         return $employee->isVisibleTo($this->user, $this->bypassPermission);
