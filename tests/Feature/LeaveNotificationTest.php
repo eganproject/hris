@@ -26,12 +26,18 @@ function leaveNotificationFixture(string $typeName = 'Sakit'): array
 
     $supervisorUser = User::factory()->create();
     $supervisorUser->givePermissionTo('my-leave.view');
+    // Absensi Harian & Jadwal Kerja dipersempit ke bawahan; pengguna ini
+    // mewakili HR/administrator yang dikecualikan lewat Kontrol Akses.
+    $supervisorUser->forceFill(['bypass_team_scope' => true])->save();
     $supervisor = Employee::query()->create([
         'user_id' => $supervisorUser->id, 'full_name' => 'Sari Atasan', 'employment_status' => 'active',
     ]);
 
     $employeeUser = User::factory()->create();
     $employeeUser->givePermissionTo('my-leave.view');
+    // Absensi Harian & Jadwal Kerja dipersempit ke bawahan; pengguna ini
+    // mewakili HR/administrator yang dikecualikan lewat Kontrol Akses.
+    $employeeUser->forceFill(['bypass_team_scope' => true])->save();
     $employee = Employee::query()->create([
         'user_id' => $employeeUser->id, 'full_name' => 'Budi Staf', 'employment_status' => 'active',
         'manager_id' => $supervisor->id,
@@ -39,6 +45,9 @@ function leaveNotificationFixture(string $typeName = 'Sakit'): array
 
     $hr = User::factory()->create();
     $hr->givePermissionTo(['leave.view', 'leave.create', 'leave.update', 'attendance.view.all']);
+    // Absensi Harian & Jadwal Kerja dipersempit ke bawahan; pengguna ini
+    // mewakili HR/administrator yang dikecualikan lewat Kontrol Akses.
+    $hr->forceFill(['bypass_team_scope' => true])->save();
 
     $type = LeaveType::query()->create([
         'code' => 'SK', 'name' => $typeName, 'attendance_status' => 'sick',

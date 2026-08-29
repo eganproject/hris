@@ -19,6 +19,8 @@ use Illuminate\Support\Carbon;
 use Maatwebsite\Excel\Concerns\FromArray;
 use Maatwebsite\Excel\Excel as ExcelWriter;
 use Maatwebsite\Excel\Facades\Excel;
+use PhpOffice\PhpSpreadsheet\IOFactory;
+use PhpOffice\PhpSpreadsheet\Spreadsheet;
 use Spatie\Permission\Models\Permission;
 use Spatie\Permission\PermissionRegistrar;
 
@@ -115,6 +117,9 @@ function rosterImporter(): User
 
     $user = User::factory()->create();
     $user->givePermissionTo($permissions);
+    // Absensi Harian & Jadwal Kerja dipersempit ke bawahan; pengguna ini
+    // mewakili HR/administrator yang dikecualikan lewat Kontrol Akses.
+    $user->forceFill(['bypass_team_scope' => true])->save();
 
     return $user;
 }
@@ -571,7 +576,7 @@ test('a shift code shaped like a range still wins over the hours reading', funct
 });
 
 /** Unggah satu sel bermasalah lalu kembalikan file rincian kesalahannya sebagai spreadsheet. */
-function rosterErrorReport(string $cell): PhpOffice\PhpSpreadsheet\Spreadsheet
+function rosterErrorReport(string $cell): Spreadsheet
 {
     $employee = rosterEmployee();
     $month = rosterMonth();
@@ -606,7 +611,7 @@ function rosterErrorReport(string $cell): PhpOffice\PhpSpreadsheet\Spreadsheet
     $out = tempnam(sys_get_temp_dir(), 'report-').'.xlsx';
     file_put_contents($out, $download->streamedContent());
 
-    return PhpOffice\PhpSpreadsheet\IOFactory::load($out);
+    return IOFactory::load($out);
 }
 
 test('the error report marks the exact cell whose shift did not match', function () {

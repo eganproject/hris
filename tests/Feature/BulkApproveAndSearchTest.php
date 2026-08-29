@@ -23,6 +23,9 @@ function bulkViewer(array $permissions): User
 
     $user = User::factory()->create();
     $user->givePermissionTo([...$permissions, 'attendance.view.all', 'employees.view.all']);
+    // Absensi Harian & Jadwal Kerja dipersempit ke bawahan; pengguna ini
+    // mewakili HR/administrator yang dikecualikan lewat Kontrol Akses.
+    $user->forceFill(['bypass_team_scope' => true])->save();
 
     return $user;
 }
@@ -60,6 +63,9 @@ test('the search endpoint does not leak employees outside the user scope', funct
 
     $user = User::factory()->create();
     $user->givePermissionTo('employees.view');
+    // Absensi Harian & Jadwal Kerja dipersempit ke bawahan; pengguna ini
+    // mewakili HR/administrator yang dikecualikan lewat Kontrol Akses.
+    $user->forceFill(['bypass_team_scope' => true])->save();
     Employee::query()->create(['user_id' => $user->id, 'full_name' => 'Atasan A', 'employment_status' => 'active', 'branch_id' => $branchA->id]);
 
     Employee::query()->create(['full_name' => 'Orang Cabang B', 'employment_status' => 'active', 'branch_id' => $branchB->id]);

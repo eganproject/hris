@@ -26,6 +26,9 @@ function employeeAccount(?Employee $manager = null, string $name = 'Karyawan'): 
 
     $user = User::factory()->create();
     $user->givePermissionTo('my-leave.view');
+    // Absensi Harian & Jadwal Kerja dipersempit ke bawahan; pengguna ini
+    // mewakili HR/administrator yang dikecualikan lewat Kontrol Akses.
+    $user->forceFill(['bypass_team_scope' => true])->save();
 
     $employee = Employee::query()->create([
         'user_id' => $user->id,
@@ -128,6 +131,9 @@ test('an account not linked to an employee cannot use self-service', function ()
     Permission::findOrCreate('my-leave.view', 'web');
     $user = User::factory()->create();
     $user->givePermissionTo('my-leave.view');
+    // Absensi Harian & Jadwal Kerja dipersempit ke bawahan; pengguna ini
+    // mewakili HR/administrator yang dikecualikan lewat Kontrol Akses.
+    $user->forceFill(['bypass_team_scope' => true])->save();
 
     $type = LeaveType::query()->create(['code' => 'IZ', 'name' => 'Izin', 'attendance_status' => 'leave', 'is_paid' => true, 'is_active' => true]);
 
@@ -152,6 +158,9 @@ test('a failure while syncing attendance rolls the leave approval back', functio
     }
     $hr = User::factory()->create();
     $hr->givePermissionTo(['leave.view', 'leave.update', 'attendance.view.all']);
+    // Absensi Harian & Jadwal Kerja dipersempit ke bawahan; pengguna ini
+    // mewakili HR/administrator yang dikecualikan lewat Kontrol Akses.
+    $hr->forceFill(['bypass_team_scope' => true])->save();
 
     $type = LeaveType::query()->create(['code' => 'IZ', 'name' => 'Izin', 'attendance_status' => 'leave', 'is_paid' => true, 'is_active' => true]);
 
@@ -200,6 +209,9 @@ test('a supervisor decision is final — HR gets no second turn', function () {
     }
     $hr = User::factory()->create();
     $hr->givePermissionTo(['leave.view', 'leave.update', 'attendance.view.all']);
+    // Absensi Harian & Jadwal Kerja dipersempit ke bawahan; pengguna ini
+    // mewakili HR/administrator yang dikecualikan lewat Kontrol Akses.
+    $hr->forceFill(['bypass_team_scope' => true])->save();
 
     $this->actingAs($user)->post('/my-leave', [
         'leave_type_id' => $type->id,
@@ -230,6 +242,9 @@ test('an employee with no supervisor still has HR as the decider', function () {
     }
     $hr = User::factory()->create();
     $hr->givePermissionTo(['leave.view', 'leave.update', 'attendance.view.all']);
+    // Absensi Harian & Jadwal Kerja dipersempit ke bawahan; pengguna ini
+    // mewakili HR/administrator yang dikecualikan lewat Kontrol Akses.
+    $hr->forceFill(['bypass_team_scope' => true])->save();
 
     $this->actingAs($user)->post('/my-leave', [
         'leave_type_id' => $type->id,

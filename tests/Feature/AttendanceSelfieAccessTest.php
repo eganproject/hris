@@ -1,11 +1,14 @@
 <?php
 
 use App\Models\Attendance;
+use App\Models\Branch;
 use App\Models\Employee;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
 use Spatie\Permission\Models\Permission;
+use Spatie\Permission\Models\Role;
 use Spatie\Permission\PermissionRegistrar;
 
 uses(RefreshDatabase::class);
@@ -22,6 +25,9 @@ function selfieFixture(): array
 
     $user = User::factory()->create();
     $user->givePermissionTo('my-attendance.view');
+    // Absensi Harian & Jadwal Kerja dipersempit ke bawahan; pengguna ini
+    // mewakili HR/administrator yang dikecualikan lewat Kontrol Akses.
+    $user->forceFill(['bypass_team_scope' => true])->save();
     $employee = Employee::query()->create([
         'user_id' => $user->id, 'full_name' => 'Pemilik Foto', 'employment_status' => 'active',
     ]);
@@ -55,6 +61,9 @@ test('HR within scope can open it, and can force a download', function () {
     Permission::findOrCreate(User::SCOPE_BYPASS_ATTENDANCE, 'web');
     $hr = User::factory()->create();
     $hr->givePermissionTo(['attendance-daily.view', User::SCOPE_BYPASS_ATTENDANCE]);
+    // Absensi Harian & Jadwal Kerja dipersempit ke bawahan; pengguna ini
+    // mewakili HR/administrator yang dikecualikan lewat Kontrol Akses.
+    $hr->forceFill(['bypass_team_scope' => true])->save();
 
     $this->actingAs($hr)
         ->get(route('attendance.selfie', ['attendance' => $attendance, 'side' => 'in']))
@@ -90,8 +99,8 @@ test('HR outside their data scope is refused', function () {
     Storage::fake('local');
     ['employee' => $employee, 'attendance' => $attendance] = selfieFixture();
 
-    $mine = App\Models\Branch::query()->create(['code' => 'BDG', 'name' => 'Bandung', 'is_active' => true]);
-    $other = App\Models\Branch::query()->create(['code' => 'SBY', 'name' => 'Surabaya', 'is_active' => true]);
+    $mine = Branch::query()->create(['code' => 'BDG', 'name' => 'Bandung', 'is_active' => true]);
+    $other = Branch::query()->create(['code' => 'SBY', 'name' => 'Surabaya', 'is_active' => true]);
     $employee->update(['branch_id' => $other->id]);
 
     Permission::findOrCreate('attendance-daily.view', 'web');
@@ -130,7 +139,7 @@ test('the superadmin dry-run photo is private and only its own owner may see it'
 
     app(PermissionRegistrar::class)->forgetCachedPermissions();
     Permission::findOrCreate('my-attendance.view', 'web');
-    $role = Spatie\Permission\Models\Role::findOrCreate('superadmin', 'web');
+    $role = Role::findOrCreate('superadmin', 'web');
     $role->givePermissionTo('my-attendance.view');
 
     $admin = User::factory()->create();
@@ -138,7 +147,7 @@ test('the superadmin dry-run photo is private and only its own owner may see it'
     Employee::query()->create(['user_id' => $admin->id, 'full_name' => 'Super', 'employment_status' => 'active']);
 
     $this->actingAs($admin)->post('/my-attendance/selfie-test', [
-        'photo' => Illuminate\Http\UploadedFile::fake()->image('uji.jpg'),
+        'photo' => UploadedFile::fake()->image('uji.jpg'),
         'latitude' => -6.9, 'longitude' => 107.6, 'accuracy' => 10,
     ])->assertRedirect();
 
@@ -150,5 +159,8 @@ test('the superadmin dry-run photo is private and only its own owner may see it'
     // Bukan superadmin: ditolak, walau tahu alamatnya.
     $biasa = User::factory()->create();
     $biasa->givePermissionTo('my-attendance.view');
+    // Absensi Harian & Jadwal Kerja dipersempit ke bawahan; pengguna ini
+    // mewakili HR/administrator yang dikecualikan lewat Kontrol Akses.
+    $biasa->forceFill(['bypass_team_scope' => true])->save();
     $this->actingAs($biasa)->get(route('my-attendance.selfie-test.show'))->assertForbidden();
 });

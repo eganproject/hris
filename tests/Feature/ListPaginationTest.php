@@ -7,6 +7,7 @@ use App\Models\OvertimeApproval;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Pagination\LengthAwarePaginator;
+use Illuminate\Support\Collection;
 use Spatie\Permission\Models\Permission;
 use Spatie\Permission\PermissionRegistrar;
 
@@ -23,6 +24,9 @@ function viewerWith(string ...$permissions): User
 
     $user = User::factory()->create();
     $user->givePermissionTo([...$permissions, User::SCOPE_BYPASS_ATTENDANCE]);
+    // Absensi Harian & Jadwal Kerja dipersempit ke bawahan; pengguna ini
+    // mewakili HR/administrator yang dikecualikan lewat Kontrol Akses.
+    $user->forceFill(['bypass_team_scope' => true])->save();
 
     return $user;
 }
@@ -156,5 +160,5 @@ test('the map is deliberately not paginated because a partial map is a wrong map
 
     $points = $this->actingAs($user)->get("/attendance/map?date={$date}")->assertOk()->viewData('points');
 
-    expect($points)->toBeInstanceOf(Illuminate\Support\Collection::class);
+    expect($points)->toBeInstanceOf(Collection::class);
 });

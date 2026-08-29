@@ -26,6 +26,9 @@ function hrEmployee(array $extra = []): array
 
     $user = User::factory()->create();
     $user->givePermissionTo(['leave.view', 'leave.update', 'corrections.view', 'corrections.update', 'attendance.view.all', ...$extra]);
+    // Absensi Harian & Jadwal Kerja dipersempit ke bawahan; pengguna ini
+    // mewakili HR/administrator yang dikecualikan lewat Kontrol Akses.
+    $user->forceFill(['bypass_team_scope' => true])->save();
     $employee = Employee::query()->create(['user_id' => $user->id, 'full_name' => 'HR Sendiri', 'employment_status' => 'active']);
 
     return [$user, $employee];
@@ -81,6 +84,9 @@ test('a self-managed employee cannot approve their own overtime', function () {
 
     $user = User::factory()->create();
     $user->givePermissionTo('my-overtime.view');
+    // Absensi Harian & Jadwal Kerja dipersempit ke bawahan; pengguna ini
+    // mewakili HR/administrator yang dikecualikan lewat Kontrol Akses.
+    $user->forceFill(['bypass_team_scope' => true])->save();
     $employee = Employee::query()->create(['user_id' => $user->id, 'full_name' => 'Mandiri', 'employment_status' => 'active']);
     // manager_id menunjuk dirinya sendiri (mis. dari impor) — tetap tidak boleh.
     $employee->update(['manager_id' => $employee->id]);
@@ -157,6 +163,9 @@ function swapHrEmployee(string $name): array
 
     $user = User::factory()->create();
     $user->givePermissionTo(['swaps.view', 'swaps.update', 'attendance.view.all']);
+    // Absensi Harian & Jadwal Kerja dipersempit ke bawahan; pengguna ini
+    // mewakili HR/administrator yang dikecualikan lewat Kontrol Akses.
+    $user->forceFill(['bypass_team_scope' => true])->save();
     $employee = Employee::query()->create(['user_id' => $user->id, 'full_name' => $name, 'employment_status' => 'active']);
 
     return [$user, $employee];

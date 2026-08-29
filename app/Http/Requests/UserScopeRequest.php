@@ -3,6 +3,7 @@
 namespace App\Http\Requests;
 
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 
 class UserScopeRequest extends FormRequest
 {
@@ -22,8 +23,9 @@ class UserScopeRequest extends FormRequest
             'departments' => ['nullable', 'array'],
             'departments.*' => ['integer', 'exists:departments,id'],
             'roles' => ['nullable', 'array'],
-            'roles.*' => ['string', \Illuminate\Validation\Rule::exists('roles', 'name')->where('guard_name', 'web')],
+            'roles.*' => ['string', Rule::exists('roles', 'name')->where('guard_name', 'web')],
             'limit_to_subordinates' => ['sometimes', 'boolean'],
+            'bypass_team_scope' => ['sometimes', 'boolean'],
         ];
     }
 }

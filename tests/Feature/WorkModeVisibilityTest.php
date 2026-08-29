@@ -129,6 +129,9 @@ test('the schedule grid no longer paints an approved WFH day as an absence', fun
     }
     $hr = User::factory()->create();
     $hr->givePermissionTo(['schedules.view', User::SCOPE_BYPASS_ATTENDANCE]);
+    // Absensi Harian & Jadwal Kerja dipersempit ke bawahan; pengguna ini
+    // mewakili HR/administrator yang dikecualikan lewat Kontrol Akses.
+    $hr->forceFill(['bypass_team_scope' => true])->save();
 
     $content = $this->actingAs($hr)
         ->get(route('attendance.schedules.index', ['month' => now()->format('Y-m')]))
@@ -150,6 +153,9 @@ test('the daily board flags a remote day before attendance is even processed', f
     }
     $hr = User::factory()->create();
     $hr->givePermissionTo(['attendance-daily.view', User::SCOPE_BYPASS_ATTENDANCE]);
+    // Absensi Harian & Jadwal Kerja dipersempit ke bawahan; pengguna ini
+    // mewakili HR/administrator yang dikecualikan lewat Kontrol Akses.
+    $hr->forceFill(['bypass_team_scope' => true])->save();
 
     // Belum ada baris absensi sama sekali: kolom Status masih kosong, tapi kolom
     // Jadwal sudah harus memberi tahu bahwa hari itu WFH.

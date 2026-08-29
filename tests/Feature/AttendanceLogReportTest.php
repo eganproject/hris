@@ -2,9 +2,12 @@
 
 use App\Enums\AttendanceStatus;
 use App\Exports\AttendanceLogExport;
+use App\Exports\AttendanceLogShiftSheet;
 use App\Exports\AttendanceLogSummary;
 use App\Models\Attendance;
 use App\Models\Employee;
+use App\Models\JobPosition;
+use App\Models\Shift;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Pagination\LengthAwarePaginator;
@@ -22,6 +25,9 @@ function logViewer(): User
 
     $user = User::factory()->create();
     $user->givePermissionTo(['reports.log.view', 'reports.log.export', User::SCOPE_BYPASS_ATTENDANCE]);
+    // Absensi Harian & Jadwal Kerja dipersempit ke bawahan; pengguna ini
+    // mewakili HR/administrator yang dikecualikan lewat Kontrol Akses.
+    $user->forceFill(['bypass_team_scope' => true])->save();
 
     return $user;
 }
@@ -194,18 +200,18 @@ test('the export route really produces a workbook', function () {
 });
 
 test('the shift sheet lists only shifts present in the exported data', function () {
-    $pagi = App\Models\Shift::query()->create([
+    $pagi = Shift::query()->create([
         'code' => 'P', 'name' => 'Pagi', 'start_time' => '08:00', 'end_time' => '17:00',
         'break_minutes' => 60, 'late_tolerance_minutes' => 10, 'early_leave_tolerance_minutes' => 5,
         'overtime_starts_after_minutes' => 30, 'overtime_min_minutes' => 30, 'is_active' => true,
     ]);
     // Shift malam yang menyeberang tengah malam — durasinya harus tetap benar.
-    $malam = App\Models\Shift::query()->create([
+    $malam = Shift::query()->create([
         'code' => 'M', 'name' => 'Malam', 'start_time' => '22:00', 'end_time' => '06:00',
         'crosses_midnight' => true, 'break_minutes' => 30, 'is_active' => true,
     ]);
     // Sengaja tidak dipakai baris mana pun: tidak boleh muncul di sheet.
-    App\Models\Shift::query()->create([
+    Shift::query()->create([
         'code' => 'X', 'name' => 'Tak Terpakai', 'start_time' => '09:00', 'end_time' => '18:00', 'is_active' => true,
     ]);
 
@@ -216,7 +222,7 @@ test('the shift sheet lists only shifts present in the exported data', function 
         'employee_id' => $employee->id, 'work_date' => '2026-06-07', 'status' => 'day_off',
     ]);
 
-    $sheet = new App\Exports\AttendanceLogShiftSheet(Attendance::with('shift')->get());
+    $sheet = new AttendanceLogShiftSheet(Attendance::with('shift')->get());
     $rows = $sheet->collection();
 
     expect($rows->pluck('kode')->all())->toBe(['M', 'P', '(tanpa shift)']);
@@ -243,8 +249,8 @@ test('the shift sheet lists only shifts present in the exported data', function 
 test('the job position filter narrows the log, the export and the pdf alike', function () {
     $user = logViewer();
 
-    $spv = App\Models\JobPosition::query()->create(['code' => 'SPV', 'name' => 'Supervisor', 'is_active' => true]);
-    $staf = App\Models\JobPosition::query()->create(['code' => 'STF', 'name' => 'Staf', 'is_active' => true]);
+    $spv = JobPosition::query()->create(['code' => 'SPV', 'name' => 'Supervisor', 'is_active' => true]);
+    $staf = JobPosition::query()->create(['code' => 'STF', 'name' => 'Staf', 'is_active' => true]);
 
     logEmployee('Ana', 3)->update(['job_position_id' => $spv->id]);
     logEmployee('Budi', 4)->update(['job_position_id' => $staf->id]);

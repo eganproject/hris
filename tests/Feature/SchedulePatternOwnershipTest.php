@@ -1,6 +1,7 @@
 <?php
 
 use App\Enums\SchedulePatternType;
+use App\Models\Branch;
 use App\Models\Employee;
 use App\Models\ScheduleAssignment;
 use App\Models\SchedulePattern;
@@ -21,6 +22,9 @@ function ownerUser(): User
     }
     $user = User::factory()->create();
     $user->givePermissionTo(['schedule-patterns.view', 'schedule-patterns.create', 'schedule-patterns.update', 'schedule-patterns.delete', 'schedules.view']);
+    // Absensi Harian & Jadwal Kerja dipersempit ke bawahan; pengguna ini
+    // mewakili HR/administrator yang dikecualikan lewat Kontrol Akses.
+    $user->forceFill(['bypass_team_scope' => true])->save();
 
     return $user;
 }
@@ -72,7 +76,7 @@ test('the roster active-assignments are limited to the users own creations', fun
     $mine = ownerUser();
     $other = ownerUser();
 
-    $branch = App\Models\Branch::query()->create(['code' => 'SBY', 'name' => 'Surabaya', 'is_active' => true]);
+    $branch = Branch::query()->create(['code' => 'SBY', 'name' => 'Surabaya', 'is_active' => true]);
     $mine->accessBranches()->sync([$branch->id]); // cakupan lokasi agar bisa lihat karyawan
 
     $a = Employee::query()->create(['branch_id' => $branch->id, 'full_name' => 'Karyawan A', 'employment_status' => 'active', 'join_date' => now()->toDateString()]);

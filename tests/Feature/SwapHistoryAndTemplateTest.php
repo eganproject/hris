@@ -116,6 +116,10 @@ test('a swap between two other people never shows up in my history', function ()
 test('the roster import template holds only the downloader subordinates', function () {
     $hr = swapHr();
 
+    // Atasan lapangan: TIDAK dikecualikan dari pembatasan bawahan, karena justru
+    // pembatasan itulah yang sedang diuji di sini.
+    $hr->forceFill(['bypass_team_scope' => false])->save();
+
     // Atasan dengan dua bawahan langsung dan satu cucu-bawahan.
     $manager = Employee::query()->create(['user_id' => $hr->id, 'full_name' => 'Rina Atasan', 'employment_status' => 'active']);
     $anak1 = Employee::query()->create(['manager_id' => $manager->id, 'full_name' => 'Bawahan Satu', 'employment_status' => 'active']);
@@ -142,8 +146,7 @@ test('a downloader with no subordinates still gets the full template', function 
     Employee::query()->create(['full_name' => 'Karyawan Satu', 'employment_status' => 'active']);
     Employee::query()->create(['full_name' => 'Karyawan Dua', 'employment_status' => 'active']);
 
-    // HR pusat dan superadmin tidak punya siapa pun di bawahnya; menyaring template
-    // mereka jadi "bawahan saja" hanya akan memberi file kosong.
+    // Pengguna yang dikecualikan lewat Kontrol Akses tetap mendapat template penuh.
     $names = templateNames($this, $hr);
 
     expect($names)->toContain('Karyawan Satu')

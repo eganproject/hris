@@ -19,6 +19,9 @@ function correctionEmployee(): array
     Permission::findOrCreate('my-attendance.view', 'web');
     $user = User::factory()->create();
     $user->givePermissionTo('my-attendance.view');
+    // Absensi Harian & Jadwal Kerja dipersempit ke bawahan; pengguna ini
+    // mewakili HR/administrator yang dikecualikan lewat Kontrol Akses.
+    $user->forceFill(['bypass_team_scope' => true])->save();
     $employee = Employee::query()->create(['user_id' => $user->id, 'full_name' => 'Budi', 'employment_status' => 'active']);
 
     return [$user, $employee];
@@ -34,6 +37,9 @@ function correctionHr(): User
     }
     $user = User::factory()->create();
     $user->givePermissionTo($permissions);
+    // Absensi Harian & Jadwal Kerja dipersempit ke bawahan; pengguna ini
+    // mewakili HR/administrator yang dikecualikan lewat Kontrol Akses.
+    $user->forceFill(['bypass_team_scope' => true])->save();
 
     return $user;
 }

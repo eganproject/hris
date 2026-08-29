@@ -146,7 +146,10 @@ class AccessControlController extends Controller
     {
         $user->accessBranches()->sync($request->validated('branches', []));
         $user->accessDepartments()->sync($request->validated('departments', []));
-        $user->forceFill(['limit_to_subordinates' => $request->boolean('limit_to_subordinates')])->save();
+        $user->forceFill([
+            'limit_to_subordinates' => $request->boolean('limit_to_subordinates'),
+            'bypass_team_scope' => $request->boolean('bypass_team_scope'),
+        ])->save();
 
         // Role menentukan menu & hak akses user. Disimpan bersama cakupan agar admin
         // bisa mengatur keduanya dari satu tempat.

@@ -1,6 +1,7 @@
 <?php
 
 use App\Enums\AttendanceStatus;
+use App\Enums\LeaveRequestStatus;
 use App\Models\Attendance;
 use App\Models\Branch;
 use App\Models\Employee;
@@ -28,6 +29,9 @@ function mapViewer(): User
 
     $user = User::factory()->create();
     $user->givePermissionTo(['attendance-daily.view', User::SCOPE_BYPASS_ATTENDANCE]);
+    // Absensi Harian & Jadwal Kerja dipersempit ke bawahan; pengguna ini
+    // mewakili HR/administrator yang dikecualikan lewat Kontrol Akses.
+    $user->forceFill(['bypass_team_scope' => true])->save();
 
     return $user;
 }
@@ -138,6 +142,9 @@ test('the map obeys the data scope, so a branch HR sees only their own branch', 
     Permission::findOrCreate('attendance-daily.view', 'web');
     $user = User::factory()->create();
     $user->givePermissionTo('attendance-daily.view');
+    // Absensi Harian & Jadwal Kerja dipersempit ke bawahan; pengguna ini
+    // mewakili HR/administrator yang dikecualikan lewat Kontrol Akses.
+    $user->forceFill(['bypass_team_scope' => true])->save();
     $user->accessBranches()->attach($mine->id); // tanpa izin "semua lokasi"
 
     foreach ([[$mine, 'Orang Bandung'], [$other, 'Orang Surabaya']] as [$branch, $name]) {
@@ -210,7 +217,7 @@ test('the pending list leaves out people whose WFH day is beaten by leave or a h
     LeaveRequest::query()->create([
         'employee_id' => $sick->id, 'leave_type_id' => $sickType->id,
         'start_date' => $date, 'end_date' => $date, 'reason' => 'Sakit.',
-        'status' => \App\Enums\LeaveRequestStatus::Approved->value,
+        'status' => LeaveRequestStatus::Approved->value,
     ]);
 
     $branch = Branch::query()->create(['code' => 'BDG', 'name' => 'Bandung', 'is_active' => true]);

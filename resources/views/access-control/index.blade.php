@@ -215,6 +215,18 @@
                                 <input type="checkbox" name="limit_to_subordinates" value="1" @checked($user->isLimitedToSubordinates()) class="mt-0.5 size-3.5 rounded border-gray-300 text-primary focus:ring-primary">
                                 <span>Batasi ke bawahan saja <span class="block text-gray-400">Hanya melihat karyawan di bawah garis atasannya (mengabaikan lokasi/divisi di atas).</span></span>
                             </label>
+                            <label class="mt-2 flex items-start gap-2 text-xs text-gray-600">
+                                <input type="checkbox" name="bypass_team_scope" value="1" @checked($user->bypassesTeamScope()) @disabled($user->isSuperAdmin()) class="mt-0.5 size-3.5 rounded border-gray-300 text-primary focus:ring-primary disabled:opacity-50">
+                                <span>Lihat semua karyawan di Absensi Harian &amp; Jadwal Kerja
+                                    <span class="block text-gray-400">
+                                        @if ($user->isSuperAdmin())
+                                            Superadmin selalu melihat semua, tidak bisa dicabut.
+                                        @else
+                                            Tanpa ini, kedua halaman itu hanya menampilkan bawahannya di struktur organisasi.
+                                        @endif
+                                    </span>
+                                </span>
+                            </label>
                         </div>
                         <div>
                             <p class="text-xs font-medium text-gray-700">Role</p>

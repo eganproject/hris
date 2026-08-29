@@ -39,6 +39,9 @@ function scheduleManager(): User
 
     $user = User::factory()->create();
     $user->givePermissionTo($permissions);
+    // Absensi Harian & Jadwal Kerja dipersempit ke bawahan; pengguna ini
+    // mewakili HR/administrator yang dikecualikan lewat Kontrol Akses.
+    $user->forceFill(['bypass_team_scope' => true])->save();
 
     return $user;
 }

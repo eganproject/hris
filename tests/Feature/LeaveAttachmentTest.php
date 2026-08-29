@@ -29,6 +29,9 @@ function requester(string $name = 'Budi', ?Employee $manager = null): array
 
     $user = User::factory()->create();
     $user->givePermissionTo('my-leave.view');
+    // Absensi Harian & Jadwal Kerja dipersempit ke bawahan; pengguna ini
+    // mewakili HR/administrator yang dikecualikan lewat Kontrol Akses.
+    $user->forceFill(['bypass_team_scope' => true])->save();
     $employee = Employee::query()->create([
         'user_id' => $user->id, 'full_name' => $name, 'employment_status' => 'active',
         'manager_id' => $manager?->id,
@@ -144,6 +147,9 @@ test('the requester, their supervisor and HR can each open the attachment', func
     Permission::findOrCreate(User::SCOPE_BYPASS_ATTENDANCE, 'web');
     $hr = User::factory()->create();
     $hr->givePermissionTo(['leave.view', User::SCOPE_BYPASS_ATTENDANCE]);
+    // Absensi Harian & Jadwal Kerja dipersempit ke bawahan; pengguna ini
+    // mewakili HR/administrator yang dikecualikan lewat Kontrol Akses.
+    $hr->forceFill(['bypass_team_scope' => true])->save();
 
     $this->actingAs($hr)->get(route('leave.attachment', $leave))->assertOk();
 });
@@ -228,6 +234,9 @@ test('HR filing on behalf of an employee can attach the document too', function 
 
     $hr = User::factory()->create();
     $hr->givePermissionTo(['leave.create', 'leave.view', User::SCOPE_BYPASS_ATTENDANCE]);
+    // Absensi Harian & Jadwal Kerja dipersempit ke bawahan; pengguna ini
+    // mewakili HR/administrator yang dikecualikan lewat Kontrol Akses.
+    $hr->forceFill(['bypass_team_scope' => true])->save();
 
     $employee = Employee::query()->create(['full_name' => 'Karyawan', 'employment_status' => 'active']);
 
@@ -264,6 +273,9 @@ test('both leave forms render the attachment field with its live preview', funct
     Permission::findOrCreate(User::SCOPE_BYPASS_ATTENDANCE, 'web');
     $hr = User::factory()->create();
     $hr->givePermissionTo(['leave.create', User::SCOPE_BYPASS_ATTENDANCE]);
+    // Absensi Harian & Jadwal Kerja dipersempit ke bawahan; pengguna ini
+    // mewakili HR/administrator yang dikecualikan lewat Kontrol Akses.
+    $hr->forceFill(['bypass_team_scope' => true])->save();
 
     $this->actingAs($hr)->get('/attendance/leave/create')
         ->assertOk()

@@ -34,7 +34,7 @@ class User extends Authenticatable
     public const SUPER_ADMIN_ROLES = ['superadmin', 'super-admin'];
 
     /** @var list<string> */
-    protected $fillable = ['name', 'email', 'password', 'is_active', 'limit_to_subordinates'];
+    protected $fillable = ['name', 'email', 'password', 'is_active', 'limit_to_subordinates', 'bypass_team_scope'];
 
     /** @var list<string> */
     protected $hidden = ['password', 'remember_token'];
@@ -53,6 +53,18 @@ class User extends Authenticatable
     public function isLimitedToSubordinates(): bool
     {
         return (bool) $this->limit_to_subordinates;
+    }
+
+    /**
+     * Boleh melihat SELURUH karyawan pada Absensi Harian & Jadwal Kerja, bukan hanya
+     * bawahannya. Diatur per pengguna di Kontrol Akses.
+     *
+     * Superadmin selalu termasuk, apa pun isi saklarnya: kalau tidak, seorang admin
+     * bisa mencabut aksesnya sendiri dan tidak punya jalan kembali untuk memulihkannya.
+     */
+    public function bypassesTeamScope(): bool
+    {
+        return $this->isSuperAdmin() || (bool) $this->bypass_team_scope;
     }
 
     /**
@@ -159,6 +171,7 @@ class User extends Authenticatable
             'email_verified_at' => 'datetime',
             'is_active' => 'boolean',
             'limit_to_subordinates' => 'boolean',
+            'bypass_team_scope' => 'boolean',
             'password' => 'hashed',
         ];
     }

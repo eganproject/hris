@@ -2,6 +2,8 @@
 
 use App\Enums\AttendanceStatus;
 use App\Enums\LeaveRequestStatus;
+use App\Models\Branch;
+use App\Models\Department;
 use App\Models\Employee;
 use App\Models\Holiday;
 use App\Models\LeaveRequest;
@@ -27,6 +29,9 @@ function attendanceManager(): User
 
     $user = User::factory()->create();
     $user->givePermissionTo($permissions);
+    // Absensi Harian & Jadwal Kerja dipersempit ke bawahan; pengguna ini
+    // mewakili HR/administrator yang dikecualikan lewat Kontrol Akses.
+    $user->forceFill(['bypass_team_scope' => true])->save();
 
     return $user;
 }
@@ -71,13 +76,16 @@ test('a scoped user cannot open the history of an employee outside their scope',
     foreach (['attendance-daily.view'] as $p) {
         Permission::findOrCreate($p, 'web');
     }
-    $branchA = \App\Models\Branch::query()->create(['name' => 'Cabang A', 'code' => 'A', 'is_active' => true]);
-    $branchB = \App\Models\Branch::query()->create(['name' => 'Cabang B', 'code' => 'B', 'is_active' => true]);
-    $dept = \App\Models\Department::query()->create(['code' => 'OPS', 'name' => 'Operasional', 'is_active' => true]);
+    $branchA = Branch::query()->create(['name' => 'Cabang A', 'code' => 'A', 'is_active' => true]);
+    $branchB = Branch::query()->create(['name' => 'Cabang B', 'code' => 'B', 'is_active' => true]);
+    $dept = Department::query()->create(['code' => 'OPS', 'name' => 'Operasional', 'is_active' => true]);
 
     // A supervisor scoped to branch A only (no attendance.view.all bypass).
     $user = User::factory()->create();
     $user->givePermissionTo('attendance-daily.view');
+    // Absensi Harian & Jadwal Kerja dipersempit ke bawahan; pengguna ini
+    // mewakili HR/administrator yang dikecualikan lewat Kontrol Akses.
+    $user->forceFill(['bypass_team_scope' => true])->save();
     Employee::query()->create(['user_id' => $user->id, 'full_name' => 'Atasan A', 'employment_status' => 'active', 'branch_id' => $branchA->id, 'department_id' => $dept->id]);
 
     $outsider = Employee::query()->create(['full_name' => 'Luar Cakupan', 'employment_status' => 'active', 'branch_id' => $branchB->id, 'department_id' => $dept->id]);
@@ -194,10 +202,13 @@ test('an admin leave request for an employee with a manager is decided in one st
 
 test('HR cannot delete a leave request — only the requester can', function () {
     $user = attendanceManager();
-    $requesterUser = App\Models\User::factory()->create();
+    $requesterUser = User::factory()->create();
     $employee = Employee::query()->create(['user_id' => $requesterUser->id, 'full_name' => 'Pengaju', 'employment_status' => 'active']);
-    Spatie\Permission\Models\Permission::findOrCreate('my-leave.view', 'web');
+    Permission::findOrCreate('my-leave.view', 'web');
     $requesterUser->givePermissionTo('my-leave.view');
+    // Absensi Harian & Jadwal Kerja dipersempit ke bawahan; pengguna ini
+    // mewakili HR/administrator yang dikecualikan lewat Kontrol Akses.
+    $requesterUser->forceFill(['bypass_team_scope' => true])->save();
     $type = LeaveType::query()->create(['code' => 'IZ', 'name' => 'Izin', 'attendance_status' => 'leave', 'is_paid' => true, 'is_active' => true]);
 
     $this->actingAs($user)->post('/attendance/leave', [
@@ -211,9 +222,12 @@ test('HR cannot delete a leave request — only the requester can', function () 
     $this->actingAs($user)->get('/attendance/leave')->assertOk()->assertDontSee('Hapus');
 
     // Karyawan lain tidak boleh menghapus pengajuan bukan miliknya.
-    $otherUser = App\Models\User::factory()->create();
+    $otherUser = User::factory()->create();
     Employee::query()->create(['user_id' => $otherUser->id, 'full_name' => 'Orang Lain', 'employment_status' => 'active']);
     $otherUser->givePermissionTo('my-leave.view');
+    // Absensi Harian & Jadwal Kerja dipersempit ke bawahan; pengguna ini
+    // mewakili HR/administrator yang dikecualikan lewat Kontrol Akses.
+    $otherUser->forceFill(['bypass_team_scope' => true])->save();
     $this->actingAs($otherUser)->delete("/my-leave/{$leave->id}")->assertForbidden();
 
     // Pengaju boleh menghapus pengajuannya sendiri (belum disetujui).
@@ -223,10 +237,13 @@ test('HR cannot delete a leave request — only the requester can', function () 
 
 test('the requester cannot delete a leave once it is approved', function () {
     $hr = attendanceManager();
-    $requesterUser = App\Models\User::factory()->create();
+    $requesterUser = User::factory()->create();
     $employee = Employee::query()->create(['user_id' => $requesterUser->id, 'full_name' => 'Pengaju2', 'employment_status' => 'active']);
-    Spatie\Permission\Models\Permission::findOrCreate('my-leave.view', 'web');
+    Permission::findOrCreate('my-leave.view', 'web');
     $requesterUser->givePermissionTo('my-leave.view');
+    // Absensi Harian & Jadwal Kerja dipersempit ke bawahan; pengguna ini
+    // mewakili HR/administrator yang dikecualikan lewat Kontrol Akses.
+    $requesterUser->forceFill(['bypass_team_scope' => true])->save();
     $type = LeaveType::query()->create(['code' => 'IZ', 'name' => 'Izin', 'attendance_status' => 'leave', 'is_paid' => true, 'is_active' => true]);
 
     $this->actingAs($hr)->post('/attendance/leave', [

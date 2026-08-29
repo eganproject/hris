@@ -3,8 +3,8 @@
 namespace App\Actions;
 
 use App\Models\Employee;
-use App\Models\User;
 use App\Services\AttendanceResolver;
+use App\Support\DataScope;
 use Carbon\CarbonInterface;
 
 /**
@@ -22,15 +22,18 @@ class ProcessDayAttendance
     public function __construct(private readonly AttendanceResolver $resolver) {}
 
     /**
-     * @param  User|null  $actor  when given, only that user's data scope is processed
-     *                            (the nightly command passes none: it runs for everyone)
+     * @param  DataScope|null  $scope  when given, only employees inside it are processed
+     *                                 (the nightly command passes none: it runs for everyone)
      */
-    public function handle(CarbonInterface $date, ?int $branchId = null, ?User $actor = null): int
+    public function handle(CarbonInterface $date, ?int $branchId = null, ?DataScope $scope = null): int
     {
+        // Cakupannya diterima jadi, bukan diturunkan sendiri dari penggunanya: tombol
+        // "Proses Ulang" harus memproses persis orang-orang yang tampil di layar
+        // pemakainya, bukan himpunan yang lebih luas.
         $employees = Employee::query()
             ->active()
             ->when($branchId, fn ($query) => $query->where('branch_id', $branchId))
-            ->when($actor, fn ($query) => $query->visibleTo($actor, User::SCOPE_BYPASS_ATTENDANCE))
+            ->when($scope, fn ($query) => $query->whereIn('id', $scope->employees()->select('employees.id')))
             ->get();
 
         foreach ($employees as $employee) {

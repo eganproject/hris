@@ -3,7 +3,6 @@
 use App\Models\Employee;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
 use Spatie\Permission\Models\Permission;
 use Spatie\Permission\Models\Role;
@@ -60,6 +59,9 @@ test('the production upgrade keeps every role and user working', function () {
     // A user with a permission granted directly (not through a role).
     $directUser = User::factory()->create();
     $directUser->givePermissionTo(['dashboard.view', 'attendance.view']);
+    // Absensi Harian & Jadwal Kerja dipersempit ke bawahan; pengguna ini
+    // mewakili HR/administrator yang dikecualikan lewat Kontrol Akses.
+    $directUser->forceFill(['bypass_team_scope' => true])->save();
 
     app(PermissionRegistrar::class)->forgetCachedPermissions();
 

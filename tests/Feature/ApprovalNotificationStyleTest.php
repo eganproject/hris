@@ -38,12 +38,18 @@ function approvalStyleFixture(): array
 
     $supervisorUser = User::factory()->create();
     $supervisorUser->givePermissionTo($selfService);
+    // Absensi Harian & Jadwal Kerja dipersempit ke bawahan; pengguna ini
+    // mewakili HR/administrator yang dikecualikan lewat Kontrol Akses.
+    $supervisorUser->forceFill(['bypass_team_scope' => true])->save();
     $supervisor = Employee::query()->create([
         'user_id' => $supervisorUser->id, 'full_name' => 'Sari Atasan', 'employment_status' => 'active',
     ]);
 
     $employeeUser = User::factory()->create();
     $employeeUser->givePermissionTo($selfService);
+    // Absensi Harian & Jadwal Kerja dipersempit ke bawahan; pengguna ini
+    // mewakili HR/administrator yang dikecualikan lewat Kontrol Akses.
+    $employeeUser->forceFill(['bypass_team_scope' => true])->save();
     $employee = Employee::query()->create([
         'user_id' => $employeeUser->id, 'full_name' => 'Budi Staf', 'employment_status' => 'active',
         'manager_id' => $supervisor->id,
@@ -51,6 +57,9 @@ function approvalStyleFixture(): array
 
     $hr = User::factory()->create();
     $hr->givePermissionTo($hrPermissions);
+    // Absensi Harian & Jadwal Kerja dipersempit ke bawahan; pengguna ini
+    // mewakili HR/administrator yang dikecualikan lewat Kontrol Akses.
+    $hr->forceFill(['bypass_team_scope' => true])->save();
 
     return compact('employee', 'employeeUser', 'supervisor', 'supervisorUser', 'hr');
 }

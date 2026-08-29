@@ -20,6 +20,9 @@ function overtimeHr(): User
     }
     $user = User::factory()->create();
     $user->givePermissionTo($permissions);
+    // Absensi Harian & Jadwal Kerja dipersempit ke bawahan; pengguna ini
+    // mewakili HR/administrator yang dikecualikan lewat Kontrol Akses.
+    $user->forceFill(['bypass_team_scope' => true])->save();
 
     return $user;
 }
@@ -37,12 +40,18 @@ function overtimeStaff(int $computedMinutes = 90): array
 
     $supervisorUser = User::factory()->create();
     $supervisorUser->givePermissionTo('my-overtime.view');
+    // Absensi Harian & Jadwal Kerja dipersempit ke bawahan; pengguna ini
+    // mewakili HR/administrator yang dikecualikan lewat Kontrol Akses.
+    $supervisorUser->forceFill(['bypass_team_scope' => true])->save();
     $supervisor = Employee::query()->create([
         'user_id' => $supervisorUser->id, 'full_name' => 'Sari Atasan', 'employment_status' => 'active',
     ]);
 
     $employeeUser = User::factory()->create();
     $employeeUser->givePermissionTo('my-overtime.view');
+    // Absensi Harian & Jadwal Kerja dipersempit ke bawahan; pengguna ini
+    // mewakili HR/administrator yang dikecualikan lewat Kontrol Akses.
+    $employeeUser->forceFill(['bypass_team_scope' => true])->save();
     $employee = Employee::query()->create([
         'user_id' => $employeeUser->id, 'full_name' => 'Budi', 'employment_status' => 'active',
         'manager_id' => $supervisor->id,

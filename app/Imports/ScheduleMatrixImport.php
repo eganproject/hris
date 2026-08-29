@@ -574,8 +574,11 @@ class ScheduleMatrixImport implements ToCollection, WithMultipleSheets
      */
     private function scopedEmployees()
     {
+        // forTeam, bukan forAttendance: file ini diunggah dari halaman Jadwal Kerja,
+        // dan baris yang tidak akan pernah tampil di roster pengunggahnya tidak boleh
+        // diam-diam bisa ia ubah lewat Excel.
         $query = $this->actor !== null
-            ? DataScope::forAttendance($this->actor)->employees()
+            ? DataScope::forTeam($this->actor)->employees()
             : Employee::query();
 
         return $query->active()->get(['id', 'employee_number', 'full_name']);

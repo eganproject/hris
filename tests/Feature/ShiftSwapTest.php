@@ -37,6 +37,9 @@ function swapEmployee(string $name): array
     Permission::findOrCreate('my-schedule.view', 'web');
     $user = User::factory()->create();
     $user->givePermissionTo('my-schedule.view');
+    // Absensi Harian & Jadwal Kerja dipersempit ke bawahan; pengguna ini
+    // mewakili HR/administrator yang dikecualikan lewat Kontrol Akses.
+    $user->forceFill(['bypass_team_scope' => true])->save();
     $employee = Employee::query()->create(['user_id' => $user->id, 'full_name' => $name, 'employment_status' => 'active']);
 
     return [$user, $employee];
@@ -52,6 +55,9 @@ function swapHr(): User
     }
     $user = User::factory()->create();
     $user->givePermissionTo($permissions);
+    // Absensi Harian & Jadwal Kerja dipersempit ke bawahan; pengguna ini
+    // mewakili HR/administrator yang dikecualikan lewat Kontrol Akses.
+    $user->forceFill(['bypass_team_scope' => true])->save();
 
     return $user;
 }

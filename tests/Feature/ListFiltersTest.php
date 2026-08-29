@@ -1,15 +1,18 @@
 <?php
 
 use App\Enums\LeaveRequestStatus;
+use App\Exports\EmployeesExport;
 use App\Models\Branch;
 use App\Models\Department;
 use App\Models\Employee;
+use App\Models\JobPosition;
 use App\Models\LeaveRequest;
 use App\Models\LeaveType;
 use App\Models\OvertimeApproval;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Spatie\Permission\Models\Permission;
+use Spatie\Permission\Models\Role;
 use Spatie\Permission\PermissionRegistrar;
 
 uses(RefreshDatabase::class);
@@ -24,6 +27,9 @@ function viewer(array $permissions): User
 
     $user = User::factory()->create();
     $user->givePermissionTo([...$permissions, 'attendance.view.all']);
+    // Absensi Harian & Jadwal Kerja dipersempit ke bawahan; pengguna ini
+    // mewakili HR/administrator yang dikecualikan lewat Kontrol Akses.
+    $user->forceFill(['bypass_team_scope' => true])->save();
 
     return $user;
 }
@@ -127,10 +133,10 @@ test('the employee list filters by job position and by role', function () {
     $user = employeeManager();
     ['branch' => $branch, 'department' => $department, 'position' => $staff] = hrMasterData();
 
-    $manager = App\Models\JobPosition::query()->create(['name' => 'Manajer Produksi', 'is_active' => true]);
-    $hrRole = Spatie\Permission\Models\Role::findOrCreate('hr-manager', 'web');
+    $manager = JobPosition::query()->create(['name' => 'Manajer Produksi', 'is_active' => true]);
+    $hrRole = Role::findOrCreate('hr-manager', 'web');
 
-    $make = function (string $name, App\Models\JobPosition $position, ?Spatie\Permission\Models\Role $role = null) use ($branch, $department) {
+    $make = function (string $name, JobPosition $position, ?Role $role = null) use ($branch, $department) {
         $account = null;
 
         if ($role) {
@@ -201,7 +207,7 @@ test('the employee export narrows by the same filters as the list', function () 
     $user = employeeManager();
     ['branch' => $branch, 'department' => $department, 'position' => $staff] = hrMasterData();
 
-    $manager = App\Models\JobPosition::query()->create(['name' => 'Manajer Produksi', 'is_active' => true]);
+    $manager = JobPosition::query()->create(['name' => 'Manajer Produksi', 'is_active' => true]);
 
     foreach ([['Staf Biasa', $staff], ['Bos Produksi', $manager]] as [$name, $position]) {
         Employee::query()->create([
@@ -213,7 +219,7 @@ test('the employee export narrows by the same filters as the list', function () 
 
     // Dulu export menyusun kondisinya sendiri dan tidak mengenal jabatan, sehingga
     // file yang diunduh berisi lebih banyak baris daripada yang tampil di layar.
-    $rows = (new App\Exports\EmployeesExport(['job_position_id' => $manager->id], $user))->query()->get();
+    $rows = (new EmployeesExport(['job_position_id' => $manager->id], $user))->query()->get();
 
     expect($rows->pluck('full_name')->all())->toBe(['Bos Produksi']);
 });

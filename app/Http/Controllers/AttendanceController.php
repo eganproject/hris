@@ -36,7 +36,7 @@ class AttendanceController extends Controller
         $search = $request->string('search')->toString() ?: null;
         $statusFilter = $request->string('status')->toString() ?: null;
         $perPage = min(max((int) $request->input('per_page', 50), 25), 200);
-        $scope = DataScope::forAttendance($request->user());
+        $scope = DataScope::forTeam($request->user());
 
         $population = fn () => $scope->employees()
             ->active()
@@ -88,6 +88,7 @@ class AttendanceController extends Controller
             'statusFilter' => $statusFilter,
             'perPage' => $perPage,
             'hasNoScope' => $scope->isEmpty(),
+            'hasNoTeam' => $scope->hasNoTeam(),
             'shifts' => Shift::query()->where('is_active', true)->orderBy('start_time')->get(),
             'statuses' => AttendanceStatus::options(),
         ]);
@@ -99,7 +100,7 @@ class AttendanceController extends Controller
      */
     public function history(Request $request, Employee $employee): View
     {
-        DataScope::forAttendance($request->user())->authorize($employee);
+        DataScope::forTeam($request->user())->authorize($employee);
 
         $month = MonthInput::resolve($request->input('month'));
         $from = $month->copy()->startOfMonth()->toDateString();
@@ -151,7 +152,7 @@ class AttendanceController extends Controller
         $branchId = $request->integer('branch_id') ?: null;
 
         // Only the employees this user may see get (re)processed.
-        $count = $this->processDay->handle($date, $branchId, $request->user());
+        $count = $this->processDay->handle($date, $branchId, DataScope::forTeam($request->user()));
 
         return redirect()
             ->route('attendance.daily.index', $request->only('date', 'branch_id'))
@@ -164,7 +165,7 @@ class AttendanceController extends Controller
     public function storePunch(AttendancePunchRequest $request): RedirectResponse
     {
         $employee = Employee::findOrFail($request->integer('employee_id'));
-        DataScope::forAttendance($request->user())->authorize($employee);
+        DataScope::forTeam($request->user())->authorize($employee);
 
         $date = Carbon::parse($request->date('work_date'));
 

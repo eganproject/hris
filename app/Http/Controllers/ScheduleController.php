@@ -61,7 +61,7 @@ class ScheduleController extends Controller
         $from = $month->copy()->startOfMonth();
         $to = $month->copy()->endOfMonth();
         $branchId = $request->integer('branch_id') ?: null;
-        $scope = DataScope::forAttendance($request->user());
+        $scope = DataScope::forTeam($request->user());
 
         $tab = $request->input('tab') === 'assignments' ? 'assignments' : 'roster';
         $perPage = $this->resolvePerPage($request);
@@ -89,6 +89,7 @@ class ScheduleController extends Controller
             ],
             'branchId' => $branchId,
             'hasNoScope' => $scope->isEmpty(),
+            'hasNoTeam' => $scope->hasNoTeam(),
             'shifts' => Shift::query()->where('is_active', true)->orderBy('start_time')->get(),
             'patternCount' => SchedulePattern::query()->visibleTo($request->user())->where('is_active', true)->count(),
             'perPage' => $perPage,
@@ -315,7 +316,7 @@ class ScheduleController extends Controller
      */
     public function show(Request $request, Employee $employee): View
     {
-        DataScope::forAttendance($request->user())->authorize($employee);
+        DataScope::forTeam($request->user())->authorize($employee);
 
         $month = MonthInput::resolve($request->input('month'));
         $from = $month->copy()->startOfMonth();
@@ -390,7 +391,7 @@ class ScheduleController extends Controller
      */
     public function destroyPeriod(Request $request, Employee $employee): RedirectResponse
     {
-        DataScope::forAttendance($request->user())->authorize($employee);
+        DataScope::forTeam($request->user())->authorize($employee);
 
         $month = MonthInput::resolve($request->input('month'));
         $range = [$month->copy()->startOfMonth()->toDateString(), $month->copy()->endOfMonth()->toDateString()];
@@ -643,7 +644,7 @@ class ScheduleController extends Controller
         // the user is looking at. Regenerating the whole location while a division is
         // filtered would quietly touch hundreds of people they never selected.
         $employees = $this->filtered(
-            DataScope::forAttendance($request->user())->employees()->active(),
+            DataScope::forTeam($request->user())->employees()->active(),
             $request,
         )->get();
 
@@ -682,7 +683,7 @@ class ScheduleController extends Controller
     public function override(ScheduleOverrideRequest $request): RedirectResponse|JsonResponse
     {
         $employee = Employee::findOrFail($request->integer('employee_id'));
-        DataScope::forAttendance($request->user())->authorize($employee);
+        DataScope::forTeam($request->user())->authorize($employee);
 
         $date = Carbon::parse($request->date('work_date'));
 
@@ -716,7 +717,7 @@ class ScheduleController extends Controller
 
     public function destroyAssignment(Request $request, ScheduleAssignment $assignment): RedirectResponse|JsonResponse
     {
-        DataScope::forAttendance($request->user())->authorize($assignment->employee);
+        DataScope::forTeam($request->user())->authorize($assignment->employee);
         abort_unless(
             $request->user()->can(User::SCOPE_BYPASS_ATTENDANCE) || $assignment->created_by === $request->user()->id,
             403,
@@ -744,20 +745,14 @@ class ScheduleController extends Controller
     public function importTemplate(Request $request): BinaryFileResponse
     {
         $month = MonthInput::resolve($request->input('month'));
-        $scope = DataScope::forAttendance($request->user());
 
-        // Atasan mengisi jadwal timnya sendiri, jadi templatenya cukup berisi anak
-        // buahnya — bukan seluruh lokasi. Penyaringnya hanya berlaku bila pengunduhnya
-        // memang punya bawahan: akun HR pusat dan superadmin tidak punya siapa-siapa
-        // di bawahnya, dan menyaringnya akan memberi mereka file kosong.
-        //
-        // Yang disaring HANYA isi template ini. Pemeriksaan cakupan saat file-nya
-        // diunggah kembali tidak disentuh (lihat ScheduleMatrixImport) — memperketat
-        // keduanya sekaligus akan menolak baris yang selama ini sah.
-        $subordinateIds = $request->user()->subordinateEmployeeIds();
+        // Isi template mengikuti apa yang tampil di roster: bawahan si pengunduh saja,
+        // kecuali superadmin. Aturannya tinggal di DataScope::forTeam(), tidak diulang
+        // di sini — dulu penyaring bawahannya ditulis khusus di tempat ini dan itu
+        // membuat template dan layarnya bisa menyimpang satu sama lain.
+        $scope = DataScope::forTeam($request->user());
 
         $employees = $this->filtered($scope->employees()->active(), $request)
-            ->when($subordinateIds !== [], fn (Builder $query) => $query->whereIn('id', $subordinateIds))
             ->orderBy('full_name')
             ->get();
 
@@ -778,7 +773,7 @@ class ScheduleController extends Controller
             'file' => ['required', 'file', 'mimes:xlsx,xls,csv', 'max:10240'],
         ], [], ['file' => 'file Excel']);
 
-        $scope = DataScope::forAttendance($request->user());
+        $scope = DataScope::forTeam($request->user());
 
         abort_if($scope->isEmpty(), 403);
 
