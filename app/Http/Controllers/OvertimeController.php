@@ -4,8 +4,8 @@ namespace App\Http\Controllers;
 
 use App\Models\OvertimeApproval;
 use App\Support\DataScope;
+use App\Support\MonthInput;
 use Illuminate\Http\Request;
-use Illuminate\Support\Carbon;
 use Illuminate\View\View;
 
 class OvertimeController extends Controller
@@ -17,7 +17,7 @@ class OvertimeController extends Controller
      */
     public function index(Request $request): View
     {
-        $month = $this->resolveMonth($request->input('month'));
+        $month = MonthInput::resolve($request->input('month'));
         [$from, $to] = [$month->copy()->startOfMonth(), $month->copy()->endOfMonth()];
         $branchId = $request->integer('branch_id') ?: null;
         $departmentId = $request->integer('department_id') ?: null;
@@ -69,7 +69,7 @@ class OvertimeController extends Controller
      */
     public function recap(Request $request): View
     {
-        $month = $this->resolveMonth($request->input('month'));
+        $month = MonthInput::resolve($request->input('month'));
         [$from, $to] = [$month->copy()->startOfMonth(), $month->copy()->endOfMonth()];
         $branchId = $request->integer('branch_id') ?: null;
         $scope = DataScope::forAttendance($request->user());
@@ -95,14 +95,5 @@ class OvertimeController extends Controller
             'branchId' => $branchId,
             'totalMinutes' => (int) $rows->sum('minutes'),
         ]);
-    }
-
-    private function resolveMonth(?string $value): Carbon
-    {
-        try {
-            return $value ? Carbon::createFromFormat('Y-m', $value)->startOfMonth() : now()->startOfMonth();
-        } catch (\Throwable) {
-            return now()->startOfMonth();
-        }
     }
 }

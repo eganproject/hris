@@ -6,9 +6,9 @@ use App\Models\Employee;
 use App\Models\Holiday;
 use App\Services\DefaultOfficeSchedule;
 use App\Support\LeaveCalendar;
+use App\Support\MonthInput;
 use Carbon\CarbonPeriod;
 use Illuminate\Http\Request;
-use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\View\View;
 
@@ -35,7 +35,7 @@ class MyRosterController extends Controller
 
         abort_unless($employee, 403, 'Akun Anda belum tertaut ke data karyawan.');
 
-        $month = $this->resolveMonth($request->input('month'));
+        $month = MonthInput::resolve($request->input('month'));
         $from = $month->copy()->startOfMonth();
         $to = $month->copy()->endOfMonth();
 
@@ -123,14 +123,5 @@ class MyRosterController extends Controller
             ->sortBy(fn ($row) => $row->work_date->toDateString())
             ->take(7)
             ->values();
-    }
-
-    private function resolveMonth(?string $value): Carbon
-    {
-        try {
-            return $value ? Carbon::createFromFormat('Y-m', $value)->startOfMonth() : now()->startOfMonth();
-        } catch (\Throwable) {
-            return now()->startOfMonth();
-        }
     }
 }

@@ -10,9 +10,11 @@ use App\Models\Employee;
 use App\Models\Shift;
 use App\Services\AttendanceResolver;
 use App\Support\DataScope;
+use App\Support\MonthInput;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
 
 class AttendanceController extends Controller
@@ -99,7 +101,7 @@ class AttendanceController extends Controller
     {
         DataScope::forAttendance($request->user())->authorize($employee);
 
-        $month = $this->resolveMonth($request->input('month'));
+        $month = MonthInput::resolve($request->input('month'));
         $from = $month->copy()->startOfMonth()->toDateString();
         $to = $month->copy()->endOfMonth()->toDateString();
 
@@ -111,7 +113,7 @@ class AttendanceController extends Controller
             ->get();
 
         // Approved overtime per date (authoritative figure), keyed by Y-m-d.
-        $approvedOvertime = \Illuminate\Support\Facades\DB::table('overtime_approvals')
+        $approvedOvertime = DB::table('overtime_approvals')
             ->where('employee_id', $employee->id)
             ->where('status', 'approved')
             ->whereBetween('work_date', [$from, $to])
@@ -185,15 +187,6 @@ class AttendanceController extends Controller
             return $value ? Carbon::parse($value)->startOfDay() : now()->startOfDay();
         } catch (\Throwable) {
             return now()->startOfDay();
-        }
-    }
-
-    private function resolveMonth(?string $value): Carbon
-    {
-        try {
-            return $value ? Carbon::createFromFormat('Y-m', $value)->startOfMonth() : now()->startOfMonth();
-        } catch (\Throwable) {
-            return now()->startOfMonth();
         }
     }
 }

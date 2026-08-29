@@ -22,6 +22,7 @@ use App\Services\DefaultOfficeSchedule;
 use App\Services\ScheduleGenerator;
 use App\Support\DataScope;
 use App\Support\ImportErrorStore;
+use App\Support\MonthInput;
 use Carbon\CarbonImmutable;
 use Carbon\CarbonPeriod;
 use Illuminate\Database\Eloquent\Builder;
@@ -55,7 +56,7 @@ class ScheduleController extends Controller
      */
     public function index(Request $request): View
     {
-        $month = $this->resolveMonth($request->input('month'));
+        $month = MonthInput::resolve($request->input('month'));
         $from = $month->copy()->startOfMonth();
         $to = $month->copy()->endOfMonth();
         $branchId = $request->integer('branch_id') ?: null;
@@ -212,7 +213,7 @@ class ScheduleController extends Controller
         $scope = DataScope::forAttendance($request->user());
         $perPage = min(max((int) $request->input('per_page', 25), 10), 100);
         $mode = $this->unscheduledMode($request);
-        $month = $this->resolveMonth($request->input('month'));
+        $month = MonthInput::resolve($request->input('month'));
         $from = $month->copy()->startOfMonth();
         $to = $month->copy()->endOfMonth();
 
@@ -256,7 +257,7 @@ class ScheduleController extends Controller
     public function unscheduledExport(Request $request): BinaryFileResponse
     {
         $mode = $this->unscheduledMode($request);
-        $month = $this->resolveMonth($request->input('month'));
+        $month = MonthInput::resolve($request->input('month'));
 
         $filters = $request->only(['branch_id', 'department_id', 'job_position_id', 'search']);
         $filters['mode'] = $mode;
@@ -315,7 +316,7 @@ class ScheduleController extends Controller
     {
         DataScope::forAttendance($request->user())->authorize($employee);
 
-        $month = $this->resolveMonth($request->input('month'));
+        $month = MonthInput::resolve($request->input('month'));
         $from = $month->copy()->startOfMonth();
         $to = $month->copy()->endOfMonth();
 
@@ -537,7 +538,7 @@ class ScheduleController extends Controller
      */
     public function generate(Request $request): RedirectResponse|JsonResponse
     {
-        $month = $this->resolveMonth($request->input('month'));
+        $month = MonthInput::resolve($request->input('month'));
         $from = $month->copy()->startOfMonth();
         $to = $month->copy()->endOfMonth();
 
@@ -637,7 +638,7 @@ class ScheduleController extends Controller
      */
     public function importTemplate(Request $request): BinaryFileResponse
     {
-        $month = $this->resolveMonth($request->input('month'));
+        $month = MonthInput::resolve($request->input('month'));
         $scope = DataScope::forAttendance($request->user());
 
         $employees = $this->filtered($scope->employees()->active(), $request)
@@ -716,14 +717,5 @@ class ScheduleController extends Controller
             ->when($request->string('search')->toString() ?: null, fn ($q, $s) => $q->where(fn ($inner) => $inner
                 ->where('full_name', 'like', "%{$s}%")
                 ->orWhere('employee_number', 'like', "%{$s}%")));
-    }
-
-    private function resolveMonth(?string $value): Carbon
-    {
-        try {
-            return $value ? Carbon::createFromFormat('Y-m', $value)->startOfMonth() : now()->startOfMonth();
-        } catch (\Throwable) {
-            return now()->startOfMonth();
-        }
     }
 }

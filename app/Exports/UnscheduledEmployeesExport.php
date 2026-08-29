@@ -5,8 +5,8 @@ namespace App\Exports;
 use App\Models\Employee;
 use App\Models\User;
 use App\Support\DataScope;
+use App\Support\MonthInput;
 use Illuminate\Contracts\Database\Eloquent\Builder;
-use Illuminate\Support\Carbon;
 use Maatwebsite\Excel\Concerns\FromQuery;
 use Maatwebsite\Excel\Concerns\ShouldAutoSize;
 use Maatwebsite\Excel\Concerns\WithHeadings;
@@ -42,7 +42,7 @@ class UnscheduledEmployeesExport implements FromQuery, ShouldAutoSize, WithHeadi
         $search = $this->filters['search'] ?? null;
         $noSchedule = ($this->filters['mode'] ?? null) === 'no_schedule';
 
-        $month = $this->resolveMonth($this->filters['month'] ?? null);
+        $month = MonthInput::resolve($this->filters['month'] ?? null);
         $from = $month->copy()->startOfMonth()->toDateString();
         $to = $month->copy()->endOfMonth()->toDateString();
 
@@ -67,15 +67,6 @@ class UnscheduledEmployeesExport implements FromQuery, ShouldAutoSize, WithHeadi
             ->when($search, fn ($q, $s) => $q->where(fn ($q) => $q
                 ->where('full_name', 'like', "%{$s}%")->orWhere('employee_number', 'like', "%{$s}%")))
             ->orderBy('full_name');
-    }
-
-    private function resolveMonth(?string $value): Carbon
-    {
-        try {
-            return $value ? Carbon::createFromFormat('Y-m', $value)->startOfMonth() : now()->startOfMonth();
-        } catch (\Throwable) {
-            return now()->startOfMonth();
-        }
     }
 
     /** @return list<string> */

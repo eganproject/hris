@@ -16,11 +16,13 @@ use App\Models\LeaveRequest;
 use App\Support\AttendanceReport;
 use App\Support\DataScope;
 use App\Support\LeaveReport;
+use App\Support\MonthInput;
 use Barryvdh\DomPDF\Facade\Pdf;
-use Illuminate\Http\Request;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
 use Maatwebsite\Excel\Facades\Excel;
@@ -163,9 +165,9 @@ class ReportController extends Controller
      * Seluruh baris untuk periode terpilih, tanpa paginasi — dipakai ekspor Excel
      * dan PDF, yang memang harus memuat semuanya.
      *
-     * @return \Illuminate\Support\Collection<int, Attendance>
+     * @return Collection<int, Attendance>
      */
-    private function attendanceLogRows(Request $request, string $from, string $to, ?int $branchId, ?int $departmentId): \Illuminate\Support\Collection
+    private function attendanceLogRows(Request $request, string $from, string $to, ?int $branchId, ?int $departmentId): Collection
     {
         return $this->attendanceLogQuery(
             $from,
@@ -235,7 +237,7 @@ class ReportController extends Controller
     {
         DataScope::forAttendance($request->user())->authorize($employee);
 
-        $month = $this->resolveMonth($request->input('month'));
+        $month = MonthInput::resolve($request->input('month'));
         [$from, $to] = [$month->copy()->startOfMonth()->toDateString(), $month->copy()->endOfMonth()->toDateString()];
 
         $records = Attendance::query()
@@ -356,7 +358,7 @@ class ReportController extends Controller
      */
     private function filters(Request $request): array
     {
-        $month = $this->resolveMonth($request->input('month'));
+        $month = MonthInput::resolve($request->input('month'));
 
         return [
             $month,
@@ -365,14 +367,5 @@ class ReportController extends Controller
             $request->integer('branch_id') ?: null,
             $request->integer('department_id') ?: null,
         ];
-    }
-
-    private function resolveMonth(?string $value): Carbon
-    {
-        try {
-            return $value ? Carbon::createFromFormat('Y-m', $value)->startOfMonth() : now()->startOfMonth();
-        } catch (\Throwable) {
-            return now()->startOfMonth();
-        }
     }
 }
