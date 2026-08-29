@@ -37,6 +37,16 @@ class ScheduleGenerator
      */
     public function forEmployee(Employee $employee, CarbonInterface $from, CarbonInterface $to): int
     {
+        // Karyawan "jam kantor" jadwalnya diturunkan dari pola saat dibaca, tidak
+        // pernah dimaterialisasi. Menulis baris untuk mereka justru MENIMPA jam
+        // kantornya, karena baris nyata selalu menang atas turunan pola — cukup satu
+        // klik Generate oleh siapa pun untuk menghidupkan lagi penugasan lama yang
+        // belum sempat dibereskan. Dijaga di sini, bukan di pemanggilnya, supaya
+        // tombol Generate maupun forAssignment() sama-sama tertutup.
+        if ($employee->follows_office_hours) {
+            return 0;
+        }
+
         $from = Carbon::parse($from)->startOfDay();
         $to = Carbon::parse($to)->startOfDay();
 

@@ -189,7 +189,8 @@ class Employee extends Model
      */
     public function officePattern(): BelongsTo
     {
-        return $this->belongsTo(SchedulePattern::class, 'office_pattern_id');
+        // Terarsip pun tetap terbaca — sama alasannya dengan ScheduleAssignment::pattern().
+        return $this->belongsTo(SchedulePattern::class, 'office_pattern_id')->withTrashed();
     }
 
     public function attendances(): HasMany

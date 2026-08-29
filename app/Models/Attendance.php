@@ -73,7 +73,9 @@ class Attendance extends Model
 
     public function shift(): BelongsTo
     {
-        return $this->belongsTo(Shift::class);
+        // Shift terarsip tetap terbaca di sini: absensi bulan lalu kehilangan
+        // maknanya kalau kolom shift-nya mendadak kosong.
+        return $this->belongsTo(Shift::class)->withTrashed();
     }
 
     public function leaveRequest(): BelongsTo

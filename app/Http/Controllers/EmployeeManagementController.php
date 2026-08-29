@@ -17,6 +17,7 @@ use App\Models\JobPosition;
 use App\Models\LeaveType;
 use App\Models\SchedulePattern;
 use App\Models\User;
+use App\Services\OfficeHoursTransition;
 use App\Services\PunchIngestionService;
 use App\Support\ImportErrorStore;
 use Illuminate\Database\Eloquent\Builder;
@@ -37,6 +38,8 @@ use Symfony\Component\HttpFoundation\BinaryFileResponse;
 
 class EmployeeManagementController extends Controller
 {
+    public function __construct(private readonly OfficeHoursTransition $officeHours) {}
+
     /**
      * Penyaring daftar karyawan. Satu daftar dipakai bersama halaman daftar dan
      * export, supaya file yang diunduh selalu berisi baris yang sama dengan layar.
@@ -327,7 +330,7 @@ class EmployeeManagementController extends Controller
 
         return view('employees.edit', [
             'employee' => $employee,
-            ...$this->formOptions(),
+            ...$this->formOptions($employee),
         ]);
     }
 
@@ -339,14 +342,28 @@ class EmployeeManagementController extends Controller
         $wasActive = ! $employee->isInactive();
         $desiredStatus = $request->validated('employment_status');
 
+        // Dibaca sebelum tersimpan: hanya PERPINDAHAN ke jam kantor yang membereskan
+        // penjadwalan lama. Menyimpan ulang formulir orang yang memang sudah jam
+        // kantor tidak boleh diam-diam menghapus jadwal, karena tombolnya tidak
+        // disentuh pada penyimpanan itu.
+        $wasFollowingOfficeHours = (bool) $employee->follows_office_hours;
+        $officeHoursCleanup = ['assignments' => 0, 'days' => 0];
+
         // Exit and reactivation are now driven by the "Status Kepegawaian" field:
         // Aktif → Nonaktif runs the exit flow; Nonaktif → Aktif reactivates.
         $isExitViaEdit = $wasActive && $desiredStatus === 'inactive';
         $isReactivateViaEdit = ! $wasActive && $desiredStatus === 'active';
 
-        DB::transaction(function () use ($request, $employee, $isExitViaEdit, $isReactivateViaEdit) {
+        DB::transaction(function () use ($request, $employee, $isExitViaEdit, $isReactivateViaEdit, $wasFollowingOfficeHours, &$officeHoursCleanup) {
             $employee->update($this->employeePayload($request));
             $this->syncDepartments($request, $employee);
+
+            // Baru sekarang ikut jam kantor: hentikan penugasan pola yang tersisa dan
+            // buang jadwal ke depan yang sudah terlanjur dibuat, supaya pola jam
+            // kantornya benar-benar berlaku dan bukan cuma jadi label.
+            if ($employee->follows_office_hours && ! $wasFollowingOfficeHours) {
+                $officeHoursCleanup = $this->officeHours->apply([$employee]);
+            }
 
             // A plain edit keeps working on the contract already stored (active, or the
             // most recent one for an employee whose contract has ended/expired) so its
@@ -411,7 +428,33 @@ class EmployeeManagementController extends Controller
                 $isExitViaEdit => 'Data karyawan diperbarui dan status akhir (keluar) berhasil diproses.',
                 $isReactivateViaEdit => 'Data karyawan diperbarui dan karyawan berhasil diaktifkan kembali.',
                 default => 'Data karyawan berhasil diperbarui.',
-            });
+            }.$this->officeHoursCleanupNote($officeHoursCleanup));
+    }
+
+    /**
+     * Kalimat tambahan yang menyebut apa saja yang ikut dibereskan saat seseorang
+     * dipindah ke jam kantor. Penghentian penugasan dan penghapusan jadwal terjadi di
+     * luar layar, jadi angkanya harus dilaporkan — bukan disimpan diam-diam.
+     *
+     * @param  array{assignments: int, days: int}  $cleanup
+     */
+    private function officeHoursCleanupNote(array $cleanup): string
+    {
+        if ($cleanup['assignments'] === 0 && $cleanup['days'] === 0) {
+            return '';
+        }
+
+        $parts = [];
+
+        if ($cleanup['assignments'] > 0) {
+            $parts[] = "{$cleanup['assignments']} penugasan pola dihentikan";
+        }
+
+        if ($cleanup['days'] > 0) {
+            $parts[] = "{$cleanup['days']} hari jadwal ke depan dibersihkan";
+        }
+
+        return ' '.implode(' dan ', $parts).' karena kini ikut jam kantor.';
     }
 
     /**
@@ -790,7 +833,9 @@ class EmployeeManagementController extends Controller
             'office_pattern_id' => [
                 'nullable',
                 'integer',
-                Rule::exists('schedule_patterns', 'id')->where('is_active', true)->where('is_office_pattern', true),
+                // deleted_at ikut dicek: Rule::exists menembak tabel langsung, jadi pola
+                // yang sudah diarsipkan masih akan lolos kalau tidak disebut di sini.
+                Rule::exists('schedule_patterns', 'id')->where('is_active', true)->where('is_office_pattern', true)->whereNull('deleted_at'),
             ],
         ], [
             'office_pattern_id.exists' => 'Pola jam kantor yang dipilih tidak tersedia. Daftarkan dulu polanya di menu Pengaturan.',
@@ -806,17 +851,45 @@ class EmployeeManagementController extends Controller
         // tanpa memilih pola berarti "ikut pola default global".
         $patternId = $follows ? ($validator->validated()['office_pattern_id'] ?? null) : null;
 
-        $updated = Employee::query()
+        // Diambil sebagai model dulu, bukan langsung di-update massal: pembersihan di
+        // bawah butuh karyawannya satu per satu, dan id di luar cakupan pengguna harus
+        // gugur di sini juga supaya tidak ikut dibereskan.
+        $employees = Employee::query()
             ->whereIn('id', $validator->validated()['employee_ids'])
             ->visibleTo($request->user())
-            ->update(['follows_office_hours' => $follows, 'office_pattern_id' => $patternId]);
+            ->get();
+
+        $updated = $employees->count();
+
+        // Satu transaksi: penandaan dan pembersihannya harus jadi atau gagal bersama,
+        // karena setengah jalan berarti orangnya berlabel jam kantor tapi jadwal
+        // lamanya masih menang — persis keadaan yang mau dihilangkan.
+        $cleanup = DB::transaction(function () use ($employees, $follows, $patternId) {
+            Employee::query()
+                ->whereIn('id', $employees->modelKeys())
+                ->update(['follows_office_hours' => $follows, 'office_pattern_id' => $patternId]);
+
+            if (! $follows) {
+                return ['assignments' => 0, 'days' => 0];
+            }
+
+            // Update massal tidak menyentuh model yang sudah di tangan, dan pembersihan
+            // menghitung ulang absensi lewat model itu — dengan atribut basi, resolver
+            // masih mengira orangnya bukan karyawan jam kantor dan mengabaikan polanya.
+            //
+            // Berbeda dari formulir edit, aksi ini tidak melakukan apa pun selain
+            // menekan tombolnya, jadi pembersihan berlaku untuk semua yang dicentang —
+            // termasuk yang sudah bertanda jam kantor tapi masih menyisakan
+            // penjadwalan lama.
+            return $this->officeHours->apply($employees->fresh());
+        });
 
         $pattern = $patternId ? SchedulePattern::query()->find($patternId) : null;
 
         return redirect()
             ->route('employees.index')
             ->with('status', $follows
-                ? "{$updated} karyawan ditandai mengikuti jam kantor (".($pattern ? "pola {$pattern->name}" : 'pola default').').'
+                ? "{$updated} karyawan ditandai mengikuti jam kantor (".($pattern ? "pola {$pattern->name}" : 'pola default').').'.$this->officeHoursCleanupNote($cleanup)
                 : "{$updated} karyawan dikembalikan ke penjadwalan manual.");
     }
 
@@ -846,12 +919,27 @@ class EmployeeManagementController extends Controller
      * Pola yang boleh dipilih untuk karyawan "ikut jam kantor" — didaftarkan di
      * Pengaturan. Dipakai form tambah/ubah karyawan dan panel aksi massal.
      */
-    private function officePatterns()
+    private function officePatterns(?Employee $employee = null)
     {
-        return SchedulePattern::query()->officeCandidates()->orderBy('name')->get(['id', 'name', 'type']);
+        $patterns = SchedulePattern::query()->officeCandidates()->orderBy('name')->get(['id', 'name', 'type']);
+
+        // Pola yang sedang dipakai karyawan ini harus tetap ada di daftar walau sudah
+        // dicabut dari kandidat atau diarsipkan. Tanpa itu pilihannya jatuh ke "ikuti
+        // pola default", dan sekali simpan orangnya pindah pola tanpa diminta.
+        $current = $employee?->office_pattern_id;
+
+        if ($current && ! $patterns->contains('id', $current)) {
+            $missing = SchedulePattern::withTrashed()->find($current, ['id', 'name', 'type', 'deleted_at']);
+
+            if ($missing) {
+                $patterns->push($missing);
+            }
+        }
+
+        return $patterns;
     }
 
-    private function formOptions(): array
+    private function formOptions(?Employee $employee = null): array
     {
         $user = auth()->user();
         $unrestricted = $user->seesAllData(User::SCOPE_BYPASS_EMPLOYEES);
@@ -893,7 +981,7 @@ class EmployeeManagementController extends Controller
             'leaveTypes' => LeaveType::query()->where('is_active', true)->where('counts_against_balance', true)->orderBy('name')->get(),
             'managers' => Employee::query()->active()->visibleTo($user)->orderBy('full_name')->get(['id', 'full_name', 'employee_number']),
             'devices' => Device::query()->with('branch')->orderBy('name')->get(),
-            'officePatterns' => $this->officePatterns(),
+            'officePatterns' => $this->officePatterns($employee),
             'statuses' => Employee::employmentStatusLabels(),
             'exitReasons' => Employee::exitReasonLabels(),
             'contractTypes' => ['PKWT', 'PKWTT', 'Probation', 'Internship'],

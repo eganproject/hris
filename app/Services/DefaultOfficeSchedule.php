@@ -133,8 +133,14 @@ class DefaultOfficeSchedule
         return new EloquentCollection($byDate->values()->all());
     }
 
-    /** The app-wide default pattern id, resolved once per instance. */
-    private function defaultPatternId(): ?int
+    /**
+     * The app-wide default pattern id, resolved once per instance.
+     *
+     * Publik karena halaman "karyawan pada pola ini" perlu tahu apakah pola yang
+     * sedang dibuka kebetulan pola default — kalau ya, karyawan jam kantor yang tidak
+     * menunjuk pola apa pun juga sebenarnya memakainya.
+     */
+    public function defaultPatternId(): ?int
     {
         if (! $this->defaultLoaded) {
             $this->defaultLoaded = true;
@@ -148,7 +154,7 @@ class DefaultOfficeSchedule
     private function pattern(int $id): ?SchedulePattern
     {
         if (! array_key_exists($id, $this->patterns)) {
-            $this->patterns[$id] = SchedulePattern::query()->with('days.shift')->find($id);
+            $this->patterns[$id] = SchedulePattern::withTrashed()->with('days.shift')->find($id);
         }
 
         return $this->patterns[$id];

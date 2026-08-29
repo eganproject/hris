@@ -4,7 +4,9 @@ namespace App\Http\Requests;
 
 use App\Models\Employee;
 use App\Models\EmployeeContract;
+use App\Models\SchedulePattern;
 use App\Models\User;
+use Closure;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
@@ -79,11 +81,7 @@ class EmployeeRequest extends FormRequest
             'follows_office_hours' => ['nullable', 'boolean'],
             // Hanya pola yang didaftarkan sebagai pola jam kantor di Pengaturan yang
             // boleh dipilih. Kosong = ikut pola default global.
-            'office_pattern_id' => [
-                'nullable',
-                'integer',
-                Rule::exists('schedule_patterns', 'id')->where('is_active', true)->where('is_office_pattern', true),
-            ],
+            'office_pattern_id' => ['nullable', 'integer', $this->officePatternRule()],
             'address' => ['nullable', 'string', 'max:1000'],
             'contract_number' => ['required', 'string', 'max:100', Rule::unique('employee_contracts', 'contract_number')->ignore($contractId)],
             'contract_type' => ['required', 'string', Rule::in(['PKWT', 'PKWTT', 'Probation', 'Internship'])],
@@ -118,11 +116,34 @@ class EmployeeRequest extends FormRequest
     /**
      * @return array<string, string>
      */
+    /**
+     * Pola jam kantor yang boleh dipilih: kandidat yang terdaftar di Pengaturan —
+     * ATAU pola yang memang sudah dipakai karyawan ini.
+     *
+     * Pengecualian kedua itu bukan kelonggaran, melainkan keharusan: sebuah pola bisa
+     * dicabut dari daftar kandidat atau diarsipkan setelah orangnya terlanjur
+     * memakainya, dan tanpa ini menyimpan formulirnya sama sekali — bahkan cuma untuk
+     * membetulkan nomor telepon — akan ditolak sampai HR memindahkan orangnya.
+     */
+    private function officePatternRule(): Closure
+    {
+        $current = $this->route('employee')?->office_pattern_id;
+
+        return function (string $attribute, mixed $value, Closure $fail) use ($current): void {
+            if ($current && (int) $value === (int) $current) {
+                return;
+            }
+
+            if (! SchedulePattern::query()->officeCandidates()->whereKey($value)->exists()) {
+                $fail('Pola jam kantor yang dipilih tidak tersedia. Daftarkan dulu polanya di menu Pengaturan.');
+            }
+        };
+    }
+
     public function messages(): array
     {
         return [
             'contract_end_date.required' => 'Tanggal selesai kontrak wajib diisi untuk jenis kontrak selain PKWTT.',
-            'office_pattern_id.exists' => 'Pola jam kantor yang dipilih tidak tersedia. Daftarkan dulu polanya di menu Pengaturan.',
             'contract_document.mimes' => 'Dokumen kontrak harus berupa berkas PDF.',
             'contract_document.max' => 'Ukuran dokumen kontrak maksimal '.EmployeeContract::DOCUMENT_MAX_MB.' MB.',
         ];

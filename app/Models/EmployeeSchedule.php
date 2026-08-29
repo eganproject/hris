@@ -51,7 +51,9 @@ class EmployeeSchedule extends Model
 
     public function shift(): BelongsTo
     {
-        return $this->belongsTo(Shift::class);
+        // Termasuk shift yang sudah diarsipkan — roster yang terlanjur memakainya
+        // harus tetap menampilkan shift itu, bukan sel kosong.
+        return $this->belongsTo(Shift::class)->withTrashed();
     }
 
     public function assignment(): BelongsTo

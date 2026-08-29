@@ -141,7 +141,9 @@ test('admin can manage shift master data', function () {
 
     $this->actingAs($admin)->delete(route('attendance.shifts.destroy', $shift))->assertRedirect(route('attendance.shifts.index'));
 
-    $this->assertDatabaseMissing('shifts', ['code' => 'MLM']);
+    // Menghapus shift berarti mengarsipkannya: barisnya tetap ada supaya absensi dan
+    // roster yang menunjuknya tidak kehilangan shift, dan supaya bisa dipulihkan.
+    $this->assertSoftDeleted('shifts', ['code' => 'MLM']);
 });
 
 test('master data still used by employees cannot be deleted', function () {

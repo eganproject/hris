@@ -193,7 +193,7 @@
                                 <select id="office_pattern_id" name="office_pattern_id" class="mt-2 block w-full rounded-md border border-gray-300 px-3 py-2.5 text-sm shadow-xs outline-none focus:border-primary focus:ring-2 focus:ring-primary/20">
                                     <option value="">Ikuti pola default (Pengaturan)</option>
                                     @foreach ($officePatterns as $officePattern)
-                                        <option value="{{ $officePattern->id }}" @selected((int) old('office_pattern_id', $employee->office_pattern_id) === $officePattern->id)>{{ $officePattern->name }} ({{ $officePattern->type->label() }})</option>
+                                        <option value="{{ $officePattern->id }}" @selected((int) old('office_pattern_id', $employee->office_pattern_id) === $officePattern->id)>{{ $officePattern->name }} ({{ $officePattern->type->label() }}){{ $officePattern->trashed() ? ' — diarsipkan' : '' }}</option>
                                     @endforeach
                                 </select>
                                 <p class="mt-2 text-xs text-gray-500">Mengubah pola ikut mengubah cara absensi karyawan ini dihitung, termasuk pada tanggal yang sudah lewat bila absensinya diproses ulang.</p>

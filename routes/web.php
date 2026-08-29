@@ -233,6 +233,10 @@ Route::middleware('auth')->group(function () {
         Route::get('shifts/{shift}/edit', [ShiftController::class, 'edit'])->middleware('permission:shifts.update')->name('shifts.edit');
         Route::put('shifts/{shift}', [ShiftController::class, 'update'])->middleware('permission:shifts.update')->name('shifts.update');
         Route::delete('shifts/{shift}', [ShiftController::class, 'destroy'])->middleware('permission:shifts.delete')->name('shifts.destroy');
+        // withTrashed(): yang dipulihkan justru baris yang sudah diarsipkan, jadi
+        // pengikatannya harus boleh menemukannya. Haknya disamakan dengan menghapus —
+        // siapa yang boleh mengarsipkan, dia pula yang boleh membatalkannya.
+        Route::post('shifts/{shift}/restore', [ShiftController::class, 'restore'])->withTrashed()->middleware('permission:shifts.delete')->name('shifts.restore');
 
         Route::get('holidays', [HolidayController::class, 'index'])->middleware('permission:holidays.view')->name('holidays.index');
         Route::get('holidays/create', [HolidayController::class, 'create'])->middleware('permission:holidays.create')->name('holidays.create');
@@ -281,9 +285,11 @@ Route::middleware('auth')->group(function () {
         Route::get('schedule-patterns', [SchedulePatternController::class, 'index'])->middleware('permission:schedule-patterns.view')->name('schedule-patterns.index');
         Route::get('schedule-patterns/create', [SchedulePatternController::class, 'create'])->middleware('permission:schedule-patterns.create')->name('schedule-patterns.create');
         Route::post('schedule-patterns', [SchedulePatternController::class, 'store'])->middleware('permission:schedule-patterns.create')->name('schedule-patterns.store');
+        Route::get('schedule-patterns/{schedulePattern}/employees', [SchedulePatternController::class, 'employees'])->withTrashed()->middleware('permission:schedule-patterns.view')->name('schedule-patterns.employees');
         Route::get('schedule-patterns/{schedulePattern}/edit', [SchedulePatternController::class, 'edit'])->middleware('permission:schedule-patterns.update')->name('schedule-patterns.edit');
         Route::put('schedule-patterns/{schedulePattern}', [SchedulePatternController::class, 'update'])->middleware('permission:schedule-patterns.update')->name('schedule-patterns.update');
         Route::delete('schedule-patterns/{schedulePattern}', [SchedulePatternController::class, 'destroy'])->middleware('permission:schedule-patterns.delete')->name('schedule-patterns.destroy');
+        Route::post('schedule-patterns/{schedulePattern}/restore', [SchedulePatternController::class, 'restore'])->withTrashed()->middleware('permission:schedule-patterns.delete')->name('schedule-patterns.restore');
 
         Route::get('schedules', [ScheduleController::class, 'index'])->middleware('permission:schedules.view')->name('schedules.index');
         // Karyawan yang belum pernah ditugaskan pola jadwal. Nama route sengaja di luar

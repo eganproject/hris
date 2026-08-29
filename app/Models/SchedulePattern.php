@@ -8,10 +8,15 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Carbon;
 
 class SchedulePattern extends Model
 {
+    // Diarsipkan, bukan dibuang: menghapus barisnya ikut menyeret seluruh penugasan
+    // karyawan yang memakainya (cascadeOnDelete), dan itu tidak bisa dibatalkan.
+    use SoftDeletes;
+
     /** @var list<string> */
     protected $fillable = [
     'code',

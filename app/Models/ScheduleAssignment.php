@@ -34,7 +34,9 @@ class ScheduleAssignment extends Model
 
     public function pattern(): BelongsTo
     {
-        return $this->belongsTo(SchedulePattern::class, 'schedule_pattern_id');
+        // Mengarsipkan pola tidak boleh mengubah jadwal orang yang sudah memakainya:
+        // tanpa withTrashed(), generator melihat pola null dan meliburkan semua hari.
+        return $this->belongsTo(SchedulePattern::class, 'schedule_pattern_id')->withTrashed();
     }
 
     public function creator(): BelongsTo

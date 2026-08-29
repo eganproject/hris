@@ -2,8 +2,9 @@
 
 namespace App\Http\Requests;
 
+use App\Models\Shift;
+use Closure;
 use Illuminate\Foundation\Http\FormRequest;
-use Illuminate\Validation\Rule;
 
 class ShiftRequest extends FormRequest
 {
@@ -20,7 +21,7 @@ class ShiftRequest extends FormRequest
         $shiftId = $this->route('shift')?->id;
 
         return [
-            'code' => ['required', 'string', 'max:50', Rule::unique('shifts', 'code')->ignore($shiftId)],
+            'code' => ['required', 'string', 'max:50', $this->uniqueCode($shiftId)],
             'name' => ['required', 'string', 'max:255'],
             'start_time' => ['required', 'date_format:H:i'],
             'end_time' => ['required', 'date_format:H:i'],
@@ -31,6 +32,30 @@ class ShiftRequest extends FormRequest
             'overtime_min_minutes' => ['nullable', 'integer', 'min:0', 'max:480'],
             'is_active' => ['sometimes', 'boolean'],
         ];
+    }
+
+    /**
+     * Kode shift unik lintas arsip — indeks uniknya tidak peduli deleted_at, dan itu
+     * memang disengaja supaya memulihkan shift tidak pernah bisa bentrok. Yang perlu
+     * dijaga hanyalah pesannya: tanpa ini pengguna cuma diberi tahu "kode sudah
+     * dipakai" oleh shift yang tidak kelihatan di mana pun.
+     */
+    private function uniqueCode(?int $shiftId): Closure
+    {
+        return function (string $attribute, mixed $value, Closure $fail) use ($shiftId): void {
+            $existing = Shift::withTrashed()
+                ->where('code', $value)
+                ->when($shiftId, fn ($query, $id) => $query->whereKeyNot($id))
+                ->first();
+
+            if (! $existing) {
+                return;
+            }
+
+            $fail($existing->trashed()
+                ? "Kode {$value} masih dipakai shift \"{$existing->name}\" yang ada di arsip. Pulihkan shift itu lewat tab Arsip, atau pakai kode lain."
+                : 'Kode shift sudah digunakan.');
+        };
     }
 
     /**

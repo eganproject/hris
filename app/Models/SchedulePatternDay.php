@@ -30,7 +30,9 @@ class SchedulePatternDay extends Model
 
     public function shift(): BelongsTo
     {
-        return $this->belongsTo(Shift::class);
+        // Lihat EmployeeSchedule::shift(): slot yang menunjuk shift terarsip harus
+        // tetap terbaca generator, bukan berubah jadi hari libur.
+        return $this->belongsTo(Shift::class)->withTrashed();
     }
 
     public function isDayOff(): bool

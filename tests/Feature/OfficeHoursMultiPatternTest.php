@@ -120,19 +120,23 @@ test('a per-employee pattern keeps its own day off', function () {
         ->and($result['shift_id'])->toBeNull();
 });
 
-test('deleting the pattern an employee follows hands them back to the global default', function () {
-    [$defaultShift] = globalOfficeDefault();
-    $cabang = officePatternFor('CAB', officeShiftNamed('SIANG', '13:00', '22:00'));
+test('archiving a pattern leaves the schedule of everyone still on it untouched', function () {
+    globalOfficeDefault();
+    $eveningShift = officeShiftNamed('SIANG', '13:00', '22:00');
+    $cabang = officePatternFor('CAB', $eveningShift);
     $employee = officeHoursEmployee('Cabang', $cabang);
 
+    // Menghapus pola kini berarti mengarsipkannya. Dulu barisnya benar-benar dibuang,
+    // dan FK nullOnDelete diam-diam melempar orang ini ke pola default global —
+    // jadwal DAN absensinya berubah tanpa ada yang memintanya.
     $cabang->delete();
     $employee->refresh();
 
-    expect($employee->office_pattern_id)->toBeNull();
+    expect($employee->office_pattern_id)->toBe($cabang->id);
 
-    $result = app(AttendanceResolver::class)->compute($employee, Carbon::parse(OFFICE_MONDAY), '08:00', '17:00');
+    $result = app(AttendanceResolver::class)->compute($employee, Carbon::parse(OFFICE_MONDAY), '13:00', '22:00');
 
-    expect($result['shift_id'])->toBe($defaultShift->id);
+    expect($result['shift_id'])->toBe($eveningShift->id);
 });
 
 test('a pattern still in use keeps working after it is unregistered as an office pattern', function () {

@@ -4,10 +4,15 @@ namespace App\Models;
 
 use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Carbon;
 
 class Shift extends Model
 {
+    // Diarsipkan, bukan dibuang: absensi dan roster lama menunjuk shift ini dan
+    // kehilangan shift_id-nya kalau barisnya benar-benar hilang (nullOnDelete).
+    use SoftDeletes;
+
     /** @var list<string> */
     protected $fillable = [
     'code',
@@ -117,6 +122,22 @@ class Shift extends Model
         }
 
         return "Mulai +{$this->overtime_starts_after_minutes}m · min {$this->overtime_min_minutes}m";
+    }
+
+    /**
+     * Label untuk pemilih shift. Shift nonaktif atau terarsip hanya muncul di sana
+     * kalau memang sudah dipakai pola yang sedang disunting, jadi keadaannya harus
+     * terbaca — tanpa penanda, pengguna mengira shift itu masih bisa dipilih bebas.
+     */
+    public function getOptionLabelAttribute(): string
+    {
+        $suffix = match (true) {
+            $this->trashed() => ' (arsip)',
+            ! $this->is_active => ' (nonaktif)',
+            default => '',
+        };
+
+        return "{$this->code} — {$this->name}{$suffix}";
     }
 
     public function getTimeRangeLabelAttribute(): string

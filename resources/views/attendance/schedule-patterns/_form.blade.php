@@ -49,7 +49,7 @@
                 <select name="days[{{ $index }}]" @disabled($currentType !== 'fixed_weekly') data-weekly-select class="mt-2 block w-full rounded-md border border-gray-300 px-3 py-2.5 text-sm shadow-xs outline-none focus:border-primary focus:ring-2 focus:ring-primary/20">
                     <option value="">Libur</option>
                     @foreach ($shifts as $shift)
-                        <option value="{{ $shift->id }}" @selected((string) old("days.$index", $dayShift[$index] ?? '') === (string) $shift->id)>{{ $shift->code }} — {{ $shift->name }}</option>
+                        <option value="{{ $shift->id }}" @selected((string) old("days.$index", $dayShift[$index] ?? '') === (string) $shift->id)>{{ $shift->option_label }}</option>
                     @endforeach
                 </select>
                 <label class="mt-2 flex items-center gap-2 text-xs text-gray-600">
@@ -86,7 +86,7 @@
         const typeSelect = document.querySelector('[data-pattern-type]');
         if (!typeSelect) return;
 
-        const shifts = @json($shifts->map(fn ($s) => ['id' => $s->id, 'label' => $s->code.' — '.$s->name])->values());
+        const shifts = @json($shifts->map(fn ($s) => ['id' => $s->id, 'label' => $s->option_label])->values());
         const dayShift = @json((object) $dayShift);
         const dayWfh = @json((object) $dayWfh);
         const oldRotating = @json((object) (old('type') === 'rotating' ? old('days', []) : []));
