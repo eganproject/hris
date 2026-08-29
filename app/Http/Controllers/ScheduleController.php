@@ -338,6 +338,10 @@ class ScheduleController extends Controller
 
         $days = collect(CarbonPeriod::create($from, $to)->toArray());
 
+        // Dihitung SEBELUM sel jam kantor disisipkan: yang bisa dihapus hanyalah baris
+        // yang benar-benar tersimpan, bukan turunan pola yang cuma ada saat dibaca.
+        $storedGenerated = $schedules->reject(fn (EmployeeSchedule $schedule) => $schedule->isManual())->count();
+
         // Karyawan "jam kantor": lengkapi hari tanpa baris jadwal dengan pola jam
         // kantor default supaya bulan tampil terisi, bukan "belum dijadwalkan".
         if ($this->officeSchedule->isConfiguredFor($employee)) {
@@ -366,7 +370,89 @@ class ScheduleController extends Controller
             'month' => $month,
             'prevMonth' => $month->copy()->subMonth()->format('Y-m'),
             'nextMonth' => $month->copy()->addMonth()->format('Y-m'),
+            'storedGenerated' => $storedGenerated,
         ]);
+    }
+
+    /**
+     * Buang jadwal hasil generate milik satu karyawan pada bulan yang sedang dibuka.
+     *
+     * Menghapus pola atau penugasannya tidak pernah menghapus baris yang terlanjur
+     * dibuat — itu disengaja, tapi akibatnya sisa jadwal dari pola yang sudah tidak
+     * ada bisa menetap tanpa satu pun cara membersihkannya. Ini caranya, dengan dua
+     * hal yang tidak ikut terbawa:
+     *
+     *   - override manual, karena itu keputusan orang, bukan hasil pola;
+     *   - hari yang absensinya sudah tercatat, karena baris jadwal itulah dasar
+     *     perhitungannya — mencabutnya membuat hari yang sudah ditutup bisa berubah
+     *     hasilnya begitu diproses ulang.
+     */
+    public function destroyPeriod(Request $request, Employee $employee): RedirectResponse
+    {
+        DataScope::forAttendance($request->user())->authorize($employee);
+
+        $month = MonthInput::resolve($request->input('month'));
+        $range = [$month->copy()->startOfMonth()->toDateString(), $month->copy()->endOfMonth()->toDateString()];
+
+        $rows = $employee->schedules()->whereBetween('work_date', $range)->get(['id', 'work_date', 'source']);
+
+        $recorded = $employee->attendances()
+            ->whereBetween('work_date', $range)
+            ->pluck('work_date')
+            ->map(fn ($date) => Carbon::parse($date)->toDateString())
+            ->all();
+
+        $manual = $rows->filter(fn (EmployeeSchedule $row) => $row->isManual());
+        $locked = $rows->reject(fn (EmployeeSchedule $row) => $row->isManual())
+            ->filter(fn (EmployeeSchedule $row) => in_array($row->work_date->toDateString(), $recorded, true));
+
+        $removable = $rows->reject(fn (EmployeeSchedule $row) => $row->isManual())
+            ->reject(fn (EmployeeSchedule $row) => in_array($row->work_date->toDateString(), $recorded, true));
+
+        if ($removable->isNotEmpty()) {
+            EmployeeSchedule::query()->whereIn('id', $removable->pluck('id'))->delete();
+        }
+
+        return redirect()
+            ->route('attendance.schedules.show', ['employee' => $employee, 'month' => $month->format('Y-m')])
+            ->with('status', $this->periodDeletionSummary($month, $removable->count(), $manual->count(), $locked->count(), $employee, $range));
+    }
+
+    /**
+     * Laporan apa adanya untuk penghapusan jadwal satu periode. Yang dilewati harus
+     * ikut disebut — kalau tidak, pengguna melihat baris yang tersisa dan mengira
+     * penghapusannya gagal separuh jalan.
+     *
+     * @param  array{0: string, 1: string}  $range
+     */
+    private function periodDeletionSummary(Carbon $month, int $deleted, int $manual, int $locked, Employee $employee, array $range): string
+    {
+        $label = $month->translatedFormat('F Y');
+
+        $summary = $deleted > 0
+            ? "{$deleted} hari jadwal {$label} dihapus."
+            : "Tidak ada jadwal {$label} yang bisa dihapus.";
+
+        if ($manual > 0) {
+            $summary .= " {$manual} override manual dipertahankan.";
+        }
+
+        if ($locked > 0) {
+            $summary .= " {$locked} hari dilewati karena absensinya sudah tercatat.";
+        }
+
+        // Penugasan yang masih menutupi bulan ini akan menulis ulang jadwalnya pada
+        // perpanjangan roster harian berikutnya, jadi katakan sekarang — bukan besok
+        // ketika barisnya muncul lagi entah dari mana.
+        $stillAssigned = $employee->scheduleAssignments()
+            ->overlapping(Carbon::parse($range[0]), Carbon::parse($range[1]))
+            ->exists();
+
+        if ($deleted > 0 && $stillAssigned) {
+            $summary .= ' Penugasan polanya masih berlaku pada periode ini, jadi jadwalnya akan terbentuk lagi — hentikan dulu penugasannya bila memang tidak diinginkan.';
+        }
+
+        return $summary;
     }
 
     /**

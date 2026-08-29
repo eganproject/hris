@@ -31,6 +31,18 @@
             <div class="flex flex-wrap items-center gap-2">
                 <a href="{{ route('attendance.schedules.index', ['month' => $month->format('Y-m'), 'branch_id' => $employee->branch_id]) }}" class="rounded-md border border-gray-200 px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50">Kembali ke Roster</a>
                 @can('employees.view')<a href="{{ route('employees.show', $employee) }}" class="rounded-md border border-gray-200 px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50">Profil Karyawan</a>@endcan
+                {{-- Hanya muncul kalau memang ada yang bisa dihapus: tombol yang selalu ada
+                     tapi tidak pernah berbuat apa-apa cuma bikin orang ragu. --}}
+                @can('schedules.delete')
+                    @if ($storedGenerated > 0)
+                        <form method="POST" action="{{ route('attendance.schedules.period.destroy', $employee) }}"
+                            onsubmit="return confirm('Hapus {{ $storedGenerated }} hari jadwal {{ $month->translatedFormat('F Y') }} milik {{ $employee->full_name }}? Override manual dan hari yang absensinya sudah tercatat tidak ikut terhapus.')">
+                            @csrf @method('DELETE')
+                            <input type="hidden" name="month" value="{{ $month->format('Y-m') }}">
+                            <button type="submit" class="inline-flex items-center gap-1.5 rounded-md border border-red-200 px-4 py-2.5 text-sm font-medium text-red-700 transition hover:bg-red-50"><x-icon name="trash"/> Hapus Jadwal Periode Ini</button>
+                        </form>
+                    @endif
+                @endcan
             </div>
         </section>
 

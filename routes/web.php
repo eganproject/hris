@@ -309,6 +309,9 @@ Route::middleware('auth')->group(function () {
         Route::post('schedules/generate', [ScheduleController::class, 'generate'])->middleware('permission:schedules.update')->name('schedules.generate');
         Route::post('schedules/override', [ScheduleController::class, 'override'])->middleware('permission:schedules.update')->name('schedules.override');
         Route::delete('schedules/assignments/{assignment}', [ScheduleController::class, 'destroyAssignment'])->middleware('permission:schedules.delete')->name('schedules.assignments.destroy');
+        // Membersihkan sisa jadwal satu bulan milik satu karyawan — jalan keluar untuk
+        // baris yang terlanjur ter-generate dari pola yang sudah tidak ada lagi.
+        Route::delete('schedules/employees/{employee}/period', [ScheduleController::class, 'destroyPeriod'])->middleware('permission:schedules.delete')->name('schedules.period.destroy');
 
         Route::get('leave', [LeaveController::class, 'index'])->middleware('permission:leave.view')->name('leave.index');
         Route::get('leave/create', [LeaveController::class, 'create'])->middleware('permission:leave.create')->name('leave.create');
