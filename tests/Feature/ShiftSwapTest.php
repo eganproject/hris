@@ -12,10 +12,21 @@ use App\Services\ScheduleGenerator;
 use App\Services\ShiftSwapService;
 use Carbon\CarbonInterface;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Storage;
 use Spatie\Permission\Models\Permission;
 use Spatie\Permission\PermissionRegistrar;
 
 uses(RefreshDatabase::class);
+
+// Bukti gambar kini wajib pada setiap pengajuan, jadi tiap pengiriman di berkas ini
+// membawa satu — dan disknya dipalsukan agar tes tidak menulis berkas sungguhan.
+beforeEach(fn () => Storage::fake(ShiftSwapRequest::ATTACHMENT_DISK));
+
+function swapProof(): UploadedFile
+{
+    return UploadedFile::fake()->image('bukti-kesepakatan.jpg', 800, 600);
+}
 
 /**
  * @return array{0: User, 1: Employee}
@@ -68,6 +79,7 @@ test('an employee submits a shift swap and it awaits the partner', function () {
         'requester_date' => $date,
         'partner_date' => $date,
         'reason' => 'Ada urusan',
+        'attachment' => swapProof(),
     ])->assertRedirect(route('my-schedule.index'));
 
     expect(ShiftSwapRequest::query()->where('requester_id', $me->id)->where('status', 'pending_partner')->count())->toBe(1);
@@ -104,6 +116,7 @@ test('the colleague list and the swap are limited to the same location and divis
         ->post('/my-schedule/swaps', [
             'type' => 'swap', 'partner_id' => $otherDept->id,
             'requester_date' => $date, 'partner_date' => $date,
+            'attachment' => swapProof(),
         ])
         ->assertSessionHasErrors('partner_id');
 
@@ -118,7 +131,7 @@ test('a swap on a day with no shift is rejected at submission', function () {
 
     $this->actingAs($user)
         ->from(route('my-schedule.index'))
-        ->post('/my-schedule/swaps', ['type' => 'cover', 'partner_id' => $partner->id, 'requester_date' => $date])
+        ->post('/my-schedule/swaps', ['type' => 'cover', 'partner_id' => $partner->id, 'requester_date' => $date, 'attachment' => swapProof()])
         ->assertSessionHasErrors('partner_id');
 
     expect(ShiftSwapRequest::query()->count())->toBe(0);
@@ -189,7 +202,7 @@ test('a cross-date swap that would double-book is rejected', function () {
 
     $this->actingAs($user)
         ->from(route('my-schedule.index'))
-        ->post('/my-schedule/swaps', ['type' => 'swap', 'partner_id' => $partner->id, 'requester_date' => $d1, 'partner_date' => $d2])
+        ->post('/my-schedule/swaps', ['type' => 'swap', 'partner_id' => $partner->id, 'requester_date' => $d1, 'partner_date' => $d2, 'attachment' => swapProof()])
         ->assertSessionHasErrors('partner_id');
 });
 

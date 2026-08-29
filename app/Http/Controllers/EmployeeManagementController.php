@@ -19,6 +19,7 @@ use App\Models\SchedulePattern;
 use App\Models\User;
 use App\Services\OfficeHoursTransition;
 use App\Services\PunchIngestionService;
+use App\Support\ActivityLogger;
 use App\Support\ImportErrorStore;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
@@ -885,6 +886,25 @@ class EmployeeManagementController extends Controller
         });
 
         $pattern = $patternId ? SchedulePattern::query()->find($patternId) : null;
+
+        // Mass update tidak memicu event model, jadi aksi massal harus mencatat
+        // dirinya sendiri — kalau tidak, perubahan pada banyak orang sekaligus justru
+        // yang paling tidak berjejak.
+        ActivityLogger::log(
+            'employees',
+            'updated',
+            $follows
+                ? "Menandai {$updated} karyawan mengikuti jam kantor (".($pattern ? "pola {$pattern->name}" : 'pola default').').'.$this->officeHoursCleanupNote($cleanup)
+                : "Mengembalikan {$updated} karyawan ke penjadwalan manual.",
+            null,
+            [
+                'karyawan' => $employees->pluck('full_name')->all(),
+                'ikut_jam_kantor' => $follows,
+                'pola' => $pattern?->name,
+                'penugasan_dihentikan' => $cleanup['assignments'],
+                'hari_jadwal_dibersihkan' => $cleanup['days'],
+            ],
+        );
 
         return redirect()
             ->route('employees.index')

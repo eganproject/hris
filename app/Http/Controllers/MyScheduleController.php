@@ -8,15 +8,39 @@ use App\Models\ShiftSwapRequest;
 use App\Services\ShiftSwapService;
 use App\Support\LeaveCalendar;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
 use Illuminate\View\View;
 
 class MyScheduleController extends Controller
 {
     public function __construct(private readonly ShiftSwapService $swaps) {}
 
-    public function index(): View
+    /** Jumlah baris per halaman pada daftar pengajuan & riwayat. */
+    private const PER_PAGE = 15;
+
+    public function index(Request $request): View
     {
         $employee = $this->employee();
+
+        // Dua tab dari satu daftar yang sama. Sebelumnya panel ini hanya memuat
+        // pengajuan MILIK SENDIRI: begitu seseorang menyetujui atau menolak permintaan
+        // rekannya, permintaan itu lenyap dari layarnya — tidak ada satu pun tempat
+        // untuk memeriksa lagi apa yang pernah ia setujui. Sekarang keduanya masuk,
+        // dibedakan kolom "Peran".
+        $tab = $request->input('tab') === 'riwayat' ? 'riwayat' : 'berjalan';
+
+        $involving = fn () => ShiftSwapRequest::query()->involving($employee->id);
+
+        $swaps = $involving()
+            ->when(
+                $tab === 'riwayat',
+                fn ($query) => $query->whereNotIn('status', ShiftSwapRequest::ACTIVE_STATUSES),
+                fn ($query) => $query->whereIn('status', ShiftSwapRequest::ACTIVE_STATUSES),
+            )
+            ->with(['requester', 'partner', 'reviewer'])
+            ->latest('id')
+            ->paginate(self::PER_PAGE)
+            ->withQueryString();
 
         $windowStart = now()->startOfDay();
         $windowEnd = now()->addDays(14)->startOfDay();
@@ -32,10 +56,10 @@ class MyScheduleController extends Controller
             // Cuti/izin yang menyentuh window 14 hari, dari sumber yang sama dengan
             // halaman "Jadwal Saya" agar hari yang sama tidak tampil berbeda.
             'calendar' => LeaveCalendar::for($employee, $windowStart, $windowEnd),
-            'myRequests' => $employee->swapRequests()
-                ->with(['partner', 'reviewer'])
-                ->latest('id')
-                ->get(),
+            'tab' => $tab,
+            'swaps' => $swaps,
+            'activeCount' => $involving()->whereIn('status', ShiftSwapRequest::ACTIVE_STATUSES)->count(),
+            'historyCount' => $involving()->whereNotIn('status', ShiftSwapRequest::ACTIVE_STATUSES)->count(),
             'pendingForMe' => $employee->swapRequestsAsPartner()
                 ->where('status', ShiftSwapRequest::STATUS_PENDING_PARTNER)
                 ->with('requester')

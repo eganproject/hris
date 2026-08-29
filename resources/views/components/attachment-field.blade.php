@@ -8,6 +8,7 @@
     'mimes' => ['image/jpeg', 'image/png', 'image/webp', 'application/pdf'],
     'typeError' => 'Lampiran harus berupa gambar (JPG, PNG, WEBP) atau PDF.',
     'hint' => null,
+    'required' => false,
     'wrapperClass' => 'sm:col-span-2',
 ])
 
@@ -23,10 +24,12 @@
      kesalahan ketahuan sebelum formulir terkirim. --}}
 <div class="{{ $wrapperClass }}" data-attachment-field data-max-mb="{{ $maxMb }}"
     data-mimes="{{ implode(',', $mimes) }}" data-type-error="{{ $typeError }}">
-    <label for="{{ $id }}" class="block text-sm font-medium text-gray-700">{{ $label }}</label>
+    <label for="{{ $id }}" class="block text-sm font-medium text-gray-700">{{ $label }}
+        @if ($required)<span class="field-requirement is-required">*</span>@endif
+    </label>
 
     <input id="{{ $id }}" name="{{ $name }}" type="file" data-attachment-input
-        accept="{{ $accept }}"
+        accept="{{ $accept }}" @required($required)
         class="mt-2 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-xs file:mr-3 file:rounded file:border-0 file:bg-gray-100 file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-gray-700 outline-none focus:border-primary focus:ring-2 focus:ring-primary/20">
 
     <p class="mt-1 text-xs text-gray-500">{{ $hint }}</p>

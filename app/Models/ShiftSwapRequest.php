@@ -9,13 +9,19 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 class ShiftSwapRequest extends Model
 {
     public const STATUS_PENDING_PARTNER = 'pending_partner';
+
     public const STATUS_PENDING_HR = 'pending_hr';
+
     public const STATUS_APPROVED = 'approved';
+
     public const STATUS_REJECTED = 'rejected';
+
     public const STATUS_CANCELLED = 'cancelled';
 
     public const TYPE_SWAP = 'swap';
+
     public const TYPE_COVER = 'cover';
+
     public const TYPE_DAYOFF = 'dayoff';
 
     /** @var list<string> */
@@ -26,6 +32,10 @@ class ShiftSwapRequest extends Model
         'partner_date',
         'type',
         'reason',
+        'attachment_path',
+        'attachment_name',
+        'attachment_mime',
+        'attachment_size',
         'status',
         'partner_responded_at',
         'reviewed_by',
@@ -40,7 +50,32 @@ class ShiftSwapRequest extends Model
             'partner_date' => 'date',
             'partner_responded_at' => 'datetime',
             'decided_at' => 'datetime',
+            'attachment_size' => 'integer',
         ];
+    }
+
+    /** Disk privat: bukti hanya boleh keluar lewat rute berotorisasi. */
+    public const ATTACHMENT_DISK = 'local';
+
+    /**
+     * Batas ukuran bukti. Satu konstanta dipakai aturan validasi, teks bantuan pada
+     * formulir, dan pemeriksaan di browser — supaya ketiganya tidak pernah menyebut
+     * angka yang berbeda.
+     */
+    public const ATTACHMENT_MAX_MB = 5;
+
+    public function hasAttachment(): bool
+    {
+        return $this->attachment_path !== null;
+    }
+
+    public function attachmentSizeLabel(): string
+    {
+        $bytes = (int) $this->attachment_size;
+
+        return $bytes >= 1048576
+            ? round($bytes / 1048576, 1).' MB'
+            : max(1, (int) round($bytes / 1024)).' KB';
     }
 
     public function requester(): BelongsTo
@@ -71,6 +106,22 @@ class ShiftSwapRequest extends Model
     public function scopePendingHr(Builder $query): void
     {
         $query->where('status', self::STATUS_PENDING_HR);
+    }
+
+    /** Status yang masih menunggu keputusan siapa pun. */
+    public const ACTIVE_STATUSES = [self::STATUS_PENDING_PARTNER, self::STATUS_PENDING_HR];
+
+    public function isSettled(): bool
+    {
+        return ! in_array($this->status, self::ACTIVE_STATUSES, true);
+    }
+
+    /** Pengajuan yang menyangkut karyawan ini, entah sebagai pengaju atau rekan. */
+    public function scopeInvolving(Builder $query, int $employeeId): void
+    {
+        $query->where(fn (Builder $inner) => $inner
+            ->where('requester_id', $employeeId)
+            ->orWhere('partner_id', $employeeId));
     }
 
     public function isCover(): bool

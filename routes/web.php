@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\AccessControlController;
+use App\Http\Controllers\ActivityLogController;
 use App\Http\Controllers\AttendanceController;
 use App\Http\Controllers\AttendanceCorrectionController;
 use App\Http\Controllers\AttendanceMapController;
@@ -37,6 +38,7 @@ use App\Http\Controllers\SchedulePatternController;
 use App\Http\Controllers\SearchController;
 use App\Http\Controllers\SettingsController;
 use App\Http\Controllers\ShiftController;
+use App\Http\Controllers\ShiftSwapAttachmentController;
 use App\Http\Controllers\ShiftSwapController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
@@ -79,6 +81,11 @@ Route::middleware('auth')->group(function () {
     Route::get('search', SearchController::class)->middleware('permission:employees.view')->name('search');
 
     // App settings (HR/admin toggles).
+    // Jejak aktivitas pengguna: hanya bisa dibaca, tidak pernah bisa disunting atau
+    // dihapus lewat antarmuka — sebuah catatan audit yang bisa dirapikan pelakunya
+    // sendiri tidak ada gunanya. Pemangkasan lama dilakukan perintah activity:prune.
+    Route::get('activity', [ActivityLogController::class, 'index'])->middleware('permission:activity.view')->name('activity.index');
+
     Route::get('settings', [SettingsController::class, 'index'])->middleware('permission:settings.view')->name('settings.index');
     Route::put('settings', [SettingsController::class, 'update'])->middleware('permission:settings.update')->name('settings.update');
 
@@ -340,6 +347,11 @@ Route::middleware('auth')->group(function () {
     // atasannya belum tentu punya leave.view, jadi siapa yang boleh melihat diperiksa
     // di dalam controller.
     Route::get('leave-attachments/{leaveRequest}', LeaveAttachmentController::class)->name('leave.attachment');
+
+    // Bukti gambar pengajuan tukar jadwal. Sama alasannya: pengaju dan rekan yang
+    // dimintai persetujuan belum tentu punya swaps.view, jadi siapa yang boleh
+    // melihat diperiksa di dalam controller.
+    Route::get('swap-attachments/{swap}', ShiftSwapAttachmentController::class)->name('swaps.attachment');
 
     // Foto selfie absensi. Sama seperti lampiran cuti: berkasnya privat, dan siapa yang
     // boleh melihat diperiksa di dalam controller (karyawannya sendiri atau petugas

@@ -28,6 +28,16 @@ class StoreShiftSwapRequest extends FormRequest
             'requester_date' => ['required', 'date'],
             'partner_date' => ['nullable', 'required_unless:type,'.ShiftSwapRequest::TYPE_COVER, 'date'],
             'reason' => ['nullable', 'string', 'max:1000'],
+            // Wajib: pengajuan tukar jadwal mengubah siapa yang bertanggung jawab pada
+            // suatu hari kerja, dan rekan maupun HR memutuskannya tanpa bertemu orangnya
+            // — bukti kesepakatannya harus ikut, bukan opsional.
+            'attachment' => [
+                'required',
+                'file',
+                'image',
+                'mimes:jpg,jpeg,png,webp',
+                'max:'.(ShiftSwapRequest::ATTACHMENT_MAX_MB * 1024),
+            ],
         ];
     }
 
@@ -61,12 +71,26 @@ class StoreShiftSwapRequest extends FormRequest
         ];
     }
 
+    /**
+     * @return array<string, string>
+     */
+    public function messages(): array
+    {
+        return [
+            'attachment.required' => 'Bukti gambar wajib dilampirkan, misalnya tangkapan layar kesepakatan dengan rekan.',
+            'attachment.image' => 'Bukti harus berupa gambar (JPG, PNG, atau WEBP).',
+            'attachment.mimes' => 'Bukti harus berupa gambar (JPG, PNG, atau WEBP).',
+            'attachment.max' => 'Ukuran bukti maksimal '.ShiftSwapRequest::ATTACHMENT_MAX_MB.' MB.',
+        ];
+    }
+
     public function attributes(): array
     {
         return [
             'partner_id' => 'rekan',
             'requester_date' => 'tanggal Anda',
             'partner_date' => 'tanggal rekan',
+            'attachment' => 'bukti',
         ];
     }
 }

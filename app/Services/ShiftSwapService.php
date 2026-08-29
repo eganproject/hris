@@ -7,6 +7,7 @@ use App\Models\EmployeeSchedule;
 use App\Models\ShiftSwapRequest;
 use App\Support\ApprovalNotifier;
 use Carbon\CarbonInterface;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -116,12 +117,33 @@ class ShiftSwapService
             'partner_date' => $data['type'] === ShiftSwapRequest::TYPE_COVER ? null : ($data['partner_date'] ?? null),
             'type' => $data['type'],
             'reason' => $data['reason'] ?? null,
+            ...$this->attachmentColumns($requester, $data['attachment'] ?? null),
             'status' => ShiftSwapRequest::STATUS_PENDING_PARTNER,
         ]);
 
         app(ApprovalNotifier::class)->swapRequested($request);
 
         return $request;
+    }
+
+    /**
+     * Kolom berkas bukti. Disimpan di disk privat dan dikelompokkan per karyawan,
+     * sama seperti lampiran cuti.
+     *
+     * @return array<string, mixed>
+     */
+    private function attachmentColumns(Employee $requester, ?UploadedFile $attachment): array
+    {
+        if (! $attachment) {
+            return [];
+        }
+
+        return [
+            'attachment_path' => $attachment->store("swap-attachments/{$requester->id}", ShiftSwapRequest::ATTACHMENT_DISK),
+            'attachment_name' => $attachment->getClientOriginalName(),
+            'attachment_mime' => $attachment->getClientMimeType(),
+            'attachment_size' => $attachment->getSize(),
+        ];
     }
 
     public function partnerRespond(ShiftSwapRequest $request, bool $accept): void

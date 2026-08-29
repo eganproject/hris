@@ -20,6 +20,7 @@ use App\Models\Shift;
 use App\Models\User;
 use App\Services\DefaultOfficeSchedule;
 use App\Services\ScheduleGenerator;
+use App\Support\ActivityLogger;
 use App\Support\DataScope;
 use App\Support\ImportErrorStore;
 use App\Support\MonthInput;
@@ -413,9 +414,19 @@ class ScheduleController extends Controller
             EmployeeSchedule::query()->whereIn('id', $removable->pluck('id'))->delete();
         }
 
+        $summary = $this->periodDeletionSummary($month, $removable->count(), $manual->count(), $locked->count(), $employee, $range);
+
+        ActivityLogger::log(
+            'schedules',
+            'deleted',
+            "Menghapus jadwal {$month->translatedFormat('F Y')} milik {$employee->full_name}: {$summary}",
+            $employee,
+            ['bulan' => $month->format('Y-m'), 'hari_dihapus' => $removable->count(), 'dilewati' => $locked->count()],
+        );
+
         return redirect()
             ->route('attendance.schedules.show', ['employee' => $employee, 'month' => $month->format('Y-m')])
-            ->with('status', $this->periodDeletionSummary($month, $removable->count(), $manual->count(), $locked->count(), $employee, $range));
+            ->with('status', $summary);
     }
 
     /**
@@ -649,6 +660,14 @@ class ScheduleController extends Controller
             $employees->count(),
         );
 
+        // Ribuan baris jadwal ditulis sekaligus di sini; yang dicatat tindakannya,
+        // bukan tiap barisnya (lihat ActivityObserver).
+        ActivityLogger::log('schedules', 'generated', $status, null, [
+            'bulan' => $month->format('Y-m'),
+            'hari_ditulis' => $days,
+            'karyawan' => $employees->count(),
+        ]);
+
         if ($request->expectsJson()) {
             return response()->json(['status' => $status, 'days' => $days]);
         }
@@ -727,7 +746,18 @@ class ScheduleController extends Controller
         $month = MonthInput::resolve($request->input('month'));
         $scope = DataScope::forAttendance($request->user());
 
+        // Atasan mengisi jadwal timnya sendiri, jadi templatenya cukup berisi anak
+        // buahnya — bukan seluruh lokasi. Penyaringnya hanya berlaku bila pengunduhnya
+        // memang punya bawahan: akun HR pusat dan superadmin tidak punya siapa-siapa
+        // di bawahnya, dan menyaringnya akan memberi mereka file kosong.
+        //
+        // Yang disaring HANYA isi template ini. Pemeriksaan cakupan saat file-nya
+        // diunggah kembali tidak disentuh (lihat ScheduleMatrixImport) — memperketat
+        // keduanya sekaligus akan menolak baris yang selama ini sah.
+        $subordinateIds = $request->user()->subordinateEmployeeIds();
+
         $employees = $this->filtered($scope->employees()->active(), $request)
+            ->when($subordinateIds !== [], fn (Builder $query) => $query->whereIn('id', $subordinateIds))
             ->orderBy('full_name')
             ->get();
 

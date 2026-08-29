@@ -77,7 +77,11 @@
                                         @endif
                                     </td>
                                 @endif
-                                <td class="text-sm text-gray-800">{{ $req->type_label }}@if ($req->reason)<p class="mt-0.5 max-w-[16rem] truncate text-xs text-gray-500" title="{{ $req->reason }}">{{ $req->reason }}</p>@endif</td>
+                                <td class="text-sm text-gray-800">
+                                    {{ $req->type_label }}
+                                    @if ($req->reason)<p class="mt-0.5 max-w-[16rem] truncate text-xs text-gray-500" title="{{ $req->reason }}">{{ $req->reason }}</p>@endif
+                                    <x-swap-attachment :swap="$req" class="mt-1 flex" />
+                                </td>
                                 <td class="text-sm text-gray-700">{{ $req->requester?->full_name }}</td>
                                 <td class="text-sm text-gray-700">{{ $req->partner?->full_name }}</td>
                                 <td class="text-sm text-gray-600">{{ $req->requester_date->translatedFormat('d M') }}@if ($req->partner_date) ⇄ {{ $req->partner_date->translatedFormat('d M') }}@endif</td>

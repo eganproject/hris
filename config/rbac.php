@@ -67,6 +67,10 @@ return [
             'dashboard' => ['label' => 'Dashboard', 'actions' => ['view']],
             'settings' => ['label' => 'Pengaturan', 'actions' => ['view', 'update']],
             'access-control' => ['label' => 'Kontrol Akses', 'actions' => ['view', 'update']],
+            // Sengaja tidak diberikan ke hr-manager secara bawaan: jejak audit ikut
+            // memuat tindakan HR sendiri, jadi siapa yang boleh membacanya adalah
+            // keputusan sadar lewat Kontrol Akses, bukan bawaan peran.
+            'activity' => ['label' => 'Aktivitas Pengguna', 'actions' => ['view']],
         ],
 
         'Self-service' => [

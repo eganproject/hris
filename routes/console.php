@@ -26,6 +26,10 @@ Schedule::command('contracts:notify-expiring')->dailyAt('06:00');
 // Deteksi mesin absensi yang offline dan beri tahu HR (sekali per gangguan).
 Schedule::command('devices:notify-offline')->everyFifteenMinutes();
 
+// Pangkas jejak aktivitas pengguna; tabel ini tumbuh pada hampir setiap tindakan
+// dan tidak pernah menyusut sendiri.
+Schedule::command('activity:prune')->monthlyOn(1, '02:10');
+
 // Pangkas log komunikasi mesin agar tabel tetap ramping (simpan 14 hari terakhir).
 Schedule::call(function () {
     DeviceCommunication::query()->where('created_at', '<', now()->subDays(14))->delete();

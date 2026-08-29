@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\SchedulePattern;
 use App\Models\Setting;
 use App\Services\DefaultOfficeSchedule;
+use App\Support\ActivityLogger;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -46,11 +47,33 @@ class SettingsController extends Controller
             'default_office_pattern_id' => 'pola default',
         ]);
 
+        // Keadaan sebelum disimpan, supaya catatan aktivitasnya bisa menyebut
+        // perubahannya — bukan sekadar "pengaturan disimpan".
+        $before = [
+            'autogenerate' => Setting::getBool('roster_autogenerate', true),
+            'patterns' => SchedulePattern::query()->where('is_office_pattern', true)->pluck('id')->all(),
+            'default' => (int) Setting::get(DefaultOfficeSchedule::SETTING_KEY) ?: null,
+        ];
+
         Setting::set('roster_autogenerate', $request->boolean('roster_autogenerate') ? '1' : '0');
 
         $this->syncOfficePatterns(array_map('intval', $validated['office_pattern_ids'] ?? []));
 
         Setting::set(DefaultOfficeSchedule::SETTING_KEY, (string) ($request->integer('default_office_pattern_id') ?: ''));
+
+        // Setting ditulis lewat Setting::set() dan pola dicentang lewat mass update;
+        // keduanya tidak memicu event Eloquent, jadi dicatat di sini secara eksplisit.
+        ActivityLogger::log(
+            'settings',
+            'updated',
+            'Menyimpan Pengaturan aplikasi.',
+            null,
+            ['changes' => [
+                'roster_autogenerate' => ['dari' => $before['autogenerate'], 'jadi' => $request->boolean('roster_autogenerate')],
+                'pola_jam_kantor' => ['dari' => implode(', ', $before['patterns']) ?: '(kosong)', 'jadi' => implode(', ', array_map('intval', $validated['office_pattern_ids'] ?? [])) ?: '(kosong)'],
+                'pola_default' => ['dari' => $before['default'] ?: '(kosong)', 'jadi' => $request->integer('default_office_pattern_id') ?: '(kosong)'],
+            ]],
+        );
 
         return back()->with('status', 'Pengaturan berhasil disimpan.');
     }

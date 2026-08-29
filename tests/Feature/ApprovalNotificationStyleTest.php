@@ -8,10 +8,16 @@ use App\Models\Shift;
 use App\Models\ShiftSwapRequest;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Storage;
 use Spatie\Permission\Models\Permission;
 use Spatie\Permission\PermissionRegistrar;
 
 uses(RefreshDatabase::class);
+
+// Bukti gambar tukar jadwal kini wajib dan tersimpan ke disk; disknya dipalsukan
+// agar tes tidak menulis berkas sungguhan.
+beforeEach(fn () => Storage::fake(ShiftSwapRequest::ATTACHMENT_DISK));
 
 /**
  * Karyawan + atasan (keduanya punya akun login) + satu HR yang boleh memutuskan
@@ -185,6 +191,7 @@ test('swap notifications carry the dates, the type and who decided', function ()
         'requester_date' => $date->toDateString(),
         'type' => ShiftSwapRequest::TYPE_COVER,
         'reason' => 'Ada acara keluarga.',
+        'attachment' => UploadedFile::fake()->image('bukti.jpg'),
     ])->assertRedirect('/my-schedule');
 
     $swap = ShiftSwapRequest::query()->firstOrFail();
@@ -235,6 +242,7 @@ test('cancelling a swap tells the partner it is off', function () {
         'requester_date' => $date->toDateString(),
         'type' => ShiftSwapRequest::TYPE_COVER,
         'reason' => 'Berubah rencana.',
+        'attachment' => UploadedFile::fake()->image('bukti.jpg'),
     ])->assertRedirect('/my-schedule');
 
     $swap = ShiftSwapRequest::query()->firstOrFail();
