@@ -215,18 +215,41 @@
                                 <input type="checkbox" name="limit_to_subordinates" value="1" @checked($user->isLimitedToSubordinates()) class="mt-0.5 size-3.5 rounded border-gray-300 text-primary focus:ring-primary">
                                 <span>Batasi ke bawahan saja <span class="block text-gray-400">Hanya melihat karyawan di bawah garis atasannya (mengabaikan lokasi/divisi di atas).</span></span>
                             </label>
-                            <label class="mt-2 flex items-start gap-2 text-xs text-gray-600">
-                                <input type="checkbox" name="bypass_team_scope" value="1" @checked($user->bypassesTeamScope()) @disabled($user->isSuperAdmin()) class="mt-0.5 size-3.5 rounded border-gray-300 text-primary focus:ring-primary disabled:opacity-50">
-                                <span>Lihat semua karyawan di Absensi Harian &amp; Jadwal Kerja
-                                    <span class="block text-gray-400">
-                                        @if ($user->isSuperAdmin())
-                                            Superadmin selalu melihat semua, tidak bisa dicabut.
-                                        @else
-                                            Tanpa ini, kedua halaman itu hanya menampilkan bawahannya di struktur organisasi.
-                                        @endif
-                                    </span>
-                                </span>
-                            </label>
+                            {{-- Cakupan khusus untuk dua halaman yang dipersempit ke garis
+                                 atasan. Ditulis sebagai pilihan, bukan satu centang: dulu
+                                 centangnya berbunyi "lihat semua karyawan", padahal yang
+                                 sebenarnya terjadi adalah kembali memakai daftar lokasi &
+                                 divisi di kartu ini — dan itu berarti "semua" hanya bagi
+                                 pemegang izin lihat-semua-data. --}}
+                            <div class="mt-3 rounded-md border border-gray-200 bg-gray-50 p-2.5">
+                                <p class="text-xs font-medium text-gray-700">Cakupan di Absensi Harian &amp; Jadwal Kerja</p>
+
+                                @if ($user->isSuperAdmin())
+                                    <p class="mt-1.5 text-xs text-gray-500">Superadmin selalu melihat seluruh karyawan; tidak bisa dibatasi.</p>
+                                    <input type="hidden" name="bypass_team_scope" value="1">
+                                @else
+                                    <label class="mt-2 flex items-start gap-2 text-xs text-gray-600">
+                                        <input type="radio" name="bypass_team_scope" value="0" @checked(! $user->bypass_team_scope) class="mt-0.5 size-3.5 border-gray-300 text-primary focus:ring-primary">
+                                        <span>Bawahan saja
+                                            <span class="block text-gray-400">Hanya karyawan di bawah garis atasannya, berapa pun tingkatnya.</span>
+                                        </span>
+                                    </label>
+                                    <label class="mt-2 flex items-start gap-2 text-xs text-gray-600">
+                                        <input type="radio" name="bypass_team_scope" value="1" @checked($user->bypass_team_scope) class="mt-0.5 size-3.5 border-gray-300 text-primary focus:ring-primary">
+                                        <span>Sesuai lokasi &amp; divisi di kartu ini
+                                            <span class="block text-gray-400">
+                                                @if ($seesAllAttendance)
+                                                    Akun ini memegang izin lihat semua data, jadi pilihan ini berarti seluruh karyawan.
+                                                @elseif ($selectedDepartments === [] && $selectedBranches === [])
+                                                    Belum ada lokasi/divisi yang dicentang — pilih dulu di sebelah kanan, kalau tidak akun ini tidak melihat siapa pun.
+                                                @else
+                                                    Semua karyawan pada {{ $selectedDepartments !== [] ? 'divisi '.$user->accessDepartments->pluck('name')->join(', ') : 'seluruh divisi' }}{{ $selectedBranches !== [] ? ' di '.$user->accessBranches->pluck('name')->join(', ') : '' }}.
+                                                @endif
+                                            </span>
+                                        </span>
+                                    </label>
+                                @endif
+                            </div>
                         </div>
                         <div>
                             <p class="text-xs font-medium text-gray-700">Role</p>

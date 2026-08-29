@@ -237,3 +237,99 @@ test('a supervisor with a team but no branch scope is not told to ask for one', 
         ->assertSee('Novia Ridwan')
         ->assertDontSee('Cakupan akses Anda belum diatur');
 });
+
+test('a user without the org-wide permission can be scoped to one division', function () {
+    app(PermissionRegistrar::class)->forgetCachedPermissions();
+
+    // Sengaja TANPA attendance.view.all: yang menentukan cakupannya hanyalah daftar
+    // lokasi & divisi pada kartu Kontrol Akses.
+    $permissions = ['schedules.view', 'attendance-daily.view'];
+
+    foreach ($permissions as $permission) {
+        Permission::findOrCreate($permission, 'web');
+    }
+
+    $user = User::factory()->create();
+    $user->givePermissionTo($permissions);
+    $user->forceFill(['bypass_team_scope' => true])->save();
+
+    $branch = Branch::query()->create(['code' => 'PTJ', 'name' => 'Petojo', 'type' => 'office', 'is_active' => true]);
+    $automotive = Department::query()->create(['code' => 'AUT', 'name' => 'Automotive', 'is_active' => true]);
+    $logistik = Department::query()->create(['code' => 'LOG', 'name' => 'Logistik', 'is_active' => true]);
+
+    $user->accessBranches()->sync([$branch->id]);
+    $user->accessDepartments()->sync([$automotive->id]);
+
+    Employee::query()->create(['branch_id' => $branch->id, 'department_id' => $automotive->id, 'full_name' => 'Novia Automotive', 'employment_status' => 'active']);
+    Employee::query()->create(['branch_id' => $branch->id, 'department_id' => $logistik->id, 'full_name' => 'Budi Logistik', 'employment_status' => 'active']);
+
+    foreach (['/attendance/daily', '/attendance/schedules'] as $url) {
+        $this->actingAs($user)->get($url)
+            ->assertOk()
+            ->assertSee('Novia Automotive')
+            ->assertDontSee('Budi Logistik');
+    }
+});
+
+test('Kontrol Akses states the real effect of each scope choice', function () {
+    app(PermissionRegistrar::class)->forgetCachedPermissions();
+
+    foreach (['access-control.view', 'access-control.update'] as $permission) {
+        Permission::findOrCreate($permission, 'web');
+    }
+
+    $admin = User::factory()->create();
+    $admin->givePermissionTo(['access-control.view', 'access-control.update']);
+
+    $target = teamUser();
+    $automotive = Department::query()->create(['code' => 'AUT', 'name' => 'Automotive', 'is_active' => true]);
+    $target->accessDepartments()->sync([$automotive->id]);
+
+    // Pilihannya harus menyebut divisi yang benar-benar akan berlaku, bukan sekadar
+    // "lihat semua" — kalimat itulah yang dulu menyesatkan.
+    $this->actingAs($admin)->get(route('access-control.index'))
+        ->assertOk()
+        ->assertSee('Cakupan di Absensi Harian &amp; Jadwal Kerja', false)
+        ->assertSee('Bawahan saja')
+        ->assertSee('Sesuai lokasi &amp; divisi di kartu ini', false);
+});
+
+test('choosing the division scope is saved and takes effect', function () {
+    app(PermissionRegistrar::class)->forgetCachedPermissions();
+
+    foreach (['access-control.view', 'access-control.update'] as $permission) {
+        Permission::findOrCreate($permission, 'web');
+    }
+
+    $admin = User::factory()->create();
+    $admin->givePermissionTo(['access-control.view', 'access-control.update']);
+
+    // Tanpa izin lihat-semua-data: justru bagi akun seperti inilah daftar divisi
+    // menentukan apa yang terlihat.
+    foreach (['schedules.view'] as $permission) {
+        Permission::findOrCreate($permission, 'web');
+    }
+
+    $target = User::factory()->create();
+    $target->givePermissionTo(['schedules.view']);
+
+    $automotive = Department::query()->create(['code' => 'AUT', 'name' => 'Automotive', 'is_active' => true]);
+    $logistik = Department::query()->create(['code' => 'LOG', 'name' => 'Logistik', 'is_active' => true]);
+
+    Employee::query()->create(['department_id' => $automotive->id, 'full_name' => 'Novia Automotive', 'employment_status' => 'active']);
+    Employee::query()->create(['department_id' => $logistik->id, 'full_name' => 'Budi Logistik', 'employment_status' => 'active']);
+
+    $this->actingAs($admin)
+        ->put(route('access-control.user-scope.update', $target), [
+            'bypass_team_scope' => '1',
+            'departments' => [$automotive->id],
+        ])
+        ->assertRedirect();
+
+    expect($target->fresh()->bypass_team_scope)->toBeTrue();
+
+    $this->actingAs($target->fresh())->get('/attendance/schedules')
+        ->assertOk()
+        ->assertSee('Novia Automotive')
+        ->assertDontSee('Budi Logistik');
+});
