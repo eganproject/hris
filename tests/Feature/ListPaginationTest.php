@@ -152,7 +152,7 @@ test('the overtime list paginates while its totals stay across the whole month',
 
 test('the map is deliberately not paginated because a partial map is a wrong map', function () {
     $date = '2026-06-15';
-    $user = viewerWith('attendance-daily.view');
+    $user = viewerWith('attendance-map.view');
 
     // Peta dibatasi satu tanggal dan hanya pekerja jarak jauh, jadi jumlahnya kecil.
     // Memaginasinya akan menyembunyikan sebagian titik tanpa petunjuk apa pun.

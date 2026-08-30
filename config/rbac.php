@@ -30,6 +30,10 @@ return [
 
         'Absensi' => [
             'attendance-daily' => ['label' => 'Absensi Harian', 'actions' => ['view', 'update']],
+            // Berdiri sendiri: peta memuat titik koordinat absen mandiri (rumah, lokasi
+            // dinas) — data yang lebih sensitif daripada jam masuk-pulang di papan
+            // harian, jadi siapa yang boleh membukanya diputuskan terpisah.
+            'attendance-map' => ['label' => 'Peta Absen Mandiri', 'actions' => ['view']],
             'punches' => ['label' => 'Log Punch', 'actions' => ['view', 'update']],
             'corrections' => ['label' => 'Koreksi Absensi', 'actions' => ['view', 'update']],
             'overtime' => ['label' => 'Lembur (rekap HR)', 'actions' => ['view']],
@@ -114,6 +118,7 @@ return [
             'dashboard.view',
             'employees.view', 'employees.create', 'employees.update', 'employees.delete', 'employees.export', 'employees.import',
             'attendance-daily.view', 'attendance-daily.update',
+            'attendance-map.view',
             'punches.view', 'punches.update',
             'corrections.view', 'corrections.update',
             'overtime.view',

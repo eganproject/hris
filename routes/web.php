@@ -268,8 +268,9 @@ Route::middleware('auth')->group(function () {
         Route::post('punches/{punch}/ignore', [PunchController::class, 'ignore'])->middleware('permission:punches.update')->name('punches.ignore');
 
         Route::get('daily', [AttendanceController::class, 'index'])->middleware('permission:attendance-daily.view')->name('daily.index');
-        // Peta absen mandiri (WFH & dinas luar); memakai izin yang sama dengan papan harian.
-        Route::get('map', [AttendanceMapController::class, 'index'])->middleware('permission:attendance-daily.view')->name('map');
+        // Peta absen mandiri (WFH & dinas luar); izinnya terpisah dari papan harian
+        // karena yang ditampilkan adalah koordinat lokasi karyawan.
+        Route::get('map', [AttendanceMapController::class, 'index'])->middleware('permission:attendance-map.view')->name('map');
         Route::get('daily/{employee}/history', [AttendanceController::class, 'history'])->middleware('permission:attendance-daily.view')->name('daily.history');
         Route::post('daily/process', [AttendanceController::class, 'process'])->middleware('permission:attendance-daily.update')->name('daily.process');
         Route::post('daily/punch', [AttendanceController::class, 'storePunch'])->middleware('permission:attendance-daily.update')->name('daily.punch');

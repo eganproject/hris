@@ -18,17 +18,16 @@ use Spatie\Permission\PermissionRegistrar;
 uses(RefreshDatabase::class);
 
 /**
- * Seorang HR yang boleh melihat papan harian (dan karenanya juga peta), tanpa batas
- * cakupan lokasi/divisi.
+ * Seorang HR yang boleh membuka peta, tanpa batas cakupan lokasi/divisi.
  */
 function mapViewer(): User
 {
     app(PermissionRegistrar::class)->forgetCachedPermissions();
-    Permission::findOrCreate('attendance-daily.view', 'web');
+    Permission::findOrCreate('attendance-map.view', 'web');
     Permission::findOrCreate(User::SCOPE_BYPASS_ATTENDANCE, 'web');
 
     $user = User::factory()->create();
-    $user->givePermissionTo(['attendance-daily.view', User::SCOPE_BYPASS_ATTENDANCE]);
+    $user->givePermissionTo(['attendance-map.view', User::SCOPE_BYPASS_ATTENDANCE]);
     // Absensi Harian & Jadwal Kerja dipersempit ke bawahan; pengguna ini
     // mewakili HR/administrator yang dikecualikan lewat Kontrol Akses.
     $user->forceFill(['bypass_team_scope' => true])->save();
@@ -139,9 +138,9 @@ test('the map obeys the data scope, so a branch HR sees only their own branch', 
     $other = Branch::query()->create(['code' => 'SBY', 'name' => 'Surabaya', 'is_active' => true]);
 
     app(PermissionRegistrar::class)->forgetCachedPermissions();
-    Permission::findOrCreate('attendance-daily.view', 'web');
+    Permission::findOrCreate('attendance-map.view', 'web');
     $user = User::factory()->create();
-    $user->givePermissionTo('attendance-daily.view');
+    $user->givePermissionTo('attendance-map.view');
     // Absensi Harian & Jadwal Kerja dipersempit ke bawahan; pengguna ini
     // mewakili HR/administrator yang dikecualikan lewat Kontrol Akses.
     $user->forceFill(['bypass_team_scope' => true])->save();
@@ -165,9 +164,9 @@ test('the map obeys the data scope, so a branch HR sees only their own branch', 
         ->and($points[0]['name'])->toBe('Orang Bandung');
 });
 
-test('the map is closed to users without the daily attendance permission', function () {
+test('the map is closed to users without the map permission', function () {
     app(PermissionRegistrar::class)->forgetCachedPermissions();
-    Permission::findOrCreate('attendance-daily.view', 'web');
+    Permission::findOrCreate('attendance-map.view', 'web');
 
     $this->actingAs(User::factory()->create())->get('/attendance/map')->assertForbidden();
 });
