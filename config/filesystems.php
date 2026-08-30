@@ -41,7 +41,13 @@ return [
         'public' => [
             'driver' => 'local',
             'root' => storage_path('app/public'),
-            'url' => rtrim(env('APP_URL', 'http://localhost'), '/').'/storage',
+            // Sengaja relatif terhadap root, bukan dibangun dari APP_URL. URL absolut
+            // memakukan foto ke satu alamat: begitu situsnya dibuka lewat host, port,
+            // atau skema yang berbeda dari APP_URL — https vs http adalah kasus yang
+            // paling sering — setiap <img> menunjuk ke tempat lain dan gambarnya tidak
+            // muncul, padahal berkasnya ada dan bisa dilayani. Sisa aset memakai
+            // asset(), yang mengikuti host permintaan; ini menyamakan perilakunya.
+            'url' => '/storage',
             'visibility' => 'public',
             'throw' => false,
             'report' => false,
