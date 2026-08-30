@@ -212,7 +212,7 @@ class ScheduleController extends Controller
      */
     public function unscheduled(Request $request): View
     {
-        $scope = DataScope::forAttendance($request->user());
+        $scope = DataScope::forTeam($request->user());
         $perPage = min(max((int) $request->input('per_page', 25), 10), 100);
         $mode = $this->unscheduledMode($request);
         $month = MonthInput::resolve($request->input('month'));
@@ -247,6 +247,7 @@ class ScheduleController extends Controller
             ],
             'perPage' => $perPage,
             'hasNoScope' => $scope->isEmpty(),
+            'hasNoTeam' => $scope->hasNoTeam(),
             // Feeds the bulk-assign bar: only patterns this user is allowed to use.
             'patterns' => SchedulePattern::query()->visibleTo($request->user())->where('is_active', true)->orderBy('name')->get(),
             'defaultStart' => $mode === 'no_schedule' ? $from->toDateString() : now()->startOfMonth()->toDateString(),
@@ -504,7 +505,7 @@ class ScheduleController extends Controller
 
     public function create(Request $request): View
     {
-        $scope = DataScope::forAttendance($request->user());
+        $scope = DataScope::forTeam($request->user());
 
         // The picker shows each employee's still-running/upcoming assignments so the
         // user can see which periods are already taken before choosing new dates.
@@ -536,6 +537,8 @@ class ScheduleController extends Controller
             'branches' => $scope->branches(),
             'departments' => $scope->departments(),
             'jobPositions' => JobPosition::query()->where('is_active', true)->orderBy('name')->get(),
+            'hasNoScope' => $scope->isEmpty(),
+            'hasNoTeam' => $scope->hasNoTeam(),
         ]);
     }
 
@@ -593,7 +596,7 @@ class ScheduleController extends Controller
         $days = 0;
         $employees = 0;
         $employeeIds = [];
-        $scope = DataScope::forAttendance($request->user());
+        $scope = DataScope::forTeam($request->user());
 
         // Hanya boleh menugaskan pola milik sendiri (kecuali pemegang attendance.view.all).
         abort_unless(

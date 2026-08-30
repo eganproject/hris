@@ -8,6 +8,8 @@
             <a href="{{ route('attendance.schedules.index') }}" class="rounded-md border border-gray-200 px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50">Kembali</a>
         </div>
 
+        <x-scope-notice :has-no-scope="$hasNoScope" :has-no-team="$hasNoTeam"/>
+
         @if ($patterns->isEmpty())
             <div class="rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
                 Belum ada pola jadwal aktif. <a href="{{ route('attendance.schedule-patterns.create') }}" class="font-medium underline">Buat pola dulu</a>.

@@ -6,6 +6,7 @@ use App\Models\Department;
 use App\Models\Employee;
 use App\Models\LeaveRequest;
 use App\Models\LeaveType;
+use App\Models\SchedulePattern;
 use App\Models\User;
 use App\Support\DataScope;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -115,7 +116,7 @@ test('a restricted user without any subordinate is told why the page is empty', 
     Employee::query()->create(['user_id' => $user->id, 'full_name' => 'Rina Tanpa Bawahan', 'employment_status' => 'active']);
 
     // Halaman kosong tanpa penjelasan terbaca sebagai aplikasi yang rusak.
-    foreach (['/attendance/daily', '/attendance/schedules', '/attendance/leave'] as $url) {
+    foreach (['/attendance/daily', '/attendance/schedules', '/attendance/leave', '/attendance/schedules/unscheduled'] as $url) {
         $this->actingAs($user)->get($url)
             ->assertOk()
             ->assertSee('belum ada seorang pun yang tercatat di bawah Anda', false)
@@ -229,17 +230,68 @@ test('the dashboard leave counter matches what the leave page shows', function (
     expect($card['count'])->toBe(1);
 });
 
+test('the unscheduled list and its assign flow show only the subordinates', function () {
+    $user = teamUser();
+    [, , $stranger] = teamTree($user);
+
+    Permission::findOrCreate('schedules.create', 'web');
+    $user->givePermissionTo('schedules.create');
+    app(PermissionRegistrar::class)->forgetCachedPermissions();
+
+    // Keduanya: daftar orang yang belum punya pola, dan pemilih karyawan di halaman
+    // "Tugaskan Pola" yang menjadi lanjutannya.
+    foreach (['/attendance/schedules/unscheduled', '/attendance/schedules/assign'] as $url) {
+        $this->actingAs($user)->get($url)
+            ->assertOk()
+            ->assertSee('Andi Bawahan')
+            ->assertDontSee('Citra Bukan Bawahan');
+    }
+
+    expect($stranger->exists)->toBeTrue();
+});
+
+test('assigning a pattern to someone outside the team is refused', function () {
+    $user = teamUser();
+    [, , $stranger] = teamTree($user);
+
+    Permission::findOrCreate('schedules.create', 'web');
+    $user->givePermissionTo('schedules.create');
+    app(PermissionRegistrar::class)->forgetCachedPermissions();
+
+    $pattern = SchedulePattern::query()->create([
+        'code' => 'UJI-5D', 'name' => 'Pola Uji', 'type' => 'fixed_weekly',
+        'cycle_length' => 7, 'is_active' => true, 'created_by' => $user->id,
+    ]);
+
+    // Percuma menyempitkan daftarnya kalau id-nya masih diterima aksi massal.
+    $this->actingAs($user)->post(route('attendance.unscheduled.assign'), [
+        'schedule_pattern_id' => $pattern->id,
+        'employee_ids' => [$stranger->id],
+        'start_date' => now()->startOfMonth()->toDateString(),
+    ])->assertForbidden();
+
+    expect($stranger->scheduleAssignments()->count())->toBe(0);
+});
+
+test('the monthly mode can be filtered straight to any month', function () {
+    $user = teamUser();
+    teamTree($user);
+
+    // Bulan yang jauh dari hari ini harus bisa dituju langsung, bukan lewat belasan
+    // klik panah — jadi bulannya adalah medan penyaring, bukan sekadar navigasi.
+    $target = now()->addMonths(5)->format('Y-m');
+
+    $this->actingAs($user)->get('/attendance/schedules/unscheduled?mode=no_schedule&month='.$target)
+        ->assertOk()
+        ->assertSee('type="month" name="month"', false)
+        ->assertSee('value="'.$target.'"', false);
+});
+
 test('the restriction does not leak into other modules', function () {
     $user = teamUser();
     [, , $stranger] = teamTree($user);
 
-    // "Belum Terjadwal" memakai cakupan lokasi/divisi seperti sebelumnya, bukan garis
-    // atasan — halaman itu tidak termasuk yang diminta untuk dipersempit.
-    $this->actingAs($user)->get('/attendance/schedules/unscheduled')
-        ->assertOk()
-        ->assertSee('Citra Bukan Bawahan');
-
-    // Dan pada tingkat cakupannya sendiri: yang dipersempit hanya forTeam().
+    // Yang dipersempit hanya forTeam(); forAttendance() tetap seperti sebelumnya.
     $scoped = DataScope::forAttendance($user->fresh())->employees()->pluck('id');
     $team = DataScope::forTeam($user->fresh())->employees()->pluck('id');
 

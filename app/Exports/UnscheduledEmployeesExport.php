@@ -46,9 +46,9 @@ class UnscheduledEmployeesExport implements FromQuery, ShouldAutoSize, WithHeadi
         $from = $month->copy()->startOfMonth()->toDateString();
         $to = $month->copy()->endOfMonth()->toDateString();
 
-        // Reuse the exact attendance scope so the export matches the list precisely.
+        // Reuse the exact scope of the list so the export matches it precisely.
         $base = $this->user
-            ? DataScope::forAttendance($this->user)->employees()
+            ? DataScope::forTeam($this->user)->employees()
             : Employee::query();
 
         return $base

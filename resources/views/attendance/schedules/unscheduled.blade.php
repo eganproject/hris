@@ -33,11 +33,7 @@
             <a href="{{ $modeUrl('no_schedule') }}" @class(['rounded px-3 py-1.5 font-medium transition', 'bg-white text-gray-950 shadow-xs' => $isMonthly, 'text-gray-500 hover:text-gray-800' => ! $isMonthly])>Belum ada jadwal (bulanan)</a>
         </div>
 
-        @if ($hasNoScope)
-            <div class="rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
-                Cakupan akses Anda belum diatur, jadi belum ada data karyawan yang bisa ditampilkan. Minta admin menetapkan lokasi kerja / divisi Anda di menu <span class="font-medium">Kontrol Akses</span>.
-            </div>
-        @endif
+        <x-scope-notice :has-no-scope="$hasNoScope" :has-no-team="$hasNoTeam"/>
 
         <section class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
             <x-stat-card :label="$isMonthly ? 'Belum Ada Jadwal '.$month->translatedFormat('M Y') : 'Belum Punya Pola'" :value="number_format($employees->total())" tone="amber" hint="Sesuai filter aktif">
@@ -45,22 +41,22 @@
             </x-stat-card>
         </section>
 
-        {{-- Month navigation (monthly mode only) --}}
-        @if ($isMonthly)
-            <div class="flex items-center gap-2">
-                <a href="{{ $monthUrl($prevMonth) }}" class="rounded-md border border-gray-200 bg-white px-3 py-2 text-sm text-gray-600 hover:bg-gray-50" aria-label="Bulan sebelumnya">‹</a>
-                <span class="min-w-40 text-center text-sm font-semibold text-gray-900">{{ $month->translatedFormat('F Y') }}</span>
-                <a href="{{ $monthUrl($nextMonth) }}" class="rounded-md border border-gray-200 bg-white px-3 py-2 text-sm text-gray-600 hover:bg-gray-50" aria-label="Bulan berikutnya">›</a>
-            </div>
-        @endif
-
         <section class="rounded-lg border border-gray-200 bg-white p-5 shadow-sm">
             <form method="GET" action="{{ route('attendance.unscheduled.index') }}" class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
                 @if ($isMonthly)
                     <input type="hidden" name="mode" value="no_schedule">
-                    <input type="hidden" name="month" value="{{ $month->format('Y-m') }}">
+                    {{-- Bulannya ikut penyaring, bukan hanya panah maju-mundur: menengok
+                         bulan yang jauh dari hari ini tidak boleh menuntut belasan klik. --}}
+                    <div>
+                        <label for="month" class="block text-sm font-medium text-gray-700">Bulan</label>
+                        <div class="mt-2 flex items-center gap-1.5">
+                            <a href="{{ $monthUrl($prevMonth) }}" class="rounded-md border border-gray-300 bg-white px-2.5 py-2.5 text-sm text-gray-600 hover:bg-gray-50" aria-label="Bulan sebelumnya">‹</a>
+                            <input id="month" type="month" name="month" value="{{ $month->format('Y-m') }}" onchange="this.form.submit()" class="block w-full rounded-md border border-gray-300 bg-white px-3 py-2.5 text-sm shadow-xs outline-none focus:border-primary focus:ring-2 focus:ring-primary/20">
+                            <a href="{{ $monthUrl($nextMonth) }}" class="rounded-md border border-gray-300 bg-white px-2.5 py-2.5 text-sm text-gray-600 hover:bg-gray-50" aria-label="Bulan berikutnya">›</a>
+                        </div>
+                    </div>
                 @endif
-                <div class="xl:col-span-2">
+                <div @class(['xl:col-span-2' => ! $isMonthly])>
                     <label for="search" class="block text-sm font-medium text-gray-700">Cari</label>
                     <input id="search" name="search" value="{{ $filters['search'] ?? '' }}" class="mt-2 block w-full rounded-md border border-gray-300 bg-white px-3 py-2.5 text-sm shadow-xs outline-none focus:border-primary focus:ring-2 focus:ring-primary/20" placeholder="Nama atau kode karyawan">
                 </div>
