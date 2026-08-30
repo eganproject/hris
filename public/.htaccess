@@ -1,3 +1,15 @@
+# Batas unggahan untuk Apache dengan mod_php. Server FPM/CGI (LiteSpeed, Hostinger)
+# mengabaikan blok ini dan memakai public/.user.ini — keduanya sengaja disediakan
+# karena satu berkas saja tidak menutup kedua jenis hosting.
+<IfModule mod_php.c>
+    php_value upload_max_filesize 16M
+    php_value post_max_size 20M
+</IfModule>
+<IfModule mod_php7.c>
+    php_value upload_max_filesize 16M
+    php_value post_max_size 20M
+</IfModule>
+
 <IfModule mod_rewrite.c>
     <IfModule mod_negotiation.c>
         Options -MultiViews -Indexes

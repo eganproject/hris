@@ -818,6 +818,11 @@ document.querySelectorAll('[data-password-toggle]').forEach((button) => {
 // Live image preview: when a file is chosen for an [data-image-input], show it in
 // the sibling [data-image-preview] and hide the [data-image-placeholder]. Clearing
 // the input restores the original photo (edit) or the placeholder (create).
+//
+// Ukurannya juga diperiksa di sini — sama seperti [data-attachment-field]. Berkas
+// yang melampaui batas harus ketahuan SEBELUM terkirim: begitu ia melewati kabel,
+// yang membalas bukan lagi validasi Laravel dengan pesannya yang terbaca, melainkan
+// server web atau middleware ValidatePostSize dengan halaman 413 telanjang.
 document.querySelectorAll('[data-image-input]').forEach((input) => {
     const field = input.closest('[data-image-field]');
 
@@ -827,8 +832,26 @@ document.querySelectorAll('[data-image-input]').forEach((input) => {
 
     const preview = field.querySelector('[data-image-preview]');
     const placeholder = field.querySelector('[data-image-placeholder]');
+    const errorEl = field.querySelector('[data-image-error]');
     const originalSrc = preview?.getAttribute('src') || '';
+    const maxMb = Number(field.dataset.maxMb || 0);
+    const maxBytes = maxMb * 1024 * 1024;
     let objectUrl = null;
+
+    const humanSize = (bytes) => bytes >= 1048576
+        ? (bytes / 1048576).toFixed(1) + ' MB'
+        : Math.max(1, Math.round(bytes / 1024)) + ' KB';
+
+    const showError = (message) => {
+        if (!errorEl) {
+            return;
+        }
+
+        errorEl.textContent = message;
+        errorEl.classList.remove('hidden');
+    };
+
+    const clearError = () => errorEl?.classList.add('hidden');
 
     const restoreOriginal = () => {
         if (preview) {
@@ -849,6 +872,8 @@ document.querySelectorAll('[data-image-input]').forEach((input) => {
     input.addEventListener('change', () => {
         const file = input.files && input.files[0];
 
+        clearError();
+
         if (objectUrl) {
             URL.revokeObjectURL(objectUrl);
             objectUrl = null;
@@ -856,6 +881,16 @@ document.querySelectorAll('[data-image-input]').forEach((input) => {
 
         if (!file || !file.type.startsWith('image/')) {
             restoreOriginal();
+            return;
+        }
+
+        if (maxBytes && file.size > maxBytes) {
+            // Kosongkan pilihannya: membiarkannya terpilih berarti pengguna menekan
+            // Simpan dan tetap menabrak batas yang sama.
+            input.value = '';
+            restoreOriginal();
+            showError('Ukuran foto ' + humanSize(file.size) + ', melebihi batas ' + maxMb + ' MB. Perkecil dulu fotonya.');
+
             return;
         }
 

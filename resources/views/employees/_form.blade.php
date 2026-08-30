@@ -40,7 +40,7 @@
         <h2 class="text-base font-semibold text-gray-950">Informasi Karyawan</h2>
 
         <div class="mt-5 grid grid-cols-1 gap-5 md:grid-cols-2">
-            <div class="md:col-span-2" data-image-field>
+            <div class="md:col-span-2" data-image-field data-max-mb="2">
                 <label for="photo" class="block text-sm font-medium text-gray-700">Foto Karyawan</label>
                 <div class="mt-2 flex flex-col gap-4 sm:flex-row sm:items-center">
                     <img
@@ -58,6 +58,7 @@
                         <input id="photo" name="photo" type="file" accept="image/jpeg,image/png,image/webp" data-image-input class="block w-full rounded-md border border-gray-300 bg-white px-3 py-2.5 text-sm shadow-xs outline-none file:mr-3 file:rounded-sm file:border-0 file:bg-gray-100 file:px-3 file:py-1.5 file:text-xs file:font-semibold file:text-gray-700 hover:file:bg-gray-200 focus:border-primary focus:ring-2 focus:ring-primary/20">
                         <p class="mt-2 text-xs text-gray-500">Format JPG, PNG, atau WebP. Maksimal 2MB. Resolusi minimal 300x300 px dan maksimal 3000x3000 px.</p>
                         @error('photo')<p class="mt-2 text-sm text-red-600">{{ $message }}</p>@enderror
+                        <p data-image-error class="mt-2 hidden text-sm text-red-600"></p>
                     </div>
                 </div>
             </div>
