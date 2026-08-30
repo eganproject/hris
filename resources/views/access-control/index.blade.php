@@ -215,14 +215,14 @@
                                 <input type="checkbox" name="limit_to_subordinates" value="1" @checked($user->isLimitedToSubordinates()) class="mt-0.5 size-3.5 rounded border-gray-300 text-primary focus:ring-primary">
                                 <span>Batasi ke bawahan saja <span class="block text-gray-400">Hanya melihat karyawan di bawah garis atasannya (mengabaikan lokasi/divisi di atas).</span></span>
                             </label>
-                            {{-- Cakupan khusus untuk dua halaman yang dipersempit ke garis
+                            {{-- Cakupan khusus untuk tiga halaman yang dipersempit ke garis
                                  atasan. Ditulis sebagai pilihan, bukan satu centang: dulu
                                  centangnya berbunyi "lihat semua karyawan", padahal yang
                                  sebenarnya terjadi adalah kembali memakai daftar lokasi &
                                  divisi di kartu ini — dan itu berarti "semua" hanya bagi
                                  pemegang izin lihat-semua-data. --}}
                             <div class="mt-3 rounded-md border border-gray-200 bg-gray-50 p-2.5">
-                                <p class="text-xs font-medium text-gray-700">Cakupan di Absensi Harian &amp; Jadwal Kerja</p>
+                                <p class="text-xs font-medium text-gray-700">Cakupan di Absensi Harian, Jadwal Kerja &amp; Cuti</p>
 
                                 @if ($user->isSuperAdmin())
                                     <p class="mt-1.5 text-xs text-gray-500">Superadmin selalu melihat seluruh karyawan; tidak bisa dibatasi.</p>

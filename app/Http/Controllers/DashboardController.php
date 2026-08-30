@@ -82,9 +82,14 @@ class DashboardController extends Controller
 
         $scope = DataScope::forAttendance($user);
 
+        // Kartu ini menaut ke halaman Cuti & Izin, yang dipersempit ke bawahan —
+        // hitungannya harus memakai cakupan yang sama, kalau tidak angkanya
+        // menjanjikan pekerjaan yang tidak ada begitu halamannya dibuka.
+        $leaveScope = DataScope::forTeam($user);
+
         $pendingLeave = fn (): int => LeaveRequest::query()
             ->where('status', LeaveRequestStatus::PendingHr->value)
-            ->tap(fn ($query) => $scope->constrain($query))
+            ->tap(fn ($query) => $leaveScope->constrain($query))
             ->count();
 
         $pendingCorrections = fn (): int => AttendanceCorrection::query()

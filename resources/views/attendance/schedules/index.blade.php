@@ -29,16 +29,7 @@
             </div>
         </section>
 
-        @if ($hasNoScope)
-            <div class="rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
-                Cakupan akses Anda belum diatur, jadi belum ada data yang bisa ditampilkan. Minta admin menetapkan lokasi kerja / divisi Anda di menu <span class="font-medium">Kontrol Akses</span>.
-            </div>
-        @elseif ($hasNoTeam)
-            {{-- Halaman kosong tanpa penjelasan terbaca sebagai aplikasi rusak. --}}
-            <div class="rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
-                Halaman ini hanya menampilkan karyawan yang menjadi bawahan Anda di struktur organisasi, dan saat ini belum ada seorang pun yang tercatat di bawah Anda. Minta admin mengatur atasan langsung karyawan, atau mencentang <span class="font-medium">&ldquo;Lihat semua karyawan di Absensi Harian &amp; Jadwal Kerja&rdquo;</span> untuk akun Anda di menu <span class="font-medium">Kontrol Akses</span>.
-            </div>
-        @endif
+        <x-scope-notice :has-no-scope="$hasNoScope" :has-no-team="$hasNoTeam"/>
 
         @if (session('status'))
             <div class="rounded-md border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">{{ session('status') }}</div>

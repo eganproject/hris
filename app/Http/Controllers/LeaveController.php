@@ -18,11 +18,16 @@ class LeaveController extends Controller
 {
     public function __construct(private readonly LeaveWorkflow $workflow) {}
 
+    /**
+     * Daftar pengajuan cuti/izin, dipersempit ke bawahan seperti Absensi Harian dan
+     * Jadwal Kerja: seorang atasan mengurus cuti timnya sendiri, bukan cuti seisi
+     * perusahaan. Pengecualiannya diatur per akun lewat Kontrol Akses.
+     */
     public function index(Request $request): View
     {
         $perPage = min(max((int) $request->input('per_page', 15), 10), 100);
 
-        $scope = DataScope::forAttendance($request->user());
+        $scope = DataScope::forTeam($request->user());
         $filters = $request->only(['search', 'status', 'leave_type_id', 'branch_id', 'department_id', 'date_from', 'date_to']);
 
         $leaveRequests = LeaveRequest::query()
@@ -51,13 +56,15 @@ class LeaveController extends Controller
             'leaveTypes' => LeaveType::query()->orderBy('name')->get(),
             'branches' => $scope->branches(),
             'departments' => $scope->departments(),
+            'hasNoScope' => $scope->isEmpty(),
+            'hasNoTeam' => $scope->hasNoTeam(),
         ]);
     }
 
     public function create(Request $request): View
     {
         return view('attendance.leave.create', [
-            'employees' => DataScope::forAttendance($request->user())->employees()->active()->orderBy('full_name')->get(),
+            'employees' => DataScope::forTeam($request->user())->employees()->active()->orderBy('full_name')->get(),
             'leaveTypes' => LeaveType::query()->where('is_active', true)->orderBy('name')->get(),
         ]);
     }
@@ -65,7 +72,7 @@ class LeaveController extends Controller
     public function store(StoreLeaveRequest $request): RedirectResponse
     {
         $employee = Employee::findOrFail($request->integer('employee_id'));
-        DataScope::forAttendance($request->user())->authorize($employee);
+        DataScope::forTeam($request->user())->authorize($employee);
 
         $leave = $this->workflow->submit($employee, $request->validated());
 
@@ -85,7 +92,7 @@ class LeaveController extends Controller
      */
     public function approve(Request $request, LeaveRequest $leaveRequest): RedirectResponse
     {
-        DataScope::forAttendance($request->user())->authorize($leaveRequest->employee);
+        DataScope::forTeam($request->user())->authorize($leaveRequest->employee);
         $this->denySelfDecision($request, $leaveRequest);
         abort_unless($leaveRequest->status->isPending(), 403);
 
@@ -96,7 +103,7 @@ class LeaveController extends Controller
 
     public function reject(Request $request, LeaveRequest $leaveRequest): RedirectResponse
     {
-        DataScope::forAttendance($request->user())->authorize($leaveRequest->employee);
+        DataScope::forTeam($request->user())->authorize($leaveRequest->employee);
         $this->denySelfDecision($request, $leaveRequest);
         abort_unless($leaveRequest->status->isPending(), 403);
 
@@ -119,7 +126,7 @@ class LeaveController extends Controller
             return back()->with('error', 'Pilih minimal satu pengajuan untuk disetujui.');
         }
 
-        $scope = DataScope::forAttendance($request->user());
+        $scope = DataScope::forTeam($request->user());
         $userId = $request->user()->id;
 
         $leaveRequests = LeaveRequest::query()->whereIn('id', $ids)->with('employee')->get();

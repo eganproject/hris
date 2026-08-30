@@ -40,12 +40,12 @@ class DataScope
      * hanya berurusan dengan bawahannya sendiri, kecuali ia dikecualikan lewat saklar
      * "Lihat semua karyawan" di Kontrol Akses (superadmin selalu dikecualikan).
      *
-     * Dipakai HANYA oleh halaman Absensi Harian dan Jadwal Kerja beserta tindakan di
-     * dalamnya. Modul lain — cuti, lembur, koreksi, laporan, data karyawan — tetap
-     * memakai forAttendance()/forEmployees() dan tidak berubah sedikit pun.
+     * Dipakai HANYA oleh halaman Absensi Harian, Jadwal Kerja dan Cuti & Izin beserta
+     * tindakan di dalamnya. Modul lain — lembur, koreksi, laporan, data karyawan —
+     * tetap memakai forAttendance()/forEmployees() dan tidak berubah sedikit pun.
      *
      * Yang perlu disadari: pengguna tanpa bawahan dan tanpa saklar itu tidak akan
-     * melihat siapa-siapa di kedua halaman tersebut. Itu memang maksudnya — dan
+     * melihat siapa-siapa di ketiga halaman tersebut. Itu memang maksudnya — dan
      * jalan keluarnya ada di Kontrol Akses, bukan pada pengecualian diam-diam di sini.
      */
     public static function forTeam(User $user): self

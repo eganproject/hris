@@ -1,11 +1,15 @@
 <?php
 
+use App\Enums\LeaveRequestStatus;
 use App\Models\Branch;
 use App\Models\Department;
 use App\Models\Employee;
+use App\Models\LeaveRequest;
+use App\Models\LeaveType;
 use App\Models\User;
 use App\Support\DataScope;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Storage;
 use Spatie\Permission\Models\Permission;
 use Spatie\Permission\Models\Role;
 use Spatie\Permission\PermissionRegistrar;
@@ -13,14 +17,14 @@ use Spatie\Permission\PermissionRegistrar;
 uses(RefreshDatabase::class);
 
 /**
- * Absensi Harian & Jadwal Kerja dipersempit ke bawahan pengguna.
+ * Absensi Harian, Jadwal Kerja & Cuti dipersempit ke bawahan pengguna.
  *
  * Pengecualiannya adalah saklar per pengguna di Kontrol Akses, bukan daftar nama role
  * di dalam kode — susunan role tiap perusahaan berbeda, dan menambah role baru tidak
  * boleh menuntut perubahan kode.
  *
  * Yang paling penting dijaga di sini: pembatasan ini TIDAK boleh merembet ke modul
- * lain. Cuti, lembur, koreksi, laporan, dan data karyawan tetap memakai cakupan
+ * lain. Lembur, koreksi, laporan, dan data karyawan tetap memakai cakupan
  * lokasi/divisi seperti sebelumnya.
  */
 function teamUser(bool $bypass = false): User
@@ -111,12 +115,118 @@ test('a restricted user without any subordinate is told why the page is empty', 
     Employee::query()->create(['user_id' => $user->id, 'full_name' => 'Rina Tanpa Bawahan', 'employment_status' => 'active']);
 
     // Halaman kosong tanpa penjelasan terbaca sebagai aplikasi yang rusak.
-    foreach (['/attendance/daily', '/attendance/schedules'] as $url) {
+    foreach (['/attendance/daily', '/attendance/schedules', '/attendance/leave'] as $url) {
         $this->actingAs($user)->get($url)
             ->assertOk()
             ->assertSee('belum ada seorang pun yang tercatat di bawah Anda', false)
             ->assertDontSee('Orang Lain');
     }
+});
+
+/** Satu pengajuan cuti yang masih menunggu keputusan HR, untuk satu karyawan. */
+function teamLeaveFor(Employee $employee): LeaveRequest
+{
+    $type = LeaveType::query()->firstOrCreate(
+        ['code' => 'IZ'],
+        ['name' => 'Izin', 'attendance_status' => 'leave', 'is_paid' => true, 'is_active' => true],
+    );
+
+    return LeaveRequest::query()->create([
+        'employee_id' => $employee->id,
+        'leave_type_id' => $type->id,
+        'start_date' => now()->addDay()->toDateString(),
+        'end_date' => now()->addDay()->toDateString(),
+        'status' => LeaveRequestStatus::PendingHr->value,
+    ]);
+}
+
+test('the leave list shows only the subordinates', function () {
+    $user = teamUser();
+    [, $subordinate, $stranger] = teamTree($user);
+
+    teamLeaveFor($subordinate);
+    teamLeaveFor($stranger);
+
+    $this->actingAs($user)->get('/attendance/leave')
+        ->assertOk()
+        ->assertSee('Andi Bawahan')
+        ->assertDontSee('Citra Bukan Bawahan');
+});
+
+test('the switch in Kontrol Akses lifts the restriction on leave too', function () {
+    $user = teamUser(bypass: true);
+    [, $subordinate, $stranger] = teamTree($user);
+
+    teamLeaveFor($subordinate);
+    teamLeaveFor($stranger);
+
+    $this->actingAs($user)->get('/attendance/leave')
+        ->assertOk()
+        ->assertSee('Andi Bawahan')
+        ->assertSee('Citra Bukan Bawahan');
+});
+
+test('deciding the leave of someone outside the team is refused', function () {
+    $user = teamUser();
+    [, $subordinate, $stranger] = teamTree($user);
+
+    Permission::findOrCreate('leave.update', 'web');
+    $user->givePermissionTo('leave.update');
+    app(PermissionRegistrar::class)->forgetCachedPermissions();
+
+    $outside = teamLeaveFor($stranger);
+    $inside = teamLeaveFor($subordinate);
+
+    $this->actingAs($user)->patch(route('attendance.leave.approve', $outside))->assertForbidden();
+    $this->actingAs($user)->patch(route('attendance.leave.reject', $outside))->assertForbidden();
+    expect($outside->fresh()->status)->toBe(LeaveRequestStatus::PendingHr);
+
+    // Dan lewat aksi massal, yang melewati baris di luar wewenang alih-alih 403.
+    $this->actingAs($user)->post(route('attendance.leave.bulk-approve'), ['ids' => [$outside->id, $inside->id]])
+        ->assertRedirect(route('attendance.leave.index'));
+
+    expect($outside->fresh()->status)->toBe(LeaveRequestStatus::PendingHr)
+        ->and($inside->fresh()->status)->toBe(LeaveRequestStatus::Approved);
+});
+
+test('the leave attachment of someone outside the team is refused', function () {
+    $user = teamUser();
+    [, , $stranger] = teamTree($user);
+
+    Storage::fake(LeaveRequest::ATTACHMENT_DISK);
+
+    $outside = teamLeaveFor($stranger);
+    $outside->forceFill([
+        'attachment_path' => 'leave/surat.pdf',
+        'attachment_name' => 'surat.pdf',
+        'attachment_mime' => 'application/pdf',
+    ])->save();
+
+    Storage::disk(LeaveRequest::ATTACHMENT_DISK)->put('leave/surat.pdf', 'x');
+
+    // Percuma menyempitkan daftarnya kalau berkasnya masih bisa diambil lewat tautan.
+    $this->actingAs($user)->get(route('leave.attachment', $outside))->assertForbidden();
+});
+
+test('the dashboard leave counter matches what the leave page shows', function () {
+    $user = teamUser();
+    [, $subordinate, $stranger] = teamTree($user);
+
+    foreach (['leave.update', 'dashboard.view'] as $permission) {
+        Permission::findOrCreate($permission, 'web');
+    }
+    $user->givePermissionTo(['leave.update', 'dashboard.view']);
+    app(PermissionRegistrar::class)->forgetCachedPermissions();
+
+    teamLeaveFor($subordinate);
+    teamLeaveFor($stranger);
+
+    // Angka yang lebih besar daripada isi halamannya menjanjikan pekerjaan yang
+    // tidak ada begitu kartunya diklik.
+    $card = collect($this->actingAs($user)->get('/dashboard')->assertOk()->viewData('todo'))
+        ->firstWhere('label', 'Cuti/izin menunggu keputusan HR');
+
+    expect($card['count'])->toBe(1);
 });
 
 test('the restriction does not leak into other modules', function () {
@@ -289,7 +399,7 @@ test('Kontrol Akses states the real effect of each scope choice', function () {
     // "lihat semua" — kalimat itulah yang dulu menyesatkan.
     $this->actingAs($admin)->get(route('access-control.index'))
         ->assertOk()
-        ->assertSee('Cakupan di Absensi Harian &amp; Jadwal Kerja', false)
+        ->assertSee('Cakupan di Absensi Harian, Jadwal Kerja &amp; Cuti', false)
         ->assertSee('Bawahan saja')
         ->assertSee('Sesuai lokasi &amp; divisi di kartu ini', false);
 });

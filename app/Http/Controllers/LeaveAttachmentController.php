@@ -57,6 +57,6 @@ class LeaveAttachmentController extends Controller
         }
 
         return $user->can('leave.view')
-            && DataScope::forAttendance($user)->allows($leaveRequest->employee);
+            && DataScope::forTeam($user)->allows($leaveRequest->employee);
     }
 }

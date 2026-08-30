@@ -12,6 +12,8 @@
             @endcan
         </section>
 
+        <x-scope-notice :has-no-scope="$hasNoScope" :has-no-team="$hasNoTeam"/>
+
         <section class="rounded-lg border border-gray-200 bg-white p-5 shadow-sm">
             <form method="GET" action="{{ route('attendance.leave.index') }}" class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
                 <div class="lg:col-span-2">
