@@ -1,0 +1,701 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<title>Blueprint Asset Management — HRIS Cahaya Optima Karya</title>
+<style>
+@page { margin: 18mm 15mm 18mm; }
+* { box-sizing: border-box; }
+body { margin: 0; color: #172033; font-family: DejaVu Sans, Arial, sans-serif; font-size: 9.2pt; line-height: 1.48; }
+h1,h2,h3,h4,p { margin-top: 0; }
+h1 { font-size: 25pt; line-height: 1.12; letter-spacing: -.6px; }
+h2 { font-size: 17pt; margin-bottom: 8px; color: #133e52; border-bottom: 2px solid #dce9ed; padding-bottom: 6px; }
+h3 { font-size: 11.5pt; margin: 14px 0 6px; color: #155e75; }
+h4 { font-size: 9.5pt; margin: 9px 0 3px; color: #334155; }
+p { margin-bottom: 7px; }
+ul,ol { margin: 4px 0 9px; padding-left: 18px; }
+li { margin-bottom: 3px; }
+table { width: 100%; border-collapse: collapse; margin: 7px 0 12px; page-break-inside: avoid; }
+th { background: #155e75; color: #fff; text-align: left; font-weight: 700; }
+th,td { border: 1px solid #cbdde3; padding: 6px 7px; vertical-align: top; }
+tr:nth-child(even) td { background: #f6fafb; }
+.cover { height: 205mm; position: relative; page-break-after: always; background: #f7fbfc; margin: -18mm -15mm 0; padding: 22mm; }
+.cover-band { position: absolute; left: 0; top: 0; bottom: 0; width: 11mm; background: #0f5f73; }
+.eyebrow { color: #0f766e; font-size: 9pt; font-weight: 700; letter-spacing: 1.8px; text-transform: uppercase; }
+.cover h1 { margin-top: 18mm; color: #0b3142; width: 150mm; }
+.cover-sub { color: #46606b; font-size: 12pt; width: 150mm; }
+.cover-card { margin-top: 18mm; width: 155mm; background: #fff; border: 1px solid #cfe1e6; border-left: 5px solid #14b8a6; padding: 14px 16px; }
+.cover-meta { position: absolute; left: 22mm; bottom: 23mm; color: #607580; font-size: 8.5pt; }
+.page-break { page-break-before: always; }
+.avoid { page-break-inside: avoid; }
+.lead { font-size: 11pt; color: #3d5660; }
+.muted { color: #64748b; }
+.small { font-size: 8pt; }
+.tag { display: inline-block; padding: 2px 7px; margin: 1px 2px 1px 0; border-radius: 9px; background: #dff5f1; color: #0f766e; font-size: 7.7pt; font-weight: 700; }
+.callout { margin: 9px 0 12px; padding: 9px 12px; border-left: 4px solid #14b8a6; background: #effaf8; }
+.callout.warn { border-color: #f59e0b; background: #fff9eb; }
+.callout.blue { border-color: #0ea5e9; background: #eff8ff; }
+.kpis { width: 100%; border-spacing: 7px; border-collapse: separate; margin: 8px -7px 12px; }
+.kpis td { width: 25%; border: 1px solid #d6e5e9; background: #fff !important; padding: 10px; }
+.kpi-number { font-size: 17pt; font-weight: 700; color: #0f5f73; }
+.kpi-label { font-size: 7.5pt; color: #64748b; text-transform: uppercase; letter-spacing: .5px; }
+.flow { width: 100%; border-collapse: separate; border-spacing: 3px; margin: 10px 0 14px; }
+.flow td { border: 0; background: transparent !important; padding: 2px; text-align: center; vertical-align: middle; }
+.flow .node { border: 1px solid #9fc4ce; border-radius: 6px; background: #f2fafb !important; padding: 8px 5px; font-weight: 700; color: #164e63; }
+.flow .decision { border: 2px solid #e5a828; background: #fff9e8 !important; color: #854d0e; }
+.flow .danger { border-color: #ef9a9a; background: #fff2f2 !important; color: #991b1b; }
+.flow .success { border-color: #62b99f; background: #edfbf4 !important; color: #166534; }
+.flow .arrow { width: 6%; font-size: 16pt; color: #6b8791; }
+.lane { border: 1px solid #cbdde3; margin: 7px 0; padding: 7px; background: #fbfdfe; }
+.lane-title { display: inline-block; width: 27mm; font-weight: 700; color: #155e75; vertical-align: top; }
+.lane-content { display: inline-block; width: 145mm; }
+.erd { width: 100%; border-collapse: separate; border-spacing: 7px; }
+.erd td { width: 33%; padding: 0; border: none; background: transparent !important; vertical-align: top; }
+.entity { border: 1px solid #9ebfc8; border-radius: 5px; overflow: hidden; page-break-inside: avoid; }
+.entity-title { background: #155e75; color: white; font-weight: 700; padding: 6px 8px; }
+.entity-body { padding: 6px 8px; font-family: DejaVu Sans Mono, monospace; font-size: 7.5pt; line-height: 1.48; background: #f8fbfc; }
+.legend { font-size: 7.8pt; padding: 6px 9px; background: #f1f5f9; border-radius: 4px; }
+.two-col { width: 100%; border-collapse: separate; border-spacing: 8px 0; margin-left: -8px; }
+.two-col > tbody > tr > td { width: 50%; border: 0; background: transparent !important; padding: 0 0 0 8px; }
+.toc { font-size: 7.8pt; }
+.toc td { border: 0; border-bottom: 1px dotted #b9cbd1; background: transparent !important; padding: 2px; }
+.toc td:last-child { text-align: right; color: #64748b; width: 22mm; }
+.status { font-weight: 700; white-space: nowrap; }
+.s-available { color: #047857; }.s-assigned { color: #0369a1; }.s-maintenance { color: #b45309; }.s-lost { color: #b91c1c; }.s-retired { color: #6b7280; }
+.footer-note { margin-top: 18px; padding-top: 7px; border-top: 1px solid #d8e5e9; color: #71858e; font-size: 7.5pt; }
+.check { color: #047857; font-weight: 700; }.cross { color: #b91c1c; font-weight: 700; }
+.code { font-family: DejaVu Sans Mono, monospace; font-size: 7.7pt; background: #f1f5f9; padding: 7px; border: 1px solid #d8e0e8; white-space: pre-wrap; }
+</style>
+</head>
+<body>
+
+<section class="cover">
+  <div class="cover-band"></div>
+  <div class="eyebrow">System Design Blueprint · Version 1.0</div>
+  <h1>Asset Management<br>untuk HRIS Cahaya Optima Karya</h1>
+  <p class="cover-sub">Rancangan bisnis dan teknis untuk mengelola seluruh siklus hidup aset: registrasi, penyerahan, transfer, pengembalian, perawatan, stock opname, hingga disposal.</p>
+  <div class="cover-card">
+    <strong>Keputusan desain utama</strong><br>
+    Aset adalah identitas permanen. Pemegang, lokasi, kondisi, dan status berubah melalui transaksi historis yang dapat diaudit—bukan dengan menimpa data lama.
+  </div>
+  <div class="cover-meta">
+    Disusun berdasarkan audit arsitektur aplikasi Laravel 12 yang berjalan<br>
+    Tanggal dokumen: 31 Agustus 2026 · Status: Blueprint untuk validasi bisnis
+  </div>
+</section>
+
+<section>
+  <div class="eyebrow">Panduan membaca</div>
+  <h2>Ringkasan Eksekutif</h2>
+  <p class="lead">Modul ini dirancang sebagai bagian native dari HRIS, memanfaatkan data karyawan, cabang, divisi, role, audit log, notifikasi, Excel, PDF, dan penyimpanan privat yang sudah tersedia.</p>
+  <table class="kpis">
+    <tr>
+      <td><div class="kpi-number">1</div><div class="kpi-label">identitas aset permanen</div></td>
+      <td><div class="kpi-number">7</div><div class="kpi-label">status lifecycle utama</div></td>
+      <td><div class="kpi-number">6</div><div class="kpi-label">workflow operasional</div></td>
+      <td><div class="kpi-number">3</div><div class="kpi-label">fase implementasi</div></td>
+    </tr>
+  </table>
+  <div class="callout"><strong>Tujuan bisnis:</strong> perusahaan dapat menjawab dengan cepat: aset apa yang dimiliki, berada di mana, dipegang siapa, kondisinya bagaimana, berapa biayanya, dan apa saja yang pernah terjadi padanya.</div>
+  <h3>Outcome yang diharapkan</h3>
+  <table>
+    <tr><th>Area</th><th>Sebelum modul</th><th>Setelah modul</th></tr>
+    <tr><td>Akuntabilitas</td><td>Informasi pemegang tersebar</td><td>Satu assignment aktif dan histori lengkap</td></tr>
+    <tr><td>Offboarding</td><td>Risiko aset belum kembali</td><td>Peringatan otomatis sebelum karyawan dinonaktifkan</td></tr>
+    <tr><td>Audit</td><td>Rekonstruksi manual</td><td>Setiap perpindahan dan perubahan memiliki pelaku/waktu</td></tr>
+    <tr><td>Operasional</td><td>Status servis dan garansi sulit dipantau</td><td>Reminder dan antrean maintenance terukur</td></tr>
+    <tr><td>Pelaporan</td><td>Rekap spreadsheet terpisah</td><td>Dashboard serta export sesuai scope akses</td></tr>
+  </table>
+
+  <h3>Daftar isi</h3>
+  <table class="toc">
+    <tr><td>1. Konteks aplikasi dan prinsip desain</td><td>Bagian 01</td></tr>
+    <tr><td>2. Ruang lingkup, aktor, dan lifecycle</td><td>Bagian 02–03</td></tr>
+    <tr><td>3. Workflow operasional</td><td>Bagian 04–06</td></tr>
+    <tr><td>4. Arsitektur data dan aturan bisnis</td><td>Bagian 07–09</td></tr>
+    <tr><td>5. RBAC, scope, menu, dan laporan</td><td>Bagian 10–13</td></tr>
+    <tr><td>6. Arsitektur Laravel, keamanan, dan pengujian</td><td>Bagian 14–17</td></tr>
+    <tr><td>7. Roadmap dan acceptance criteria</td><td>Bagian 18–20</td></tr>
+  </table>
+</section>
+
+<section class="page-break">
+  <div class="eyebrow">01 · Konteks</div>
+  <h2>Fondasi Aplikasi yang Digunakan</h2>
+  <table>
+    <tr><th>Fondasi saat ini</th><th>Pemanfaatan pada Asset Management</th></tr>
+    <tr><td>Employee, Branch, Department</td><td>Custodian aset, lokasi organisasi, kepemilikan divisi, dan offboarding check.</td></tr>
+    <tr><td>Spatie Permission + katalog RBAC</td><td>Permission per menu/aksi serta default role yang dikelola dari Kontrol Akses.</td></tr>
+    <tr><td>DataScope fail-closed</td><td>Pengguna hanya melihat aset sesuai cabang/divisi/tim; tanpa scope berarti tanpa data.</td></tr>
+    <tr><td>ActivityLogger + observer</td><td>Audit create/update/archive dan event workflow penting dengan snapshot pelaku.</td></tr>
+    <tr><td>Private storage</td><td>Invoice, garansi, foto kondisi, dan berita acara tidak dibuka sebagai URL publik.</td></tr>
+    <tr><td>Notifications</td><td>Reminder pengembalian, warranty, maintenance, approval, dan aset belum kembali.</td></tr>
+    <tr><td>Laravel Excel + DomPDF</td><td>Import master, export laporan, label QR, dan berita acara PDF.</td></tr>
+  </table>
+  <h3>Prinsip desain</h3>
+  <table class="two-col"><tr><td>
+    <div class="callout"><strong>Historis, bukan overwrite</strong><br>Assignment dan transaksi lama tidak ditimpa atau dihapus.</div>
+    <div class="callout"><strong>Fail closed</strong><br>Permission menu dan object-level authorization harus sama-sama lolos.</div>
+    <div class="callout"><strong>Satu sumber kebenaran</strong><br>Status assigned harus konsisten dengan assignment yang masih terbuka.</div>
+  </td><td>
+    <div class="callout blue"><strong>Workflow atomik</strong><br>Assign, return, dan transfer berjalan dalam transaction + row lock.</div>
+    <div class="callout blue"><strong>Dokumen privat</strong><br>Download hanya melalui endpoint berotorisasi.</div>
+    <div class="callout blue"><strong>MVP lebih dulu</strong><br>Lifecycle operasional didahulukan; depresiasi/procurement menyusul.</div>
+  </td></tr></table>
+  <div class="callout warn"><strong>Batas desain:</strong> perangkat fingerprint yang sekarang ada tetap merupakan perangkat absensi. Ia dapat direferensikan sebagai aset bila diperlukan, tetapi tabel dan workflow operasional absensi tidak digabung dengan asset master.</div>
+</section>
+
+<section class="page-break">
+  <div class="eyebrow">02 · Cakupan</div>
+  <h2>Ruang Lingkup Produk</h2>
+  <table>
+    <tr><th>Termasuk MVP</th><th>Fase berikutnya</th><th>Di luar cakupan awal</th></tr>
+    <tr>
+      <td>Dashboard; kategori; master aset; foto/dokumen; assign; return; transfer; histori; audit; scope; export; Aset Saya; offboarding check.</td>
+      <td>Maintenance terjadwal; QR label; stock opname; import; approval disposal; reminders; berita acara PDF.</td>
+      <td>General ledger; jurnal akuntansi; pembayaran vendor; purchasing end-to-end; perpajakan; integrasi ERP.</td>
+    </tr>
+  </table>
+  <h3>Aktor utama</h3>
+  <table>
+    <tr><th>Aktor</th><th>Kebutuhan utama</th><th>Batas akses</th></tr>
+    <tr><td>Asset Admin Pusat</td><td>Kelola master dan seluruh lifecycle</td><td>Semua cabang bila memiliki <span class="tag">assets.view.all</span></td></tr>
+    <tr><td>Asset Officer Cabang</td><td>Serah-terima, transfer, cek kondisi</td><td>Cabang/divisi yang ditetapkan</td></tr>
+    <tr><td>HR Manager</td><td>Cek aset karyawan dan offboarding</td><td>Scope data karyawan</td></tr>
+    <tr><td>Department Head</td><td>Melihat aset divisi/bawahan</td><td>Divisi atau reporting line</td></tr>
+    <tr><td>Employee</td><td>Melihat dan mengakui aset sendiri</td><td>Assignment milik sendiri</td></tr>
+    <tr><td>Auditor</td><td>Membaca histori dan export</td><td>Read-only sesuai scope</td></tr>
+    <tr><td>Approver Disposal</td><td>Menyetujui penghapusan/disposal</td><td>Terpisah dari pembuat usulan</td></tr>
+  </table>
+  <h3>Objek yang dikelola</h3>
+  <p><span class="tag">Laptop</span><span class="tag">Desktop</span><span class="tag">Monitor</span><span class="tag">Printer</span><span class="tag">Telepon</span><span class="tag">Kendaraan</span><span class="tag">Furnitur</span><span class="tag">Mesin</span><span class="tag">Peralatan kerja</span></p>
+</section>
+
+<section class="page-break">
+  <div class="eyebrow">03 · Lifecycle</div>
+  <h2>Status Lifecycle dan Kondisi</h2>
+  <p>Status menjawab <em>“aset sedang berada pada proses apa?”</em>, sedangkan kondisi menjawab <em>“keadaan fisiknya bagaimana?”</em>. Keduanya tidak boleh disatukan.</p>
+  <table class="flow">
+    <tr>
+      <td class="node">Draft</td><td class="arrow">→</td>
+      <td class="node success">Available</td><td class="arrow">→</td>
+      <td class="node">Assigned</td><td class="arrow">→</td>
+      <td class="node decision">Maintenance</td><td class="arrow">→</td>
+      <td class="node success">Available</td>
+    </tr>
+  </table>
+  <table class="flow">
+    <tr>
+      <td class="node">Assigned</td><td class="arrow">→</td>
+      <td class="node danger">Lost</td><td class="arrow">→</td>
+      <td class="node">Ditemukan</td><td class="arrow">→</td>
+      <td class="node decision">Inspeksi</td><td class="arrow">→</td>
+      <td class="node success">Available</td>
+    </tr>
+  </table>
+  <table class="flow">
+    <tr>
+      <td class="node success">Available</td><td class="arrow">→</td>
+      <td class="node">Retired</td><td class="arrow">→</td>
+      <td class="node danger">Disposed</td>
+      <td style="width:40%"></td>
+    </tr>
+  </table>
+  <table>
+    <tr><th>Status</th><th>Arti</th><th>Aksi yang diperbolehkan</th></tr>
+    <tr><td class="status">draft</td><td>Registrasi belum final</td><td>Edit, lengkapi, aktivasi</td></tr>
+    <tr><td class="status s-available">available</td><td>Siap digunakan</td><td>Assign, transfer lokasi, maintenance, retire</td></tr>
+    <tr><td class="status s-assigned">assigned</td><td>Memiliki assignment aktif</td><td>Return, transfer custodian, lapor rusak/hilang</td></tr>
+    <tr><td class="status s-maintenance">maintenance</td><td>Dalam servis/perawatan</td><td>Selesaikan maintenance; tidak dapat di-assign</td></tr>
+    <tr><td class="status s-lost">lost</td><td>Belum ditemukan</td><td>Investigasi atau ditemukan kembali</td></tr>
+    <tr><td class="status s-retired">retired</td><td>Tidak dipakai, masih tercatat</td><td>Disposal setelah approval</td></tr>
+    <tr><td class="status s-retired">disposed</td><td>Lifecycle selesai</td><td>Read-only</td></tr>
+  </table>
+  <p><strong>Kondisi:</strong> <span class="tag">new</span><span class="tag">good</span><span class="tag">fair</span><span class="tag">damaged</span><span class="tag">unusable</span></p>
+  <div class="callout warn"><strong>Invariant:</strong> status <code>assigned</code> tidak boleh ada tanpa satu assignment terbuka; satu aset tidak boleh mempunyai dua assignment terbuka.</div>
+</section>
+
+<section class="page-break">
+  <div class="eyebrow">04 · Workflow</div>
+  <h2>Flow Registrasi dan Penyerahan</h2>
+  <h3>A. Registrasi aset</h3>
+  <table class="flow"><tr>
+    <td class="node">Input master</td><td class="arrow">→</td>
+    <td class="node decision">Validasi kode & serial</td><td class="arrow">→</td>
+    <td class="node">Simpan dokumen privat</td><td class="arrow">→</td>
+    <td class="node success">Available</td>
+  </tr></table>
+  <div class="lane"><span class="lane-title">Asset Officer</span><span class="lane-content">Mengisi kategori, identitas, lokasi, nilai perolehan, garansi, kondisi, foto, dan dokumen.</span></div>
+  <div class="lane"><span class="lane-title">Sistem</span><span class="lane-content">Membuat kode bila otomatis, memvalidasi uniqueness, menyimpan dokumen privat, mencatat audit, dan menetapkan status awal.</span></div>
+  <h3>B. Penyerahan kepada karyawan</h3>
+  <table class="flow"><tr>
+    <td class="node">Pilih aset</td><td class="arrow">→</td>
+    <td class="node decision">Available?</td><td class="arrow">→</td>
+    <td class="node decision">Karyawan aktif & dalam scope?</td><td class="arrow">→</td>
+    <td class="node">Konfirmasi kondisi</td><td class="arrow">→</td>
+    <td class="node success">Assignment aktif</td>
+  </tr></table>
+  <table>
+    <tr><th>Data wajib</th><th>Validasi kritis</th><th>Efek berhasil</th></tr>
+    <tr>
+      <td>Aset, karyawan, tanggal, kondisi, tujuan, petugas; target return bila sementara.</td>
+      <td>Aset tersedia; employee aktif; object berada dalam scope; tidak ada assignment terbuka.</td>
+      <td>Buat assignment; ubah status; tulis transaction; audit; kirim notifikasi; opsional berita acara.</td>
+    </tr>
+  </table>
+  <div class="callout blue"><strong>Concurrency:</strong> workflow harus melakukan <code>lockForUpdate()</code> pada aset di dalam <code>DB::transaction()</code>. Dua petugas tidak boleh berhasil menyerahkan aset yang sama secara bersamaan.</div>
+</section>
+
+<section class="page-break">
+  <div class="eyebrow">05 · Workflow</div>
+  <h2>Flow Pengembalian dan Transfer</h2>
+  <h3>A. Pengembalian</h3>
+  <table class="flow"><tr>
+    <td class="node">Cari assignment aktif</td><td class="arrow">→</td>
+    <td class="node">Inspeksi & foto</td><td class="arrow">→</td>
+    <td class="node decision">Kondisi?</td><td class="arrow">→</td>
+    <td class="node success">Available</td><td class="arrow"> / </td>
+    <td class="node danger">Maintenance / Lost</td>
+  </tr></table>
+  <table>
+    <tr><th>Hasil inspeksi</th><th>Status berikut</th><th>Tindak lanjut</th></tr>
+    <tr><td>Baik dan lengkap</td><td class="s-available">available</td><td>Siap untuk assignment berikutnya</td></tr>
+    <tr><td>Perlu servis</td><td class="s-maintenance">maintenance</td><td>Buat maintenance case</td></tr>
+    <tr><td>Rusak berat</td><td class="s-retired">retired</td><td>Review kelayakan dan disposal</td></tr>
+    <tr><td>Tidak dikembalikan/hilang</td><td class="s-lost">lost</td><td>Investigation record dan notifikasi</td></tr>
+  </table>
+  <h3>B. Transfer</h3>
+  <table class="flow"><tr>
+    <td class="node">Assignment lama</td><td class="arrow">→</td>
+    <td class="node">Tutup & catat kondisi</td><td class="arrow">→</td>
+    <td class="node decision">Validasi tujuan</td><td class="arrow">→</td>
+    <td class="node">Buat assignment/lokasi baru</td><td class="arrow">→</td>
+    <td class="node success">Transfer selesai</td>
+  </tr></table>
+  <p>Transfer dibedakan menjadi: antarkaryawan, antardivisi, antarcabang, dan ke lokasi/gudang. Penutupan dan pembukaan assignment harus berhasil atau gagal sebagai satu unit transaksi.</p>
+  <div class="callout warn"><strong>Dilarang:</strong> mengubah langsung <code>employee_id</code> atau <code>branch_id</code> tanpa transaction record. Cara tersebut menghilangkan jejak asal aset.</div>
+</section>
+
+<section class="page-break">
+  <div class="eyebrow">06 · Workflow</div>
+  <h2>Maintenance, Stock Opname, dan Offboarding</h2>
+  <h3>Maintenance</h3>
+  <table class="flow"><tr>
+    <td class="node">Keluhan / jadwal</td><td class="arrow">→</td>
+    <td class="node">Check-in servis</td><td class="arrow">→</td>
+    <td class="node decision">Vendor / internal</td><td class="arrow">→</td>
+    <td class="node">Biaya & tindakan</td><td class="arrow">→</td>
+    <td class="node success">Selesai & inspeksi</td>
+  </tr></table>
+  <p>Case menyimpan keluhan, vendor, tanggal, kondisi, biaya, komponen, dokumen servis, petugas, serta jadwal berikutnya. Selama case aktif, aset tidak dapat di-assign.</p>
+  <h3>Stock opname</h3>
+  <table class="flow"><tr>
+    <td class="node">Buka periode</td><td class="arrow">→</td>
+    <td class="node">Scan / cari aset</td><td class="arrow">→</td>
+    <td class="node decision">Cocok?</td><td class="arrow">→</td>
+    <td class="node">Review selisih</td><td class="arrow">→</td>
+    <td class="node success">Rekonsiliasi</td>
+  </tr></table>
+  <p>Hasil scan disimpan sebagai temuan. Master tidak berubah sebelum reviewer menyetujui rekonsiliasi.</p>
+  <h3>Offboarding karyawan</h3>
+  <table class="flow"><tr>
+    <td class="node">Proses keluar</td><td class="arrow">→</td>
+    <td class="node decision">Ada aset aktif?</td><td class="arrow">→</td>
+    <td class="node danger">Tahan / warning</td><td class="arrow">→</td>
+    <td class="node">Return / exception approval</td><td class="arrow">→</td>
+    <td class="node success">Nonaktif</td>
+  </tr></table>
+  <div class="callout"><strong>Rekomendasi kebijakan:</strong> default-nya proses keluar diblokir bila aset aktif masih ada. Superadmin/HR tertentu dapat memakai exception dengan alasan wajib, dan exception tersebut dicatat di audit log.</div>
+</section>
+
+<section class="page-break">
+  <div class="eyebrow">07 · Data</div>
+  <h2>Entity Relationship Diagram</h2>
+  <p class="muted">Notasi: PK = primary key, FK = foreign key, UQ = unique. Diagram menunjukkan relasi inti, bukan seluruh kolom teknis.</p>
+  <table class="erd"><tr>
+    <td><div class="entity"><div class="entity-title">asset_categories</div><div class="entity-body">PK id<br>UQ code<br>name<br>asset_prefix<br>requires_serial<br>requires_maintenance<br>useful_life_months<br>is_active</div></div></td>
+    <td><div class="entity"><div class="entity-title">assets</div><div class="entity-body">PK id<br>UQ asset_code<br>FK category_id<br>FK owning_branch_id<br>FK current_branch_id<br>FK department_id?<br>name, brand, model<br>UQ serial_number?<br>status, condition<br>acquired_at, cost<br>warranty_expires_at<br>retired_at, disposed_at</div></div></td>
+    <td><div class="entity"><div class="entity-title">asset_assignments</div><div class="entity-body">PK id<br>FK asset_id<br>FK employee_id<br>FK assigned_by<br>assigned_at<br>returned_at?<br>condition_out<br>condition_in?<br>purpose<br>expected_return_at?</div></div></td>
+  </tr><tr>
+    <td><div class="entity"><div class="entity-title">asset_transactions</div><div class="entity-body">PK id<br>FK asset_id<br>FK actor_id<br>type<br>from/to status<br>from/to branch<br>from/to department<br>from/to employee<br>condition<br>occurred_at<br>notes, metadata JSON</div></div></td>
+    <td><div class="entity"><div class="entity-title">asset_maintenances</div><div class="entity-body">PK id<br>FK asset_id<br>FK vendor_id?<br>status<br>complaint, action<br>started_at, completed_at<br>cost<br>condition_before/after<br>next_maintenance_at</div></div></td>
+    <td><div class="entity"><div class="entity-title">asset_documents</div><div class="entity-body">PK id<br>FK asset_id<br>FK assignment_id?<br>FK maintenance_id?<br>type<br>disk, path<br>original_name<br>mime_type, size<br>uploaded_by</div></div></td>
+  </tr><tr>
+    <td><div class="entity"><div class="entity-title">asset_vendors</div><div class="entity-body">PK id<br>UQ code<br>name<br>contact_person<br>phone, email<br>address<br>is_active</div></div></td>
+    <td><div class="entity"><div class="entity-title">asset_stocktakes</div><div class="entity-body">PK id<br>FK branch_id<br>period, status<br>started_at, closed_at<br>created_by, reviewed_by</div></div></td>
+    <td><div class="entity"><div class="entity-title">asset_stocktake_items</div><div class="entity-body">PK id<br>FK stocktake_id<br>FK asset_id<br>result<br>actual_location<br>actual_condition<br>scanned_at<br>review_notes</div></div></td>
+  </tr></table>
+  <div class="legend"><strong>Relasi:</strong> Category 1—* Asset · Branch/Department 1—* Asset · Asset 1—* Assignment/Transaction/Maintenance/Document · Employee 1—* Assignment · Stocktake 1—* Stocktake Item.</div>
+</section>
+
+<section class="page-break">
+  <div class="eyebrow">08 · Data</div>
+  <h2>Kamus Data Master Aset</h2>
+  <table>
+    <tr><th>Field</th><th>Tipe konseptual</th><th>Aturan</th></tr>
+    <tr><td>asset_code</td><td>varchar(50)</td><td>Wajib, unik, immutable setelah aktivasi</td></tr>
+    <tr><td>category_id</td><td>FK</td><td>Wajib; category nonaktif tetap dapat direferensikan data lama</td></tr>
+    <tr><td>serial_number</td><td>varchar nullable</td><td>Unik bila diisi; normalisasi spasi/case</td></tr>
+    <tr><td>owning_branch_id</td><td>FK</td><td>Wajib; unit organisasi pemilik aset dan tidak otomatis berubah saat transfer fisik</td></tr>
+    <tr><td>current_branch_id</td><td>FK</td><td>Wajib; lokasi fisik terkini dan berubah melalui transaction</td></tr>
+    <tr><td>department_id</td><td>FK nullable</td><td>Harus valid untuk cabang bila relasi organisasi mensyaratkan</td></tr>
+    <tr><td>status</td><td>varchar indexed</td><td>Transisi hanya melalui domain Action</td></tr>
+    <tr><td>condition</td><td>varchar indexed</td><td>Nilai label terpusat/PHP Enum</td></tr>
+    <tr><td>acquisition_cost</td><td>decimal(18,2)</td><td>Non-negatif; bukan float</td></tr>
+    <tr><td>acquired_at</td><td>date</td><td>Tidak boleh di masa depan tanpa kebijakan pre-registration</td></tr>
+    <tr><td>warranty_expires_at</td><td>date nullable</td><td>Index untuk reminder/report</td></tr>
+    <tr><td>next_maintenance_at</td><td>date nullable</td><td>Index untuk scheduler</td></tr>
+    <tr><td>created_by</td><td>FK user</td><td>Pelaku registrasi; snapshot tetap ada di audit</td></tr>
+    <tr><td>deleted_at</td><td>timestamp nullable</td><td>Hanya untuk draft tanpa histori; lifecycle menggunakan retired/disposed</td></tr>
+  </table>
+  <h3>Indeks minimum</h3>
+  <div class="code">UNIQUE (asset_code)
+UNIQUE (serial_number) — hanya bila terisi
+INDEX (current_branch_id, status)
+INDEX (owning_branch_id, status)
+INDEX (category_id, status)
+INDEX (department_id, status)
+INDEX (warranty_expires_at)
+INDEX (next_maintenance_at)
+INDEX asset_assignments (asset_id, returned_at)
+INDEX asset_assignments (employee_id, returned_at)
+INDEX asset_transactions (asset_id, occurred_at)</div>
+  <div class="callout blue">Migration dibuat baru dan reversible. Migration yang sudah pernah dijalankan di production tidak diubah.</div>
+  <div class="callout warn"><strong>Portabilitas database:</strong> jangan mengandalkan partial unique index untuk menjamin satu assignment aktif. SQLite dan MySQL memiliki perilaku NULL/index yang berbeda. Jaminan utama adalah transaction, <code>lockForUpdate()</code>, pemeriksaan assignment terbuka, dan automated invariant test.</div>
+</section>
+
+<section class="page-break">
+  <div class="eyebrow">09 · Aturan</div>
+  <h2>Business Rules dan Invariant</h2>
+  <table>
+    <tr><th>#</th><th>Aturan</th><th>Penegakan</th></tr>
+    <tr><td>BR-01</td><td>Kode aset selalu unik dan tidak berubah setelah aktivasi.</td><td>Unique index + validation.</td></tr>
+    <tr><td>BR-02</td><td>Satu aset maksimal satu assignment aktif.</td><td>Transaction, row lock, query invariant.</td></tr>
+    <tr><td>BR-03</td><td>Aset assigned wajib memiliki assignment aktif.</td><td>Domain Action + consistency test.</td></tr>
+    <tr><td>BR-04</td><td>Aset maintenance/lost/retired/disposed tidak dapat di-assign.</td><td>State transition guard.</td></tr>
+    <tr><td>BR-05</td><td>Karyawan nonaktif tidak dapat menerima aset baru.</td><td>Assignment request + Action guard.</td></tr>
+    <tr><td>BR-06</td><td>Return menutup assignment; tidak menghapus histori.</td><td>Update returned_at + transaction event.</td></tr>
+    <tr><td>BR-07</td><td>Transfer merupakan satu transaksi atomik.</td><td>DB transaction.</td></tr>
+    <tr><td>BR-08</td><td>Aset dengan histori tidak dapat hard delete.</td><td>Deletion blocker; gunakan retired/disposed.</td></tr>
+    <tr><td>BR-09</td><td>Scope diberlakukan pada list, detail, mutation, download, dan export.</td><td>AssetScope + Policy/authorization.</td></tr>
+    <tr><td>BR-10</td><td>Dokumen tidak memiliki public URL.</td><td>Private disk + authorized controller.</td></tr>
+    <tr><td>BR-11</td><td>Disposal dibuat dan disetujui oleh pihak berbeda.</td><td>Permission terpisah + SoD check.</td></tr>
+    <tr><td>BR-12</td><td>Stock opname tidak langsung menimpa master.</td><td>Review/reconciliation workflow.</td></tr>
+  </table>
+  <h3>Contoh transition guard</h3>
+  <table>
+    <tr><th>Dari</th><th>Ke</th><th>Syarat</th></tr>
+    <tr><td>available</td><td>assigned</td><td>Employee aktif, dalam scope, kondisi layak</td></tr>
+    <tr><td>assigned</td><td>available</td><td>Assignment aktif ditutup dan kondisi layak</td></tr>
+    <tr><td>assigned</td><td>maintenance</td><td>Assignment ditutup atau replacement policy ditentukan</td></tr>
+    <tr><td>maintenance</td><td>available</td><td>Maintenance selesai dan inspeksi lulus</td></tr>
+    <tr><td>available</td><td>retired</td><td>Alasan dan bukti dicatat</td></tr>
+    <tr><td>retired</td><td>disposed</td><td>Approval disposal lengkap</td></tr>
+  </table>
+</section>
+
+<section class="page-break">
+  <div class="eyebrow">10 · Access Control</div>
+  <h2>Permission Matrix</h2>
+  <table class="small">
+    <tr><th>Kapabilitas</th><th>Superadmin</th><th>Asset Admin</th><th>Officer Cabang</th><th>HR</th><th>Head</th><th>Employee</th><th>Auditor</th></tr>
+    <tr><td>Lihat master</td><td>✓</td><td>✓</td><td>Scope</td><td>Scope</td><td>Scope</td><td>—</td><td>Scope</td></tr>
+    <tr><td>Registrasi/edit</td><td>✓</td><td>✓</td><td>Scope</td><td>—</td><td>—</td><td>—</td><td>—</td></tr>
+    <tr><td>Assign/return</td><td>✓</td><td>✓</td><td>Scope</td><td>Opsional</td><td>—</td><td>—</td><td>—</td></tr>
+    <tr><td>Transfer</td><td>✓</td><td>✓</td><td>Scope</td><td>—</td><td>—</td><td>—</td><td>—</td></tr>
+    <tr><td>Maintenance</td><td>✓</td><td>✓</td><td>Scope</td><td>—</td><td>—</td><td>—</td><td>Read</td></tr>
+    <tr><td>Usul disposal</td><td>✓</td><td>✓</td><td>Scope</td><td>—</td><td>—</td><td>—</td><td>—</td></tr>
+    <tr><td>Approve disposal</td><td>✓</td><td>Role terpisah</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td></tr>
+    <tr><td>Aset Saya</td><td>✓</td><td>✓</td><td>✓</td><td>✓</td><td>✓</td><td>✓</td><td>✓</td></tr>
+    <tr><td>Export</td><td>✓</td><td>✓</td><td>Scope</td><td>Scope</td><td>—</td><td>—</td><td>Scope</td></tr>
+  </table>
+  <h3>Katalog permission</h3>
+  <p><span class="tag">assets.view</span><span class="tag">assets.view.all</span><span class="tag">assets.create</span><span class="tag">assets.update</span><span class="tag">assets.delete</span><span class="tag">assets.import</span><span class="tag">assets.export</span></p>
+  <p><span class="tag">asset-assignments.view</span><span class="tag">asset-assignments.assign</span><span class="tag">asset-assignments.return</span><span class="tag">asset-assignments.transfer</span></p>
+  <p><span class="tag">asset-maintenance.view</span><span class="tag">asset-maintenance.create</span><span class="tag">asset-maintenance.update</span><span class="tag">asset-maintenance.complete</span></p>
+  <p><span class="tag">asset-disposals.request</span><span class="tag">asset-disposals.approve</span><span class="tag">asset-reports.view</span><span class="tag">asset-reports.export</span><span class="tag">my-assets.view</span></p>
+  <div class="callout warn"><strong>Security rule:</strong> menyembunyikan tombol di Blade bukan authorization. Route middleware dan pemeriksaan object-level tetap wajib.</div>
+</section>
+
+<section class="page-break">
+  <div class="eyebrow">11 · Scope</div>
+  <h2>Model Cakupan Data</h2>
+  <table class="flow"><tr>
+    <td class="node">Request pengguna</td><td class="arrow">→</td>
+    <td class="node decision">assets.view?</td><td class="arrow">→</td>
+    <td class="node decision">view.all?</td><td class="arrow">→</td>
+    <td class="node">Filter branch / dept / team</td><td class="arrow">→</td>
+    <td class="node success">Object authorized</td>
+  </tr></table>
+  <table>
+    <tr><th>Skenario</th><th>Data yang terlihat</th></tr>
+    <tr><td>Superadmin atau <code>assets.view.all</code></td><td>Semua aset.</td></tr>
+    <tr><td>Officer dengan branch scope</td><td>Aset yang berada/dimiliki cabang tersebut.</td></tr>
+    <tr><td>User dengan department scope</td><td>Aset divisi tersebut dan assignment terkait.</td></tr>
+    <tr><td>Head dibatasi bawahan</td><td>Aset yang sedang dipegang bawahan dalam reporting line.</td></tr>
+    <tr><td>Employee self-service</td><td>Assignment aktif dan histori miliknya sendiri.</td></tr>
+    <tr><td>Tanpa bypass dan tanpa scope</td><td>Tidak ada data; tampilkan scope notice.</td></tr>
+  </table>
+  <h3>Titik yang wajib menggunakan scope</h3>
+  <p><span class="tag">index</span><span class="tag">show</span><span class="tag">edit/update</span><span class="tag">assign</span><span class="tag">return</span><span class="tag">transfer</span><span class="tag">maintenance</span><span class="tag">documents</span><span class="tag">export</span><span class="tag">search/ajax</span></p>
+  <div class="callout">Implementasikan sebagai <strong>AssetScope</strong> yang konsisten dengan pola DataScope saat ini. Query list dan authorization terhadap satu objek harus memakai definisi scope yang sama.</div>
+</section>
+
+<section class="page-break">
+  <div class="eyebrow">12 · Experience</div>
+  <h2>Information Architecture dan Halaman</h2>
+  <table class="two-col"><tr><td>
+    <h3>Sidebar admin</h3>
+    <div class="code">Asset Management
+├── Dashboard Aset
+├── Daftar Aset
+├── Penyerahan & Pengembalian
+├── Transfer
+├── Maintenance
+├── Stock Opname
+├── Laporan
+└── Master
+    ├── Kategori
+    └── Vendor</div>
+  </td><td>
+    <h3>Self-service</h3>
+    <div class="code">Menu Saya
+└── Aset Saya
+    ├── Sedang dipegang
+    ├── Riwayat
+    └── Konfirmasi serah-terima</div>
+  </td></tr></table>
+  <h3>Halaman daftar aset</h3>
+  <p>Search kode/nama/serial; filter status, kondisi, kategori, cabang, divisi, pemegang, garansi, maintenance; pagination; column selection; export sesuai filter.</p>
+  <h3>Halaman detail aset</h3>
+  <table>
+    <tr><th>Tab</th><th>Isi</th></tr>
+    <tr><td>Ringkasan</td><td>Identitas, status, kondisi, foto, lokasi, nilai, garansi, quick actions.</td></tr>
+    <tr><td>Pemegang & lokasi</td><td>Assignment aktif dan perjalanan lokasi.</td></tr>
+    <tr><td>Histori</td><td>Timeline transaksi lifecycle yang immutable.</td></tr>
+    <tr><td>Maintenance</td><td>Case aktif, histori servis, biaya, jadwal berikut.</td></tr>
+    <tr><td>Dokumen</td><td>Invoice, warranty, foto, berita acara, dokumen disposal.</td></tr>
+    <tr><td>Audit</td><td>Siapa mengubah field apa dan kapan.</td></tr>
+  </table>
+  <h3>Dashboard cards</h3>
+  <p><span class="tag">Total</span><span class="tag">Available</span><span class="tag">Assigned</span><span class="tag">Maintenance</span><span class="tag">Lost</span><span class="tag">Warranty ≤ 30 hari</span><span class="tag">Overdue return</span><span class="tag">Nilai perolehan</span></p>
+</section>
+
+<section class="page-break">
+  <div class="eyebrow">13 · Reporting</div>
+  <h2>Laporan dan Notifikasi</h2>
+  <table>
+    <tr><th>Laporan</th><th>Dimensi/filter</th><th>Format</th></tr>
+    <tr><td>Register aset</td><td>Kategori, cabang, divisi, status, kondisi</td><td>Web, Excel, PDF</td></tr>
+    <tr><td>Aset per karyawan</td><td>Employee, departemen, aktif/nonaktif</td><td>Web, Excel</td></tr>
+    <tr><td>Histori perpindahan</td><td>Periode, tipe, asal, tujuan, pelaku</td><td>Web, Excel</td></tr>
+    <tr><td>Maintenance & biaya</td><td>Vendor, kategori, periode, status</td><td>Web, Excel, PDF</td></tr>
+    <tr><td>Warranty expiry</td><td>Jatuh tempo 30/60/90 hari</td><td>Web, Excel</td></tr>
+    <tr><td>Stock opname variance</td><td>Periode, lokasi, hasil, reviewer</td><td>Web, Excel, PDF</td></tr>
+    <tr><td>Retired/disposed</td><td>Periode, alasan, approver, nilai</td><td>Web, Excel, PDF</td></tr>
+  </table>
+  <h3>Notifikasi yang bernilai tinggi</h3>
+  <table>
+    <tr><th>Trigger</th><th>Penerima</th><th>Waktu</th></tr>
+    <tr><td>Assignment baru</td><td>Employee + officer</td><td>Setelah transaction commit</td></tr>
+    <tr><td>Expected return mendekat/lewat</td><td>Employee + officer</td><td>H-7, H-1, overdue</td></tr>
+    <tr><td>Warranty berakhir</td><td>Asset admin</td><td>H-90, H-30</td></tr>
+    <tr><td>Maintenance jatuh tempo</td><td>Officer cabang</td><td>H-14, overdue</td></tr>
+    <tr><td>Offboarding masih punya aset</td><td>HR + asset officer</td><td>Saat proses keluar</td></tr>
+    <tr><td>Disposal menunggu approval</td><td>Approver</td><td>Setelah pengajuan</td></tr>
+  </table>
+  <p class="muted">Scheduler menggunakan withoutOverlapping; notifikasi workflow dikirim setelah database transaction berhasil.</p>
+</section>
+
+<section class="page-break">
+  <div class="eyebrow">14 · Laravel Design</div>
+  <h2>Arsitektur Implementasi</h2>
+  <table class="flow"><tr>
+    <td class="node">Route + Permission</td><td class="arrow">→</td>
+    <td class="node">Form Request</td><td class="arrow">→</td>
+    <td class="node">Policy / AssetScope</td><td class="arrow">→</td>
+    <td class="node decision">Action / Service</td><td class="arrow">→</td>
+    <td class="node success">Models + Events</td>
+  </tr></table>
+  <h3>Single-purpose Actions</h3>
+  <table class="two-col"><tr><td>
+    <ul>
+      <li>RegisterAsset</li><li>UpdateAsset</li><li>AssignAsset</li><li>ReturnAsset</li><li>TransferAsset</li><li>MarkAssetLost</li>
+    </ul>
+  </td><td>
+    <ul>
+      <li>StartAssetMaintenance</li><li>CompleteAssetMaintenance</li><li>RetireAsset</li><li>RequestAssetDisposal</li><li>ApproveAssetDisposal</li><li>ReconcileStocktake</li>
+    </ul>
+  </td></tr></table>
+  <h3>Form Requests</h3>
+  <p><span class="tag">StoreAssetRequest</span><span class="tag">UpdateAssetRequest</span><span class="tag">AssignAssetRequest</span><span class="tag">ReturnAssetRequest</span><span class="tag">TransferAssetRequest</span><span class="tag">MaintenanceRequest</span><span class="tag">DisposalRequest</span></p>
+  <h3>Model relationships</h3>
+  <p><code>Asset</code> belongsTo Category/Branch/Department/Creator; hasMany Assignments/Transactions/Maintenances/Documents; hasOne currentAssignment menggunakan constraint <code>returned_at IS NULL</code>. Semua relationship memakai return type dan index yang sesuai.</p>
+  <h3>Query pattern</h3>
+  <div class="code">Asset::query()
+  ->select(/* kolom list */)
+  ->visibleTo($user)
+  ->matchingFilters($filters)
+  ->with(['category:id,name', 'branch:id,name', 'currentAssignment.employee:id,full_name'])
+  ->withCount(['maintenances', 'documents'])
+  ->latest('id')
+  ->paginate($perPage);</div>
+  <div class="callout blue">Tujuan arsitektur ini adalah menjaga controller tetap tipis dan memastikan business rule yang sama dipakai oleh UI, import, maupun proses terjadwal.</div>
+</section>
+
+<section class="page-break">
+  <div class="eyebrow">15 · Routes & Files</div>
+  <h2>Rancangan Route dan Struktur Kode</h2>
+  <table class="two-col"><tr><td>
+    <h3>Route groups</h3>
+    <div class="code">/assets
+  GET    /dashboard
+  GET    /
+  POST   /
+  GET    /{asset}
+  PUT    /{asset}
+  POST   /{asset}/assign
+  POST   /{asset}/return
+  POST   /{asset}/transfer
+  POST   /{asset}/maintenance
+  GET    /{asset}/documents/{document}
+
+/my-assets
+  GET    /
+  POST   /{assignment}/acknowledge</div>
+  </td><td>
+    <h3>Folder utama</h3>
+    <div class="code">app/
+├── Actions/Assets/
+├── Enums/Asset*.php
+├── Http/Controllers/Assets/
+├── Http/Requests/Assets/
+├── Models/Asset*.php
+├── Notifications/Assets/
+├── Policies/AssetPolicy.php
+└── Support/AssetScope.php
+
+resources/views/assets/
+database/factories/
+tests/Feature/Assets/</div>
+  </td></tr></table>
+  <h3>Penamaan route</h3>
+  <p><span class="tag">assets.index</span><span class="tag">assets.show</span><span class="tag">assets.store</span><span class="tag">assets.update</span><span class="tag">assets.assign</span><span class="tag">assets.return</span><span class="tag">assets.transfer</span><span class="tag">assets.documents.show</span><span class="tag">my-assets.index</span></p>
+  <div class="callout warn">Route literal seperti <code>export</code>, <code>import</code>, dan <code>dashboard</code> harus dideklarasikan sebelum wildcard <code>{asset}</code>.</div>
+</section>
+
+<section class="page-break">
+  <div class="eyebrow">16 · Security</div>
+  <h2>Keamanan, Audit, dan Integritas</h2>
+  <table>
+    <tr><th>Risiko</th><th>Kontrol</th></tr>
+    <tr><td>IDOR: membuka aset/dokumen cabang lain</td><td>Permission + AssetPolicy/AssetScope pada setiap object endpoint.</td></tr>
+    <tr><td>Upload berbahaya</td><td>Whitelist MIME/extension/size, generated filename, private disk.</td></tr>
+    <tr><td>Double assignment</td><td>DB transaction, row lock, invariant check.</td></tr>
+    <tr><td>Manipulasi status via request</td><td>Status tidak mass-assignable dari form umum; hanya Action yang mengubah.</td></tr>
+    <tr><td>Hilangnya histori</td><td>Deletion blocker, soft delete draft, lifecycle retirement/disposal.</td></tr>
+    <tr><td>Audit tidak lengkap</td><td>Observer untuk master; explicit ActivityLogger untuk workflow.</td></tr>
+    <tr><td>Approval oleh pembuat sendiri</td><td>Segregation of duties untuk disposal/adjustment.</td></tr>
+    <tr><td>Export bocor lintas scope</td><td>Export membangun query dari AssetScope yang sama dengan index.</td></tr>
+  </table>
+  <h3>Audit event minimum</h3>
+  <p><span class="tag">asset.created</span><span class="tag">asset.updated</span><span class="tag">asset.assigned</span><span class="tag">asset.returned</span><span class="tag">asset.transferred</span><span class="tag">asset.maintenance_started</span><span class="tag">asset.maintenance_completed</span><span class="tag">asset.lost</span><span class="tag">asset.retired</span><span class="tag">asset.disposed</span><span class="tag">asset.imported</span></p>
+  <p>Audit menyimpan actor, IP, user agent, subject snapshot, perubahan field, dan timestamp. Dokumen sensitif tidak dimasukkan ke properties audit.</p>
+</section>
+
+<section class="page-break">
+  <div class="eyebrow">17 · Quality</div>
+  <h2>Strategi Pengujian</h2>
+  <table>
+    <tr><th>Lapisan</th><th>Skenario minimum</th></tr>
+    <tr><td>Model/Enum</td><td>Relasi, casts, label status/kondisi, scopes, current assignment.</td></tr>
+    <tr><td>Permission</td><td>Setiap route menolak user tanpa permission; tombol menu mengikuti permission.</td></tr>
+    <tr><td>Data scope</td><td>Branch/dept/team/self; detail/download/export tidak dapat menembus scope.</td></tr>
+    <tr><td>Lifecycle</td><td>Transition valid berhasil; transition ilegal menghasilkan domain error.</td></tr>
+    <tr><td>Concurrency</td><td>Dua attempt assign tidak menghasilkan dua assignment aktif.</td></tr>
+    <tr><td>Documents</td><td>MIME/size invalid ditolak; download authorized; file lama dibersihkan aman.</td></tr>
+    <tr><td>Audit</td><td>Actor/subject/event/properties benar untuk semua workflow.</td></tr>
+    <tr><td>Offboarding</td><td>Karyawan dengan aset aktif diblokir atau butuh exception berizin.</td></tr>
+    <tr><td>Reports</td><td>Filter konsisten, totals benar, export mengikuti scope.</td></tr>
+    <tr><td>Performance</td><td>List tidak N+1, pagination stabil, index digunakan pada query utama.</td></tr>
+  </table>
+  <h3>Test files yang disarankan</h3>
+  <p><span class="tag">AssetCrudTest</span><span class="tag">AssetAssignmentTest</span><span class="tag">AssetReturnTest</span><span class="tag">AssetTransferTest</span><span class="tag">AssetScopeTest</span><span class="tag">AssetDocumentTest</span><span class="tag">AssetAuditTest</span><span class="tag">AssetOffboardingTest</span><span class="tag">AssetReportTest</span></p>
+  <div class="callout blue"><strong>Definition of done:</strong> fitur bukan hanya lolos happy path; authorization, race condition, histori, dan kegagalan upload juga memiliki automated test.</div>
+</section>
+
+<section class="page-break">
+  <div class="eyebrow">18 · Delivery</div>
+  <h2>Roadmap Implementasi</h2>
+  <table>
+    <tr><th>Fase</th><th>Deliverables</th><th>Dependency</th></tr>
+    <tr><td><strong>0 — Validasi</strong></td><td>Finalisasi terminology, status, ownership, scope, format kode, offboarding policy.</td><td>Keputusan bisnis</td></tr>
+    <tr><td><strong>1 — Foundation</strong></td><td>Schema, models, enums, AssetScope, permissions, factories, audit registry.</td><td>Fase 0</td></tr>
+    <tr><td><strong>2 — MVP Master</strong></td><td>Kategori, master aset, documents, list/detail/filter/export.</td><td>Foundation</td></tr>
+    <tr><td><strong>3 — Custody</strong></td><td>Assign, return, transfer, My Assets, notifications, offboarding guard.</td><td>MVP Master</td></tr>
+    <tr><td><strong>4 — Operations</strong></td><td>Maintenance, reminders, berita acara PDF, QR label.</td><td>Custody</td></tr>
+    <tr><td><strong>5 — Control</strong></td><td>Stock opname, reconciliation, approval disposal, reports.</td><td>Operations</td></tr>
+    <tr><td><strong>6 — Finance</strong></td><td>Depresiasi, procurement reference, budget/integration bila dibutuhkan.</td><td>Validasi Finance</td></tr>
+  </table>
+  <h3>Urutan release MVP</h3>
+  <table class="flow"><tr>
+    <td class="node">Foundation</td><td class="arrow">→</td>
+    <td class="node">Master</td><td class="arrow">→</td>
+    <td class="node">Custody</td><td class="arrow">→</td>
+    <td class="node">Offboarding</td><td class="arrow">→</td>
+    <td class="node success">Pilot 1 cabang</td>
+  </tr></table>
+  <div class="callout"><strong>Pilot:</strong> mulai dari satu cabang dan 2–3 kategori dengan volume tinggi (mis. laptop, monitor, telepon). Migrasikan spreadsheet setelah format dan workflow stabil.</div>
+</section>
+
+<section class="page-break">
+  <div class="eyebrow">19 · Acceptance</div>
+  <h2>Acceptance Criteria MVP</h2>
+  <table>
+    <tr><th>ID</th><th>Kriteria diterima</th></tr>
+    <tr><td>AC-01</td><td>Pengguna berizin dapat membuat aset dengan kode unik, kategori, cabang, kondisi, dan dokumen privat.</td></tr>
+    <tr><td>AC-02</td><td>Pengguna tanpa scope tidak melihat data; URL detail dan dokumen juga mengembalikan penolakan.</td></tr>
+    <tr><td>AC-03</td><td>Aset available dapat diserahkan kepada employee aktif dan menjadi assigned.</td></tr>
+    <tr><td>AC-04</td><td>Dua request penyerahan paralel tidak menghasilkan lebih dari satu assignment aktif.</td></tr>
+    <tr><td>AC-05</td><td>Pengembalian menutup assignment dan memilih status berikut berdasarkan kondisi.</td></tr>
+    <tr><td>AC-06</td><td>Transfer menyimpan asal/tujuan dan tidak kehilangan assignment sebelumnya.</td></tr>
+    <tr><td>AC-07</td><td>Employee dapat melihat asetnya sendiri tanpa melihat aset employee lain.</td></tr>
+    <tr><td>AC-08</td><td>Proses keluar mendeteksi assignment aktif dan menerapkan kebijakan block/exception.</td></tr>
+    <tr><td>AC-09</td><td>Semua create/update/assign/return/transfer memiliki audit actor dan timestamp.</td></tr>
+    <tr><td>AC-10</td><td>Daftar dapat difilter dan diekspor; hasil export identik dengan scope/filter layar.</td></tr>
+    <tr><td>AC-11</td><td>Aset dengan histori tidak dapat dihapus permanen dari UI.</td></tr>
+    <tr><td>AC-12</td><td>List utama memakai pagination dan eager loading tanpa N+1.</td></tr>
+  </table>
+  <h3>Exit criteria pilot</h3>
+  <ul>
+    <li>Data kategori dan aset pilot sudah direkonsiliasi.</li>
+    <li>Asset officer dan HR menyelesaikan UAT assign–return–transfer–offboarding.</li>
+    <li>Permission matrix ditandatangani pemilik proses.</li>
+    <li>Backup/restore dan export diverifikasi.</li>
+    <li>Tidak ada defect severity tinggi pada authorization atau integritas histori.</li>
+  </ul>
+</section>
+
+<section class="page-break">
+  <div class="eyebrow">20 · Decisions</div>
+  <h2>Keputusan Bisnis yang Harus Dikonfirmasi</h2>
+  <table>
+    <tr><th>#</th><th>Pertanyaan</th><th>Rekomendasi default</th></tr>
+    <tr><td>1</td><td>Siapa pemilik aset: cabang, divisi, atau keduanya?</td><td>Cabang wajib, divisi opsional.</td></tr>
+    <tr><td>2</td><td>Apakah employee wajib mengakui serah-terima?</td><td>Ya untuk kategori bernilai tinggi.</td></tr>
+    <tr><td>3</td><td>Apakah offboarding diblokir bila aset belum kembali?</td><td>Ya; exception khusus dengan alasan dan audit.</td></tr>
+    <tr><td>4</td><td>Format kode aset otomatis atau manual?</td><td>Otomatis dari prefix kategori + tahun + sequence.</td></tr>
+    <tr><td>5</td><td>Apakah serial number wajib?</td><td>Diatur per kategori.</td></tr>
+    <tr><td>6</td><td>Siapa yang boleh transfer antar cabang?</td><td>Asset Admin pusat atau permission khusus.</td></tr>
+    <tr><td>7</td><td>Siapa approver disposal?</td><td>Role terpisah dari requester; dapat berjenjang berdasar nilai.</td></tr>
+    <tr><td>8</td><td>Apakah nilai perolehan boleh dilihat semua officer?</td><td>Permission/report terpisah bila sensitif.</td></tr>
+    <tr><td>9</td><td>Aset apa yang masuk pilot?</td><td>Laptop, monitor, dan telepon.</td></tr>
+    <tr><td>10</td><td>Database production: SQLite atau database server?</td><td>Gunakan MySQL/PostgreSQL untuk concurrency operasional; SQLite tetap didukung untuk test/dev.</td></tr>
+    <tr><td>11</td><td>Apakah depresiasi diperlukan pada release awal?</td><td>Tidak; tunda sampai kebutuhan Finance tervalidasi.</td></tr>
+  </table>
+  <div class="callout"><strong>Langkah berikut:</strong> validasi keputusan di atas, lalu turunkan blueprint menjadi backlog implementasi per migration, model, Action, route, halaman, dan test case.</div>
+  <div class="footer-note">Blueprint Asset Management · HRIS Cahaya Optima Karya · Version 1.0 · 31 Agustus 2026</div>
+</section>
+
+</body>
+</html>
