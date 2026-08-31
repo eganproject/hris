@@ -32,13 +32,11 @@ class DashboardController extends Controller
     {
         $user = auth()->user();
 
-        $employeeDashboard = $user?->employee && ! $user->canAny([
-            'employees.view',
-            'leave.update',
-            'corrections.update',
-            'swaps.update',
-            'attendance-daily.view',
-        ]);
+        // Hak akses tambahan tidak mengubah seorang karyawan menjadi HR. Dashboard
+        // operasional hanya dipakai oleh peran HR dan superadmin yang sebenarnya.
+        $employeeDashboard = $user?->employee
+            && ! $user->isSuperAdmin()
+            && ! $user->hasRole('hr-manager');
 
         return view('dashboard', [
             'metrics' => $this->metrics($user),

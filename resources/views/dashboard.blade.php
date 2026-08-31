@@ -198,7 +198,7 @@
         @endif
 
         {{-- Angka HR — sudah mengikuti cakupan lokasi/divisi pengguna --}}
-        @if ($metrics->isNotEmpty())
+        @if (! $employeeDashboard && $metrics->isNotEmpty())
             <section class="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
                 @foreach ($metrics as $metric)
                     <x-stat-card :label="$metric['label']" :value="number_format($metric['value'])" :tone="$metric['tone']"
@@ -209,6 +209,7 @@
             </section>
         @endif
 
+        @if (! $employeeDashboard)
         @canany(['employees.view', 'leave.update', 'corrections.update', 'swaps.update', 'attendance-daily.view'])
             <section class="grid grid-cols-1 gap-6 xl:grid-cols-[1fr_360px]">
                 {{-- Antrean kerja: hanya yang benar-benar menunggu keputusan pengguna ini --}}
@@ -261,5 +262,6 @@
                 </aside>
             </section>
         @endcanany
+        @endif
     </div>
 </x-layouts.app>

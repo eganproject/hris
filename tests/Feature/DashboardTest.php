@@ -18,6 +18,7 @@ use App\Models\User;
 use App\Services\DefaultOfficeSchedule;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Spatie\Permission\Models\Permission;
+use Spatie\Permission\Models\Role;
 use Spatie\Permission\PermissionRegistrar;
 
 uses(RefreshDatabase::class);
@@ -162,6 +163,40 @@ test('an employee without HR permissions sees only their own summary', function 
         ->assertSee(route('my-roster.index'), false)
         ->assertDontSee('Karyawan Aktif')
         ->assertDontSee('Perlu Tindakan');
+});
+
+test('an employee with additional permissions still sees the employee dashboard', function () {
+    $user = dashboardUser(['dashboard.view', 'employees.view', 'attendance-daily.view']);
+    Employee::query()->create([
+        'user_id' => $user->id,
+        'full_name' => 'Staf Dengan Akses Tambahan',
+        'employment_status' => 'active',
+        'join_date' => now()->subYear()->toDateString(),
+    ]);
+
+    $this->actingAs($user)->get('/dashboard')
+        ->assertOk()
+        ->assertSee('Jadwal 7 Hari ke Depan')
+        ->assertDontSee('Karyawan Aktif')
+        ->assertDontSee('Perlu Tindakan');
+});
+
+test('a linked HR account keeps the operational dashboard', function () {
+    $user = dashboardUser(['dashboard.view', 'employees.view']);
+    Role::findOrCreate('hr-manager', 'web');
+    $user->assignRole('hr-manager');
+    Employee::query()->create([
+        'user_id' => $user->id,
+        'full_name' => 'HR Terhubung',
+        'employment_status' => 'active',
+        'join_date' => now()->subYear()->toDateString(),
+    ]);
+
+    $this->actingAs($user)->get('/dashboard')
+        ->assertOk()
+        ->assertSee('Karyawan Aktif')
+        ->assertSee('Pengajuan Saya Berjalan')
+        ->assertDontSee('Yang Perlu Anda Perhatikan');
 });
 
 test('employee dashboard links each active request to the correct self-service page', function () {
