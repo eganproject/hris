@@ -55,9 +55,9 @@
                         <img src="{{ asset('img/company-logo.svg') }}" alt="Logo perusahaan" class="size-full object-cover">
                     </div>
                     <div class="min-w-0 flex-1">
-                        <input id="photo" name="photo" type="file" accept="image/jpeg,image/png,image/webp" data-image-input class="block w-full rounded-md border border-gray-300 bg-white px-3 py-2.5 text-sm shadow-xs outline-none file:mr-3 file:rounded-sm file:border-0 file:bg-gray-100 file:px-3 file:py-1.5 file:text-xs file:font-semibold file:text-gray-700 hover:file:bg-gray-200 focus:border-primary focus:ring-2 focus:ring-primary/20">
+                        <input id="photo" name="photo" type="file" accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp" data-image-input data-file-guard data-max-mb="2" data-file-label="Foto karyawan" class="block w-full rounded-md border border-gray-300 bg-white px-3 py-2.5 text-sm shadow-xs outline-none file:mr-3 file:rounded-sm file:border-0 file:bg-gray-100 file:px-3 file:py-1.5 file:text-xs file:font-semibold file:text-gray-700 hover:file:bg-gray-200 focus:border-primary focus:ring-2 focus:ring-primary/20">
                         <p class="mt-2 text-xs text-gray-500">Format JPG, PNG, atau WebP. Maksimal 2MB. Resolusi minimal 300x300 px dan maksimal 3000x3000 px.</p>
-                        @error('photo')<p class="mt-2 text-sm text-red-600">{{ $message }}</p>@enderror
+                        @error('photo')<p data-upload-error data-upload-error-for="photo" class="mt-2 text-sm text-red-600">{{ $message }}</p>@enderror
                         <p data-image-error class="mt-2 hidden text-sm text-red-600"></p>
                     </div>
                 </div>
@@ -349,8 +349,6 @@
                         :label="$contract?->hasDocument() ? 'Ganti Dokumen Kontrak' : 'Dokumen Kontrak'"
                         :max-mb="\App\Models\EmployeeContract::DOCUMENT_MAX_MB"
                         accept=".pdf,application/pdf"
-                        :mimes="['application/pdf']"
-                        type-error="Dokumen kontrak harus berupa berkas PDF."
                         :hint="'Opsional. Hasil pindai kontrak yang sudah ditandatangani, format PDF, maksimal '.\App\Models\EmployeeContract::DOCUMENT_MAX_MB.' MB.'.($contract?->hasDocument() ? ' Mengunggah berkas baru akan menggantikan dokumen yang tersimpan.' : '')"
                         wrapper-class=""
                     />

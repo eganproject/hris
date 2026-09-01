@@ -4,6 +4,7 @@ namespace App\Http\Requests;
 
 use App\Models\LeaveRequest;
 use App\Support\LeaveGuard;
+use App\Support\UploadMessages;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Validator;
 
@@ -33,8 +34,7 @@ class StoreMyLeaveRequest extends FormRequest
     public function messages(): array
     {
         return [
-            'attachment.max' => 'Ukuran lampiran maksimal '.LeaveRequest::ATTACHMENT_MAX_MB.' MB.',
-            'attachment.mimes' => 'Lampiran harus berupa gambar (JPG, PNG, WEBP) atau PDF.',
+            ...UploadMessages::attachment('attachment', LeaveRequest::ATTACHMENT_MAX_MB),
         ];
     }
 

@@ -301,13 +301,21 @@
             </form>
         </dialog>
         @endif
+    @endcan
 
+    {{-- Izinnya harus sama dengan tombol pembukanya di header halaman. Sebelumnya
+         seluruh blok ini ikut "schedules.update": pemegang hak import tanpa hak ubah
+         jadwal melihat tombol Import, menekannya, dan tidak terjadi apa-apa. --}}
+    @can('schedules.import')
         {{-- Import roster bulanan dari Excel --}}
         @php
             $importErrors = session('import_errors', []);
             $templateQuery = array_merge(['month' => $month->format('Y-m')], array_filter($filters));
         @endphp
-        <div data-import-modal @unless ($importErrors) hidden @endunless class="fixed inset-0 z-50 flex items-center justify-center bg-gray-950/50 p-4">
+        {{-- Dibuka kembali juga saat berkasnya sendiri yang ditolak (bukan Excel /
+             kelewat besar), supaya pesan di dalamnya terlihat alih-alih gagal tanpa
+             keterangan apa pun. --}}
+        <div data-import-modal @unless ($importErrors || $errors->has('file')) hidden @endunless class="fixed inset-0 z-50 flex items-center justify-center bg-gray-950/50 p-4">
             <div class="w-full max-w-lg rounded-lg border border-gray-200 bg-white shadow-xl" role="dialog" aria-modal="true" aria-labelledby="schedule-import-title">
                 <div class="flex items-start justify-between gap-4 border-b border-gray-100 p-5">
                     <div>
@@ -376,8 +384,8 @@
                         <input type="hidden" name="job_position_id" value="{{ $filters['job_position_id'] }}">
                         <div>
                             <label for="schedule-import-file" class="block text-sm font-medium text-gray-700">File Excel (.xlsx, .xls, .csv) <span class="field-requirement is-required" aria-label="Wajib diisi">*</span></label>
-                            <input id="schedule-import-file" name="file" type="file" accept=".xlsx,.xls,.csv" required class="mt-2 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-700 shadow-xs outline-none file:mr-3 file:rounded file:border-0 file:bg-gray-100 file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-gray-700 focus:border-primary focus:ring-2 focus:ring-primary/20">
-                            @error('file')<p class="mt-2 text-sm text-red-600">{{ $message }}</p>@enderror
+                            <input id="schedule-import-file" name="file" type="file" accept=".xlsx,.xls,.csv" data-file-guard data-max-mb="{{ \App\Support\UploadMessages::EXCEL_MAX_MB }}" data-file-label="File Excel" required class="mt-2 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-700 shadow-xs outline-none file:mr-3 file:rounded file:border-0 file:bg-gray-100 file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-gray-700 focus:border-primary focus:ring-2 focus:ring-primary/20">
+                            @error('file')<p data-upload-error-for="file" class="mt-2 text-sm text-red-600">{{ $message }}</p>@enderror
                         </div>
                         <div class="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
                             <button type="button" data-import-close class="rounded-md border border-gray-200 px-4 py-2.5 text-sm font-medium text-gray-700 transition hover:bg-gray-50">Batal</button>

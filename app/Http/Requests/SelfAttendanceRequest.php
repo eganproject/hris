@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests;
 
+use App\Support\UploadMessages;
 use Illuminate\Foundation\Http\FormRequest;
 
 /**
@@ -49,6 +50,7 @@ class SelfAttendanceRequest extends FormRequest
     public function messages(): array
     {
         return [
+            ...UploadMessages::photo('photo', 2, 'Foto selfie', ['JPG', 'PNG']),
             'photo.required' => 'Ambil foto selfie dulu sebelum mengirim absen.',
             'latitude.required' => 'Lokasi tidak terbaca. Izinkan akses lokasi di browser Anda, lalu coba lagi.',
             'longitude.required' => 'Lokasi tidak terbaca. Izinkan akses lokasi di browser Anda, lalu coba lagi.',

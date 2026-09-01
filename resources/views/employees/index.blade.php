@@ -502,8 +502,6 @@
                             label="Dokumen Kontrak"
                             :max-mb="\App\Models\EmployeeContract::DOCUMENT_MAX_MB"
                             accept=".pdf,application/pdf"
-                            :mimes="['application/pdf']"
-                            type-error="Dokumen kontrak harus berupa berkas PDF."
                             :hint="'Opsional. Hasil pindai kontrak baru yang sudah ditandatangani, PDF, maksimal '.\App\Models\EmployeeContract::DOCUMENT_MAX_MB.' MB.'"
                             wrapper-class=""
                         />
@@ -605,10 +603,9 @@
                                  dipindahkan antar langkah adalah FileList-nya. --}}
                             <div>
                                 <label for="bulk_renew_document" class="block text-sm font-medium text-gray-700">Dokumen Kontrak</label>
-                                <input id="bulk_renew_document" type="file" data-bulk-file accept=".pdf,application/pdf"
+                                <input id="bulk_renew_document" type="file" data-bulk-file accept=".pdf,application/pdf" data-file-guard data-max-mb="{{ \App\Models\EmployeeContract::DOCUMENT_MAX_MB }}" data-file-label="Dokumen kontrak"
                                     class="mt-2 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-xs file:mr-3 file:rounded file:border-0 file:bg-gray-100 file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-gray-700 outline-none focus:border-primary focus:ring-2 focus:ring-primary/20">
                                 <p class="mt-1 text-xs text-gray-500">Opsional, PDF maksimal {{ \App\Models\EmployeeContract::DOCUMENT_MAX_MB }} MB. Berlaku untuk karyawan pada langkah ini saja.</p>
-                                <p data-bulk-file-error class="mt-1 hidden text-sm text-red-600"></p>
                             </div>
                             <div class="flex flex-col-reverse gap-2 pt-1 sm:flex-row sm:items-center sm:justify-between">
                                 <div class="flex gap-2">
@@ -790,8 +787,6 @@
                         const nextBtn = modal.querySelector('[data-bulk-next]');
                         // Hanya wizard perpanjang yang punya kolom berkas.
                         const fileEl = modal.querySelector('[data-bulk-file]');
-                        const fileErrorEl = modal.querySelector('[data-bulk-file-error]');
-                        const MAX_DOC_BYTES = {{ \App\Models\EmployeeContract::DOCUMENT_MAX_MB }} * 1024 * 1024;
                         // Berkas tidak bisa dititipkan lewat hidden input seperti kolom
                         // lain: input.value untuk file hanya string semu dan tak bisa
                         // diisi dari kode. Yang disimpan di sini FileList-nya sendiri,
@@ -807,26 +802,7 @@
                         const restoreFile = (id) => {
                             if (!fileEl) return;
                             fileEl.files = collectedFiles[id] ?? noFiles();
-                            fileErrorEl?.classList.add('hidden');
                         };
-                        const fileIsValid = () => {
-                            if (!fileEl || !fileEl.files.length) return true;
-
-                            const file = fileEl.files[0];
-                            const fail = (message) => {
-                                if (!fileErrorEl) return false;
-                                fileErrorEl.textContent = message;
-                                fileErrorEl.classList.remove('hidden');
-                                return false;
-                            };
-
-                            if (file.type !== 'application/pdf') return fail('Dokumen kontrak harus berupa berkas PDF.');
-                            if (file.size > MAX_DOC_BYTES) return fail('Ukuran dokumen melebihi batas {{ \App\Models\EmployeeContract::DOCUMENT_MAX_MB }} MB.');
-
-                            fileErrorEl?.classList.add('hidden');
-                            return true;
-                        };
-
                         const syncEnd = () => {
                             if (action !== 'renew') return;
                             const end = fieldEl('end_date');
@@ -858,9 +834,10 @@
                                 const el = fieldEl(f);
                                 if (el && !el.checkValidity()) { el.reportValidity(); return false; }
                             }
-                            // Dicegat di sini supaya berkas yang salah ketahuan pada
-                            // langkahnya, bukan setelah seluruh antrean diisi.
-                            return fileIsValid();
+                            // Jenis & ukuran berkas dijaga file-guard.js, yang membuang
+                            // berkas tak layak dari input-nya begitu dipilih — jadi apa pun
+                            // yang masih tersimpan di sini sudah lolos pemeriksaan.
+                            return true;
                         };
                         const finish = () => {
                             const holder = form.querySelector('[data-bulk-entries]');
@@ -944,9 +921,16 @@
             @endpush
         @endcanany
 
-        @can('employees.create')
+        {{-- Izinnya harus sama dengan tombol pembukanya di atas. Dulu di sini tertulis
+             "employees.create": pemegang hak import tanpa hak tambah karyawan melihat
+             tombol Import, menekannya, dan tidak terjadi apa-apa — modalnya memang
+             tidak pernah ikut dirender. --}}
+        @can('employees.import')
             @php $importErrors = session('import_errors', []); @endphp
-            <div data-import-modal @unless ($importErrors) hidden @endunless class="fixed inset-0 z-50 flex items-center justify-center bg-gray-950/50 p-4">
+            {{-- Modal dibuka kembali juga saat berkasnya sendiri yang ditolak
+                 (bukan Excel / kelewat besar), supaya pesan di dalamnya terlihat
+                 alih-alih gagal tanpa keterangan apa pun. --}}
+            <div data-import-modal @unless ($importErrors || $errors->has('file')) hidden @endunless class="fixed inset-0 z-50 flex items-center justify-center bg-gray-950/50 p-4">
                 <div class="w-full max-w-lg rounded-lg border border-gray-200 bg-white shadow-xl" role="dialog" aria-modal="true" aria-labelledby="import-modal-title">
                     <div class="flex items-start justify-between gap-4 border-b border-gray-100 p-5">
                         <div>
@@ -1004,8 +988,8 @@
                             @csrf
                             <div>
                                 <label for="import-file" class="block text-sm font-medium text-gray-700">File Excel (.xlsx, .xls, .csv) <span class="field-requirement is-required" aria-label="Wajib diisi">*</span></label>
-                                <input id="import-file" name="file" type="file" accept=".xlsx,.xls,.csv" required class="mt-2 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-700 shadow-xs outline-none file:mr-3 file:rounded file:border-0 file:bg-gray-100 file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-gray-700 focus:border-primary focus:ring-2 focus:ring-primary/20">
-                                @error('file')<p class="mt-2 text-sm text-red-600">{{ $message }}</p>@enderror
+                                <input id="import-file" name="file" type="file" accept=".xlsx,.xls,.csv" data-file-guard data-max-mb="{{ \App\Support\UploadMessages::EXCEL_MAX_MB }}" data-file-label="File Excel" required class="mt-2 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-700 shadow-xs outline-none file:mr-3 file:rounded file:border-0 file:bg-gray-100 file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-gray-700 focus:border-primary focus:ring-2 focus:ring-primary/20">
+                                @error('file')<p data-upload-error-for="file" class="mt-2 text-sm text-red-600">{{ $message }}</p>@enderror
                             </div>
                             <div class="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
                                 <button type="button" data-import-close class="rounded-md border border-gray-200 px-4 py-2.5 text-sm font-medium text-gray-700 transition hover:bg-gray-50">Batal</button>

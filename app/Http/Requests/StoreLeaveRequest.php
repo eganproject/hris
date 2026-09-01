@@ -5,6 +5,7 @@ namespace App\Http\Requests;
 use App\Models\Employee;
 use App\Models\LeaveRequest;
 use App\Support\LeaveGuard;
+use App\Support\UploadMessages;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Validator;
 
@@ -62,8 +63,7 @@ class StoreLeaveRequest extends FormRequest
     public function messages(): array
     {
         return [
-            'attachment.max' => 'Ukuran lampiran maksimal '.LeaveRequest::ATTACHMENT_MAX_MB.' MB.',
-            'attachment.mimes' => 'Lampiran harus berupa gambar (JPG, PNG, WEBP) atau PDF.',
+            ...UploadMessages::attachment('attachment', LeaveRequest::ATTACHMENT_MAX_MB),
             'start_date.after_or_equal' => 'Tanggal mulai tidak boleh lebih awal dari awal bulan lalu.',
         ];
     }

@@ -347,8 +347,6 @@
                                     label="Dokumen Kontrak"
                                     :max-mb="\App\Models\EmployeeContract::DOCUMENT_MAX_MB"
                                     accept=".pdf,application/pdf"
-                                    :mimes="['application/pdf']"
-                                    type-error="Dokumen kontrak harus berupa berkas PDF."
                                     :hint="'Opsional. Hasil pindai kontrak baru yang sudah ditandatangani, PDF, maksimal '.\App\Models\EmployeeContract::DOCUMENT_MAX_MB.' MB.'"
                                     wrapper-class=""
                                 />

@@ -6,6 +6,7 @@ use App\Models\Employee;
 use App\Models\EmployeeContract;
 use App\Models\SchedulePattern;
 use App\Models\User;
+use App\Support\UploadMessages;
 use Closure;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Support\Facades\DB;
@@ -144,8 +145,8 @@ class EmployeeRequest extends FormRequest
     {
         return [
             'contract_end_date.required' => 'Tanggal selesai kontrak wajib diisi untuk jenis kontrak selain PKWTT.',
-            'contract_document.mimes' => 'Dokumen kontrak harus berupa berkas PDF.',
-            'contract_document.max' => 'Ukuran dokumen kontrak maksimal '.EmployeeContract::DOCUMENT_MAX_MB.' MB.',
+            ...UploadMessages::pdf('contract_document', EmployeeContract::DOCUMENT_MAX_MB, 'Dokumen kontrak'),
+            ...UploadMessages::photo('photo', 2, 'Foto karyawan', dimensions: 'Resolusi foto karyawan minimal 300x300 px dan maksimal 3000x3000 px.'),
         ];
     }
 

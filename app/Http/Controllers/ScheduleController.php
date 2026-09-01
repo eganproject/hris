@@ -24,6 +24,7 @@ use App\Support\ActivityLogger;
 use App\Support\DataScope;
 use App\Support\ImportErrorStore;
 use App\Support\MonthInput;
+use App\Support\UploadMessages;
 use Carbon\CarbonImmutable;
 use Carbon\CarbonPeriod;
 use Illuminate\Database\Eloquent\Builder;
@@ -772,9 +773,11 @@ class ScheduleController extends Controller
      */
     public function import(Request $request): RedirectResponse
     {
-        $request->validate([
-            'file' => ['required', 'file', 'mimes:xlsx,xls,csv', 'max:10240'],
-        ], [], ['file' => 'file Excel']);
+        $request->validate(
+            ['file' => UploadMessages::excelRules()],
+            UploadMessages::excel(),
+            ['file' => 'file Excel'],
+        );
 
         $scope = DataScope::forTeam($request->user());
 

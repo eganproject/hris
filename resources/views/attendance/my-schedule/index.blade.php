@@ -188,8 +188,6 @@
                 :required="true"
                 :max-mb="\App\Models\ShiftSwapRequest::ATTACHMENT_MAX_MB"
                 accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp"
-                :mimes="['image/jpeg', 'image/png', 'image/webp']"
-                type-error="Bukti harus berupa gambar (JPG, PNG, atau WEBP)."
                 hint="Wajib. Gambar (JPG, PNG, WEBP), maksimal 5 MB — misalnya tangkapan layar kesepakatan dengan rekan."
                 wrapper-class="" />
             <div class="flex justify-end gap-2 pt-2">

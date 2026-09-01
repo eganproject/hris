@@ -21,6 +21,7 @@ use App\Services\OfficeHoursTransition;
 use App\Services\PunchIngestionService;
 use App\Support\ActivityLogger;
 use App\Support\ImportErrorStore;
+use App\Support\UploadMessages;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Http\RedirectResponse;
@@ -249,9 +250,11 @@ class EmployeeManagementController extends Controller
      */
     public function import(Request $request): RedirectResponse
     {
-        $request->validate([
-            'file' => ['required', 'file', 'mimes:xlsx,xls,csv', 'max:10240'],
-        ], [], ['file' => 'file Excel']);
+        $request->validate(
+            ['file' => UploadMessages::excelRules()],
+            UploadMessages::excel(),
+            ['file' => 'file Excel'],
+        );
 
         $this->abortIfNoScope();
 
@@ -524,8 +527,7 @@ class EmployeeManagementController extends Controller
             'contract_document' => ['nullable', 'file', 'mimes:pdf', 'max:'.(EmployeeContract::DOCUMENT_MAX_MB * 1024)],
         ], [
             'end_date.required' => 'Tanggal selesai kontrak wajib diisi untuk jenis kontrak selain PKWTT.',
-            'contract_document.mimes' => 'Dokumen kontrak harus berupa berkas PDF.',
-            'contract_document.max' => 'Ukuran dokumen kontrak maksimal '.EmployeeContract::DOCUMENT_MAX_MB.' MB.',
+            ...UploadMessages::pdf('contract_document', EmployeeContract::DOCUMENT_MAX_MB, 'Dokumen kontrak'),
         ]);
 
         if ($validator->fails()) {
@@ -680,8 +682,7 @@ class EmployeeManagementController extends Controller
             // satu per satu, jadi tiap entri boleh membawa dokumennya sendiri.
             'entries.*.contract_document' => ['nullable', 'file', 'mimes:pdf', 'max:'.(EmployeeContract::DOCUMENT_MAX_MB * 1024)],
         ], [
-            'entries.*.contract_document.mimes' => 'Dokumen kontrak harus berupa berkas PDF.',
-            'entries.*.contract_document.max' => 'Ukuran dokumen kontrak maksimal '.EmployeeContract::DOCUMENT_MAX_MB.' MB.',
+            ...UploadMessages::pdf('entries.*.contract_document', EmployeeContract::DOCUMENT_MAX_MB, 'Dokumen kontrak'),
         ]);
 
         if ($validator->fails()) {

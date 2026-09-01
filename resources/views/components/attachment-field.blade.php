@@ -5,8 +5,6 @@
     // Jenis berkas yang diterima. Defaultnya gambar + PDF (lampiran cuti); pemakai
     // lain — mis. dokumen kontrak — mempersempitnya lewat props ini.
     'accept' => '.jpg,.jpeg,.png,.webp,.pdf,image/jpeg,image/png,image/webp,application/pdf',
-    'mimes' => ['image/jpeg', 'image/png', 'image/webp', 'application/pdf'],
-    'typeError' => 'Lampiran harus berupa gambar (JPG, PNG, WEBP) atau PDF.',
     'hint' => null,
     'required' => false,
     'wrapperClass' => 'sm:col-span-2',
@@ -20,23 +18,26 @@
 {{-- Input lampiran dengan pratinjau langsung. Gambar ditampilkan sebagai thumbnail;
      PDF ditampilkan sebagai kartu berisi nama & ukuran plus tautan buka di tab baru,
      karena penampil PDF di dalam iframe tidak tersedia di semua browser seluler dan
-     akan menyisakan kotak kosong. Batas ukuran & jenis juga diperiksa di sini supaya
-     kesalahan ketahuan sebelum formulir terkirim. --}}
-<div class="{{ $wrapperClass }}" data-attachment-field data-max-mb="{{ $maxMb }}"
-    data-mimes="{{ implode(',', $mimes) }}" data-type-error="{{ $typeError }}">
+     akan menyisakan kotak kosong. Batas ukuran & jenisnya dijaga file-guard.js, yang
+     menolak berkas sebelum formulir terkirim dan menjelaskannya lewat modal. --}}
+<div class="{{ $wrapperClass }}" data-attachment-field>
     <label for="{{ $id }}" class="block text-sm font-medium text-gray-700">{{ $label }}
         @if ($required)<span class="field-requirement is-required">*</span>@endif
     </label>
 
+    {{-- Jenis & ukuran diperiksa penjaga bersama (resources/js/file-guard.js): ia
+         membaca daftar yang diterima dari atribut accept di bawah, jadi tidak ada
+         daftar kedua yang bisa ikut basi. --}}
     <input id="{{ $id }}" name="{{ $name }}" type="file" data-attachment-input
+        data-file-guard data-max-mb="{{ $maxMb }}" data-file-label="{{ $label }}"
         accept="{{ $accept }}" @required($required)
         class="mt-2 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-xs file:mr-3 file:rounded file:border-0 file:bg-gray-100 file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-gray-700 outline-none focus:border-primary focus:ring-2 focus:ring-primary/20">
 
     <p class="mt-1 text-xs text-gray-500">{{ $hint }}</p>
 
-    @error($name)<p class="mt-1 text-sm text-red-600">{{ $message }}</p>@enderror
-
-    <p data-attachment-error class="mt-1 hidden text-sm text-red-600"></p>
+    @error($name)
+        <p data-upload-error data-upload-error-for="{{ $name }}" class="mt-1 text-sm text-red-600">{{ $message }}</p>
+    @enderror
 
     <div data-attachment-preview class="mt-3 hidden items-start gap-3 rounded-md border border-gray-200 bg-gray-50 p-3">
         <a data-attachment-open target="_blank" rel="noopener" class="flex-none">
@@ -60,8 +61,6 @@
     @push('scripts')
     <script>
         (function () {
-            const FALLBACK_MIME = ['image/jpeg', 'image/png', 'image/webp', 'application/pdf'];
-
             document.querySelectorAll('[data-attachment-field]').forEach((field) => {
                 const input = field.querySelector('[data-attachment-input]');
                 const preview = field.querySelector('[data-attachment-preview]');
@@ -69,14 +68,7 @@
                 const doc = field.querySelector('[data-attachment-doc]');
                 const nameEl = field.querySelector('[data-attachment-name]');
                 const sizeEl = field.querySelector('[data-attachment-size]');
-                const errorEl = field.querySelector('[data-attachment-error]');
                 const links = field.querySelectorAll('[data-attachment-open]');
-                const maxBytes = Number(field.dataset.maxMb || 2) * 1024 * 1024;
-                // Tiap field membawa daftar jenisnya sendiri: lampiran cuti menerima
-                // gambar & PDF, dokumen kontrak hanya PDF.
-                const allowed = (field.dataset.mimes || '').split(',').filter(Boolean);
-                const mimes = allowed.length ? allowed : FALLBACK_MIME;
-                const typeError = field.dataset.typeError || 'Jenis berkas tidak didukung.';
 
                 let objectUrl = null;
 
@@ -95,19 +87,16 @@
                     image.removeAttribute('src');
                 };
 
-                const fail = (message) => {
-                    input.value = '';
-                    reset();
-                    errorEl.textContent = message;
-                    errorEl.classList.remove('hidden');
-                };
-
                 const humanSize = (bytes) => bytes >= 1048576
                     ? (bytes / 1048576).toFixed(1) + ' MB'
                     : Math.max(1, Math.round(bytes / 1024)) + ' KB';
 
+                // Berkas yang ditolak penjaga sudah dikosongkan dari input-nya, jadi
+                // pratinjaunya ikut dibersihkan — kalau tidak, layar menampilkan berkas
+                // yang sebenarnya tidak akan ikut terkirim.
+                input.addEventListener('file-guard:rejected', reset);
+
                 input.addEventListener('change', () => {
-                    errorEl.classList.add('hidden');
                     const file = input.files?.[0];
 
                     if (!file) {
@@ -115,26 +104,20 @@
                         return;
                     }
 
-                    // Dicegat di sini supaya penggunanya tahu sebelum menunggu unggahan
-                    // selesai lalu ditolak server.
-                    if (!mimes.includes(file.type)) {
-                        fail(typeError);
-                        return;
-                    }
-
-                    if (file.size > maxBytes) {
-                        fail('Ukuran berkas ' + humanSize(file.size) + ', melebihi batas ' + field.dataset.maxMb + ' MB.');
-                        return;
-                    }
-
                     release();
                     objectUrl = URL.createObjectURL(file);
 
+                    // Sama seperti penjaganya: ekstensi lebih dipercaya daripada
+                    // file.type, yang bisa kosong untuk PDF pada sebagian perangkat.
+                    // Kalau hanya file.type yang dibaca, PDF semacam itu dipratinjau
+                    // sebagai gambar dan yang muncul cuma ikon gambar rusak.
+                    const isPdf = /\.pdf$/i.test(file.name) || file.type === 'application/pdf';
+
                     nameEl.textContent = file.name;
-                    sizeEl.textContent = humanSize(file.size) + ' · ' + (file.type === 'application/pdf' ? 'PDF' : 'Gambar');
+                    sizeEl.textContent = humanSize(file.size) + ' · ' + (isPdf ? 'PDF' : 'Gambar');
                     links.forEach((link) => { link.href = objectUrl; });
 
-                    if (file.type === 'application/pdf') {
+                    if (isPdf) {
                         doc.classList.remove('hidden');
                         doc.classList.add('flex');
                         image.classList.add('hidden');
@@ -151,7 +134,6 @@
 
                 field.querySelector('[data-attachment-clear]')?.addEventListener('click', () => {
                     input.value = '';
-                    errorEl.classList.add('hidden');
                     reset();
                 });
 

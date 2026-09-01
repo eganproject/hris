@@ -1,5 +1,6 @@
 import $ from 'jquery';
 import flatpickr from 'flatpickr';
+import initFileGuard from './file-guard';
 import select2Factory from 'select2';
 import 'flatpickr/dist/flatpickr.css';
 import 'select2/dist/css/select2.css';
@@ -150,6 +151,10 @@ const showFlashToast = ({ message, type = 'success' }) => {
     close.addEventListener('click', removeToast);
     window.setTimeout(removeToast, 4600);
 };
+
+// Penjaga unggahan berkas: memeriksa jenis & ukuran sebelum formulir terkirim,
+// dan menampilkan penolakan (dari sini maupun dari server) dalam satu modal.
+initFileGuard();
 
 document.querySelectorAll('[data-flash-notification]').forEach((flash) => {
     showFlashToast({
