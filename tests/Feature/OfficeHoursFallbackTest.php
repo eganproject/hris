@@ -6,10 +6,13 @@ use App\Models\Employee;
 use App\Models\SchedulePattern;
 use App\Models\Setting;
 use App\Models\Shift;
+use App\Models\User;
 use App\Services\AttendanceResolver;
 use App\Services\DefaultOfficeSchedule;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
+use Spatie\Permission\Models\Permission;
+use Spatie\Permission\PermissionRegistrar;
 
 uses(RefreshDatabase::class);
 
@@ -106,4 +109,71 @@ test('with no default pattern configured the flag does nothing', function () {
     // Falls back to the old behaviour: worked on an unscheduled day.
     expect($result['status'])->toBe(AttendanceStatus::Present)
         ->and($result['shift_id'])->toBeNull();
+});
+
+/**
+ * Pengguna yang boleh membuka papan Absensi Harian untuk semua karyawan:
+ * dikecualikan dari pembatasan bawahan sekaligus punya hak melihat semua data
+ * absensi — sama seperti HR/administrator sungguhan.
+ */
+function officeBoardUser(): User
+{
+    app(PermissionRegistrar::class)->forgetCachedPermissions();
+
+    foreach (['attendance-daily.view', 'attendance.view.all'] as $permission) {
+        Permission::findOrCreate($permission, 'web');
+    }
+
+    $user = User::factory()->create();
+    $user->givePermissionTo(['attendance-daily.view', 'attendance.view.all']);
+    $user->forceFill(['bypass_team_scope' => true])->save();
+
+    return $user;
+}
+
+test('the daily board shows an office-hours employee shift instead of "Belum dijadwalkan"', function () {
+    officeDefaultPattern();
+
+    Employee::query()->create([
+        'full_name' => 'Kantoran Papan', 'employment_status' => 'active', 'follows_office_hours' => true,
+    ]);
+
+    // 2026-07-20 jatuh pada hari Senin: pola jam kantor memberi shift OFFICE.
+    $this->actingAs(officeBoardUser())->get(route('attendance.daily.index', ['date' => '2026-07-20']))
+        ->assertOk()
+        ->assertSee('Kantoran Papan')
+        ->assertSee('OFFICE')
+        ->assertSee('08:00')
+        ->assertDontSee('Belum dijadwalkan');
+});
+
+test('the daily board shows an office-hours employee as Libur on the pattern day off', function () {
+    officeDefaultPattern();
+
+    Employee::query()->create([
+        'full_name' => 'Kantoran Papan', 'employment_status' => 'active', 'follows_office_hours' => true,
+    ]);
+
+    // 2026-07-19 jatuh pada hari Minggu: tidak ada slot di pola, jadi hari libur.
+    $this->actingAs(officeBoardUser())->get(route('attendance.daily.index', ['date' => '2026-07-19']))
+        ->assertOk()
+        ->assertSee('Kantoran Papan')
+        ->assertDontSee('Belum dijadwalkan')
+        ->assertDontSee('OFFICE');
+});
+
+test('an employee who really has no schedule is still reported as "Belum dijadwalkan"', function () {
+    officeDefaultPattern();
+
+    // Tanpa tanda "ikut jam kantor" tidak ada pola yang bisa diturunkan, dan papan
+    // harian memang harus mengatakannya — pengisian tadi tidak boleh menutupi
+    // karyawan yang benar-benar belum dijadwalkan.
+    Employee::query()->create([
+        'full_name' => 'Shift Belum Diatur', 'employment_status' => 'active', 'follows_office_hours' => false,
+    ]);
+
+    $this->actingAs(officeBoardUser())->get(route('attendance.daily.index', ['date' => '2026-07-20']))
+        ->assertOk()
+        ->assertSee('Shift Belum Diatur')
+        ->assertSee('Belum dijadwalkan');
 });

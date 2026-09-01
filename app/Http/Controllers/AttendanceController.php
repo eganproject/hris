@@ -9,6 +9,7 @@ use App\Models\Attendance;
 use App\Models\Employee;
 use App\Models\Shift;
 use App\Services\AttendanceResolver;
+use App\Services\DefaultOfficeSchedule;
 use App\Support\DataScope;
 use App\Support\MonthInput;
 use Illuminate\Http\RedirectResponse;
@@ -22,6 +23,7 @@ class AttendanceController extends Controller
     public function __construct(
         private readonly AttendanceResolver $resolver,
         private readonly ProcessDayAttendance $processDay,
+        private readonly DefaultOfficeSchedule $officeSchedule,
     ) {}
 
     /**
@@ -73,6 +75,21 @@ class AttendanceController extends Controller
             ->orderBy('full_name')
             ->paginate($perPage)
             ->withQueryString();
+
+        // Karyawan "jam kantor" tidak pernah punya baris roster — jadwalnya diturunkan
+        // dari pola saat dibaca. Tanpa langkah ini kolom "Jadwal" menampilkan "Belum
+        // dijadwalkan" untuk mereka, padahal AttendanceResolver memakai pola yang sama
+        // dan tetap menghitung telat/lembur mereka dengan benar. Sumbernya disamakan
+        // dengan grid roster HR dan halaman Jadwal Saya. Polanya di-cache per id di
+        // dalam service, jadi ini tetap satu query per pola yang dipakai.
+        foreach ($employees as $employee) {
+            if ($employee->follows_office_hours) {
+                $employee->setRelation(
+                    'schedules',
+                    $this->officeSchedule->fill($employee, $employee->schedules, [$date]),
+                );
+            }
+        }
 
         return view('attendance.daily.index', [
             'employees' => $employees,
