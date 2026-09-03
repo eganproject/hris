@@ -104,14 +104,18 @@
                             </div>
                         </section>
 
-                        <aside class="rounded-lg border border-gray-200 bg-white p-5 shadow-sm">
-                            <h3 class="text-sm font-semibold text-gray-950">Aksi Cepat</h3>
-                            <div class="mt-4 grid grid-cols-2 gap-3">
-                                @can('my-leave.view')<a href="{{ route('my-leave.create') }}" class="rounded-md border border-gray-200 px-3 py-3 text-sm font-medium text-gray-700 transition hover:bg-gray-50">Ajukan Cuti</a>@endcan
-                                @can('my-overtime.view')<a href="{{ route('my-overtime.index') }}" class="rounded-md border border-gray-200 px-3 py-3 text-sm font-medium text-gray-700 transition hover:bg-gray-50">Ajukan Lembur</a>@endcan
-                                @can('my-attendance.view')<a href="{{ route('my-attendance.index') }}" class="rounded-md border border-gray-200 px-3 py-3 text-sm font-medium text-gray-700 transition hover:bg-gray-50">Koreksi Absensi</a>@endcan
-                                @can('my-schedule.view')<a href="{{ route('my-schedule.index') }}" class="rounded-md border border-gray-200 px-3 py-3 text-sm font-medium text-gray-700 transition hover:bg-gray-50">Tukar Jadwal</a>@endcan
-                            </div>
+                        <aside class="space-y-4">
+                            <section class="rounded-lg border border-gray-200 bg-white p-5 shadow-sm">
+                                <h3 class="text-sm font-semibold text-gray-950">Aksi Cepat</h3>
+                                <div class="mt-4 grid grid-cols-2 gap-3">
+                                    @can('my-leave.view')<a href="{{ route('my-leave.create') }}" class="rounded-md border border-gray-200 px-3 py-3 text-sm font-medium text-gray-700 transition hover:bg-gray-50">Ajukan Cuti</a>@endcan
+                                    @can('my-overtime.view')<a href="{{ route('my-overtime.index') }}" class="rounded-md border border-gray-200 px-3 py-3 text-sm font-medium text-gray-700 transition hover:bg-gray-50">Ajukan Lembur</a>@endcan
+                                    @can('my-attendance.view')<a href="{{ route('my-attendance.index') }}" class="rounded-md border border-gray-200 px-3 py-3 text-sm font-medium text-gray-700 transition hover:bg-gray-50">Koreksi Absensi</a>@endcan
+                                    @can('my-schedule.view')<a href="{{ route('my-schedule.index') }}" class="rounded-md border border-gray-200 px-3 py-3 text-sm font-medium text-gray-700 transition hover:bg-gray-50">Tukar Jadwal</a>@endcan
+                                </div>
+                            </section>
+
+                            @include('dashboard._birthdays')
                         </aside>
                     </div>
 
@@ -259,6 +263,8 @@
                             @endcan
                         </div>
                     </section>
+
+                    @include('dashboard._birthdays')
                 </aside>
             </section>
         @endcanany

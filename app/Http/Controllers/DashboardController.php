@@ -41,11 +41,53 @@ class DashboardController extends Controller
         return view('dashboard', [
             'metrics' => $this->metrics($user),
             'todo' => $this->todo($user),
+            'birthdays' => $this->birthdays($user),
             'employeeDashboard' => (bool) $employeeDashboard,
             'personal' => $user?->employee
                 ? ($employeeDashboard ? $this->employeeDashboardData($user, $user->employee) : $this->personalData($user->employee))
                 : null,
         ]);
+    }
+
+    /**
+     * Karyawan aktif yang berulang tahun pada bulan berjalan, diurutkan dari tanggal
+     * paling awal. Tahun lahirnya tidak pernah ikut ke layar — yang dirayakan
+     * tanggalnya, bukan usianya.
+     *
+     * @return Collection<int, Employee>
+     */
+    private function birthdays(?User $user): Collection
+    {
+        if (! $user) {
+            return collect();
+        }
+
+        $scope = DataScope::forEmployees($user);
+        $branchId = $user->employee?->branch_id;
+
+        // Karyawan biasa tidak punya cakupan data karyawan sama sekali. Papan ulang
+        // tahun tetap berguna untuk mereka, jadi isinya jatuh ke rekan satu lokasi
+        // kerja — bukan kosong, dan bukan pula seluruh perusahaan.
+        if ($scope->isEmpty()) {
+            if (! $branchId) {
+                return collect();
+            }
+
+            $employees = Employee::query()->where('branch_id', $branchId);
+        } else {
+            $employees = $scope->employees();
+        }
+
+        return $employees
+            ->active()
+            ->whereNotNull('birth_date')
+            ->whereMonth('birth_date', now()->month)
+            ->with('jobPosition')
+            ->get()
+            // Diurutkan di PHP, bukan lewat SQL: ekspresi "ambil tanggalnya saja"
+            // berbeda antar driver, sedangkan daftarnya paling panjang sebulan.
+            ->sortBy(fn (Employee $employee) => $employee->birth_date->day)
+            ->values();
     }
 
     /**
