@@ -8,6 +8,9 @@
                 <p class="text-sm font-medium text-gray-500">{{ $employee->employee_number }}</p>
                 <h1 class="mt-1 text-2xl font-semibold text-gray-950">{{ $employee->full_name }}</h1>
                 <p class="mt-2 text-sm text-gray-500">{{ $employee->jobPosition?->name ?? '-' }} · {{ $employee->branch?->name ?? '-' }}</p>
+                @if ($employee->motto)
+                    <p class="mt-2 border-l-2 border-gray-200 pl-3 text-sm italic text-gray-600">&ldquo;{{ $employee->motto }}&rdquo;</p>
+                @endif
             </div>
             <div class="flex gap-2">
                 <a href="{{ route('employees.index') }}" class="rounded-md border border-gray-200 px-4 py-2.5 text-sm font-medium text-gray-700 transition hover:bg-gray-50">Kembali</a>

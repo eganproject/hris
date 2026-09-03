@@ -43,6 +43,7 @@ class Employee extends Model
         'exit_date',
         'exit_notes',
         'address',
+        'motto',
     ];
 
     /**

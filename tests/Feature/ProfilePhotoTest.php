@@ -25,7 +25,7 @@ test('an employee can upload their own profile photo', function () {
 
     $this->actingAs($user)->post(route('profile.photo.update'), [
         'photo' => UploadedFile::fake()->image('saya.jpg', 600, 600),
-    ])->assertRedirect()->assertSessionHas('status', 'photo-updated');
+    ])->assertRedirect()->assertSessionHas('status', 'Foto profil berhasil diperbarui.');
 
     $path = $employee->fresh()->photo_path;
 
@@ -67,7 +67,7 @@ test('the photo can be removed entirely', function () {
 
     $this->actingAs($user)->delete(route('profile.photo.destroy'))
         ->assertRedirect()
-        ->assertSessionHas('status', 'photo-removed');
+        ->assertSessionHas('status', 'Foto profil dihapus.');
 
     expect($employee->fresh()->photo_path)->toBeNull();
     Storage::disk('public')->assertMissing($path);

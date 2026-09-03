@@ -547,9 +547,13 @@ document.querySelectorAll('[data-tabs]').forEach((tabs) => {
         }
     };
 
-    const firstTab = buttons[0]?.dataset.tabButton;
+    // A page may force which tab opens first — used when the server comes back with
+    // validation errors that live inside one particular tab, which would otherwise
+    // stay hidden. Absent the attribute this resolves exactly as before: the stored
+    // tab, else the first one.
+    const knownTab = (tab) => buttons.some((button) => button.dataset.tabButton === tab);
     const storedTab = storageKey ? window.localStorage.getItem(storageKey) : null;
-    const initialTab = buttons.some((button) => button.dataset.tabButton === storedTab) ? storedTab : firstTab;
+    const initialTab = [tabs.dataset.tabsInitial, storedTab].find(knownTab) ?? buttons[0]?.dataset.tabButton;
 
     if (initialTab) {
         activate(initialTab);

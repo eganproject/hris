@@ -11,7 +11,7 @@ use Illuminate\View\View;
 
 /**
  * Self-service account & profile for the signed-in user: view own data, update
- * personal contact fields (phone/address), and change own password. Sensitive
+ * personal fields (phone/address/motto), and change own password. Sensitive
  * fields (name, placement, contract, login email) stay HR-managed. Foto profil
  * boleh diganti sendiri — aturannya sama persis dengan yang dipakai HR di form
  * karyawan, supaya standar fotonya tidak berbeda tergantung siapa yang mengunggah.
@@ -22,7 +22,7 @@ class ProfileController extends Controller
     {
         return view('profile.edit', [
             'user' => auth()->user(),
-            'employee' => auth()->user()->employee?->load(['branch', 'department', 'jobPosition', 'currentContract']),
+            'employee' => auth()->user()->employee?->load(['branch', 'department', 'departments', 'jobPosition', 'currentContract']),
         ]);
     }
 
@@ -33,11 +33,17 @@ class ProfileController extends Controller
         $data = $request->validateWithBag('updateProfile', [
             'phone' => ['nullable', 'string', 'max:50'],
             'address' => ['nullable', 'string', 'max:1000'],
+            // Motto ditulis karyawan sendiri; satu kalimat, bukan paragraf.
+            'motto' => ['nullable', 'string', 'max:160'],
+        ], [], [
+            'phone' => 'nomor telepon',
+            'address' => 'alamat',
+            'motto' => 'motto',
         ]);
 
         $employee->update($data);
 
-        return back()->with('status', 'profile-updated');
+        return back()->with('status', 'Data pribadi berhasil diperbarui.');
     }
 
     /**
@@ -65,7 +71,7 @@ class ProfileController extends Controller
 
         $this->forget($previous, $employee->photo_path);
 
-        return back()->with('status', 'photo-updated');
+        return back()->with('status', 'Foto profil berhasil diperbarui.');
     }
 
     public function destroyPhoto(): RedirectResponse
@@ -74,13 +80,13 @@ class ProfileController extends Controller
         $previous = $employee->photo_path;
 
         if (! $previous) {
-            return back()->with('status', 'photo-removed');
+            return back()->with('status', 'Foto profil dihapus.');
         }
 
         $employee->update(['photo_path' => null]);
         $this->forget($previous, null);
 
-        return back()->with('status', 'photo-removed');
+        return back()->with('status', 'Foto profil dihapus.');
     }
 
     /** Hapus berkas lama, kecuali kalau ternyata masih dipakai baris yang sama. */
@@ -110,6 +116,6 @@ class ProfileController extends Controller
         // The User model casts `password` to "hashed", so this is stored hashed.
         auth()->user()->update(['password' => $request->input('password')]);
 
-        return back()->with('status', 'password-updated');
+        return back()->with('status', 'Password berhasil diubah.');
     }
 }
