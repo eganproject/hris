@@ -1000,7 +1000,18 @@ class EmployeeManagementController extends Controller
             ],
             'roles' => Role::query()->where('guard_name', 'web')->orderBy('name')->get(),
             'leaveTypes' => LeaveType::query()->where('is_active', true)->where('counts_against_balance', true)->orderBy('name')->get(),
-            'managers' => Employee::query()->active()->visibleTo($user)->orderBy('full_name')->get(['id', 'full_name', 'employee_number']),
+            // Atasan langsung: yang ditawarkan adalah karyawan aktif — ditambah atasan
+            // yang memang sudah tercatat untuk orang ini sekalipun ia sudah keluar.
+            // Tanpa pengecualian itu pilihannya tidak ada di daftar, <select> jatuh ke
+            // "— Tidak ada —", dan sekadar membuka lalu menyimpan formulir diam-diam
+            // menghapus atasannya.
+            'managers' => Employee::query()
+                ->visibleTo($user)
+                ->where(fn ($query) => $query
+                    ->active()
+                    ->when($employee?->manager_id, fn ($q, $managerId) => $q->orWhere('employees.id', $managerId)))
+                ->orderBy('full_name')
+                ->get(['id', 'full_name', 'employee_number']),
             'devices' => Device::query()->with('branch')->orderBy('name')->get(),
             'officePatterns' => $this->officePatterns($employee),
             'statuses' => Employee::employmentStatusLabels(),

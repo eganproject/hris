@@ -1366,14 +1366,23 @@ document.querySelectorAll('[data-exit-form]').forEach((stepper) => {
     const statusSelect = stepper.querySelector('#employment_status');
     const reasonField = modal.querySelector('#exit_reason');
     const dateField = modal.querySelector('#exit_date');
+    const exitFields = [...modal.querySelectorAll('[data-exit-field]')];
     const confirmButton = modal.querySelector('[data-exit-confirm]');
     const cancelButton = modal.querySelector('[data-exit-cancel]');
 
     let exitConfirmed = false;
 
     const isExiting = () => Boolean(statusSelect) && statusSelect.value === 'inactive';
-    const openModal = () => { modal.hidden = false; };
-    const closeModal = () => { modal.hidden = true; };
+
+    // The exit fields sit inside the same <form> as the rest of the employee data, so
+    // while nobody is processing an exit they stay disabled and are never submitted.
+    // Left enabled, their defaults (reason "Kontrak Berakhir", date today) rode along
+    // on every ordinary save and were validated against the join date — which broke
+    // saving anyone whose join date is still in the future, and bounced the page back
+    // with this modal open as if an exit were underway.
+    const setFieldsEnabled = (enabled) => exitFields.forEach((field) => { field.disabled = !enabled; });
+    const openModal = () => { setFieldsEnabled(true); modal.hidden = false; };
+    const closeModal = () => { modal.hidden = true; setFieldsEnabled(false); };
 
     // Runs in the capture phase after the stepper's own validation handler, so all
     // steps are validated first. If the status is being set to Nonaktif, show the
@@ -1402,7 +1411,7 @@ document.querySelectorAll('[data-exit-form]').forEach((stepper) => {
 
         exitConfirmed = true;
         form.dataset.confirmed = 'true'; // skip the generic "Simpan perubahan?" confirmation
-        closeModal();
+        modal.hidden = true; // hide it, but keep the fields enabled so they are submitted
 
         if (typeof form.requestSubmit === 'function') {
             form.requestSubmit();

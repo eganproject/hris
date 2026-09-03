@@ -29,6 +29,31 @@ class EmployeeRequest extends FormRequest
         if (empty($this->input('department_ids')) && $this->filled('department_id')) {
             $this->merge(['department_ids' => [$this->integer('department_id')]]);
         }
+
+        // Modal "Proses Karyawan Keluar" hidup di dalam formulir yang sama dan hanya
+        // disembunyikan, jadi exit_reason/exit_date/exit_notes ikut terkirim pada
+        // SETIAP penyimpanan — termasuk saat statusnya tetap Aktif. Dibiarkan begitu,
+        // tanggal keluar bawaannya (hari ini) tetap diadu dengan tanggal bergabung,
+        // sehingga karyawan yang tanggal bergabungnya masih di depan ditolak dengan
+        // galat "tanggal keluar" — dan halamannya kembali dengan modal keluar
+        // terbuka, seolah-olah orangnya sedang diproses keluar. Selama proses keluar
+        // tidak benar-benar dijalankan, kolomnya dibuang.
+        if (! $this->isProcessingExit()) {
+            $this->merge(['exit_reason' => null, 'exit_date' => null, 'exit_notes' => null]);
+        }
+    }
+
+    /**
+     * Penyimpanan ini benar-benar memproses karyawan keluar: statusnya diubah menjadi
+     * "Nonaktif" dari keadaan yang belum nonaktif (atau karyawan baru yang langsung
+     * dicatat nonaktif). Hanya pada keadaan itu alasan & tanggal keluar wajib diisi.
+     */
+    private function isProcessingExit(): bool
+    {
+        $employee = $this->route('employee');
+
+        return $this->input('employment_status') === 'inactive'
+            && (! $employee || ! $employee->isInactive());
     }
 
     /**
@@ -44,8 +69,7 @@ class EmployeeRequest extends FormRequest
         // Setting the status to "Nonaktif" (from a not-already-inactive state, or on
         // a brand-new employee) triggers the exit flow, so the reason & date become
         // required and are processed together with the save.
-        $isClosingExit = $this->input('employment_status') === 'inactive'
-            && (! $employee || ! $employee->isInactive());
+        $isClosingExit = $this->isProcessingExit();
 
         // Reactivating from the edit form starts a fresh contract (see update()), so
         // its number must be new. A plain edit keeps working on the contract already
@@ -115,8 +139,44 @@ class EmployeeRequest extends FormRequest
     }
 
     /**
+     * Nama kolom dalam bahasa Indonesia, supaya pesan galat bawaan Laravel menyebut
+     * kolom yang sama dengan labelnya di formulir.
+     *
      * @return array<string, string>
      */
+    public function attributes(): array
+    {
+        return [
+            'branch_id' => 'lokasi kerja',
+            'department_ids' => 'divisi',
+            'job_position_id' => 'jabatan',
+            'manager_id' => 'atasan langsung',
+            'photo' => 'foto karyawan',
+            'full_name' => 'nama lengkap',
+            'email' => 'email',
+            'phone' => 'nomor telepon',
+            'identity_number' => 'nomor identitas',
+            'birth_date' => 'tanggal lahir',
+            'join_date' => 'tanggal bergabung',
+            'employment_status' => 'status kepegawaian',
+            'office_pattern_id' => 'pola jam kantor',
+            'address' => 'alamat',
+            'contract_number' => 'nomor kontrak',
+            'contract_type' => 'jenis kontrak',
+            'contract_start_date' => 'tanggal mulai kontrak',
+            'contract_end_date' => 'tanggal selesai kontrak',
+            'contract_status' => 'status kontrak',
+            'contract_notes' => 'catatan kontrak',
+            'contract_document' => 'dokumen kontrak',
+            'exit_reason' => 'alasan keluar',
+            'exit_date' => 'tanggal keluar',
+            'exit_notes' => 'catatan keluar',
+            'login_password' => 'password login',
+            'login_role_id' => 'role login',
+            'machine_pins' => 'PIN mesin absensi',
+        ];
+    }
+
     /**
      * Pola jam kantor yang boleh dipilih: kandidat yang terdaftar di Pengaturan —
      * ATAU pola yang memang sudah dipakai karyawan ini.

@@ -2,6 +2,10 @@
     $contract = old('contract_number') ? null : ($employee->exists ? $employee->editableContract() : null);
     // Selecting "Nonaktif" runs the exit flow; that is possible whenever the employee
     // is not already inactive (a new employee, or an active one being edited).
+    //
+    // Kolom modal keluar di bawah dinonaktifkan selama modalnya belum dibuka: ia
+    // berada di dalam <form> yang sama, jadi kalau tetap aktif ia ikut terkirim pada
+    // setiap penyimpanan dan tanggal keluar bawaannya (hari ini) ikut divalidasi.
     $canExit = ! ($employee->exists && $employee->isInactive());
     $exitModalOpen = $errors->hasAny(['exit_reason', 'exit_date', 'exit_notes']);
 @endphp
@@ -452,7 +456,7 @@
                 <div class="mt-5 space-y-4">
                     <div>
                         <label for="exit_reason" class="block text-sm font-medium text-gray-700">Alasan Keluar <span class="field-requirement is-required" aria-label="Wajib diisi">*</span></label>
-                        <select id="exit_reason" name="exit_reason" data-exit-field class="mt-2 block w-full rounded-md border border-gray-300 px-3 py-2.5 text-sm shadow-xs outline-none focus:border-primary focus:ring-2 focus:ring-primary/20">
+                        <select id="exit_reason" name="exit_reason" data-exit-field @disabled(! $exitModalOpen) class="mt-2 block w-full rounded-md border border-gray-300 px-3 py-2.5 text-sm shadow-xs outline-none focus:border-primary focus:ring-2 focus:ring-primary/20">
                             @foreach ($exitReasons as $reason => $label)
                                 <option value="{{ $reason }}" @selected(old('exit_reason', 'contract_ended') === $reason)>{{ $label }}</option>
                             @endforeach
@@ -461,12 +465,12 @@
                     </div>
                     <div>
                         <label for="exit_date" class="block text-sm font-medium text-gray-700">Tanggal Keluar <span class="field-requirement is-required" aria-label="Wajib diisi">*</span></label>
-                        <input id="exit_date" name="exit_date" type="date" value="{{ old('exit_date', now()->format('Y-m-d')) }}" data-exit-field class="mt-2 block w-full rounded-md border border-gray-300 px-3 py-2.5 text-sm shadow-xs outline-none focus:border-primary focus:ring-2 focus:ring-primary/20">
+                        <input id="exit_date" name="exit_date" type="date" value="{{ old('exit_date', now()->format('Y-m-d')) }}" data-exit-field @disabled(! $exitModalOpen) class="mt-2 block w-full rounded-md border border-gray-300 px-3 py-2.5 text-sm shadow-xs outline-none focus:border-primary focus:ring-2 focus:ring-primary/20">
                         @error('exit_date')<p class="mt-2 text-sm text-red-600">{{ $message }}</p>@enderror
                     </div>
                     <div>
                         <label for="exit_notes" class="block text-sm font-medium text-gray-700">Catatan Keluar</label>
-                        <textarea id="exit_notes" name="exit_notes" rows="3" data-exit-field class="mt-2 block w-full rounded-md border border-gray-300 px-3 py-2.5 text-sm shadow-xs outline-none focus:border-primary focus:ring-2 focus:ring-primary/20">{{ old('exit_notes') }}</textarea>
+                        <textarea id="exit_notes" name="exit_notes" rows="3" data-exit-field @disabled(! $exitModalOpen) class="mt-2 block w-full rounded-md border border-gray-300 px-3 py-2.5 text-sm shadow-xs outline-none focus:border-primary focus:ring-2 focus:ring-primary/20">{{ old('exit_notes') }}</textarea>
                         @error('exit_notes')<p class="mt-2 text-sm text-red-600">{{ $message }}</p>@enderror
                     </div>
                 </div>

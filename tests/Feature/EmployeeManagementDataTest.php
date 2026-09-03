@@ -943,6 +943,145 @@ test('setting the status to Nonaktif during edit requires an exit reason', funct
     expect($employee->fresh()->employment_status)->toBe('active');
 });
 
+/**
+ * Kolom modal "Proses Karyawan Keluar" berada di dalam formulir karyawan dan ikut
+ * terkirim pada setiap penyimpanan. Dua pengujian berikut menjaga agar kolom itu
+ * tidak lagi dianggap sebagai proses keluar selama statusnya tetap Aktif.
+ */
+function employeeFormPayload(array $master, array $overrides = []): array
+{
+    return array_merge([
+        'branch_id' => $master['branch']->id,
+        'department_ids' => [$master['department']->id],
+        'job_position_id' => $master['position']->id,
+        'machine_pins' => [['device_id' => null, 'machine_user_id' => '9001']],
+        'full_name' => 'Mulai Bulan Depan',
+        'join_date' => now()->addDays(21)->toDateString(),
+        'employment_status' => 'active',
+        'contract_number' => 'CTR-DEPAN',
+        'contract_type' => 'PKWT',
+        'contract_start_date' => now()->addDays(21)->toDateString(),
+        'contract_end_date' => now()->addYear()->toDateString(),
+        'contract_status' => 'active',
+        // Bawaan modal keluar yang selalu ikut terkirim oleh browser.
+        'exit_reason' => 'contract_ended',
+        'exit_date' => now()->toDateString(),
+        'exit_notes' => '',
+    ], $overrides);
+}
+
+test('an employee can be registered before their first working day', function () {
+    $user = employeeManager();
+    $master = hrMasterData();
+
+    $this->actingAs($user)
+        ->from('/employees/create')
+        ->post('/employees', employeeFormPayload($master))
+        ->assertSessionHasNoErrors()
+        ->assertRedirect('/employees');
+
+    $employee = Employee::query()->where('full_name', 'Mulai Bulan Depan')->firstOrFail();
+
+    expect($employee->employment_status)->toBe('active')
+        ->and($employee->exit_reason)->toBeNull()
+        ->and($employee->exit_date)->toBeNull()
+        ->and($employee->join_date->toDateString())->toBe(now()->addDays(21)->toDateString())
+        ->and($employee->contracts()->first()->start_date->toDateString())->toBe(now()->addDays(21)->toDateString());
+});
+
+test('an ordinary edit never processes the employee out', function () {
+    $user = employeeManager();
+    $master = hrMasterData();
+
+    // Tanggal bergabungnya masih di depan: keadaan yang dulu membuat setiap
+    // penyimpanan ditolak dengan galat tanggal keluar.
+    $employee = Employee::query()->create([
+        'branch_id' => $master['branch']->id,
+        'department_id' => $master['department']->id,
+        'job_position_id' => $master['position']->id,
+        'full_name' => 'Mulai Bulan Depan',
+        'join_date' => now()->addDays(21)->toDateString(),
+        'employment_status' => 'active',
+    ]);
+    $employee->contracts()->create([
+        'contract_number' => 'CTR-DEPAN',
+        'contract_type' => 'PKWT',
+        'start_date' => now()->addDays(21)->toDateString(),
+        'end_date' => now()->addYear()->toDateString(),
+        'status' => 'active',
+    ]);
+
+    $this->actingAs($user)
+        ->from("/employees/{$employee->id}/edit")
+        ->put("/employees/{$employee->id}", employeeFormPayload($master, [
+            'full_name' => 'Mulai Bulan Depan',
+            'phone' => '081234567890',
+        ]))
+        ->assertSessionHasNoErrors()
+        ->assertRedirect('/employees');
+
+    $employee->refresh();
+
+    expect($employee->phone)->toBe('081234567890')
+        ->and($employee->employment_status)->toBe('active')
+        ->and($employee->exit_reason)->toBeNull()
+        ->and($employee->exit_date)->toBeNull()
+        ->and($employee->contracts()->first()->status)->toBe('active');
+});
+
+test('the edit form keeps a supervisor who has already left, instead of clearing them', function () {
+    $user = employeeManager();
+    ['branch' => $branch, 'department' => $department, 'position' => $position] = hrMasterData();
+
+    $manager = Employee::query()->create([
+        'branch_id' => $branch->id,
+        'department_id' => $department->id,
+        'job_position_id' => $position->id,
+        'full_name' => 'Atasan Sudah Keluar',
+        'join_date' => now()->subYears(3)->toDateString(),
+        'employment_status' => 'inactive',
+    ]);
+
+    $employee = Employee::query()->create([
+        'branch_id' => $branch->id,
+        'department_id' => $department->id,
+        'job_position_id' => $position->id,
+        'manager_id' => $manager->id,
+        'full_name' => 'Bawahan',
+        'join_date' => now()->subYear()->toDateString(),
+        'employment_status' => 'active',
+    ]);
+    $employee->contracts()->create([
+        'contract_number' => 'CTR-BWH',
+        'contract_type' => 'PKWT',
+        'start_date' => now()->subYear()->toDateString(),
+        'end_date' => now()->addMonths(6)->toDateString(),
+        'status' => 'active',
+    ]);
+
+    // Tanpa opsi ini <select> jatuh ke "— Tidak ada —", jadi sekadar membuka lalu
+    // menyimpan formulir akan menghapus atasannya tanpa pemberitahuan.
+    $this->actingAs($user)
+        ->get("/employees/{$employee->id}/edit")
+        ->assertOk()
+        ->assertSee('Atasan Sudah Keluar');
+
+    // Atasan yang sudah keluar tidak ditawarkan pada karyawan lain.
+    $other = Employee::query()->create([
+        'branch_id' => $branch->id,
+        'department_id' => $department->id,
+        'job_position_id' => $position->id,
+        'full_name' => 'Karyawan Lain',
+        'join_date' => now()->subYear()->toDateString(),
+        'employment_status' => 'active',
+    ]);
+
+    $this->actingAs($user)
+        ->get("/employees/{$other->id}/edit")
+        ->assertOk()
+        ->assertDontSee('Atasan Sudah Keluar');
+});
+
 test('renewing a contract creates a new active contract and records history', function () {
     $user = employeeManager();
     ['branch' => $branch, 'department' => $department, 'position' => $position] = hrMasterData();
