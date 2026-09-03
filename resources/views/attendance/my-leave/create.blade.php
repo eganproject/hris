@@ -20,10 +20,16 @@
             <div class="grid grid-cols-1 gap-5 md:grid-cols-2">
                 <div class="md:col-span-2">
                     <label for="leave_type_id" class="block text-sm font-medium text-gray-700">Jenis <span class="field-requirement is-required" aria-label="Wajib diisi">*</span></label>
-                    <select id="leave_type_id" name="leave_type_id" required class="mt-2 block w-full rounded-md border border-gray-300 px-3 py-2.5 text-sm shadow-xs outline-none focus:border-primary focus:ring-2 focus:ring-primary/20">
+                    <select id="leave_type_id" name="leave_type_id" required data-attachment-requirement="#attachment-field" class="mt-2 block w-full rounded-md border border-gray-300 px-3 py-2.5 text-sm shadow-xs outline-none focus:border-primary focus:ring-2 focus:ring-primary/20">
                         <option value="">— Pilih jenis —</option>
                         @foreach ($leaveTypes as $type)
-                            <option value="{{ $type->id }}" @selected(old('leave_type_id') == $type->id)>{{ $type->name }}</option>
+                            {{-- Jenis sakit mewajibkan surat keterangan. Penandanya dari
+                                 server, sehingga aturannya sama dengan yang divalidasi. --}}
+                            <option value="{{ $type->id }}"
+                                @if ($type->attendance_status === \App\Enums\AttendanceStatus::Sick)
+                                    data-requires-attachment="Surat keterangan sakit wajib dilampirkan. Gambar (JPG, PNG, WEBP) atau PDF, maksimal {{ \App\Models\LeaveRequest::ATTACHMENT_MAX_MB }} MB."
+                                @endif
+                                @selected(old('leave_type_id') == $type->id)>{{ $type->name }}</option>
                         @endforeach
                     </select>
                     @error('leave_type_id')<p class="mt-2 text-sm text-red-600">{{ $message }}</p>@enderror
@@ -43,7 +49,7 @@
                     <textarea id="reason" name="reason" rows="3" class="mt-2 block w-full rounded-md border border-gray-300 px-3 py-2.5 text-sm shadow-xs outline-none focus:border-primary focus:ring-2 focus:ring-primary/20">{{ old('reason') }}</textarea>
                     @error('reason')<p class="mt-2 text-sm text-red-600">{{ $message }}</p>@enderror
                 </div>
-                <x-attachment-field name="attachment" :max-mb="\App\Models\LeaveRequest::ATTACHMENT_MAX_MB" />
+                <x-attachment-field name="attachment" label="Lampiran" :max-mb="\App\Models\LeaveRequest::ATTACHMENT_MAX_MB" />
             </div>
             <p class="mt-4 rounded-md bg-gray-50 px-3 py-2 text-xs text-gray-500">Pengajuan akan diteruskan ke atasan Anda, dan keputusan atasan bersifat final. Bila Anda belum punya atasan, HR yang memutuskan.</p>
         </section>

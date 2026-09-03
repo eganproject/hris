@@ -1457,6 +1457,52 @@ document.querySelectorAll('[data-exit-form]').forEach((stepper) => {
     });
 });
 
+// Some leave types demand proof — a sick note. The options that do are tagged with
+// `data-requires-attachment` by the server (holding the hint to show), so the rule
+// lives in one place and this never drifts from what the server validates.
+document.querySelectorAll('[data-attachment-requirement]').forEach((select) => {
+    const field = document.querySelector(select.dataset.attachmentRequirement);
+    const input = field?.querySelector('[data-attachment-input]');
+
+    if (!field || !input) {
+        return;
+    }
+
+    const label = field.querySelector('label');
+    const hint = field.querySelector('p');
+    const optionalHint = hint?.textContent ?? '';
+
+    const syncRequirement = () => {
+        const demand = select.selectedOptions[0]?.dataset.requiresAttachment ?? null;
+
+        input.required = demand !== null;
+
+        if (hint) {
+            hint.textContent = demand ?? optionalHint;
+            hint.classList.toggle('text-amber-700', demand !== null);
+            hint.classList.toggle('text-gray-500', demand === null);
+        }
+
+        if (!label) {
+            return;
+        }
+
+        let marker = label.querySelector('.field-requirement');
+
+        if (!marker) {
+            marker = document.createElement('span');
+            label.append(' ', marker);
+        }
+
+        marker.className = demand !== null ? 'field-requirement is-required' : 'field-requirement is-optional';
+        marker.setAttribute('aria-label', demand !== null ? 'Wajib diisi' : 'Opsional');
+        marker.textContent = demand !== null ? '*' : 'Opsional';
+    };
+
+    select.addEventListener('change', syncRequirement);
+    syncRequirement();
+});
+
 // PKWTT (permanent) contracts don't need an end date; every other type does.
 // Toggle the `required` attribute and the required/optional marker on the linked
 // end-date field whenever the contract type changes.

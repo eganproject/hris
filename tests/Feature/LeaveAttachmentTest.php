@@ -13,11 +13,16 @@ use Spatie\Permission\PermissionRegistrar;
 
 uses(RefreshDatabase::class);
 
+/**
+ * Jenis cuti biasa — lampirannya opsional. Sengaja BUKAN jenis sakit: pengajuan
+ * sakit mewajibkan surat keterangan, dan itu diuji tersendiri di
+ * SickNoteRequiredTest.
+ */
 function leaveType(): LeaveType
 {
     return LeaveType::query()->firstOrCreate(
-        ['code' => 'SK'],
-        ['name' => 'Sakit', 'attendance_status' => 'sick', 'is_paid' => true, 'counts_against_balance' => false, 'is_active' => true],
+        ['code' => 'CT'],
+        ['name' => 'Cuti Tahunan', 'attendance_status' => 'leave', 'is_paid' => true, 'counts_against_balance' => false, 'is_active' => true],
     );
 }
 

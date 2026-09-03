@@ -6,6 +6,8 @@ use App\Models\LeaveRequest;
 use App\Models\LeaveType;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Storage;
 use Spatie\Permission\Models\Permission;
 use Spatie\Permission\PermissionRegistrar;
 
@@ -16,7 +18,7 @@ uses(RefreshDatabase::class);
  *
  * @return array{employee: Employee, employeeUser: User, supervisor: Employee, supervisorUser: User, hr: User, type: LeaveType}
  */
-function leaveNotificationFixture(string $typeName = 'Sakit'): array
+function leaveNotificationFixture(string $typeName = 'Sakit', string $attendanceStatus = 'leave'): array
 {
     app(PermissionRegistrar::class)->forgetCachedPermissions();
 
@@ -50,7 +52,7 @@ function leaveNotificationFixture(string $typeName = 'Sakit'): array
     $hr->forceFill(['bypass_team_scope' => true])->save();
 
     $type = LeaveType::query()->create([
-        'code' => 'SK', 'name' => $typeName, 'attendance_status' => 'sick',
+        'code' => 'SK', 'name' => $typeName, 'attendance_status' => $attendanceStatus,
         'is_paid' => true, 'counts_against_balance' => false, 'is_active' => true,
     ]);
 
@@ -66,7 +68,8 @@ function notificationsOf(User $user): array
 }
 
 test('the whole leave flow tells each side what they need to know', function () {
-    ['employeeUser' => $employeeUser, 'supervisorUser' => $supervisorUser, 'hr' => $hr, 'type' => $type] = leaveNotificationFixture('Sakit');
+    Storage::fake('local');
+    ['employeeUser' => $employeeUser, 'supervisorUser' => $supervisorUser, 'hr' => $hr, 'type' => $type] = leaveNotificationFixture('Sakit', 'sick');
 
     // 1. Karyawan mengajukan → atasan diberi tahu: siapa, jenis, periode, alasan.
     $start = now()->addDays(3);
@@ -77,6 +80,8 @@ test('the whole leave flow tells each side what they need to know', function () 
         'start_date' => $start->toDateString(),
         'end_date' => $end->toDateString(),
         'reason' => 'Demam tinggi.',
+        // Pengajuan sakit wajib melampirkan surat keterangan.
+        'attachment' => UploadedFile::fake()->image('surat-sakit.jpg'),
     ])->assertRedirect();
 
     $period = LeaveRequest::query()->firstOrFail()->days.' hari';
@@ -174,7 +179,7 @@ test('an employee cancelling their own request tells the supervisor waiting on i
 });
 
 test('leave filed by HR on behalf of an employee notifies that employee', function () {
-    ['employeeUser' => $employeeUser, 'employee' => $employee, 'hr' => $hr, 'type' => $type] = leaveNotificationFixture('Sakit');
+    ['employeeUser' => $employeeUser, 'employee' => $employee, 'hr' => $hr, 'type' => $type] = leaveNotificationFixture('Sakit', 'sick');
 
     // Tanggal dalam rentang yang diizinkan (bulan berjalan), dan tetap satu bulan
     // sehingga format periodenya "d – d M Y".
