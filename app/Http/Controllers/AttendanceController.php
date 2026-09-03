@@ -20,6 +20,13 @@ use Illuminate\View\View;
 
 class AttendanceController extends Controller
 {
+    /**
+     * Penyaring daftar harian yang ikut dibawa saat menyimpan. Tanpa ini penyimpanan
+     * memulangkan pengguna ke halaman 1 tanpa filter, sehingga baris yang baru saja
+     * diubah tidak ikut tampil — terbaca seperti perubahannya tidak tersimpan.
+     */
+    private const LIST_CONTEXT = ['branch_id', 'department_id', 'search', 'status', 'per_page', 'page'];
+
     public function __construct(
         private readonly AttendanceResolver $resolver,
         private readonly ProcessDayAttendance $processDay,
@@ -172,7 +179,7 @@ class AttendanceController extends Controller
         $count = $this->processDay->handle($date, $branchId, DataScope::forTeam($request->user()));
 
         return redirect()
-            ->route('attendance.daily.index', $request->only('date', 'branch_id'))
+            ->route('attendance.daily.index', $this->listContext($request, $date))
             ->with('status', "Absensi {$date->translatedFormat('d M Y')} diproses ({$count} karyawan).");
     }
 
@@ -195,8 +202,22 @@ class AttendanceController extends Controller
         );
 
         return redirect()
-            ->route('attendance.daily.index', ['date' => $date->toDateString(), 'branch_id' => $request->integer('branch_id') ?: null])
+            ->route('attendance.daily.index', $this->listContext($request, $date))
             ->with('status', 'Absensi karyawan diperbarui.');
+    }
+
+    /**
+     * Tanggal yang sedang dibuka plus penyaring daftar yang dikirim formulir, tanpa
+     * nilai kosong supaya tautan kembalinya tetap bersih.
+     *
+     * @return array<string, mixed>
+     */
+    private function listContext(Request $request, Carbon $date): array
+    {
+        return ['date' => $date->toDateString()] + array_filter(
+            $request->only(self::LIST_CONTEXT),
+            fn ($value) => $value !== null && $value !== '',
+        );
     }
 
     private function resolveDate(?string $value): Carbon

@@ -1,3 +1,17 @@
+@php
+    // Penyaring yang sedang aktif, dikirim ulang oleh setiap aksi di halaman ini.
+    // Tanpa itu penyimpanan memulangkan pengguna ke halaman 1 tanpa filter, sehingga
+    // baris yang baru diubah tidak ikut tampil dan terbaca seperti tidak tersimpan.
+    $listContext = array_filter([
+        'branch_id' => $branchId,
+        'department_id' => $departmentId,
+        'search' => $search,
+        'status' => $statusFilter,
+        'per_page' => $perPage,
+        'page' => request('page'),
+    ], fn ($value) => $value !== null && $value !== '');
+@endphp
+
 <x-layouts.app title="Absensi Harian - {{ config('app.name', 'HRIS') }}" heading="Absensi Harian">
     <div class="mx-auto max-w-7xl space-y-6">
         <section class="flex flex-col justify-between gap-4 lg:flex-row lg:items-end">
@@ -11,7 +25,9 @@
                     <form method="POST" action="{{ route('attendance.daily.process') }}">
                         @csrf
                         <input type="hidden" name="date" value="{{ $date->toDateString() }}">
-                        <input type="hidden" name="branch_id" value="{{ $branchId }}">
+                        @foreach ($listContext as $contextKey => $contextValue)
+                            <input type="hidden" name="{{ $contextKey }}" value="{{ $contextValue }}">
+                        @endforeach
                         <button type="submit" class="inline-flex items-center gap-1.5 rounded-md bg-primary px-4 py-2.5 text-sm font-semibold text-white shadow-xs hover:bg-primary-hover"><x-icon name="refresh"/> Proses Absensi</button>
                     </form>
                 @endcan
@@ -148,11 +164,21 @@
                 @csrf
                 <input type="hidden" name="employee_id" id="pn-emp">
                 <input type="hidden" name="work_date" value="{{ $date->toDateString() }}">
-                <input type="hidden" name="branch_id" value="{{ $branchId }}">
+                @foreach ($listContext as $contextKey => $contextValue)
+                    <input type="hidden" name="{{ $contextKey }}" value="{{ $contextValue }}">
+                @endforeach
                 <div>
                     <h3 class="text-base font-semibold text-gray-950">Input Jam Presensi</h3>
                     <p class="mt-1 text-sm text-gray-500"><span id="pn-emp-name" class="font-medium text-gray-700"></span> · {{ $date->translatedFormat('d M Y') }}</p>
                 </div>
+
+                @if ($errors->any())
+                    <div class="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+                        <ul class="space-y-0.5">
+                            @foreach ($errors->all() as $error)<li>{{ $error }}</li>@endforeach
+                        </ul>
+                    </div>
+                @endif
                 <div class="grid grid-cols-2 gap-4">
                     <div>
                         <label for="pn-in" class="block text-sm font-medium text-gray-700">Jam Masuk</label>
@@ -163,7 +189,7 @@
                         <input type="time" name="clock_out" id="pn-out" class="mt-2 block w-full rounded-md border border-gray-300 px-3 py-2.5 text-sm shadow-xs outline-none focus:border-primary focus:ring-2 focus:ring-primary/20">
                     </div>
                 </div>
-                <p class="text-xs text-gray-500">Kosongkan keduanya lalu simpan untuk menandai tidak hadir sesuai jadwal. Jam pulang lebih awal dari jam masuk dianggap lintas tengah malam.</p>
+                <p class="text-xs text-gray-500">Jam pulang boleh dikosongkan bila karyawan belum absen pulang. Kosongkan keduanya lalu simpan untuk menandai tidak hadir sesuai jadwal. Jam pulang lebih awal dari jam masuk dianggap lintas tengah malam.</p>
                 <div>
                     <label for="pn-note" class="block text-sm font-medium text-gray-700">Catatan <span class="text-gray-400">(opsional)</span></label>
                     <input type="text" name="note" id="pn-note" maxlength="255" class="mt-2 block w-full rounded-md border border-gray-300 px-3 py-2.5 text-sm shadow-xs outline-none focus:border-primary focus:ring-2 focus:ring-primary/20">
@@ -186,18 +212,45 @@
                 const clockOut = document.getElementById('pn-out');
                 const note = document.getElementById('pn-note');
 
+                // Kolom jam dipegang flatpickr. Menyetel .value langsung membuat yang
+                // tampil dan keadaan internal flatpickr berbeda, sehingga pemetiknya
+                // terbuka pada jam bawaan, bukan pada jam yang sedang ditampilkan.
+                function setTime(field, value) {
+                    if (field._flatpickr) {
+                        value ? field._flatpickr.setDate(value, false) : field._flatpickr.clear();
+                        return;
+                    }
+
+                    field.value = value || '';
+                }
+
+                function fill(employeeId, employeeName, inValue, outValue, noteValue) {
+                    emp.value = employeeId || '';
+                    empName.textContent = employeeName || '';
+                    setTime(clockIn, inValue);
+                    setTime(clockOut, outValue);
+                    note.value = noteValue || '';
+                    dialog.showModal();
+                }
+
                 document.querySelectorAll('[data-punch]').forEach(function (btn) {
                     btn.addEventListener('click', function () {
-                        emp.value = btn.dataset.emp;
-                        empName.textContent = btn.dataset.empName;
-                        clockIn.value = btn.dataset.in || '';
-                        clockOut.value = btn.dataset.out || '';
-                        note.value = btn.dataset.note || '';
-                        dialog.showModal();
+                        fill(btn.dataset.emp, btn.dataset.empName, btn.dataset.in, btn.dataset.out, btn.dataset.note);
                     });
                 });
 
                 dialog.querySelector('[data-close-dialog]').addEventListener('click', function () { dialog.close(); });
+
+                @if ($errors->any())
+                    // Validasi gagal: buka lagi modal orang yang sama beserta isian
+                    // terakhirnya, supaya penolakannya terlihat dan bisa dibetulkan.
+                    (function () {
+                        const failedId = @json((string) old('employee_id'));
+                        const row = document.querySelector('[data-punch][data-emp="' + failedId + '"]');
+
+                        fill(failedId, row ? row.dataset.empName : '', @json(old('clock_in')), @json(old('clock_out')), @json(old('note')));
+                    })();
+                @endif
             })();
         </script>
         @endpush

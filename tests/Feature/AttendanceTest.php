@@ -174,6 +174,71 @@ test('manual punch entry stores and resolves the attendance', function () {
         ->and($attendance->clock_in->format('H:i'))->toBe('08:05');
 });
 
+test('a clock-in can be corrected on its own, without a clock-out', function () {
+    $user = attendanceActor();
+    $shift = regularShift();
+    $employee = Employee::query()->create(['full_name' => 'Budi', 'employment_status' => 'active']);
+    scheduleDay($employee, '2026-02-10', $shift);
+
+    // Absen masuk tercatat, absen pulang belum — keadaan sehari-hari dari mesin
+    // sidik jari, dan yang paling sering perlu dibetulkan lewat modal Jam.
+    app(AttendanceResolver::class)->resolve($employee, Carbon::parse('2026-02-10'), '08:00', null);
+
+    $this->actingAs($user)->post('/attendance/daily/punch', [
+        'employee_id' => $employee->id,
+        'work_date' => '2026-02-10',
+        'clock_in' => '07:55',
+        'clock_out' => '',
+    ])->assertSessionHasNoErrors()->assertRedirect();
+
+    $attendance = Attendance::query()->where('employee_id', $employee->id)->firstOrFail();
+    expect($attendance->clock_in->format('H:i'))->toBe('07:55')
+        ->and($attendance->clock_out)->toBeNull();
+});
+
+test('a clock-out without a clock-in is refused, and the modal says so', function () {
+    $user = attendanceActor();
+    $employee = Employee::query()->create(['full_name' => 'Budi', 'employment_status' => 'active']);
+
+    // Baris "Alfa" yang tetap menyimpan jam pulang tidak masuk akal, jadi ditolak —
+    // tapi penolakannya harus terlihat: modalnya dibuka lagi beserta pesannya.
+    $html = $this->actingAs($user)
+        ->from('/attendance/daily?date=2026-02-10')
+        ->followingRedirects()
+        ->post('/attendance/daily/punch', [
+            'employee_id' => $employee->id,
+            'work_date' => '2026-02-10',
+            'clock_in' => '',
+            'clock_out' => '17:00',
+        ])
+        ->assertOk()
+        ->getContent();
+
+    expect($html)->toContain('jam masuk')
+        ->and($html)->toContain('dialog.showModal()')
+        ->and(Attendance::query()->count())->toBe(0);
+});
+
+test('saving a punch returns to the same filtered page of the list', function () {
+    $user = attendanceActor();
+    $shift = regularShift();
+    $employee = Employee::query()->create(['full_name' => 'Budi', 'employment_status' => 'active']);
+    scheduleDay($employee, '2026-02-10', $shift);
+
+    // Tanpa konteks ini pengguna dipulangkan ke halaman 1 tanpa filter, sehingga
+    // baris yang baru diubah tidak ikut tampil dan terbaca seperti tidak tersimpan.
+    $this->actingAs($user)->post('/attendance/daily/punch', [
+        'employee_id' => $employee->id,
+        'work_date' => '2026-02-10',
+        'clock_in' => '08:05',
+        'clock_out' => '17:00',
+        'search' => 'Budi',
+        'status' => 'present',
+        'per_page' => 25,
+        'page' => 2,
+    ])->assertRedirect('/attendance/daily?date=2026-02-10&search=Budi&status=present&per_page=25&page=2');
+});
+
 test('the daily attendance page renders', function () {
     $user = attendanceActor();
 
