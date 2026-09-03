@@ -58,6 +58,22 @@ test('the centre button sits between two shortcuts on each side', function () {
         ->and(substr_count(substr($nav, $centre), 'mobile-bottom-nav-link'))->toBe(2);
 });
 
+/**
+ * Markup bilah navigasi bawah saja. Pemeriksaan label pintasan harus dibatasi ke
+ * sini — sisa halaman bebas memuat kata yang sama untuk keperluan lain.
+ */
+function mobileNavMarkup(string $html): string
+{
+    $start = strpos($html, '<nav class="mobile-bottom-nav');
+
+    if ($start === false) {
+        return '';
+    }
+
+    $end = strpos($html, '</nav>', $start);
+
+    return $end === false ? substr($html, $start) : substr($html, $start, $end - $start);
+}
 test('the centre button is highlighted while on its own page', function () {
     $user = navUser('dashboard.view', 'my-attendance.view');
 
@@ -85,8 +101,10 @@ test('the bar falls back to whatever the user may actually open', function () {
 
     $response->assertSee('Harian')->assertSee('Karyawan')->assertSee('Lainnya');
 
-    // Menu yang tidak boleh dibuka tidak muncul sebagai pintasan.
-    expect($response->getContent())->not->toContain('>Cuti<');
+    // Menu yang tidak boleh dibuka tidak muncul sebagai pintasan. Diperiksa hanya di
+    // dalam bilahnya: kata "Cuti" juga muncul sebagai pilihan status di penyaring
+    // halaman, dan itu bukan pintasan menu.
+    expect(mobileNavMarkup($response->getContent()))->not->toContain('>Cuti<');
 });
 
 test('it never offers more than five slots', function () {

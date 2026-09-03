@@ -10,16 +10,16 @@ use Illuminate\Support\Collection;
 
 /**
  * Builds the per-employee attendance recap for a date range: how many days each
- * employee was present, late, left early, absent, on leave/sick, plus total late,
- * worked and overtime minutes. Shared by the report screen and its Excel export so
- * both always show identical numbers.
+ * employee was present, late, left early, absent, on leave (cuti), on permit
+ * (izin) or sick, plus total late, worked and overtime minutes. Shared by the
+ * report screen and its Excel export so both always show identical numbers.
  */
 class AttendanceReport
 {
     /**
      * @return Collection<int, array{
      *     employee: Employee, total_hari:int, hadir:int, terlambat:int,
-     *     pulang_cepat:int, alfa:int, cuti:int, sakit:int,
+     *     pulang_cepat:int, alfa:int, cuti:int, izin:int, sakit:int,
      *     terlambat_menit:int, kerja_menit:int, lembur_menit:int
      * }>
      */
@@ -44,11 +44,13 @@ class AttendanceReport
                 SUM(CASE WHEN status = 'early_leave' THEN 1 ELSE 0 END) as pulang_cepat,
                 SUM(CASE WHEN status = 'absent' THEN 1 ELSE 0 END) as alfa,
                 SUM(CASE WHEN status = 'leave' THEN 1 ELSE 0 END) as cuti,
+                SUM(CASE WHEN status = 'permit' THEN 1 ELSE 0 END) as izin,
                 SUM(CASE WHEN status = 'sick' THEN 1 ELSE 0 END) as sakit,
                 COALESCE(SUM(late_minutes), 0) as terlambat_menit,
                 COALESCE(SUM(work_minutes), 0) as kerja_menit,
                 -- "Hari" = hari kerja terjadwal; libur nasional & libur jadwal tidak
-                -- dihitung agar breakdown (hadir+alfa+cuti+sakit) berdamai dengan totalnya.
+                -- dihitung agar breakdown (hadir+alfa+cuti+izin+sakit) berdamai dengan
+                -- totalnya.
                 SUM(CASE WHEN status NOT IN ('holiday','day_off') THEN 1 ELSE 0 END) as total_hari
                 SQL)
             ->groupBy('employee_id')
@@ -98,6 +100,7 @@ class AttendanceReport
                     'pulang_cepat' => (int) ($s->pulang_cepat ?? 0),
                     'alfa' => (int) ($s->alfa ?? 0),
                     'cuti' => (int) ($s->cuti ?? 0),
+                    'izin' => (int) ($s->izin ?? 0),
                     'sakit' => (int) ($s->sakit ?? 0),
                     'terlambat_menit' => (int) ($s->terlambat_menit ?? 0),
                     'kerja_menit' => (int) ($s->kerja_menit ?? 0),

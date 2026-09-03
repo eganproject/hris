@@ -37,7 +37,7 @@ class AttendanceLogDailySheet implements FromCollection, ShouldAutoSize, WithEve
         return [
             'Tanggal', 'Hari', 'Karyawan Tercatat',
             'Hadir', '% Kehadiran', 'Tepat Waktu', 'Terlambat', 'Pulang Cepat', 'Alfa',
-            'Cuti / Izin', 'Sakit', 'WFH', 'Dinas Luar', 'Libur',
+            'Cuti', 'Izin', 'Sakit', 'WFH', 'Dinas Luar', 'Libur',
             'Jam Kerja (jam)', 'Total Telat (menit)',
         ];
     }
@@ -59,6 +59,7 @@ class AttendanceLogDailySheet implements FromCollection, ShouldAutoSize, WithEve
             $row['pulang_cepat'],
             $row['alfa'],
             $row['cuti'],
+            $row['izin'],
             $row['sakit'],
             $row['wfh'],
             $row['dinas_luar'],

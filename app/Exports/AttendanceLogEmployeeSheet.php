@@ -37,7 +37,7 @@ class AttendanceLogEmployeeSheet implements FromCollection, ShouldAutoSize, With
             'NIK', 'Nama', 'Divisi', 'Lokasi', 'Jabatan',
             'Hari Tercatat', 'Hari Kerja', 'Hadir', '% Kehadiran',
             'Tepat Waktu', 'Terlambat', 'Pulang Cepat', 'Alfa',
-            'Cuti / Izin', 'Sakit', 'WFH', 'Dinas Luar', 'Libur',
+            'Cuti', 'Izin', 'Sakit', 'WFH', 'Dinas Luar', 'Libur',
             'Jam Kerja (jam)', 'Lembur (jam)',
             'Total Telat (menit)', 'Rata-rata Telat (menit)',
         ];
@@ -64,6 +64,7 @@ class AttendanceLogEmployeeSheet implements FromCollection, ShouldAutoSize, With
             $row['pulang_cepat'],
             $row['alfa'],
             $row['cuti'],
+            $row['izin'],
             $row['sakit'],
             $row['wfh'],
             $row['dinas_luar'],

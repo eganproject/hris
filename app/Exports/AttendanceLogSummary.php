@@ -101,6 +101,7 @@ class AttendanceLogSummary
             'pulang_cepat' => $countOf(AttendanceStatus::EarlyLeave),
             'alfa' => $countOf(AttendanceStatus::Absent),
             'cuti' => $countOf(AttendanceStatus::Leave),
+            'izin' => $countOf(AttendanceStatus::Permit),
             'sakit' => $countOf(AttendanceStatus::Sick),
             'wfh' => $countOf(AttendanceStatus::Wfh),
             'dinas_luar' => $countOf(AttendanceStatus::BusinessTrip),

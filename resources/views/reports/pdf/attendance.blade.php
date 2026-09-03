@@ -31,7 +31,7 @@
             <tr>
                 <th class="l">Karyawan</th>
                 <th>Hari</th><th>Hadir</th><th>Telat</th><th>Plg Cepat</th>
-                <th>Alfa</th><th>Cuti</th><th>Sakit</th>
+                <th>Alfa</th><th>Cuti</th><th>Izin</th><th>Sakit</th>
                 <th>Total Telat</th><th>Jam Kerja</th><th>Lembur Disetujui</th>
             </tr>
         </thead>
@@ -46,6 +46,7 @@
                     <td class="c">{{ $row['pulang_cepat'] }}</td>
                     <td class="c">{{ $row['alfa'] }}</td>
                     <td class="c">{{ $row['cuti'] }}</td>
+                    <td class="c">{{ $row['izin'] }}</td>
                     <td class="c">{{ $row['sakit'] }}</td>
                     <td class="r">{{ $row['terlambat_menit'] }} m</td>
                     <td class="r">{{ intdiv($row['kerja_menit'], 60) }}j {{ $row['kerja_menit'] % 60 }}m</td>
@@ -66,6 +67,7 @@
                     <td class="c">{{ $rows->sum('pulang_cepat') }}</td>
                     <td class="c">{{ $rows->sum('alfa') }}</td>
                     <td class="c">{{ $rows->sum('cuti') }}</td>
+                    <td class="c">{{ $rows->sum('izin') }}</td>
                     <td class="c">{{ $rows->sum('sakit') }}</td>
                     <td class="r">{{ $rows->sum('terlambat_menit') }} m</td>
                     <td class="r">{{ intdiv($kerjaTotal, 60) }}j {{ $kerjaTotal % 60 }}m</td>

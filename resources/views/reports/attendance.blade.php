@@ -57,7 +57,8 @@
                             <th class="text-center"><span class="cursor-help border-b border-dotted border-gray-400" title="Jumlah hari terlambat (bagian dari Hadir).">Telat</span></th>
                             <th class="text-center"><span class="cursor-help border-b border-dotted border-gray-400" title="Jumlah hari pulang lebih cepat dari jadwal (bagian dari Hadir).">Plg Cepat</span></th>
                             <th class="text-center"><span class="cursor-help border-b border-dotted border-gray-400" title="Jumlah hari tanpa keterangan / mangkir (tidak hadir tanpa cuti/izin yang disetujui).">Alfa</span></th>
-                            <th class="text-center"><span class="cursor-help border-b border-dotted border-gray-400" title="Jumlah hari cuti/izin yang telah disetujui.">Cuti</span></th>
+                            <th class="text-center"><span class="cursor-help border-b border-dotted border-gray-400" title="Jumlah hari cuti disetujui — jenis cuti yang dipetakan ke status Cuti di menu Jenis Cuti.">Cuti</span></th>
+                            <th class="text-center"><span class="cursor-help border-b border-dotted border-gray-400" title="Jumlah hari izin disetujui — jenis cuti yang dipetakan ke status Izin di menu Jenis Cuti.">Izin</span></th>
                             <th class="text-center"><span class="cursor-help border-b border-dotted border-gray-400" title="Jumlah hari sakit.">Sakit</span></th>
                             <th class="text-right"><span class="cursor-help border-b border-dotted border-gray-400" title="Akumulasi menit keterlambatan selama periode.">Total Telat</span></th>
                             <th class="text-right"><span class="cursor-help border-b border-dotted border-gray-400" title="Total jam kerja yang tercatat dari absensi.">Jam Kerja</span></th>
@@ -78,6 +79,7 @@
                                 <td class="text-center text-sm {{ $row['pulang_cepat'] > 0 ? 'font-medium text-amber-600' : 'text-gray-400' }}">{{ $row['pulang_cepat'] }}</td>
                                 <td class="text-center text-sm {{ $row['alfa'] > 0 ? 'font-medium text-red-600' : 'text-gray-400' }}">{{ $row['alfa'] }}</td>
                                 <td class="text-center text-sm text-gray-700">{{ $row['cuti'] }}</td>
+                                <td class="text-center text-sm text-gray-700">{{ $row['izin'] }}</td>
                                 <td class="text-center text-sm text-gray-700">{{ $row['sakit'] }}</td>
                                 <td class="text-right text-sm text-gray-700">{{ $row['terlambat_menit'] }} m</td>
                                 <td class="text-right text-sm text-gray-700">{{ intdiv($row['kerja_menit'], 60) }}j {{ $row['kerja_menit'] % 60 }}m</td>
@@ -98,6 +100,7 @@
                                 <td class="text-center text-sm text-amber-700">{{ $rows->sum('pulang_cepat') }}</td>
                                 <td class="text-center text-sm text-red-700">{{ $rows->sum('alfa') }}</td>
                                 <td class="text-center text-sm">{{ $rows->sum('cuti') }}</td>
+                                <td class="text-center text-sm">{{ $rows->sum('izin') }}</td>
                                 <td class="text-center text-sm">{{ $rows->sum('sakit') }}</td>
                                 <td class="text-right text-sm">{{ $rows->sum('terlambat_menit') }} m</td>
                                 <td class="text-right text-sm">{{ intdiv($kerjaTotal, 60) }}j {{ $kerjaTotal % 60 }}m</td>
@@ -110,7 +113,7 @@
         </section>
 
         <div class="space-y-1 text-xs text-gray-400">
-            <p>"Hari" = hari kerja terjadwal pada periode (tidak termasuk libur nasional & libur jadwal). "Hadir" sudah termasuk telat, pulang cepat, WFH, dan dinas luar; "Cuti" termasuk izin. Karyawan aktif yang belum punya data absensi tetap tampil bernilai nol.</p>
+            <p>"Hari" = hari kerja terjadwal pada periode (tidak termasuk libur nasional & libur jadwal). "Hadir" sudah termasuk telat, pulang cepat, WFH, dan dinas luar. "Cuti" dan "Izin" dipisah menurut status yang dipetakan pada tiap jenis cuti di menu Jenis Cuti. Karyawan aktif yang belum punya data absensi tetap tampil bernilai nol.</p>
             <p>"Lembur Disetujui" = total lembur yang telah diajukan karyawan & disetujui atasan (angka resmi untuk penggajian), bukan hitungan otomatis dari absensi.</p>
         </div>
     </div>

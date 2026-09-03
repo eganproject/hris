@@ -12,7 +12,8 @@ enum AttendanceStatus: string
     case Late = 'late';              // Terlambat
     case EarlyLeave = 'early_leave'; // Pulang cepat
     case Absent = 'absent';          // Alfa / mangkir
-    case Leave = 'leave';            // Cuti / izin (disetujui)
+    case Leave = 'leave';            // Cuti (disetujui)
+    case Permit = 'permit';          // Izin (disetujui)
     case Sick = 'sick';              // Sakit
     case BusinessTrip = 'business_trip'; // Dinas luar
     case Wfh = 'wfh';                // Kerja dari rumah
@@ -47,7 +48,8 @@ enum AttendanceStatus: string
             self::Late => 'Terlambat',
             self::EarlyLeave => 'Pulang Cepat',
             self::Absent => 'Alfa',
-            self::Leave => 'Cuti / Izin',
+            self::Leave => 'Cuti',
+            self::Permit => 'Izin',
             self::Sick => 'Sakit',
             self::BusinessTrip => 'Dinas Luar',
             self::Wfh => 'WFH',
@@ -65,7 +67,7 @@ enum AttendanceStatus: string
             self::Present, self::Wfh => 'success',
             self::Late, self::EarlyLeave => 'warning',
             self::Absent => 'danger',
-            self::Leave, self::Sick, self::BusinessTrip => 'info',
+            self::Leave, self::Permit, self::Sick, self::BusinessTrip => 'info',
             self::Holiday, self::DayOff => 'neutral',
         };
     }

@@ -15,7 +15,7 @@ class AttendanceFoundationSeeder extends Seeder
     {
         $leaveTypes = [
             ['code' => 'CT', 'name' => 'Cuti Tahunan', 'attendance_status' => 'leave', 'is_paid' => true, 'counts_against_balance' => true, 'default_quota_days' => 12],
-            ['code' => 'IZ', 'name' => 'Izin', 'attendance_status' => 'leave', 'is_paid' => true, 'counts_against_balance' => false, 'default_quota_days' => null],
+            ['code' => 'IZ', 'name' => 'Izin', 'attendance_status' => 'permit', 'is_paid' => true, 'counts_against_balance' => false, 'default_quota_days' => null],
             ['code' => 'SK', 'name' => 'Sakit', 'attendance_status' => 'sick', 'is_paid' => true, 'counts_against_balance' => false, 'default_quota_days' => null],
             ['code' => 'DL', 'name' => 'Dinas Luar', 'attendance_status' => 'business_trip', 'is_paid' => true, 'counts_against_balance' => false, 'default_quota_days' => null],
             ['code' => 'WFH', 'name' => 'Work From Home', 'attendance_status' => 'wfh', 'is_paid' => true, 'counts_against_balance' => false, 'default_quota_days' => null],

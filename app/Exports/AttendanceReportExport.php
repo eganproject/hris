@@ -37,7 +37,7 @@ class AttendanceReportExport implements FromCollection, ShouldAutoSize, WithHead
     {
         return [
             'No. Karyawan', 'Nama', 'Lokasi', 'Divisi', 'Jabatan',
-            'Total Hari', 'Hadir', 'Terlambat', 'Pulang Cepat', 'Alfa', 'Cuti', 'Sakit',
+            'Total Hari', 'Hadir', 'Terlambat', 'Pulang Cepat', 'Alfa', 'Cuti', 'Izin', 'Sakit',
             'Total Terlambat (menit)', 'Total Jam Kerja', 'Total Lembur Disetujui',
         ];
     }
@@ -62,6 +62,7 @@ class AttendanceReportExport implements FromCollection, ShouldAutoSize, WithHead
             $row['pulang_cepat'],
             $row['alfa'],
             $row['cuti'],
+            $row['izin'],
             $row['sakit'],
             $row['terlambat_menit'],
             $this->hm($row['kerja_menit']),

@@ -10,7 +10,8 @@ class LeaveTypeRequest extends FormRequest
 {
     /** Attendance statuses a leave type may resolve to. */
     public const ALLOWED_STATUSES = [
-        AttendanceStatus::Leave->value => 'Cuti / Izin',
+        AttendanceStatus::Leave->value => 'Cuti',
+        AttendanceStatus::Permit->value => 'Izin',
         AttendanceStatus::Sick->value => 'Sakit',
         AttendanceStatus::BusinessTrip->value => 'Dinas Luar',
         AttendanceStatus::Wfh->value => 'WFH',
