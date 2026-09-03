@@ -7,6 +7,7 @@ use App\Models\AttendanceCorrection;
 use App\Models\Branch;
 use App\Models\Department;
 use App\Models\Employee;
+use App\Models\EmployeeSchedule;
 use App\Models\JobPosition;
 use App\Models\LeaveRequest;
 use App\Models\LeaveType;
@@ -17,6 +18,7 @@ use App\Models\Shift;
 use App\Models\User;
 use App\Services\DefaultOfficeSchedule;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Carbon;
 use Spatie\Permission\Models\Permission;
 use Spatie\Permission\Models\Role;
 use Spatie\Permission\PermissionRegistrar;
@@ -242,12 +244,112 @@ test('employee dashboard shows todays attendance state', function () {
         'clock_out' => now()->setTime(17, 2),
     ]);
 
+    // Jam masuk & jam pulang ditampilkan eksplisit dan berlabel, bukan sebagai kalimat.
     $this->actingAs($user)->get('/dashboard')
         ->assertOk()
-        ->assertSee('Selesai bekerja')
-        ->assertSee('Masuk 08:05')
-        ->assertSee('Pulang 17:02')
+        ->assertSee('Absen Masuk')
+        ->assertSee('Absen Pulang')
+        ->assertSee('08:05')
+        ->assertSee('17:02')
+        ->assertSee('Sudah absen masuk dan pulang.')
         ->assertSee(route('my-attendance.index'), false);
+});
+
+test('the dashboard shows a dash for a clock-out that has not happened yet', function () {
+    $user = dashboardUser(['dashboard.view', 'my-attendance.view']);
+    $employee = Employee::query()->create([
+        'user_id' => $user->id,
+        'full_name' => 'Staf Masih Kerja',
+        'employment_status' => 'active',
+        'join_date' => now()->subYear()->toDateString(),
+    ]);
+
+    Attendance::query()->create([
+        'employee_id' => $employee->id,
+        'work_date' => now()->toDateString(),
+        'status' => 'present',
+        'clock_in' => now()->setTime(8, 0),
+    ]);
+
+    $this->actingAs($user)->get('/dashboard')
+        ->assertOk()
+        ->assertSee('08:00')
+        ->assertSee('--:--')
+        ->assertSee('Sudah absen masuk, jam pulang belum tercatat.');
+});
+
+test('an HR account that is also an employee sees its own clock times too', function () {
+    app(PermissionRegistrar::class)->forgetCachedPermissions();
+
+    foreach (['dashboard.view', 'employees.view', 'my-attendance.view'] as $permission) {
+        Permission::findOrCreate($permission, 'web');
+    }
+
+    // Peran HR memakai ragam dashboard yang lain; dulu ragam itu tidak menampilkan
+    // absensi pemakainya sama sekali.
+    $user = User::factory()->create();
+    $user->givePermissionTo(['dashboard.view', 'employees.view', 'my-attendance.view']);
+    $user->assignRole(Role::findOrCreate('hr-manager', 'web'));
+
+    $employee = Employee::query()->create([
+        'user_id' => $user->id,
+        'full_name' => 'HR Yang Absen',
+        'employment_status' => 'active',
+        'join_date' => now()->subYear()->toDateString(),
+    ]);
+
+    Attendance::query()->create([
+        'employee_id' => $employee->id,
+        'work_date' => now()->toDateString(),
+        'status' => 'present',
+        'clock_in' => now()->setTime(7, 45),
+        'clock_out' => now()->setTime(16, 30),
+    ]);
+
+    $this->actingAs($user)->get('/dashboard')
+        ->assertOk()
+        ->assertSee('Absensi Hari Ini')
+        ->assertSee('07:45')
+        ->assertSee('16:30');
+});
+
+test('an overnight shift still reports the clock-in from the shift that started yesterday', function () {
+    $user = dashboardUser(['dashboard.view', 'my-attendance.view']);
+    $employee = Employee::query()->create([
+        'user_id' => $user->id,
+        'full_name' => 'Staf Malam',
+        'employment_status' => 'active',
+        'join_date' => now()->subYear()->toDateString(),
+    ]);
+
+    $shift = Shift::query()->create([
+        'code' => 'NGT', 'name' => 'Malam', 'start_time' => '22:00', 'end_time' => '06:00',
+        'crosses_midnight' => true, 'break_minutes' => 60, 'late_tolerance_minutes' => 10,
+        'early_leave_tolerance_minutes' => 10, 'is_active' => true,
+    ]);
+
+    Carbon::setTestNow(Carbon::parse('2026-02-11 03:00:00'));
+
+    EmployeeSchedule::query()->create([
+        'employee_id' => $employee->id, 'work_date' => '2026-02-10',
+        'shift_id' => $shift->id, 'is_day_off' => false, 'source' => 'generated',
+    ]);
+
+    Attendance::query()->create([
+        'employee_id' => $employee->id,
+        'work_date' => '2026-02-10',
+        'status' => 'present',
+        'clock_in' => Carbon::parse('2026-02-10 22:00'),
+    ]);
+
+    // Pukul 03:00 tanggal 11 masih shift tanggal 10; memakai tanggal kalender akan
+    // melaporkan "belum absen masuk" kepada orang yang justru sedang bekerja.
+    $this->actingAs($user)->get('/dashboard')
+        ->assertOk()
+        ->assertSee('22:00')
+        ->assertSee('lintas tengah malam');
+
+    Carbon::setTestNow();
 });
 
 test('employee dashboard resolves office hours without materialized schedule rows', function () {

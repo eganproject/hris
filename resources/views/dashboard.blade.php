@@ -77,19 +77,9 @@
                                     @if ($todayAttendance)<x-status-badge :tone="$todayAttendance->status->tone()">{{ $todayAttendance->status->label() }}</x-status-badge>@endif
                                 </div>
 
-                                @if ($todayAttendance?->clock_out)
-                                    <p class="mt-3 text-lg font-semibold text-gray-950">Selesai bekerja</p>
-                                    <p class="mt-1 text-sm text-gray-500">Masuk {{ $todayAttendance->clock_in_label }} <span class="mx-0.5 text-gray-300">&middot;</span> Pulang {{ $todayAttendance->clock_out_label }}</p>
-                                @elseif ($todayAttendance?->clock_in)
-                                    <p class="mt-3 text-lg font-semibold text-gray-950">Sudah absen masuk</p>
-                                    <p class="mt-1 text-sm text-gray-500">Tercatat pukul {{ $todayAttendance->clock_in_label }}</p>
-                                @elseif ($today['holiday'] || ! $todayMode->isWorking)
-                                    <p class="mt-3 text-lg font-semibold text-gray-950">Tidak ada absensi</p>
-                                    <p class="mt-1 text-sm text-gray-500">Hari ini tidak dijadwalkan bekerja.</p>
-                                @else
-                                    <p class="mt-3 text-lg font-semibold text-gray-950">Belum ada absensi</p>
-                                    <p class="mt-1 text-sm text-gray-500">Jam masuk belum tercatat untuk hari ini.</p>
-                                @endif
+                                <div class="mt-3">
+                                    @include('dashboard._today-attendance', ['attendance' => $personal['attendance']])
+                                </div>
                             </div>
 
                             @can('my-attendance.view')
@@ -201,6 +191,18 @@
                         </x-stat-card>
                     @endforeach
                 </div>
+
+                <x-dashboard.card
+                    title="Absensi Hari Ini"
+                    :subtitle="$personal['attendance']['work_date']->translatedFormat('l, d F Y')"
+                    icon="clock"
+                    tone="emerald">
+                    @include('dashboard._today-attendance', ['attendance' => $personal['attendance']])
+
+                    @can('my-attendance.view')
+                        <a href="{{ route('my-attendance.index') }}" class="mt-4 inline-flex items-center justify-center rounded-md border border-gray-200 px-3 py-2 text-xs font-semibold text-gray-700 transition hover:bg-gray-50">Lihat Absensi Saya</a>
+                    @endcan
+                </x-dashboard.card>
 
                 <x-dashboard.card
                     title="Jadwal 7 Hari ke Depan"

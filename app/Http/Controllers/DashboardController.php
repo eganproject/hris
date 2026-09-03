@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Enums\LeaveRequestStatus;
+use App\Models\Attendance;
 use App\Models\AttendanceCorrection;
 use App\Models\Employee;
 use App\Models\EmployeeContract;
@@ -12,12 +13,14 @@ use App\Models\LeaveType;
 use App\Models\OvertimeApproval;
 use App\Models\ShiftSwapRequest;
 use App\Models\User;
+use App\Services\AttendanceRollup;
 use App\Services\DefaultOfficeSchedule;
 use App\Services\LeaveBalanceService;
 use App\Support\DataScope;
 use App\Support\LeaveCalendar;
 use App\Support\WorkMode;
 use Carbon\CarbonPeriod;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\View\View;
 
@@ -26,6 +29,7 @@ class DashboardController extends Controller
     public function __construct(
         private readonly LeaveBalanceService $balances,
         private readonly DefaultOfficeSchedule $officeSchedule,
+        private readonly AttendanceRollup $rollup,
     ) {}
 
     public function __invoke(): View
@@ -208,6 +212,30 @@ class DashboardController extends Controller
     }
 
     /**
+     * Absensi yang sedang berjalan bagi karyawan ini: jam masuk & jam pulang beserta
+     * tanggal kerja yang memilikinya.
+     *
+     * Tanggal kerjanya diambil lewat AttendanceRollup, bukan now()->toDateString():
+     * pada shift lintas tengah malam, absen pukul 22:00 kemarin masih shift yang
+     * sama dengan pukul 06:00 hari ini. Memakai tanggal kalender akan melaporkan
+     * "belum absen masuk" kepada orang yang justru sedang bekerja.
+     *
+     * @return array{attendance: ?Attendance, work_date: Carbon}
+     */
+    private function currentAttendance(Employee $employee): array
+    {
+        $workDate = $this->rollup->workDateFor($employee, now());
+
+        return [
+            'attendance' => $employee->attendances()
+                ->whereDate('work_date', $workDate->toDateString())
+                ->with('shift')
+                ->first(),
+            'work_date' => $workDate,
+        ];
+    }
+
+    /**
      * Self-service snapshot for an employee: leave balances, upcoming schedule, and
      * how many requests are in flight or waiting on them as a supervisor.
      *
@@ -220,6 +248,7 @@ class DashboardController extends Controller
 
         return [
             'employee' => $employee,
+            'attendance' => $this->currentAttendance($employee),
             'balances' => LeaveType::query()
                 ->where('is_active', true)
                 ->where('counts_against_balance', true)
@@ -295,10 +324,7 @@ class DashboardController extends Controller
         });
 
         $todayRow = $scheduleRows->first();
-        $todayAttendance = $employee->attendances()
-            ->whereDate('work_date', $today->toDateString())
-            ->with('shift')
-            ->first();
+        $attendance = $this->currentAttendance($employee);
 
         $requests = collect([
             [
@@ -367,7 +393,8 @@ class DashboardController extends Controller
 
         return [
             'employee' => $employee,
-            'today' => [...$todayRow, 'attendance' => $todayAttendance],
+            'today' => [...$todayRow, 'attendance' => $attendance['attendance']],
+            'attendance' => $attendance,
             'schedule' => $scheduleRows,
             'nextWorkday' => $scheduleRows->skip(1)->first(fn (array $row) => ! $row['holiday'] && $row['mode']->isWorking),
             'balances' => $balances,
