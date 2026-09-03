@@ -508,7 +508,19 @@ document.addEventListener('keydown', (event) => {
     }
 });
 window.addEventListener('resize', () => closeAllDropdowns());
-window.addEventListener('scroll', () => closeAllDropdowns(), true);
+// Capture phase, because scroll events don't bubble: without it a scroll inside a
+// container (a table's scroll area, the page shell) would never reach window. The
+// catch is that it then fires for EVERY scrollable element, the dropdown's own list
+// included — which is why the notification list could not be scrolled at all: the
+// first wheel tick closed the panel it was in. The menu is positioned `fixed`, so a
+// page scroll still has to close it; a scroll inside the menu must not.
+window.addEventListener('scroll', (event) => {
+    if (event.target instanceof Element && event.target.closest('[data-dropdown-menu]')) {
+        return;
+    }
+
+    closeAllDropdowns();
+}, true);
 
 document.querySelectorAll('[data-tabs]').forEach((tabs) => {
     const storageKey = tabs.dataset.tabsStorageKey;
