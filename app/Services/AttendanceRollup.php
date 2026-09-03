@@ -62,6 +62,28 @@ class AttendanceRollup
     }
 
     /**
+     * Work date yang memiliki sebuah momen absen bagi karyawan ini.
+     *
+     * Untuk shift lintas tengah malam, pukul 06:00 masih bagian dari shift yang
+     * dimulai kemarin pukul 22:00 — absensinya menempel pada work_date kemarin, bukan
+     * hari ini. Aturannya sengaja memakai window() yang sama dengan feed mesin sidik
+     * jari, supaya absen mandiri (selfie) dan absen mesin tidak pernah jatuh ke
+     * tanggal yang berbeda untuk shift yang sama.
+     */
+    public function workDateFor(Employee $employee, CarbonInterface $moment): Carbon
+    {
+        $moment = Carbon::parse($moment);
+        $today = $moment->copy()->startOfDay();
+        $yesterday = $today->copy()->subDay();
+
+        [$from, $to] = $this->window($employee, $yesterday);
+
+        // Setengah terbuka: batas atas sudah menjadi milik hari berikutnya, sehingga
+        // satu momen tidak pernah diklaim dua tanggal sekaligus.
+        return ($moment->greaterThanOrEqualTo($from) && $moment->lessThan($to)) ? $yesterday : $today;
+    }
+
+    /**
      * The datetime window that "owns" punches for a work date. For a scheduled shift
      * it is the shift window (handles overnight) plus a margin; otherwise the calendar day.
      *

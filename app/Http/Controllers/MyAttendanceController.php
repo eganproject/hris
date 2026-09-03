@@ -9,17 +9,22 @@ use App\Models\Attendance;
 use App\Models\AttendanceCorrection;
 use App\Models\Employee;
 use App\Services\AttendanceResolver;
+use App\Services\AttendanceRollup;
 use App\Support\ApprovalNotifier;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\View\View;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class MyAttendanceController extends Controller
 {
-    public function __construct(private readonly AttendanceResolver $resolver) {}
+    public function __construct(
+        private readonly AttendanceResolver $resolver,
+        private readonly AttendanceRollup $rollup,
+    ) {}
 
     /**
      * The employee's own attendance history plus their correction requests.
@@ -27,6 +32,7 @@ class MyAttendanceController extends Controller
     public function index(): View
     {
         $employee = $this->employee();
+        $workDate = $this->activeWorkDate($employee);
 
         return view('attendance.my-attendance.index', [
             'attendances' => $employee->attendances()
@@ -38,10 +44,11 @@ class MyAttendanceController extends Controller
                 ->with('reviewer')
                 ->latest('id')
                 ->get(),
-            // Absen mandiri: hanya ditawarkan saat hari ini memang hari kerja jarak
-            // jauh (WFH terjadwal/disetujui, atau dinas luar disetujui).
-            'remoteToday' => $remote = $this->remoteStatusToday($employee),
-            'todayAttendance' => $employee->attendances()->whereDate('work_date', now()->toDateString())->first(),
+            // Absen mandiri: hanya ditawarkan saat shift yang sedang berjalan memang
+            // kerja jarak jauh (WFH terjadwal/disetujui, atau dinas luar disetujui).
+            'remoteStatus' => $remote = $this->remoteStatusOn($employee, $workDate),
+            'remoteWorkDate' => $workDate,
+            'remoteAttendance' => $employee->attendances()->whereDate('work_date', $workDate->toDateString())->first(),
             // Superadmin boleh mencoba alat absennya di hari biasa untuk memastikan
             // kamera & lokasi berfungsi. Pada hari WFH/dinas luar tidak perlu — panel
             // absen sungguhannya sudah muncul.
@@ -102,49 +109,77 @@ class MyAttendanceController extends Controller
     public function checkIn(SelfAttendanceRequest $request): RedirectResponse
     {
         $employee = $this->employee();
-        $status = $this->remoteStatusToday($employee);
+        $workDate = $this->activeWorkDate($employee);
+        $status = $this->remoteStatusOn($employee, $workDate);
 
         if (! $status) {
             return back()->with('error', 'Absen mandiri hanya untuk hari WFH atau dinas luar yang sudah disetujui.');
         }
 
-        $today = now();
-        $existing = $employee->attendances()->whereDate('work_date', $today->toDateString())->first();
+        $now = now();
+        $existing = $employee->attendances()->whereDate('work_date', $workDate->toDateString())->first();
 
         if ($existing?->clock_in) {
-            return back()->with('error', 'Anda sudah absen masuk hari ini pukul '.$existing->clock_in->format('H:i').'.');
+            return back()->with('error', 'Anda sudah absen masuk untuk '.$this->shiftLabel($workDate).' pukul '.$existing->clock_in->format('H:i').'.');
         }
 
-        $attendance = $this->resolver->resolve($employee, $today, $today->format('H:i'), $existing?->clock_out?->format('H:i'), $existing?->note);
+        // Jamnya diambil dari server dan disimpan sebagai "H:i" pada work_date shift
+        // ini. Untuk shift malam, jam pulang yang lebih awal dari jam masuk digulirkan
+        // ke hari berikutnya oleh AttendanceResolver, jadi rentang kerjanya tetap utuh.
+        $attendance = $this->resolver->resolve($employee, $workDate, $now->format('H:i'), $existing?->clock_out?->format('H:i'), $existing?->note);
         $this->attachProof($attendance, 'in', $request);
 
-        return back()->with('status', 'Absen masuk '.$status->label().' tercatat pukul '.$today->format('H:i').'.');
+        return back()->with('status', 'Absen masuk '.$status->label().' tercatat pukul '.$now->format('H:i').'.');
     }
 
     public function checkOut(SelfAttendanceRequest $request): RedirectResponse
     {
         $employee = $this->employee();
-        $status = $this->remoteStatusToday($employee);
+        $workDate = $this->activeWorkDate($employee);
+        $status = $this->remoteStatusOn($employee, $workDate);
 
         if (! $status) {
             return back()->with('error', 'Absen mandiri hanya untuk hari WFH atau dinas luar yang sudah disetujui.');
         }
 
-        $today = now();
-        $existing = $employee->attendances()->whereDate('work_date', $today->toDateString())->first();
+        $now = now();
+        $existing = $employee->attendances()->whereDate('work_date', $workDate->toDateString())->first();
 
         if (! $existing?->clock_in) {
             return back()->with('error', 'Absen masuk dulu sebelum absen pulang.');
         }
 
         if ($existing->clock_out) {
-            return back()->with('error', 'Anda sudah absen pulang hari ini pukul '.$existing->clock_out->format('H:i').'.');
+            return back()->with('error', 'Anda sudah absen pulang untuk '.$this->shiftLabel($workDate).' pukul '.$existing->clock_out->format('H:i').'.');
         }
 
-        $attendance = $this->resolver->resolve($employee, $today, $existing->clock_in->format('H:i'), $today->format('H:i'), $existing->note);
+        $attendance = $this->resolver->resolve($employee, $workDate, $existing->clock_in->format('H:i'), $now->format('H:i'), $existing->note);
         $this->attachProof($attendance, 'out', $request);
 
-        return back()->with('status', 'Absen pulang '.$status->label().' tercatat pukul '.$today->format('H:i').'.');
+        return back()->with('status', 'Absen pulang '.$status->label().' tercatat pukul '.$now->format('H:i').'.');
+    }
+
+    /**
+     * Tanggal kerja yang sedang dijalani karyawan saat ini. Untuk shift lintas tengah
+     * malam ini adalah tanggal KEMARIN sampai shiftnya berakhir: absen pulang pukul
+     * 06:00 adalah milik shift yang dimulai kemarin pukul 22:00.
+     *
+     * Sebelumnya semuanya memakai now()->toDateString(), sehingga begitu lewat tengah
+     * malam panel absennya hilang dan absen pulang ditolak — malam kerjanya berhenti
+     * di jam masuk saja dan tercatat nol jam.
+     */
+    private function activeWorkDate(Employee $employee): Carbon
+    {
+        return $this->rollup->workDateFor($employee, now());
+    }
+
+    /**
+     * Penyebut tanggal shift untuk pesan, supaya "sudah absen masuk" pada shift malam
+     * tidak berbunyi "hari ini" saat jamnya sudah lewat tengah malam.
+     */
+    private function shiftLabel(Carbon $workDate): string
+    {
+        return $workDate->isSameDay(now()) ? 'hari ini' : 'shift '.$workDate->translatedFormat('d M Y');
     }
 
     /**
@@ -176,16 +211,16 @@ class MyAttendanceController extends Controller
     }
 
     /**
-     * Hari ini karyawan bekerja jarak jauh dengan status apa — WFH dari roster (hari
-     * WFH terjadwal), atau WFH/dinas luar dari pengajuan yang disetujui? Null berarti
-     * hari kantor biasa, absen mandiri tidak berlaku.
+     * Pada tanggal kerja itu karyawan bekerja jarak jauh dengan status apa — WFH dari
+     * roster (hari WFH terjadwal), atau WFH/dinas luar dari pengajuan yang disetujui?
+     * Null berarti hari kantor biasa, absen mandiri tidak berlaku.
      */
-    private function remoteStatusToday(Employee $employee): ?AttendanceStatus
+    private function remoteStatusOn(Employee $employee, Carbon $workDate): ?AttendanceStatus
     {
-        $today = now()->toDateString();
+        $date = $workDate->toDateString();
 
         $scheduled = $employee->schedules()
-            ->whereDate('work_date', $today)
+            ->whereDate('work_date', $date)
             ->where('is_wfh', true)
             ->exists();
 
@@ -196,7 +231,7 @@ class MyAttendanceController extends Controller
         $remoteValues = array_map(fn (AttendanceStatus $s) => $s->value, AttendanceResolver::REMOTE_STATUSES);
 
         $leave = $employee->leaveRequests()
-            ->approvedOn($today)
+            ->approvedOn($date)
             ->whereHas('leaveType', fn ($query) => $query->whereIn('attendance_status', $remoteValues))
             ->with('leaveType')
             ->first();

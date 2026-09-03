@@ -10,6 +10,7 @@ use App\Models\User;
 use App\Services\AttendanceResolver;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Storage;
 use Spatie\Permission\Models\Permission;
 use Spatie\Permission\PermissionRegistrar;
@@ -72,6 +73,122 @@ function wfhFixture(): array
 
     return compact('user', 'employee', 'shift', 'date');
 }
+
+/**
+ * Karyawan WFH dengan shift malam 22:00–06:00 pada work_date yang diberikan. Shift
+ * seperti ini berakhir di tanggal kalender BERIKUTNYA, dan itulah yang dulu membuat
+ * absen mandiri buntu begitu lewat tengah malam.
+ *
+ * @return array{user: User, employee: Employee, shift: Shift, date: Carbon}
+ */
+function overnightWfhFixture(string $workDate): array
+{
+    app(PermissionRegistrar::class)->forgetCachedPermissions();
+    Permission::findOrCreate('my-attendance.view', 'web');
+
+    $user = User::factory()->create();
+    $user->givePermissionTo('my-attendance.view');
+    $employee = Employee::query()->create([
+        'user_id' => $user->id, 'full_name' => 'Budi Malam', 'employment_status' => 'active',
+    ]);
+
+    $shift = Shift::query()->create([
+        'code' => 'NGT', 'name' => 'Malam', 'start_time' => '22:00', 'end_time' => '06:00',
+        'crosses_midnight' => true, 'break_minutes' => 60, 'late_tolerance_minutes' => 10,
+        'early_leave_tolerance_minutes' => 10, 'overtime_starts_after_minutes' => 30,
+        'overtime_min_minutes' => 30, 'is_active' => true,
+    ]);
+
+    EmployeeSchedule::query()->create([
+        'employee_id' => $employee->id, 'work_date' => $workDate,
+        'shift_id' => $shift->id, 'is_day_off' => false, 'is_wfh' => true, 'source' => 'generated',
+    ]);
+
+    return ['user' => $user, 'employee' => $employee, 'shift' => $shift, 'date' => Carbon::parse($workDate)];
+}
+
+test('an overnight WFH shift can still be clocked out after midnight', function () {
+    Storage::fake('local');
+    ['user' => $user, 'employee' => $employee] = overnightWfhFixture('2026-02-10');
+
+    // 22:00 tanggal 10 — awal shift.
+    Carbon::setTestNow(Carbon::parse('2026-02-10 22:00:00'));
+    $this->actingAs($user)->post('/my-attendance/check-in', selfiePayload())->assertRedirect();
+
+    // 06:00 tanggal 11 — akhir shift yang sama, sudah lewat tengah malam. Panelnya
+    // harus tetap menunjuk shift tanggal 10, bukan menghilang.
+    Carbon::setTestNow(Carbon::parse('2026-02-11 06:00:00'));
+    $this->actingAs($user)->get('/my-attendance')->assertOk()->assertSee('Absen Pulang');
+    $this->actingAs($user)->post('/my-attendance/check-out', selfiePayload())->assertRedirect();
+
+    // Satu baris saja, menempel pada work_date awal shift.
+    expect($employee->attendances()->count())->toBe(1);
+
+    $attendance = $employee->attendances()->firstOrFail();
+
+    expect($attendance->work_date->toDateString())->toBe('2026-02-10')
+        ->and($attendance->status)->toBe(AttendanceStatus::Wfh)
+        ->and($attendance->clock_in->format('Y-m-d H:i'))->toBe('2026-02-10 22:00')
+        // Jam pulang digulirkan ke hari berikutnya oleh resolver.
+        ->and($attendance->clock_out->format('Y-m-d H:i'))->toBe('2026-02-11 06:00')
+        // 8 jam rentang dikurangi istirahat 60 menit.
+        ->and($attendance->work_minutes)->toBe(420)
+        ->and($attendance->clock_in_photo_path)->not->toBeNull()
+        ->and($attendance->clock_out_photo_path)->not->toBeNull();
+
+    Carbon::setTestNow();
+});
+
+test('an overnight shift refuses a second check-in after midnight, naming its own date', function () {
+    Storage::fake('local');
+    ['user' => $user, 'employee' => $employee] = overnightWfhFixture('2026-02-10');
+
+    Carbon::setTestNow(Carbon::parse('2026-02-10 22:00:00'));
+    $this->actingAs($user)->post('/my-attendance/check-in', selfiePayload())->assertRedirect();
+
+    // Lewat tengah malam absen masuk lagi: ditolak, dan pesannya menyebut tanggal
+    // shiftnya — bukan "hari ini", yang sudah tanggal 11.
+    Carbon::setTestNow(Carbon::parse('2026-02-11 02:00:00'));
+    $this->actingAs($user)->post('/my-attendance/check-in', selfiePayload())->assertRedirect();
+
+    expect(session('error'))->toContain('10 Feb 2026')
+        ->and($employee->attendances()->count())->toBe(1);
+
+    Carbon::setTestNow();
+});
+
+test('the work date that owns a punch follows the shift, not the calendar day', function () {
+    $rollup = app(\App\Services\AttendanceRollup::class);
+
+    ['employee' => $nightWorker] = overnightWfhFixture('2026-02-10');
+
+    // Shift malam: pukul 06:00 tanggal 11 masih milik shift tanggal 10 …
+    expect($rollup->workDateFor($nightWorker, Carbon::parse('2026-02-11 06:00'))->toDateString())->toBe('2026-02-10')
+        // … dan pukul 22:00 tanggal 10 tentu saja juga.
+        ->and($rollup->workDateFor($nightWorker, Carbon::parse('2026-02-10 22:00'))->toDateString())->toBe('2026-02-10');
+
+    // Shift siang biasa tidak boleh ikut tergeser: pagi hari adalah harinya sendiri.
+    $dayWorker = Employee::query()->create(['full_name' => 'Budi Siang', 'employment_status' => 'active']);
+    $dayShift = Shift::query()->create([
+        'code' => 'REG2', 'name' => 'Reguler', 'start_time' => '08:00', 'end_time' => '17:00',
+        'break_minutes' => 60, 'late_tolerance_minutes' => 10, 'is_active' => true,
+    ]);
+
+    foreach (['2026-02-10', '2026-02-11'] as $day) {
+        EmployeeSchedule::query()->create([
+            'employee_id' => $dayWorker->id, 'work_date' => $day,
+            'shift_id' => $dayShift->id, 'is_day_off' => false, 'source' => 'generated',
+        ]);
+    }
+
+    expect($rollup->workDateFor($dayWorker, Carbon::parse('2026-02-11 07:50'))->toDateString())->toBe('2026-02-11')
+        ->and($rollup->workDateFor($dayWorker, Carbon::parse('2026-02-11 17:10'))->toDateString())->toBe('2026-02-11');
+
+    // Karyawan tanpa jadwal sama sekali selalu jatuh ke hari kalendernya.
+    $unscheduled = Employee::query()->create(['full_name' => 'Tanpa Jadwal', 'employment_status' => 'active']);
+
+    expect($rollup->workDateFor($unscheduled, Carbon::parse('2026-02-11 03:00'))->toDateString())->toBe('2026-02-11');
+});
 
 test('a WFH day with clock times counts as worked hours, still labelled WFH', function () {
     ['employee' => $employee, 'date' => $date] = wfhFixture();

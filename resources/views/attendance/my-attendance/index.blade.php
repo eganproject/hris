@@ -23,18 +23,24 @@
             </div>
         @endif
 
-        {{-- Absen mandiri: hanya muncul saat hari ini WFH atau dinas luar --}}
-        @if ($remoteToday)
+        {{-- Absen mandiri: hanya muncul saat shift yang sedang berjalan WFH atau dinas
+             luar. Untuk shift lintas tengah malam, shift itu bisa saja milik tanggal
+             kemarin — panelnya tetap terbuka sampai absen pulang tercatat. --}}
+        @if ($remoteStatus)
             @php
-                $inLabel = $todayAttendance?->clock_in?->format('H:i');
-                $outLabel = $todayAttendance?->clock_out?->format('H:i');
-                $inProof = $todayAttendance?->selfieFor('in');
-                $outProof = $todayAttendance?->selfieFor('out');
+                $inLabel = $remoteAttendance?->clock_in?->format('H:i');
+                $outLabel = $remoteAttendance?->clock_out?->format('H:i');
+                $inProof = $remoteAttendance?->selfieFor('in');
+                $outProof = $remoteAttendance?->selfieFor('out');
+                $isOvernight = ! $remoteWorkDate->isSameDay(now());
             @endphp
             <section class="rounded-lg border border-emerald-200 bg-emerald-50/60 p-5 shadow-sm">
                 <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                     <div>
-                        <p class="text-sm font-semibold text-emerald-900">{{ $remoteToday->label() }} — {{ now()->translatedFormat('l, d M Y') }}</p>
+                        <p class="text-sm font-semibold text-emerald-900">{{ $remoteStatus->label() }} — {{ $remoteWorkDate->translatedFormat('l, d M Y') }}</p>
+                        @if ($isOvernight)
+                            <p class="mt-0.5 text-xs font-medium text-emerald-800">Shift lintas tengah malam — masih berjalan dari tanggal tersebut.</p>
+                        @endif
                         <p class="mt-0.5 text-sm text-emerald-700">
                             Absen masuk: <span class="font-semibold">{{ $inLabel ?? 'belum' }}</span>
                             · Absen pulang: <span class="font-semibold">{{ $outLabel ?? 'belum' }}</span>
@@ -163,7 +169,7 @@
         </section>
     </div>
 
-    @if ($remoteToday || $selfieTestMode)
+    @if ($remoteStatus || $selfieTestMode)
         <dialog id="selfie-dialog" class="w-full max-w-md rounded-lg p-0 backdrop:bg-black/40">
             <form method="POST" action="" enctype="multipart/form-data" data-no-confirm="true" data-selfie-form class="space-y-4 p-6">
                 @csrf
@@ -245,7 +251,7 @@
 
     {{-- Absen mandiri: kamera + koordinat. Keduanya butuh HTTPS (atau localhost).
          Hanya dikirim pada hari WFH/dinas luar, sama seperti dialognya. --}}
-    @if ($remoteToday || $selfieTestMode)
+    @if ($remoteStatus || $selfieTestMode)
     <script>
         (function () {
             const dialog = document.getElementById('selfie-dialog');
