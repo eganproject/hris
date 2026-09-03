@@ -1,6 +1,7 @@
 <?php
 
 use App\Enums\LeaveRequestStatus;
+use App\Models\Attendance;
 use App\Models\Branch;
 use App\Models\Department;
 use App\Models\Employee;
@@ -74,6 +75,86 @@ test('the daily board and the roster show only the subordinates', function () {
     expect($subordinate->id)->not->toBe($stranger->id);
 });
 
+/** Satu baris absensi hari ini untuk tiap karyawan yang diberikan. */
+function logAttendanceFor(array $employees): void
+{
+    foreach ($employees as $employee) {
+        Attendance::query()->create([
+            'employee_id' => $employee->id,
+            'work_date' => now()->toDateString(),
+            'status' => 'present',
+            'clock_in' => now()->copy()->setTime(8, 0),
+            'clock_out' => now()->copy()->setTime(17, 0),
+        ]);
+    }
+}
+
+test('the attendance log report shows only the subordinates', function () {
+    $user = teamUser();
+    [, $subordinate, $stranger] = teamTree($user);
+    logAttendanceFor([$subordinate, $stranger]);
+
+    $this->actingAs($user)->get('/reports/attendance-log')
+        ->assertOk()
+        ->assertSee('Andi Bawahan')
+        ->assertDontSee('Citra Bukan Bawahan');
+});
+
+test('the attendance log downloads carry the same narrowing as the screen', function () {
+    $user = teamUser();
+    [, $subordinate, $stranger] = teamTree($user);
+    logAttendanceFor([$subordinate, $stranger]);
+
+    // Berkas unduhan yang memuat lebih banyak orang daripada tabelnya adalah
+    // kebocoran, jadi ekspor dan PDF harus memakai cakupan yang sama.
+    $rows = $this->actingAs($user)->get('/reports/attendance-log')
+        ->assertOk()
+        ->viewData('rows');
+
+    $ids = collect($rows->items())->pluck('employee_id');
+
+    expect($ids)->toContain($subordinate->id)
+        ->and($ids)->not->toContain($stranger->id);
+
+    $this->actingAs($user)->get('/reports/attendance-log/export')->assertOk();
+    $this->actingAs($user)->get('/reports/attendance-log/pdf')->assertOk();
+});
+
+test('a user with no subordinate is told why the attendance log is empty', function () {
+    $user = teamUser();
+
+    // Tanpa keterangan, laporan kosong terbaca sebagai aplikasi rusak — sama seperti
+    // Jadwal Kerja dan Absensi Harian.
+    Employee::query()->create([
+        'user_id' => $user->id, 'full_name' => 'Rina Tanpa Tim', 'employment_status' => 'active',
+    ]);
+
+    $this->actingAs($user)->get('/reports/attendance-log')
+        ->assertOk()
+        ->assertSee('belum ada seorang pun yang tercatat di bawah Anda');
+});
+
+test('the switch in Kontrol Akses lifts the restriction on the attendance log too', function () {
+    $user = teamUser(bypass: true);
+    [, $subordinate, $stranger] = teamTree($user);
+    logAttendanceFor([$subordinate, $stranger]);
+
+    $this->actingAs($user)->get('/reports/attendance-log')
+        ->assertOk()
+        ->assertSee('Andi Bawahan')
+        ->assertSee('Citra Bukan Bawahan');
+});
+
+test('the other reports keep their location and division scope', function () {
+    $user = teamUser();
+    [, , $stranger] = teamTree($user);
+
+    // Hanya Log Absensi yang pindah ke garis atasan; Rekap Absensi tetap memakai
+    // cakupan lokasi/divisi seperti sebelumnya.
+    $this->actingAs($user)->get('/reports/attendance')
+        ->assertOk()
+        ->assertSee($stranger->full_name);
+});
 test('the switch in Kontrol Akses lifts the restriction', function () {
     $user = teamUser(bypass: true);
     teamTree($user);
@@ -451,7 +532,7 @@ test('Kontrol Akses states the real effect of each scope choice', function () {
     // "lihat semua" — kalimat itulah yang dulu menyesatkan.
     $this->actingAs($admin)->get(route('access-control.index'))
         ->assertOk()
-        ->assertSee('Cakupan di Absensi Harian, Jadwal Kerja &amp; Cuti', false)
+        ->assertSee('Cakupan di Absensi Harian, Jadwal Kerja, Cuti &amp; Log Absensi', false)
         ->assertSee('Bawahan saja')
         ->assertSee('Sesuai lokasi &amp; divisi di kartu ini', false);
 });

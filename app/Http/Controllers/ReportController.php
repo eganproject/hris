@@ -86,11 +86,15 @@ class ReportController extends Controller
     /**
      * Daily attendance log: one row per employee per day for the selected month,
      * showing the actual clock-in / clock-out times (jam masuk/keluar).
+     *
+     * Dipersempit ke garis atasan seperti Jadwal Kerja: laporan ini memuat jam
+     * masuk & pulang orang per orang, jadi cakupannya harus sama dengan halaman
+     * yang menampilkan data yang sama — bukan lebih luas.
      */
     public function attendanceLog(Request $request): View
     {
         [$month, $from, $to, $branchId, $departmentId] = $this->filters($request);
-        $scope = DataScope::forAttendance($request->user());
+        $scope = DataScope::forTeam($request->user());
         $jobPositionId = $request->integer('job_position_id') ?: null;
         $search = $request->string('search')->toString() ?: null;
         $status = $request->string('status')->toString() ?: null;
@@ -119,6 +123,8 @@ class ReportController extends Controller
             'statusFilter' => $status,
             'statuses' => AttendanceStatus::options(),
             'perPage' => $perPage,
+            'hasNoScope' => $scope->isEmpty(),
+            'hasNoTeam' => $scope->hasNoTeam(),
         ]);
     }
 
@@ -165,6 +171,9 @@ class ReportController extends Controller
      * Seluruh baris untuk periode terpilih, tanpa paginasi — dipakai ekspor Excel
      * dan PDF, yang memang harus memuat semuanya.
      *
+     * Cakupannya wajib sama dengan layarnya (forTeam): berkas unduhan yang memuat
+     * lebih banyak orang daripada tabelnya adalah kebocoran, bukan kemudahan.
+     *
      * @return Collection<int, Attendance>
      */
     private function attendanceLogRows(Request $request, string $from, string $to, ?int $branchId, ?int $departmentId): Collection
@@ -175,7 +184,7 @@ class ReportController extends Controller
             $branchId,
             $departmentId,
             $request->integer('job_position_id') ?: null,
-            DataScope::forAttendance($request->user()),
+            DataScope::forTeam($request->user()),
             $request->string('search')->toString() ?: null,
             $request->string('status')->toString() ?: null,
         )->get();

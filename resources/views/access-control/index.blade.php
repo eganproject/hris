@@ -222,7 +222,7 @@
                                  divisi di kartu ini — dan itu berarti "semua" hanya bagi
                                  pemegang izin lihat-semua-data. --}}
                             <div class="mt-3 rounded-md border border-gray-200 bg-gray-50 p-2.5">
-                                <p class="text-xs font-medium text-gray-700">Cakupan di Absensi Harian, Jadwal Kerja &amp; Cuti</p>
+                                <p class="text-xs font-medium text-gray-700">Cakupan di Absensi Harian, Jadwal Kerja, Cuti &amp; Log Absensi</p>
 
                                 @if ($user->isSuperAdmin())
                                     <p class="mt-1.5 text-xs text-gray-500">Superadmin selalu melihat seluruh karyawan; tidak bisa dibatasi.</p>
