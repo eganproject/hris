@@ -296,3 +296,53 @@ test('dashboard explains when an account is not linked to an employee', function
         ->assertSee('Akun belum tertaut ke data karyawan')
         ->assertSee('Hubungi HR atau administrator');
 });
+
+test('the quick actions only offer menus the user may actually open', function () {
+    app(PermissionRegistrar::class)->forgetCachedPermissions();
+
+    foreach (['dashboard.view', 'employees.view', 'employees.create', 'branches.view'] as $permission) {
+        Permission::findOrCreate($permission, 'web');
+    }
+
+    // Tanpa izin membuat karyawan, pintasannya tidak boleh ditawarkan.
+    $viewer = User::factory()->create();
+    $viewer->givePermissionTo(['dashboard.view', 'employees.view']);
+
+    $this->actingAs($viewer)->get('/dashboard')
+        ->assertOk()
+        ->assertSee('Aksi Cepat')
+        ->assertDontSee('Tambah Karyawan')
+        ->assertDontSee('Lokasi Kerja');
+
+    $admin = User::factory()->create();
+    $admin->givePermissionTo(['dashboard.view', 'employees.view', 'employees.create', 'branches.view']);
+
+    $this->actingAs($admin)->get('/dashboard')
+        ->assertOk()
+        ->assertSee('Tambah Karyawan')
+        ->assertSee('Lokasi Kerja');
+});
+
+test('the header greets a linked employee by name and stays generic without one', function () {
+    app(PermissionRegistrar::class)->forgetCachedPermissions();
+
+    foreach (['dashboard.view', 'employees.view'] as $permission) {
+        Permission::findOrCreate($permission, 'web');
+    }
+
+    $linked = User::factory()->create();
+    $linked->givePermissionTo(['dashboard.view', 'employees.view']);
+    Employee::query()->create([
+        'user_id' => $linked->id, 'full_name' => 'Budi Santoso', 'employment_status' => 'active',
+    ]);
+
+    $this->actingAs($linked)->get('/dashboard')->assertOk()->assertSee('Budi');
+
+    // Akun tanpa data karyawan tidak boleh membuat kepala halaman ini meledak.
+    $unlinked = User::factory()->create();
+    $unlinked->givePermissionTo(['dashboard.view', 'employees.view']);
+
+    $this->actingAs($unlinked)->get('/dashboard')
+        ->assertOk()
+        ->assertSee('Ringkasan operasional sesuai cakupan akses Anda.');
+});

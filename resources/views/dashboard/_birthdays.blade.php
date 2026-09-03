@@ -5,26 +5,19 @@
     $canOpenEmployee = (bool) auth()->user()?->can('employees.view');
 @endphp
 
-<section class="overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm">
-    <div class="flex items-center gap-3 border-b border-gray-200 px-5 py-4">
-        <span class="flex size-9 flex-none items-center justify-center rounded-md bg-amber-50 text-amber-600 ring-1 ring-inset ring-amber-200">
-            <x-icon name="cake" class="size-5"/>
-        </span>
-        <div class="min-w-0 flex-1">
-            <h3 class="text-sm font-semibold text-gray-950">Ulang Tahun Bulan Ini</h3>
-            <p class="mt-0.5 text-xs text-gray-500">
-                {{ now()->translatedFormat('F Y') }}
-                @if ($birthdays->isNotEmpty())
-                    <span class="text-gray-300">&middot;</span> {{ $birthdays->count() }} karyawan
-                @endif
-            </p>
-        </div>
-        @if ($celebrantsToday->isNotEmpty())
-            <span class="flex-none rounded-md bg-amber-100 px-2 py-1 text-[11px] font-semibold text-amber-800">
+<x-dashboard.card
+    title="Ulang Tahun Bulan Ini"
+    :subtitle="now()->translatedFormat('F Y').($birthdays->isNotEmpty() ? ' · '.$birthdays->count().' karyawan' : '')"
+    icon="cake"
+    tone="amber"
+    flush>
+    @if ($celebrantsToday->isNotEmpty())
+        <x-slot:action>
+            <span class="rounded-md bg-amber-100 px-2 py-1 text-[11px] font-semibold text-amber-800">
                 🎉 {{ $celebrantsToday->count() }} hari ini
             </span>
-        @endif
-    </div>
+        </x-slot:action>
+    @endif
 
     <ul class="divide-y divide-gray-50">
         @forelse ($birthdays as $person)
@@ -70,10 +63,13 @@
                 @endif
             </li>
         @empty
-            <li class="px-5 py-8 text-center">
-                <p class="text-sm font-medium text-gray-700">Belum ada yang berulang tahun</p>
+            <li class="px-5 py-10 text-center">
+                <span class="mx-auto flex size-10 items-center justify-center rounded-full bg-gray-100 text-gray-400">
+                    <x-icon name="cake" class="size-5"/>
+                </span>
+                <p class="mt-3 text-sm font-medium text-gray-700">Belum ada yang berulang tahun</p>
                 <p class="mt-1 text-xs text-gray-500">Tidak ada karyawan dengan tanggal lahir di bulan {{ now()->translatedFormat('F') }}.</p>
             </li>
         @endforelse
     </ul>
-</section>
+</x-dashboard.card>
