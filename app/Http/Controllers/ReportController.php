@@ -40,10 +40,14 @@ class ReportController extends Controller
         return view('reports.index');
     }
 
+    /**
+     * Rekap kehadiran bulanan. Dipersempit ke garis atasan seperti Absensi Harian:
+     * isinya kehadiran orang per orang, hanya diringkas per bulan.
+     */
     public function attendance(Request $request): View
     {
         [$month, $from, $to, $branchId, $departmentId] = $this->filters($request);
-        $scope = DataScope::forAttendance($request->user());
+        $scope = DataScope::forTeam($request->user());
 
         return view('reports.attendance', [
             'rows' => $this->attendanceReport->rows($from, $to, $branchId, $departmentId, $scope),
@@ -54,6 +58,8 @@ class ReportController extends Controller
             'departments' => $scope->departments(),
             'branchId' => $branchId,
             'departmentId' => $departmentId,
+            'hasNoScope' => $scope->isEmpty(),
+            'hasNoTeam' => $scope->hasNoTeam(),
         ]);
     }
 
@@ -61,7 +67,7 @@ class ReportController extends Controller
     {
         [$month, $from, $to, $branchId, $departmentId] = $this->filters($request);
 
-        $rows = $this->attendanceReport->rows($from, $to, $branchId, $departmentId, DataScope::forAttendance($request->user()));
+        $rows = $this->attendanceReport->rows($from, $to, $branchId, $departmentId, DataScope::forTeam($request->user()));
 
         return Excel::download(
             new AttendanceReportExport($rows),
@@ -74,7 +80,7 @@ class ReportController extends Controller
         [$month, $from, $to, $branchId, $departmentId] = $this->filters($request);
 
         $pdf = Pdf::loadView('reports.pdf.attendance', [
-            'rows' => $this->attendanceReport->rows($from, $to, $branchId, $departmentId, DataScope::forAttendance($request->user())),
+            'rows' => $this->attendanceReport->rows($from, $to, $branchId, $departmentId, DataScope::forTeam($request->user())),
             'month' => $month,
             'branchName' => $branchId ? Branch::find($branchId)?->name : null,
             'departmentName' => $departmentId ? Department::find($departmentId)?->name : null,
@@ -241,10 +247,14 @@ class ReportController extends Controller
 
     /**
      * Per-employee daily attendance breakdown for the selected month.
+     *
+     * Pintu masuk kedua ke data yang sama dengan rekapnya, jadi penjaganya harus
+     * sama: mempersempit daftarnya saja tidak ada artinya kalau URL rinciannya
+     * masih bisa dirakit sendiri.
      */
     public function employeeAttendance(Request $request, Employee $employee): View
     {
-        DataScope::forAttendance($request->user())->authorize($employee);
+        DataScope::forTeam($request->user())->authorize($employee);
 
         $month = MonthInput::resolve($request->input('month'));
         [$from, $to] = [$month->copy()->startOfMonth()->toDateString(), $month->copy()->endOfMonth()->toDateString()];
@@ -282,12 +292,16 @@ class ReportController extends Controller
         ]);
     }
 
+    /**
+     * Rekap cuti tahunan. Dipersempit ke garis atasan seperti halaman Cuti & Izin,
+     * yang memang menampilkan pengajuan orang-orang yang sama.
+     */
     public function leave(Request $request): View
     {
         $year = $this->resolveYear($request->input('year'));
         $branchId = $request->integer('branch_id') ?: null;
         $departmentId = $request->integer('department_id') ?: null;
-        $scope = DataScope::forAttendance($request->user());
+        $scope = DataScope::forTeam($request->user());
 
         $report = $this->leaveReport->build($year, $branchId, $departmentId, $scope);
 
@@ -299,13 +313,15 @@ class ReportController extends Controller
             'departments' => $scope->departments(),
             'branchId' => $branchId,
             'departmentId' => $departmentId,
+            'hasNoScope' => $scope->isEmpty(),
+            'hasNoTeam' => $scope->hasNoTeam(),
         ]);
     }
 
     public function leaveExport(Request $request): BinaryFileResponse
     {
         $year = $this->resolveYear($request->input('year'));
-        $report = $this->leaveReport->build($year, $request->integer('branch_id') ?: null, $request->integer('department_id') ?: null, DataScope::forAttendance($request->user()));
+        $report = $this->leaveReport->build($year, $request->integer('branch_id') ?: null, $request->integer('department_id') ?: null, DataScope::forTeam($request->user()));
 
         return Excel::download(
             new LeaveReportExport($report['rows'], $report['types']),
@@ -318,7 +334,7 @@ class ReportController extends Controller
         $year = $this->resolveYear($request->input('year'));
         $branchId = $request->integer('branch_id') ?: null;
         $departmentId = $request->integer('department_id') ?: null;
-        $report = $this->leaveReport->build($year, $branchId, $departmentId, DataScope::forAttendance($request->user()));
+        $report = $this->leaveReport->build($year, $branchId, $departmentId, DataScope::forTeam($request->user()));
 
         $pdf = Pdf::loadView('reports.pdf.leave', [
             'rows' => $report['rows'],
@@ -333,10 +349,12 @@ class ReportController extends Controller
 
     /**
      * Per-employee leave history for the selected year.
+     *
+     * Sama seperti rincian kehadiran: penjaganya mengikuti rekapnya.
      */
     public function employeeLeave(Request $request, Employee $employee): View
     {
-        DataScope::forAttendance($request->user())->authorize($employee);
+        DataScope::forTeam($request->user())->authorize($employee);
 
         $year = $this->resolveYear($request->input('year'));
 

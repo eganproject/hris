@@ -16,6 +16,8 @@
             </div>
         </section>
 
+        <x-scope-notice :has-no-scope="$hasNoScope" :has-no-team="$hasNoTeam"/>
+
         <section class="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
             <form method="GET" action="{{ route('reports.attendance') }}" class="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
                 <div class="flex items-center gap-2">

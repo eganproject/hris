@@ -7,6 +7,7 @@ use App\Models\Department;
 use App\Models\Employee;
 use App\Models\LeaveRequest;
 use App\Models\LeaveType;
+use App\Models\OvertimeApproval;
 use App\Models\SchedulePattern;
 use App\Models\User;
 use App\Support\DataScope;
@@ -74,6 +75,44 @@ test('the daily board and the roster show only the subordinates', function () {
 
     expect($subordinate->id)->not->toBe($stranger->id);
 });
+
+/** Satu lembur disetujui bulan ini untuk tiap karyawan yang diberikan. */
+function overtimeFor(array $employees): void
+{
+    foreach ($employees as $employee) {
+        OvertimeApproval::query()->create([
+            'employee_id' => $employee->id,
+            'work_date' => now()->toDateString(),
+            'start_time' => '18:00',
+            'end_time' => '20:00',
+            'requested_minutes' => 120,
+            'approved_minutes' => 120,
+            'reason' => 'Lembur uji.',
+            'status' => OvertimeApproval::STATUS_APPROVED,
+        ]);
+    }
+}
+
+/** Satu cuti disetujui tahun ini untuk tiap karyawan yang diberikan. */
+function approvedLeaveFor(array $employees): void
+{
+    $type = LeaveType::query()->firstOrCreate(['code' => 'CT'], [
+        'name' => 'Cuti Tahunan', 'attendance_status' => 'leave',
+        'is_paid' => true, 'counts_against_balance' => true,
+        'default_quota_days' => 12, 'is_active' => true,
+    ]);
+
+    foreach ($employees as $employee) {
+        LeaveRequest::query()->create([
+            'employee_id' => $employee->id,
+            'leave_type_id' => $type->id,
+            'start_date' => now()->startOfMonth()->toDateString(),
+            'end_date' => now()->startOfMonth()->toDateString(),
+            'reason' => 'Cuti uji.',
+            'status' => LeaveRequestStatus::Approved->value,
+        ]);
+    }
+}
 
 /** Satu baris absensi hari ini untuk tiap karyawan yang diberikan. */
 function logAttendanceFor(array $employees): void
@@ -145,15 +184,79 @@ test('the switch in Kontrol Akses lifts the restriction on the attendance log to
         ->assertSee('Citra Bukan Bawahan');
 });
 
-test('the other reports keep their location and division scope', function () {
+test('every report page shows only the subordinates', function () {
+    $user = teamUser();
+    [, $subordinate, $stranger] = teamTree($user);
+    logAttendanceFor([$subordinate, $stranger]);
+    overtimeFor([$subordinate, $stranger]);
+    approvedLeaveFor([$subordinate, $stranger]);
+
+    $pages = [
+        '/reports/attendance',
+        '/reports/attendance-log',
+        '/reports/leave',
+        '/attendance/overtime/recap',
+    ];
+
+    foreach ($pages as $url) {
+        $this->actingAs($user)->get($url)
+            ->assertOk()
+            ->assertSee('Andi Bawahan')
+            ->assertDontSee('Citra Bukan Bawahan');
+    }
+});
+
+test('every report download carries the same narrowing as its screen', function () {
+    $user = teamUser();
+    [, $subordinate, $stranger] = teamTree($user);
+    logAttendanceFor([$subordinate, $stranger]);
+    approvedLeaveFor([$subordinate, $stranger]);
+
+    // Berkas unduhan yang memuat lebih banyak orang daripada tabelnya adalah
+    // kebocoran, jadi tiap ekspor & PDF harus memakai cakupan yang sama.
+    $downloads = [
+        '/reports/attendance/export',
+        '/reports/attendance/pdf',
+        '/reports/attendance-log/export',
+        '/reports/attendance-log/pdf',
+        '/reports/leave/export',
+        '/reports/leave/pdf',
+    ];
+
+    foreach ($downloads as $url) {
+        $this->actingAs($user)->get($url)->assertOk();
+    }
+
+    $rows = $this->actingAs($user)->get('/reports/attendance')->assertOk()->viewData('rows');
+    $names = collect($rows)->pluck('employee.full_name');
+
+    expect($names)->toContain($subordinate->full_name)
+        ->and($names)->not->toContain($stranger->full_name);
+});
+
+test('the per-employee report detail of someone outside the team is forbidden', function () {
+    $user = teamUser();
+    [, $subordinate, $stranger] = teamTree($user);
+
+    // Mempersempit daftarnya saja tidak ada artinya kalau URL rinciannya masih
+    // bisa dirakit sendiri.
+    $this->actingAs($user)->get("/reports/attendance/{$subordinate->id}")->assertOk();
+    $this->actingAs($user)->get("/reports/attendance/{$stranger->id}")->assertForbidden();
+
+    $this->actingAs($user)->get("/reports/leave/{$subordinate->id}")->assertOk();
+    $this->actingAs($user)->get("/reports/leave/{$stranger->id}")->assertForbidden();
+});
+
+test('the overtime monitoring list keeps its location and division scope', function () {
     $user = teamUser();
     [, , $stranger] = teamTree($user);
+    overtimeFor([$stranger]);
 
-    // Hanya Log Absensi yang pindah ke garis atasan; Rekap Absensi tetap memakai
-    // cakupan lokasi/divisi seperti sebelumnya.
-    $this->actingAs($user)->get('/reports/attendance')
+    // Yang pindah ke garis atasan adalah halaman LAPORAN. Pemantauan lembur,
+    // koreksi absensi, dan data karyawan tetap memakai cakupan lokasi/divisi.
+    $this->actingAs($user)->get('/attendance/overtime')
         ->assertOk()
-        ->assertSee($stranger->full_name);
+        ->assertSee('Citra Bukan Bawahan');
 });
 test('the switch in Kontrol Akses lifts the restriction', function () {
     $user = teamUser(bypass: true);
@@ -532,7 +635,7 @@ test('Kontrol Akses states the real effect of each scope choice', function () {
     // "lihat semua" — kalimat itulah yang dulu menyesatkan.
     $this->actingAs($admin)->get(route('access-control.index'))
         ->assertOk()
-        ->assertSee('Cakupan di Absensi Harian, Jadwal Kerja, Cuti &amp; Log Absensi', false)
+        ->assertSee('Cakupan di Absensi Harian, Jadwal Kerja, Cuti &amp; Laporan', false)
         ->assertSee('Bawahan saja')
         ->assertSee('Sesuai lokasi &amp; divisi di kartu ini', false);
 });

@@ -9,6 +9,8 @@
             <a href="{{ route('attendance.overtime.index', ['month' => $month->format('Y-m'), 'branch_id' => $branchId]) }}" class="rounded-md border border-gray-200 px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50">Persetujuan Lembur</a>
         </section>
 
+        <x-scope-notice :has-no-scope="$hasNoScope" :has-no-team="$hasNoTeam"/>
+
         <section class="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
             <form method="GET" action="{{ route('attendance.overtime.recap') }}" class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <div class="flex items-center gap-2">

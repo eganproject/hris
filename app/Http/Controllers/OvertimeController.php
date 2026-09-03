@@ -66,13 +66,17 @@ class OvertimeController extends Controller
 
     /**
      * Monthly overtime recap: approved overtime totals per employee.
+     *
+     * Halaman laporan, jadi dipersempit ke garis atasan seperti rekap lainnya.
+     * Daftar pemantauan lembur (index) tidak ikut — itu halaman operasional yang
+     * masih memakai cakupan lokasi/divisi.
      */
     public function recap(Request $request): View
     {
         $month = MonthInput::resolve($request->input('month'));
         [$from, $to] = [$month->copy()->startOfMonth(), $month->copy()->endOfMonth()];
         $branchId = $request->integer('branch_id') ?: null;
-        $scope = DataScope::forAttendance($request->user());
+        $scope = DataScope::forTeam($request->user());
 
         $rows = OvertimeApproval::query()
             ->approved()
@@ -94,6 +98,8 @@ class OvertimeController extends Controller
             'branches' => $scope->branches(),
             'branchId' => $branchId,
             'totalMinutes' => (int) $rows->sum('minutes'),
+            'hasNoScope' => $scope->isEmpty(),
+            'hasNoTeam' => $scope->hasNoTeam(),
         ]);
     }
 }
