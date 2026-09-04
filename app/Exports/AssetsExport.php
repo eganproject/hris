@@ -36,7 +36,7 @@ class AssetsExport implements FromQuery, ShouldAutoSize, WithHeadings, WithMappi
     public function query(): Builder
     {
         return Asset::query()
-            ->with(['category:id,name', 'owningBranch:id,name', 'currentBranch:id,name', 'department:id,name', 'departments:id,name', 'storageLocation:id,full_path'])
+            ->with(['category:id,name', 'owningBranch:id,name', 'currentBranch:id,name', 'department:id,name', 'departments:id,name'])
             ->when($this->user, fn ($query) => $query->visibleTo($this->user))
             ->matchingFilters($this->filters)
             ->orderBy('asset_code');
@@ -56,7 +56,6 @@ class AssetsExport implements FromQuery, ShouldAutoSize, WithHeadings, WithMappi
             'Kondisi',
             'Lokasi Pemilik',
             'Lokasi Sekarang',
-            'Tempat Penyimpanan',
             'Divisi',
             'Tanggal Perolehan',
             'Nilai Perolehan',
@@ -82,7 +81,6 @@ class AssetsExport implements FromQuery, ShouldAutoSize, WithHeadings, WithMappi
             $asset->condition_label,
             $asset->owningBranch?->name,
             $asset->currentBranch?->name,
-            $asset->storageLocation?->full_path,
             // Aset milik bersama tetap satu baris: kedua divisinya ditulis
             // berdampingan, karena memecahnya jadi dua baris akan membuat siapa pun
             // yang menjumlahkan nilai perolehan menghitungnya dua kali.

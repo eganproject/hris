@@ -6,7 +6,6 @@ use App\Enums\AssetCondition;
 use App\Enums\AssetStatus;
 use App\Models\Asset;
 use App\Models\AssetCategory;
-use App\Models\AssetStorageLocation;
 use App\Support\DataScope;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
@@ -59,16 +58,6 @@ class AssetRequest extends FormRequest
             'owning_branch_id' => ['required', Rule::in($branchIds)],
             'current_branch_id' => ['required', Rule::in($branchIds)],
 
-            // Aset yang tidak dipegang siapa pun harus jelas disimpan di mana.
-            // Status lain dibiarkan kosong karena barangnya memang tidak di gudang:
-            // Perawatan ada di vendor, Hilang belum diketahui, Dipegang ada pada
-            // karyawan.
-            'storage_location_id' => [
-                Rule::requiredIf(fn () => $this->input('status') === AssetStatus::Available->value),
-                'nullable',
-                $this->storageLocationRule(),
-            ],
-
             'department_id' => ['required', Rule::in($departmentIds)],
             // Satu aset boleh dimiliki bersama oleh dua divisi (mis. kendaraan
             // operasional). Divisi kedua opsional dan harus berbeda dari yang utama.
@@ -96,7 +85,6 @@ class AssetRequest extends FormRequest
             'department_id.in' => 'Divisi pemilik berada di luar cakupan akses Anda.',
             'secondary_department_id.in' => 'Divisi kedua berada di luar cakupan akses Anda.',
             'secondary_department_id.different' => 'Divisi kedua harus berbeda dari divisi pemilik.',
-            'storage_location_id.required' => 'Aset berstatus Tersedia harus punya tempat penyimpanan — pilih rak atau ruang tempat barangnya berada.',
             'serial_number.required' => 'Kategori ini mewajibkan nomor seri.',
             'serial_number.unique' => 'Nomor seri ini sudah terdaftar pada aset lain (termasuk aset yang sudah diarsipkan).',
             'acquired_at.before_or_equal' => 'Tanggal perolehan tidak boleh di masa depan.',
@@ -115,7 +103,6 @@ class AssetRequest extends FormRequest
             'serial_number' => 'nomor seri',
             'owning_branch_id' => 'lokasi pemilik',
             'current_branch_id' => 'lokasi aset',
-            'storage_location_id' => 'tempat penyimpanan',
             'department_id' => 'divisi pemilik',
             'secondary_department_id' => 'divisi kedua',
             'acquired_at' => 'tanggal perolehan',
@@ -157,39 +144,6 @@ class AssetRequest extends FormRequest
             (int) $this->validated('department_id'),
             (int) $this->validated('secondary_department_id'),
         ])));
-    }
-
-    /**
-     * Tempat penyimpanan harus berada di lokasi kerja tempat asetnya sekarang —
-     * sebuah aset di Head Office tidak bisa tersimpan di rak gudang Surabaya.
-     */
-    private function storageLocationRule(): callable
-    {
-        return function (string $attribute, $value, callable $fail): void {
-            if (! $value) {
-                return;
-            }
-
-            $location = AssetStorageLocation::query()->find($value);
-
-            if (! $location) {
-                $fail('Tempat penyimpanan yang dipilih tidak ditemukan.');
-
-                return;
-            }
-
-            if ((int) $location->branch_id !== (int) $this->input('current_branch_id')) {
-                $fail('Tempat penyimpanan harus berada di lokasi aset yang dipilih.');
-
-                return;
-            }
-
-            // Tempat yang sudah dinonaktifkan tidak boleh dipakai lagi — kecuali aset
-            // ini memang sudah tersimpan di sana sejak sebelumnya.
-            if (! $location->is_active && (int) $this->asset()?->storage_location_id !== (int) $value) {
-                $fail('Tempat penyimpanan itu sudah dinonaktifkan.');
-            }
-        };
     }
 
     private function asset(): ?Asset

@@ -37,7 +37,6 @@ class Asset extends Model
         'specification',
         'owning_branch_id',
         'current_branch_id',
-        'storage_location_id',
         'department_id',
         'status',
         'condition',
@@ -138,12 +137,6 @@ class Asset extends Model
     public function currentBranch(): BelongsTo
     {
         return $this->belongsTo(Branch::class, 'current_branch_id');
-    }
-
-    /** Di rak/ruang mana barangnya disimpan saat tidak dipegang siapa pun. */
-    public function storageLocation(): BelongsTo
-    {
-        return $this->belongsTo(AssetStorageLocation::class, 'storage_location_id');
     }
 
     public function department(): BelongsTo
@@ -327,16 +320,6 @@ class Asset extends Model
                     $query->where('department_id', $id)
                         ->orWhereHas('departments', fn (Builder $q) => $q->where('departments.id', $id));
                 });
-            })
-            ->when($filters['storage'] ?? null, function (Builder $query, $id): void {
-                // Termasuk isi rak di bawahnya: memilih "Gudang A" harus menampilkan
-                // seluruh aset di Rak A1, A2, dan seterusnya — bukan hanya yang
-                // kebetulan ditaruh persis di tingkat gudangnya. Keturunannya
-                // diturunkan lebih dulu di PHP; tabelnya kecil, dan query rekursif
-                // berbeda bentuknya antara MySQL dan SQLite.
-                $location = AssetStorageLocation::query()->find($id);
-
-                $query->whereIn('storage_location_id', $location?->subtreeIds() ?: [0]);
             })
             ->when(($filters['warranty'] ?? null) === 'expiring', function (Builder $query): void {
                 $query->whereNotNull('warranty_expires_at')

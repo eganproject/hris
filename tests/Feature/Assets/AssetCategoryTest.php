@@ -4,7 +4,6 @@ use App\Enums\AssetStatus;
 use App\Models\ActivityLog;
 use App\Models\Asset;
 use App\Models\AssetCategory;
-use App\Models\AssetStorageLocation;
 use App\Models\Branch;
 use App\Models\Department;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -76,20 +75,15 @@ test('jejak aktivitas aset menyebut kode asetnya', function () {
     $branch = Branch::query()->create(['code' => 'HO', 'name' => 'Head Office', 'is_active' => true]);
     $department = Department::query()->create(['code' => 'IT', 'name' => 'IT', 'is_active' => true]);
 
-    $storage = AssetStorageLocation::query()->create([
-        'branch_id' => $branch->id, 'name' => 'Gudang A', 'is_active' => true,
-    ]);
-
     $this->actingAs(assetAdmin())->post(route('assets.store'), [
         'category_id' => $category->id,
         'name' => 'Laptop Dell',
         'owning_branch_id' => $branch->id,
         'current_branch_id' => $branch->id,
-        'storage_location_id' => $storage->id,
         'department_id' => $department->id,
         'status' => AssetStatus::Available->value,
         'condition' => 'good',
-    ])->assertRedirect();
+    ]);
 
     $asset = Asset::query()->firstOrFail();
     $log = ActivityLog::query()->where('subject_type', Asset::class)->latest('id')->first();

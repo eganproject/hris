@@ -46,18 +46,6 @@
                         </dd>
                     </div>
                     <div>
-                        <dt class="text-xs font-medium uppercase tracking-wide text-gray-500">Tempat Penyimpanan</dt>
-                        <dd class="mt-1 text-sm text-gray-900">
-                            @if ($asset->storageLocation)
-                                {{ $asset->storageLocation->full_path }}
-                            @elseif ($asset->status === \App\Enums\AssetStatus::Available)
-                                <span class="text-amber-600">Belum diisi</span>
-                            @else
-                                -
-                            @endif
-                        </dd>
-                    </div>
-                    <div>
                         <dt class="text-xs font-medium uppercase tracking-wide text-gray-500">Divisi Pemilik</dt>
                         <dd class="mt-1 text-sm text-gray-900">{{ $asset->departments->pluck('name')->implode(', ') ?: ($asset->department?->name ?? '-') }}</dd>
                     </div>
