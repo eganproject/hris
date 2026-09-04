@@ -2,12 +2,14 @@
 
 namespace App\Http\Controllers;
 
+use App\Actions\Assets\ReturnAsset;
 use App\Enums\AssetCondition;
 use App\Enums\AssetStatus;
 use App\Exports\AssetsExport;
 use App\Http\Requests\AssetRequest;
 use App\Models\Asset;
 use App\Models\AssetCategory;
+use App\Models\Employee;
 use App\Support\DataScope;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -132,10 +134,33 @@ class AssetController extends Controller
             'department:id,name',
             'departments:id,name',
             'creator:id,name',
+            'currentAssignment.employee:id,full_name,employee_number',
+            'currentAssignment.assignedBy:id,name',
             'documents' => fn ($query) => $query->with('uploader:id,name')->latest('id'),
+            'transactions' => fn ($query) => $query->with('actor:id,name')->latest('occurred_at')->latest('id'),
+            'assignments' => fn ($query) => $query->with('employee:id,full_name')->latest('assigned_at'),
         ]);
 
-        return view('assets.show', ['asset' => $asset]);
+        $scope = DataScope::forAssets($request->user());
+
+        return view('assets.show', [
+            'asset' => $asset,
+            // Hanya karyawan aktif yang bisa menerima aset. Daftarnya dimuat hanya
+            // bila penggunanya memang boleh menyerahkan — tidak ada gunanya mengirim
+            // ratusan nama ke layar orang yang cuma boleh melihat.
+            'employees' => $request->user()->can('asset-assignments.assign')
+                ? Employee::query()->active()->orderBy('full_name')->get(['id', 'full_name', 'employee_number'])
+                : collect(),
+            'branches' => $scope->branches(),
+            'departments' => $scope->departments(),
+            'conditions' => AssetCondition::labels(),
+            'serviceableConditions' => collect(AssetCondition::SERVICEABLE)
+                ->mapWithKeys(fn (AssetCondition $c) => [$c->value => $c->label()])
+                ->all(),
+            'returnOutcomes' => collect(ReturnAsset::OUTCOMES)
+                ->mapWithKeys(fn (AssetStatus $s) => [$s->value => $s->label()])
+                ->all(),
+        ]);
     }
 
     public function edit(Request $request, Asset $asset): View

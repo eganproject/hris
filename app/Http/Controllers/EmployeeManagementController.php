@@ -358,6 +358,14 @@ class EmployeeManagementController extends Controller
         $isExitViaEdit = $wasActive && $desiredStatus === 'inactive';
         $isReactivateViaEdit = ! $wasActive && $desiredStatus === 'active';
 
+        // Diperiksa sebelum apa pun tersimpan: menonaktifkan orang yang masih memegang
+        // aset perusahaan membuat barangnya kehilangan penanggung jawab sekaligus
+        // menghilangkannya dari daftar karyawan aktif — dua hal yang bersama-sama
+        // membuatnya tidak pernah tertagih.
+        if ($isExitViaEdit && $blocked = $this->assetsStillHeld($employee)) {
+            return back()->withInput()->with('error', $blocked);
+        }
+
         DB::transaction(function () use ($request, $employee, $isExitViaEdit, $isReactivateViaEdit, $wasFollowingOfficeHours, &$officeHoursCleanup) {
             $employee->update($this->employeePayload($request));
             $this->syncDepartments($request, $employee);
@@ -487,6 +495,10 @@ class EmployeeManagementController extends Controller
     public function resign(ResignEmployeeRequest $request, Employee $employee): RedirectResponse
     {
         $this->authorizeScope($employee);
+
+        if ($blocked = $this->assetsStillHeld($employee)) {
+            return back()->with('error', $blocked);
+        }
 
         DB::transaction(function () use ($request, $employee) {
             $employee->loadMissing('currentContract', 'user');
@@ -637,6 +649,15 @@ class EmployeeManagementController extends Controller
                 $exitDate = Carbon::parse($entry['exit_date'])->startOfDay();
 
                 if (! $employee || $employee->isInactive() || ($employee->join_date && $exitDate->lt($employee->join_date))) {
+                    $skipped++;
+
+                    continue;
+                }
+
+                // Baris yang masih memegang aset dilewati, bukan menggagalkan seluruh
+                // proses massal: satu orang yang belum mengembalikan laptop tidak boleh
+                // menahan puluhan proses keluar lain yang sudah beres.
+                if ($employee->openAssetCount() > 0) {
                     $skipped++;
 
                     continue;
@@ -1237,4 +1258,21 @@ class EmployeeManagementController extends Controller
             $user->syncRoles([$role->name]);
         }
     }
+    /**
+     * Kalimat penolakan bila karyawan masih memegang aset perusahaan — atau null bila
+     * ia memang sudah tidak memegang apa-apa.
+     */
+    private function assetsStillHeld(Employee $employee): ?string
+    {
+        $count = $employee->openAssetCount();
+
+        if ($count === 0) {
+            return null;
+        }
+
+        return "{$employee->full_name} masih tercatat memegang {$count} aset perusahaan. "
+            .'Catat dulu pengembaliannya di menu Aset sebelum memproses keluar, agar barangnya tidak kehilangan penanggung jawab.';
+    }
+
+
 }

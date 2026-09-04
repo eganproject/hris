@@ -21,10 +21,10 @@
         <x-scope-notice :has-no-scope="$hasNoScope" />
 
         @if ($limitedToSubordinates && ! $hasNoScope)
-            {{-- Bukan halaman rusak: akun ini memang dipersempit ke bawahannya, dan
-                 aset baru terhubung ke orang setelah modul penyerahan aktif. --}}
+            {{-- Bukan halaman rusak: akun ini memang dipersempit ke bawahannya, jadi
+                 yang tampil hanya aset yang sedang dipegang timnya. --}}
             <div class="rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
-                Akun Anda dibatasi ke bawahan, sehingga daftar aset mengikuti siapa yang memegang asetnya. Penyerahan aset kepada karyawan belum tersedia pada tahap ini, jadi belum ada aset yang bisa ditampilkan di sini. Untuk melihat aset per lokasi kerja, minta admin mengubah cakupan akun Anda di menu <span class="font-medium">Kontrol Akses</span>.
+                Akun Anda dibatasi ke bawahan, sehingga halaman ini hanya menampilkan aset yang <span class="font-medium">sedang dipegang</span> karyawan di bawah Anda — bukan seluruh aset di lokasi kerja. Untuk melihat aset per lokasi kerja, minta admin mengubah cakupan akun Anda di menu <span class="font-medium">Kontrol Akses</span>.
             </div>
         @endif
 

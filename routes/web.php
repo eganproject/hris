@@ -3,6 +3,7 @@
 use App\Http\Controllers\AccessControlController;
 use App\Http\Controllers\ActivityLogController;
 use App\Http\Controllers\AssetCategoryController;
+use App\Http\Controllers\AssetAssignmentController;
 use App\Http\Controllers\AssetController;
 use App\Http\Controllers\AssetDocumentController;
 use App\Http\Controllers\AttendanceController;
@@ -24,6 +25,7 @@ use App\Http\Controllers\LeaveAttachmentController;
 use App\Http\Controllers\LeaveBalanceController;
 use App\Http\Controllers\LeaveController;
 use App\Http\Controllers\LeaveTypeController;
+use App\Http\Controllers\MyAssetController;
 use App\Http\Controllers\MyAttendanceController;
 use App\Http\Controllers\MyLeaveController;
 use App\Http\Controllers\MyOvertimeController;
@@ -79,6 +81,13 @@ Route::middleware('auth')->group(function () {
 
     // Self-service: check own work schedule (read-only, no special permission).
     Route::get('jadwal-saya', [MyRosterController::class, 'index'])->name('my-roster.index');
+
+    // Aset Saya: aset yang sedang dipegang pengguna sendiri, beserta konfirmasi
+    // penerimaannya. Cakupan datanya adalah dirinya sendiri, bukan lokasi/divisi.
+    Route::prefix('aset-saya')->name('my-assets.')->group(function () {
+        Route::get('/', [MyAssetController::class, 'index'])->middleware('permission:my-assets.view')->name('index');
+        Route::post('{assignment}/konfirmasi', [MyAssetController::class, 'acknowledge'])->middleware('permission:my-assets.view')->name('acknowledge');
+    });
 
     // Global quick-search (command palette): finds employees within the user's scope.
     Route::get('search', SearchController::class)->middleware('permission:employees.view')->name('search');
@@ -229,6 +238,8 @@ Route::middleware('auth')->group(function () {
         Route::put('categories/{category}', [AssetCategoryController::class, 'update'])->middleware('permission:asset-categories.update')->name('categories.update');
         Route::delete('categories/{category}', [AssetCategoryController::class, 'destroy'])->middleware('permission:asset-categories.delete')->name('categories.destroy');
 
+        Route::get('assignments', [AssetAssignmentController::class, 'index'])->middleware('permission:asset-assignments.view')->name('assignments.index');
+
         Route::get('create', [AssetController::class, 'create'])->middleware('permission:assets.create')->name('create');
         Route::post('/', [AssetController::class, 'store'])->middleware('permission:assets.create')->name('store');
 
@@ -240,6 +251,12 @@ Route::middleware('auth')->group(function () {
         // Berkas aset. Mengunggah dan menghapus mengikuti izin mengubah aset;
         // membacanya cukup izin melihat — tetapi keduanya tetap melewati pemeriksaan
         // cakupan di controller-nya.
+        // Serah-terima. Tiga wewenang terpisah: menyerahkan barang ke tangan orang,
+        // menerimanya kembali, dan memindahkannya antarcabang.
+        Route::post('{asset}/assign', [AssetAssignmentController::class, 'assign'])->middleware('permission:asset-assignments.assign')->name('assign');
+        Route::post('{asset}/return', [AssetAssignmentController::class, 'receive'])->middleware('permission:asset-assignments.return')->name('return');
+        Route::post('{asset}/transfer', [AssetAssignmentController::class, 'transfer'])->middleware('permission:asset-assignments.transfer')->name('transfer');
+
         Route::post('{asset}/documents', [AssetDocumentController::class, 'store'])->middleware('permission:assets.update')->name('documents.store');
         Route::get('{asset}/documents/{document}', [AssetDocumentController::class, 'show'])->middleware('permission:assets.view')->name('documents.show');
         Route::delete('{asset}/documents/{document}', [AssetDocumentController::class, 'destroy'])->middleware('permission:assets.update')->name('documents.destroy');

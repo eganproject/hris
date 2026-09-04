@@ -53,6 +53,18 @@ class DeactivateExpiredContracts
 
                     app(ApprovalNotifier::class)->contractAutoDeactivated($employee, $contract);
 
+                    // Proses keluar manual DIBLOKIR bila asetnya belum kembali, tapi
+                    // yang otomatis ini tidak boleh ikut berhenti: menahannya hanya
+                    // membuat kontrak kedaluwarsa menumpuk diam-diam, dan orang yang
+                    // sudah tidak bekerja tetap terhitung aktif. Jadi ia tetap
+                    // dinonaktifkan, dan yang mengurus aset diberi tahu agar barangnya
+                    // bisa dikejar.
+                    $assets = $employee->openAssetCount();
+
+                    if ($assets > 0) {
+                        app(ApprovalNotifier::class)->employeeExitedWithAssets($employee, $assets);
+                    }
+
                     $count++;
                 }
             });

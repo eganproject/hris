@@ -237,7 +237,7 @@
                         </div>
                     @endcanany
 
-                    @canany(['assets.view', 'asset-categories.view'])
+                    @canany(['assets.view', 'asset-assignments.view', 'asset-categories.view'])
                         @php $g = request()->routeIs('assets.*'); @endphp
                         <div @class(['sidebar-group', 'is-open' => $g]) data-sidebar-group="aset">
                             <button type="button" data-sidebar-group-toggle aria-expanded="{{ $g ? 'true' : 'false' }}" class="sidebar-group-toggle flex w-full items-center gap-2.5 rounded px-2.5 py-1.5 text-left transition hover:bg-white/70">
@@ -247,9 +247,15 @@
                             </button>
                             <div class="sidebar-group-items space-y-0.5" data-sidebar-group-items>
                                 @can('assets.view')
-                                    <a href="{{ route('assets.index') }}" @class(['sidebar-nav-link flex items-center gap-2.5 rounded px-2.5 py-1.5 text-[13px] font-medium transition', 'bg-white text-gray-950 shadow-xs ring-1 ring-gray-200' => request()->routeIs('assets.*') && ! request()->routeIs('assets.categories.*'), 'text-gray-600 hover:bg-white hover:text-gray-950' => ! request()->routeIs('assets.*') || request()->routeIs('assets.categories.*')]) title="Daftar Aset">
+                                    <a href="{{ route('assets.index') }}" @class(['sidebar-nav-link flex items-center gap-2.5 rounded px-2.5 py-1.5 text-[13px] font-medium transition', 'bg-white text-gray-950 shadow-xs ring-1 ring-gray-200' => request()->routeIs('assets.*') && ! request()->routeIs('assets.categories.*', 'assets.assignments.*'), 'text-gray-600 hover:bg-white hover:text-gray-950' => ! request()->routeIs('assets.*') || request()->routeIs('assets.categories.*', 'assets.assignments.*')]) title="Daftar Aset">
                                         <svg class="size-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/></svg>
                                         <span class="sidebar-label truncate">Daftar Aset</span>
+                                    </a>
+                                @endcan
+                                @can('asset-assignments.view')
+                                    <a href="{{ route('assets.assignments.index') }}" @class(['sidebar-nav-link flex items-center gap-2.5 rounded px-2.5 py-1.5 text-[13px] font-medium transition', 'bg-white text-gray-950 shadow-xs ring-1 ring-gray-200' => request()->routeIs('assets.assignments.*'), 'text-gray-600 hover:bg-white hover:text-gray-950' => ! request()->routeIs('assets.assignments.*')]) title="Serah Terima Aset">
+                                        <svg class="size-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 3 4 7l4 4"/><path d="M4 7h16"/><path d="m16 21 4-4-4-4"/><path d="M20 17H4"/></svg>
+                                        <span class="sidebar-label truncate">Serah Terima Aset</span>
                                     </a>
                                 @endcan
                                 @can('asset-categories.view')
@@ -308,6 +314,12 @@
                                     <a href="{{ route('my-overtime.index') }}" @class(['sidebar-nav-link flex items-center gap-2.5 rounded px-2.5 py-1.5 text-[13px] font-medium transition', 'bg-white text-gray-950 shadow-xs ring-1 ring-gray-200' => request()->routeIs('my-overtime.*'), 'text-gray-600 hover:bg-white hover:text-gray-950' => ! request()->routeIs('my-overtime.*')]) title="Lembur Saya">
                                         <svg class="size-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M12 8v4l3 2"></path></svg>
                                         <span class="sidebar-label truncate">Lembur Saya</span>
+                                    </a>
+                                @endcan
+                                @can('my-assets.view')
+                                    <a href="{{ route('my-assets.index') }}" @class(['sidebar-nav-link flex items-center gap-2.5 rounded px-2.5 py-1.5 text-[13px] font-medium transition', 'bg-white text-gray-950 shadow-xs ring-1 ring-gray-200' => request()->routeIs('my-assets.*'), 'text-gray-600 hover:bg-white hover:text-gray-950' => ! request()->routeIs('my-assets.*')]) title="Aset Saya">
+                                        <svg class="size-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/></svg>
+                                        <span class="sidebar-label truncate">Aset Saya</span>
                                     </a>
                                 @endcan
                             </div>

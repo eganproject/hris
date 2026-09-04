@@ -3,6 +3,7 @@
 namespace App\Support;
 
 use App\Enums\LeaveRequestStatus;
+use App\Models\AssetAssignment;
 use App\Models\AttendanceCorrection;
 use App\Models\Device;
 use App\Models\Employee;
@@ -35,6 +36,121 @@ class ApprovalNotifier
     public const CONTRACT_MANAGER = 'employees.update';
 
     public const DEVICE_MANAGER = 'devices.view';
+
+    /** Yang mengurus serah-terima aset: merekalah yang bisa menindaklanjutinya. */
+    public const ASSET_OFFICER = 'asset-assignments.assign';
+
+    /**
+     * Aset baru diserahkan — karyawannya perlu tahu, dan perlu mengonfirmasinya.
+     */
+    public function assetAssigned(AssetAssignment $assignment): void
+    {
+        $assignment->loadMissing('asset', 'employee');
+
+        $asset = $assignment->asset;
+        $target = $assignment->expected_return_at
+            ? ' Mohon dikembalikan paling lambat '.$this->longDate($assignment->expected_return_at).'.'
+            : '';
+
+        $this->toEmployee($assignment->employee, new ApprovalNotification(
+            title: 'Aset diserahkan kepada Anda',
+            message: "{$asset?->name} ({$asset?->asset_code}) tercatat diserahkan kepada Anda dalam kondisi {$assignment->condition_out_label}."
+                .$target.' Buka menu Aset Saya untuk mengonfirmasi penerimaannya.',
+            url: route('my-assets.index'),
+            category: 'asset',
+        ));
+    }
+
+    /** Serah-terima yang sudah lewat beberapa hari tapi belum juga diakui. */
+    public function assetAcknowledgementReminder(AssetAssignment $assignment): void
+    {
+        $assignment->loadMissing('asset', 'employee');
+
+        $asset = $assignment->asset;
+
+        $this->toEmployee($assignment->employee, new ApprovalNotification(
+            title: 'Konfirmasi penerimaan aset',
+            message: "{$asset?->name} ({$asset?->asset_code}) tercatat diserahkan kepada Anda sejak "
+                .$this->longDate($assignment->assigned_at).' tetapi belum Anda konfirmasi. '
+                .'Buka menu Aset Saya untuk mengonfirmasinya, atau tulis catatan bila ada yang tidak sesuai.',
+            url: route('my-assets.index'),
+            category: 'asset',
+        ));
+    }
+
+    /**
+     * Aset yang mendekati atau melewati tanggal kembali. Karyawannya diingatkan, dan
+     * setelah lewat tenggat yang mengurus aset ikut diberi tahu — sesudah lewat, ini
+     * bukan lagi urusan mengingatkan melainkan urusan menagih.
+     */
+    public function assetReturnReminder(AssetAssignment $assignment, int $daysLeft): void
+    {
+        $assignment->loadMissing('asset', 'employee');
+
+        $asset = $assignment->asset;
+        $due = $this->longDate($assignment->expected_return_at);
+
+        $message = $daysLeft >= 0
+            ? "{$asset?->name} ({$asset?->asset_code}) dijadwalkan kembali pada {$due}."
+                .($daysLeft === 0 ? ' Hari ini tenggatnya.' : " Tinggal {$daysLeft} hari lagi.")
+            : "{$asset?->name} ({$asset?->asset_code}) seharusnya sudah kembali pada {$due} — telat "
+                .abs($daysLeft).' hari.';
+
+        $this->toEmployee($assignment->employee, new ApprovalNotification(
+            title: $daysLeft >= 0 ? 'Pengembalian aset mendekat' : 'Aset telat dikembalikan',
+            message: $message,
+            url: route('my-assets.index'),
+            category: 'asset',
+        ));
+
+        if ($daysLeft < 0) {
+            $this->toPermission(self::ASSET_OFFICER, new ApprovalNotification(
+                title: 'Aset telat dikembalikan',
+                message: "{$assignment->employee?->full_name} belum mengembalikan {$asset?->name} ({$asset?->asset_code}) — telat "
+                    .abs($daysLeft).' hari dari tenggat '.$due.'.',
+                url: route('assets.assignments.index', ['state' => 'overdue']),
+                category: 'asset',
+            ), $assignment->employee);
+        }
+    }
+
+    /** Karyawan sudah mengakui penerimaan — petugas yang menyerahkan perlu tahu. */
+    public function assetAcknowledged(AssetAssignment $assignment): void
+    {
+        $assignment->loadMissing('asset', 'employee', 'assignedBy');
+
+        $asset = $assignment->asset;
+        $officer = $assignment->assignedBy;
+
+        if (! $officer || $officer->id === Auth::id()) {
+            return;
+        }
+
+        $officer->notify(new ApprovalNotification(
+            title: 'Serah-terima aset dikonfirmasi',
+            message: "{$assignment->employee?->full_name} mengonfirmasi penerimaan {$asset?->name} ({$asset?->asset_code}).",
+            url: route('assets.show', $asset),
+            category: 'asset',
+        ));
+    }
+
+    /**
+     * Karyawan dinonaktifkan padahal masih memegang aset.
+     *
+     * Dipakai oleh proses keluar otomatis (kontrak berakhir), yang tidak bisa
+     * dihentikan begitu saja: menahannya hanya akan membuat kontrak kedaluwarsa
+     * menumpuk diam-diam. Jadi orangnya tetap dinonaktifkan, dan yang mengurus aset
+     * diberi tahu agar barangnya bisa dikejar.
+     */
+    public function employeeExitedWithAssets(Employee $employee, int $count): void
+    {
+        $this->toPermission(self::ASSET_OFFICER, new ApprovalNotification(
+            title: 'Karyawan keluar, aset belum kembali',
+            message: "{$employee->full_name} sudah dinonaktifkan tetapi masih tercatat memegang {$count} aset. Mohon ditindaklanjuti pengembaliannya.",
+            url: route('employees.show', $employee),
+            category: 'asset',
+        ), $employee);
+    }
 
     /** "Sen, 10 Feb 2026 (17:00–18:30, 1j 30m)" */
     private function overtimePeriod(OvertimeApproval $overtime, ?int $minutes = null): string
@@ -438,9 +554,15 @@ class ApprovalNotifier
         }
 
         if ($about) {
-            $bypass = str_starts_with($permission, 'employees.')
-                ? User::SCOPE_BYPASS_EMPLOYEES
-                : User::SCOPE_BYPASS_ATTENDANCE;
+            // Sumbu cakupannya harus mengikuti MODUL notifikasinya. Sebelum ada baris
+            // untuk aset, pemberitahuan soal aset ikut diukur dengan cakupan absensi —
+            // sehingga seorang asset officer baru bisa ditagih soal aset kalau ia
+            // kebetulan juga dikecualikan di absensi, yang tidak ada hubungannya.
+            $bypass = match (true) {
+                str_starts_with($permission, 'employees.') => User::SCOPE_BYPASS_EMPLOYEES,
+                str_starts_with($permission, 'asset') => User::SCOPE_BYPASS_ASSETS,
+                default => User::SCOPE_BYPASS_ATTENDANCE,
+            };
 
             $recipients = $recipients->filter(fn (User $user) => $about->isVisibleTo($user, $bypass));
         }

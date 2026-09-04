@@ -14,6 +14,14 @@ return [
         'delete' => 'Hapus',
         'export' => 'Ekspor',
         'import' => 'Impor',
+        // Tiga aksi khusus serah-terima aset. Ditulis sebagai kolom tersendiri, bukan
+        // menumpang pada "create"/"update", karena menyerahkan barang ke tangan
+        // seseorang, menerimanya kembali, dan memindahkannya antarcabang adalah tiga
+        // wewenang yang berbeda bobotnya — dan harus bisa diberikan atau dicabut
+        // sendiri-sendiri.
+        'assign' => 'Serahkan',
+        'return' => 'Terima',
+        'transfer' => 'Pindahkan',
     ],
 
     /**
@@ -60,6 +68,7 @@ return [
 
         'Aset' => [
             'assets' => ['label' => 'Daftar Aset', 'actions' => ['view', 'create', 'update', 'delete', 'export']],
+            'asset-assignments' => ['label' => 'Serah Terima Aset', 'actions' => ['view', 'assign', 'return', 'transfer']],
             'asset-categories' => ['label' => 'Kategori Aset', 'actions' => ['view', 'create', 'update', 'delete']],
         ],
 
@@ -91,6 +100,7 @@ return [
             'my-attendance' => ['label' => 'Absensi Saya (koreksi)', 'actions' => ['view']],
             'my-schedule' => ['label' => 'Tukar Jadwal Saya', 'actions' => ['view']],
             'my-overtime' => ['label' => 'Lembur Saya', 'actions' => ['view']],
+            'my-assets' => ['label' => 'Aset Saya', 'actions' => ['view']],
         ],
 
         // Cakupan data: mencentang "Lihat" = boleh melihat SEMUA lokasi & divisi,
@@ -153,7 +163,7 @@ return [
             'departments.view', 'departments.create', 'departments.update', 'departments.delete',
             'job-positions.view', 'job-positions.create', 'job-positions.update', 'job-positions.delete',
             'settings.view', 'settings.update',
-            'my-leave.view', 'my-attendance.view', 'my-schedule.view', 'my-overtime.view',
+            'my-leave.view', 'my-attendance.view', 'my-schedule.view', 'my-overtime.view', 'my-assets.view',
             'employees.view.all', 'attendance.view.all',
         ],
 
@@ -168,6 +178,7 @@ return [
             'my-attendance.view',
             'my-schedule.view',
             'my-overtime.view',
+            'my-assets.view',
         ],
     ],
 ];

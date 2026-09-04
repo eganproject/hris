@@ -10,6 +10,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use LogicException;
 
@@ -54,7 +55,7 @@ class Asset extends Model
      *
      * @var list<string>
      */
-    public const HISTORY_RELATIONS = ['documents'];
+    public const HISTORY_RELATIONS = ['documents', 'assignments', 'transactions'];
 
     /**
      * Kode memuat id, jadi ia ditulis tepat setelah barisnya ada. Berbeda dengan
@@ -167,6 +168,25 @@ class Asset extends Model
         return $this->hasMany(AssetDocument::class);
     }
 
+    public function assignments(): HasMany
+    {
+        return $this->hasMany(AssetAssignment::class);
+    }
+
+    /**
+     * Masa pegang yang masih berjalan. Sebuah aset hanya boleh punya satu — dijaga
+     * oleh AssignAsset lewat penguncian baris di dalam transaksi.
+     */
+    public function currentAssignment(): HasOne
+    {
+        return $this->hasOne(AssetAssignment::class)->whereNull('returned_at')->latestOfMany();
+    }
+
+    public function transactions(): HasMany
+    {
+        return $this->hasMany(AssetTransaction::class);
+    }
+
     public function creator(): BelongsTo
     {
         return $this->belongsTo(User::class, 'created_by');
@@ -224,14 +244,19 @@ class Asset extends Model
             return;
         }
 
-        // "Batasi ke bawahan" untuk aset berarti "aset yang dipegang bawahan saya".
-        // Selama penyerahan aset belum ada, tidak ada satu pun aset yang punya
-        // pemegang — dan menampilkan seluruh aset satu cabang kepada akun yang justru
-        // dipersempit ke bawahannya jelas lebih longgar daripada yang diminta. Jadi
-        // untuk sekarang ia tidak melihat apa pun, dan halaman daftarnya menjelaskan
-        // kenapa. Klausa pemegang ditambahkan bersama modul penyerahan.
+        // "Batasi ke bawahan" untuk aset berarti "aset yang sedang dipegang bawahan
+        // saya" — garis atasan MENGGANTIKAN cakupan lokasi/divisi, sama seperti pada
+        // modul absensi. Aset yang menganggur di gudang bukan urusan seorang atasan;
+        // yang ia perlu tahu adalah barang yang ada di tangan timnya.
+        //
+        // [0] agar yang tidak punya bawahan mendapat daftar kosong, bukan seluruh tabel.
         if ($user->isLimitedToSubordinates()) {
-            $query->whereRaw('1 = 0');
+            $ids = $user->subordinateEmployeeIds() ?: [0];
+
+            $query->whereHas(
+                'assignments',
+                fn (Builder $assignment) => $assignment->open()->whereIn('employee_id', $ids),
+            );
 
             return;
         }
@@ -269,7 +294,10 @@ class Asset extends Model
         }
 
         if ($user->isLimitedToSubordinates()) {
-            return false;
+            return $this->assignments()
+                ->open()
+                ->whereIn('employee_id', $user->subordinateEmployeeIds() ?: [0])
+                ->exists();
         }
 
         $branchIds = $user->accessBranchIds();

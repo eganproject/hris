@@ -240,6 +240,24 @@ class Employee extends Model
         );
     }
 
+    /** Seluruh masa pegang aset karyawan ini, yang berjalan maupun yang sudah lewat. */
+    public function assetAssignments(): HasMany
+    {
+        return $this->hasMany(AssetAssignment::class);
+    }
+
+    /** Aset yang masih ada di tangannya — dipakai penjaga proses keluar. */
+    public function openAssetAssignments(): HasMany
+    {
+        return $this->assetAssignments()->whereNull('returned_at');
+    }
+
+    /** Berapa aset perusahaan yang masih ada di tangannya. */
+    public function openAssetCount(): int
+    {
+        return $this->openAssetAssignments()->count();
+    }
+
     public function contracts(): HasMany
     {
         return $this->hasMany(EmployeeContract::class);
@@ -297,6 +315,9 @@ class Employee extends Model
         'leaveRequests',
         'attendanceCorrections',
         'overtimeApprovals',
+        // Pernah memegang aset perusahaan adalah riwayat juga: barisnya menyimpan
+        // siapa yang bertanggung jawab atas sebuah barang dan kapan.
+        'assetAssignments',
     ];
 
     /** Flag every history relation in one query, so a list can hide "Hapus" per row. */

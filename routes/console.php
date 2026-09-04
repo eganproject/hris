@@ -23,6 +23,9 @@ Schedule::command('employees:deactivate-expired')->dailyAt('00:05');
 // Ingatkan HR untuk kontrak yang akan berakhir (H-30, H-14, H-7), setiap pagi.
 Schedule::command('contracts:notify-expiring')->dailyAt('06:00');
 
+// Ingatkan konfirmasi serah-terima aset dan pengembalian yang mendekat atau telat.
+Schedule::command('assets:notify-custody')->dailyAt('06:15');
+
 // Deteksi mesin absensi yang offline dan beri tahu HR (sekali per gangguan).
 Schedule::command('devices:notify-offline')->everyFifteenMinutes();
 
