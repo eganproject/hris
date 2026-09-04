@@ -6,11 +6,15 @@ use App\Actions\Assets\ReturnAsset;
 use App\Enums\AssetCondition;
 use App\Enums\AssetStatus;
 use App\Exports\AssetsExport;
+use App\Exports\AssetTemplateExport;
 use App\Http\Requests\AssetRequest;
+use App\Imports\AssetsImport;
 use App\Models\Asset;
 use App\Models\AssetCategory;
 use App\Models\Employee;
 use App\Support\DataScope;
+use App\Support\ImportErrorStore;
+use App\Support\UploadMessages;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -236,6 +240,64 @@ class AssetController extends Controller
             new AssetsExport($filters, $request->user()),
             'daftar-aset-'.now()->format('Ymd-His').'.xlsx',
         );
+    }
+
+    public function importTemplate(): BinaryFileResponse
+    {
+        return Excel::download(new AssetTemplateExport, 'template-import-aset.xlsx');
+    }
+
+    /**
+     * Impor master aset dari template .xlsx/.csv yang sudah diisi.
+     *
+     * Semua-atau-tidak sama sekali: bila ada satu baris pun yang tidak sah, tidak ada
+     * yang disimpan dan kesalahannya dikembalikan per baris — beserta token untuk
+     * mengunduh berkasnya yang sudah ditandai.
+     */
+    public function import(Request $request): RedirectResponse
+    {
+        $request->validate(
+            ['file' => UploadMessages::excelRules()],
+            UploadMessages::excel(),
+            ['file' => 'file Excel'],
+        );
+
+        $scope = DataScope::forAssets($request->user());
+
+        abort_if($scope->isEmpty(), 403, 'Cakupan akses Anda belum diatur.');
+
+        // Pengimpor yang bercakupan hanya boleh memasukkan aset ke lokasi dan divisi
+        // yang memang sudah bisa ia akses — kalau tidak, ia bisa membuat baris yang
+        // seketika hilang dari layarnya sendiri.
+        $unrestricted = $scope->isUnrestricted();
+
+        $import = new AssetsImport(
+            $unrestricted ? null : $scope->branches()->map(fn ($branch) => strtolower(trim($branch->name)))->values()->all(),
+            $unrestricted ? null : $scope->departments()->map(fn ($department) => strtolower(trim($department->name)))->values()->all(),
+        );
+
+        try {
+            Excel::import($import, $request->file('file'));
+        } catch (\Throwable $exception) {
+            report($exception);
+
+            return back()->with('import_errors', ['Gagal membaca file. Pastikan file sesuai template. ('.$exception->getMessage().')']);
+        }
+
+        if ($import->errors() !== []) {
+            return back()
+                ->with('import_errors', $import->errors())
+                ->with('import_error_token', ImportErrorStore::put($request->file('file'), $import->rowErrors()));
+        }
+
+        return redirect()->route('assets.index')
+            ->with('status', "Berhasil mengimpor {$import->imported()} aset.");
+    }
+
+    /** Salinan berkas yang baru diunggah, lengkap dengan tanda pada sel yang bermasalah. */
+    public function importErrors(string $token): BinaryFileResponse
+    {
+        return ImportErrorStore::download($token);
     }
 
     /**

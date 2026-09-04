@@ -2,6 +2,7 @@
 
 namespace App\Exports;
 
+use App\Imports\AssetsImport;
 use App\Models\Asset;
 use App\Models\User;
 use Illuminate\Contracts\Database\Eloquent\Builder;
@@ -42,26 +43,16 @@ class AssetsExport implements FromQuery, ShouldAutoSize, WithHeadings, WithMappi
             ->orderBy('asset_code');
     }
 
-    /** @return list<string> */
+    /**
+     * Judul kolomnya diambil dari AssetsImport, bukan ditulis ulang di sini — dengan
+     * begitu berkas hasil ekspor bisa disunting lalu diimpor kembali, dan kedua sisi
+     * tidak pernah bergeser diam-diam.
+     *
+     * @return list<string>
+     */
     public function headings(): array
     {
-        return [
-            'Kode Aset',
-            'Nama',
-            'Kategori',
-            'Merek',
-            'Model',
-            'Nomor Seri',
-            'Status',
-            'Kondisi',
-            'Lokasi Pemilik',
-            'Lokasi Sekarang',
-            'Divisi',
-            'Tanggal Perolehan',
-            'Nilai Perolehan',
-            'Garansi Berakhir',
-            'Catatan',
-        ];
+        return array_map(fn ($column) => $column['header'], AssetsImport::columns());
     }
 
     /**
@@ -70,6 +61,11 @@ class AssetsExport implements FromQuery, ShouldAutoSize, WithHeadings, WithMappi
      */
     public function map($asset): array
     {
+        // Divisi kedua adalah anggota himpunan yang bukan divisi utama.
+        $second = $asset->departments
+            ->reject(fn ($department) => $department->id === $asset->department_id)
+            ->first();
+
         return [
             $asset->asset_code,
             $asset->name,
@@ -77,17 +73,16 @@ class AssetsExport implements FromQuery, ShouldAutoSize, WithHeadings, WithMappi
             $asset->brand,
             $asset->model,
             $asset->serial_number,
-            $asset->status_label,
-            $asset->condition_label,
+            $asset->specification,
             $asset->owningBranch?->name,
             $asset->currentBranch?->name,
-            // Aset milik bersama tetap satu baris: kedua divisinya ditulis
-            // berdampingan, karena memecahnya jadi dua baris akan membuat siapa pun
-            // yang menjumlahkan nilai perolehan menghitungnya dua kali.
-            $asset->departments->pluck('name')->implode(', ') ?: $asset->department?->name,
-            $asset->acquired_at?->format('d/m/Y'),
+            $asset->department?->name,
+            $second?->name,
+            $asset->status_label,
+            $asset->condition_label,
+            $asset->acquired_at?->format('Y-m-d'),
             $asset->acquisition_cost,
-            $asset->warranty_expires_at?->format('d/m/Y'),
+            $asset->warranty_expires_at?->format('Y-m-d'),
             $asset->notes,
         ];
     }

@@ -67,7 +67,7 @@ return [
         ],
 
         'Aset' => [
-            'assets' => ['label' => 'Daftar Aset', 'actions' => ['view', 'create', 'update', 'delete', 'export']],
+            'assets' => ['label' => 'Daftar Aset', 'actions' => ['view', 'create', 'update', 'delete', 'export', 'import']],
             'asset-assignments' => ['label' => 'Serah Terima Aset', 'actions' => ['view', 'assign', 'return', 'transfer']],
             'asset-categories' => ['label' => 'Kategori Aset', 'actions' => ['view', 'create', 'update', 'delete']],
         ],

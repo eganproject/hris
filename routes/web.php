@@ -238,6 +238,10 @@ Route::middleware('auth')->group(function () {
         Route::put('categories/{category}', [AssetCategoryController::class, 'update'])->middleware('permission:asset-categories.update')->name('categories.update');
         Route::delete('categories/{category}', [AssetCategoryController::class, 'destroy'])->middleware('permission:asset-categories.delete')->name('categories.destroy');
 
+        Route::get('import/template', [AssetController::class, 'importTemplate'])->middleware('permission:assets.import')->name('import.template');
+        Route::post('import', [AssetController::class, 'import'])->middleware('permission:assets.import')->name('import');
+        Route::get('import/errors/{token}', [AssetController::class, 'importErrors'])->middleware('permission:assets.import')->name('import.errors');
+
         Route::get('assignments', [AssetAssignmentController::class, 'index'])->middleware('permission:asset-assignments.view')->name('assignments.index');
 
         Route::get('create', [AssetController::class, 'create'])->middleware('permission:assets.create')->name('create');

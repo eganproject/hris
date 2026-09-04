@@ -12,6 +12,9 @@
                 @can('asset-categories.view')
                     <a href="{{ route('assets.categories.index') }}" class="inline-flex items-center gap-2 rounded-md border border-gray-200 px-4 py-2.5 text-sm font-medium text-gray-700 transition hover:bg-gray-50"><x-icon name="layers"/> Kategori</a>
                 @endcan
+                @can('assets.import')
+                    <button type="button" data-open-import class="inline-flex items-center gap-2 rounded-md border border-gray-200 px-4 py-2.5 text-sm font-medium text-gray-700 transition hover:bg-gray-50"><x-icon name="upload"/> Impor</button>
+                @endcan
                 @can('assets.create')
                     <a href="{{ route('assets.create') }}" class="rounded-md bg-primary px-4 py-2.5 text-sm font-semibold text-white shadow-xs transition hover:bg-primary-hover">Tambah Aset</a>
                 @endcan
@@ -188,4 +191,103 @@
             </div>
         </section>
     </div>
+
+    @can('assets.import')
+        @php $importErrors = session('import_errors', []); @endphp
+
+        {{-- Modal impor. Terbuka sendiri saat kembali membawa kesalahan: kalau tidak,
+             pesan galatnya tersembunyi dan unggahan terlihat seperti tidak terkirim. --}}
+        <div data-import-modal @unless ($importErrors || $errors->has('file')) hidden @endunless class="fixed inset-0 z-50 flex items-center justify-center bg-gray-950/50 p-4">
+            <div class="w-full max-w-lg rounded-lg border border-gray-200 bg-white shadow-xl" role="dialog" aria-modal="true" aria-labelledby="asset-import-title">
+                <div class="flex items-start justify-between gap-4 border-b border-gray-200 px-5 py-4">
+                    <div>
+                        <h2 id="asset-import-title" class="text-base font-semibold text-gray-950">Import Data Aset dari Excel</h2>
+                        <p class="mt-0.5 text-xs text-gray-500">Untuk memindahkan daftar aset yang masih tersimpan di spreadsheet.</p>
+                    </div>
+                    <button type="button" data-import-close class="-m-1 rounded-md p-1 text-gray-400 transition hover:bg-gray-100 hover:text-gray-600" aria-label="Tutup">&times;</button>
+                </div>
+
+                <div class="max-h-[70vh] overflow-y-auto px-5 py-4">
+                    @if ($importErrors)
+                        <div class="mb-4 rounded-md border border-red-200 bg-red-50 p-3">
+                            <p class="text-sm font-semibold text-red-800">Import dibatalkan — perbaiki {{ count($importErrors) }} masalah berikut. Tidak ada data yang tersimpan.</p>
+                            <ul class="mt-2 max-h-48 space-y-1 overflow-y-auto text-xs text-red-700">
+                                @foreach ($importErrors as $importError)
+                                    <li>• {{ $importError }}</li>
+                                @endforeach
+                            </ul>
+                            @if ($importErrorToken = session('import_error_token'))
+                                <a href="{{ route('assets.import.errors', $importErrorToken) }}" class="mt-3 inline-flex items-center gap-1.5 rounded-md border border-red-300 bg-white px-3 py-1.5 text-xs font-semibold text-red-700 transition hover:bg-red-100">
+                                    <x-icon name="download" class="size-3.5"/> Unduh rincian kesalahan
+                                </a>
+                                <p class="mt-1.5 text-xs text-red-600">File Excel Anda dikembalikan dengan sel bermasalah ditandai merah dan sheet berisi rincian tiap baris.</p>
+                            @endif
+                        </div>
+                    @endif
+
+                    <ol class="space-y-3 text-sm text-gray-600">
+                        <li class="flex gap-3">
+                            <span class="flex size-6 flex-none items-center justify-center rounded-full bg-primary-soft text-xs font-semibold text-gray-700">1</span>
+                            <span>
+                                Unduh template, lalu isi data mulai <strong>baris ke-2</strong> pada sheet <strong>&ldquo;Data Aset&rdquo;</strong>. Jangan mengubah baris judul kolom.
+                                <a href="{{ route('assets.import.template') }}" class="mt-2 inline-flex items-center gap-1.5 rounded-md border border-gray-200 bg-white px-3 py-1.5 text-xs font-semibold text-gray-700 transition hover:bg-gray-50">
+                                    <x-icon name="download" class="size-3.5"/> Unduh Template Excel
+                                </a>
+                            </span>
+                        </li>
+                        <li class="flex gap-3">
+                            <span class="flex size-6 flex-none items-center justify-center rounded-full bg-primary-soft text-xs font-semibold text-gray-700">2</span>
+                            <span><strong>Kategori</strong>, <strong>Lokasi Kerja</strong>, dan <strong>Divisi</strong> harus sudah terdaftar lebih dulu — tidak dibuat otomatis. Kategori membawa prefix yang ikut membentuk kode aset permanen, jadi ia tidak boleh ditebak dari sebuah nama di spreadsheet.</span>
+                        </li>
+                        <li class="flex gap-3">
+                            <span class="flex size-6 flex-none items-center justify-center rounded-full bg-primary-soft text-xs font-semibold text-gray-700">3</span>
+                            <span>Kode aset <strong>dibuat otomatis</strong> saat disimpan. Status <strong>&ldquo;Dipegang&rdquo;</strong> tidak bisa diimpor — masukkan asetnya sebagai Tersedia, lalu serahkan lewat menu Serah Terima Aset agar pemegangnya ikut tercatat.</span>
+                        </li>
+                        <li class="flex gap-3">
+                            <span class="flex size-6 flex-none items-center justify-center rounded-full bg-primary-soft text-xs font-semibold text-gray-700">4</span>
+                            <span>Unggah file di bawah. Jika ada <strong>satu baris saja</strong> yang salah, seluruh import dibatalkan dan kesalahannya ditampilkan — tidak ada data setengah jadi.</span>
+                        </li>
+                    </ol>
+
+                    <form method="POST" action="{{ route('assets.import') }}" enctype="multipart/form-data" data-no-confirm="true" data-loading-title="Mengimpor data..." data-loading-message="Memvalidasi dan menyimpan data aset." class="mt-5 space-y-4">
+                        @csrf
+                        <div>
+                            <label for="asset-import-file" class="block text-sm font-medium text-gray-700">File Excel (.xlsx, .xls, .csv) <span class="field-requirement is-required" aria-label="Wajib diisi">*</span></label>
+                            <input id="asset-import-file" name="file" type="file" accept=".xlsx,.xls,.csv" data-file-guard data-max-mb="{{ \App\Support\UploadMessages::EXCEL_MAX_MB }}" data-file-label="File Excel" required class="mt-2 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-700 shadow-xs outline-none file:mr-3 file:rounded file:border-0 file:bg-gray-100 file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-gray-700 focus:border-primary focus:ring-2 focus:ring-primary/20">
+                            @error('file')<p data-upload-error-for="file" class="mt-2 text-sm text-red-600">{{ $message }}</p>@enderror
+                        </div>
+                        <div class="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+                            <button type="button" data-import-close class="rounded-md border border-gray-200 px-4 py-2.5 text-sm font-medium text-gray-700 transition hover:bg-gray-50">Batal</button>
+                            <button type="submit" class="inline-flex items-center justify-center gap-1.5 rounded-md bg-primary px-4 py-2.5 text-sm font-semibold text-white shadow-xs transition hover:bg-primary-hover">
+                                <x-icon name="upload" class="size-4"/> Import Sekarang
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        @push('scripts')
+        <script>
+            (function () {
+                const modal = document.querySelector('[data-import-modal]');
+
+                if (!modal) return;
+
+                document.querySelectorAll('[data-open-import]').forEach((button) => {
+                    button.addEventListener('click', () => { modal.hidden = false; });
+                });
+
+                modal.querySelectorAll('[data-import-close]').forEach((button) => {
+                    button.addEventListener('click', () => { modal.hidden = true; });
+                });
+
+                modal.addEventListener('click', (event) => {
+                    if (event.target === modal) modal.hidden = true;
+                });
+            })();
+        </script>
+        @endpush
+    @endcan
+
 </x-layouts.app>
