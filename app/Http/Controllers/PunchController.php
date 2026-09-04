@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\AttendancePunch;
 use App\Models\Device;
 use App\Models\Employee;
+use App\Services\AttendanceRollup;
 use App\Services\PunchIngestionService;
 use App\Support\DataScope;
 use Illuminate\Http\RedirectResponse;
@@ -13,9 +14,10 @@ use Illuminate\View\View;
 
 class PunchController extends Controller
 {
-    public function __construct(private readonly PunchIngestionService $ingestion)
-    {
-    }
+    public function __construct(
+        private readonly PunchIngestionService $ingestion,
+        private readonly AttendanceRollup $rollup,
+    ) {}
 
     public function index(Request $request): View
     {
@@ -84,6 +86,15 @@ class PunchController extends Controller
 
         $punch->forceFill(['status' => AttendancePunch::STATUS_IGNORED])->save();
 
-        return redirect()->back()->with('status', 'Punch ditandai diabaikan.');
+        // Absensinya ikut dihitung ulang. Tanpa ini, menandai sebuah punch keliru
+        // sebagai diabaikan tidak mengubah apa pun di papan harian: jam yang salah
+        // tetap terpampang, dan baru hilang sendiri entah kapan — saat punch
+        // berikutnya kebetulan datang dan memicu hitung ulang. Pemetaan PIN di
+        // halaman yang sama sudah lama melakukannya; hanya jalur ini yang tertinggal.
+        if ($punch->employee) {
+            $this->rollup->rebuildAfterIgnoring($punch->employee, $punch);
+        }
+
+        return redirect()->back()->with('status', 'Punch ditandai diabaikan & absensi terkait dihitung ulang.');
     }
 }

@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\Attendance;
+use App\Models\AttendancePunch;
 use App\Models\Employee;
 use Carbon\CarbonInterface;
 use Illuminate\Support\Carbon;
@@ -89,6 +90,45 @@ class AttendanceRollup
         // Catatannya ikut dibawa: ia menyimpan alasan koreksi, dan membiarkannya
         // hilang membuat jam yang tidak berasal dari mesin jadi tak bisa dijelaskan.
         return $this->resolver->resolve($employee, $date, $clockIn, $clockOut, $existing?->note);
+    }
+
+    /**
+     * Hitung ulang absensi setelah satu punch tidak lagi dihitung (ditandai
+     * "diabaikan" di Log Punch).
+     *
+     * Tidak cukup memanggil rebuild() begitu saja. Bila punch itu satu-satunya di
+     * hari tersebut, rebuild() memilih tidak menyentuh apa pun — penjagaannya agar
+     * absensi yang diisi tangan tidak terhapus — sehingga jam yang justru baru saja
+     * dinyatakan keliru tetap terpampang di papan harian. Karena itu jam yang nilainya
+     * memang BERASAL dari punch itu dikosongkan lebih dulu, sedangkan jam yang tidak
+     * cocok dengannya dibiarkan: itu tulisan manusia, bukan bekas punch ini.
+     */
+    public function rebuildAfterIgnoring(Employee $employee, AttendancePunch $punch): ?Attendance
+    {
+        $date = $this->workDateFor($employee, $punch->punched_at);
+
+        $attendance = $employee->attendances()
+            ->whereDate('work_date', $date->toDateString())
+            ->first();
+
+        if ($attendance) {
+            $time = Carbon::parse($punch->punched_at)->format('H:i');
+
+            $cleared = collect(['clock_in', 'clock_out'])
+                ->filter(fn (string $column) => $attendance->{$column}?->format('H:i') === $time)
+                ->mapWithKeys(fn (string $column) => [$column => null])
+                ->all();
+
+            if ($cleared !== []) {
+                $attendance->forceFill($cleared)->save();
+            }
+        }
+
+        // Punch yang tersisa mengisi kembali sisi yang kosong. Kalau tidak ada lagi
+        // yang tersisa, statusnya tetap harus dihitung ulang dari jam yang sekarang —
+        // hari yang jam masuknya baru saja hilang bukan lagi "hadir".
+        return $this->rebuild($employee, $date)
+            ?? ($attendance ? $this->resolver->reprocess($employee, $date) : null);
     }
 
     /**
