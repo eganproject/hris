@@ -1,0 +1,249 @@
+<?php
+
+use App\Enums\AssetStatus;
+use App\Models\Asset;
+use App\Models\AssetCategory;
+use App\Models\Branch;
+use App\Models\Department;
+use App\Models\User;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Spatie\Permission\Models\Permission;
+use Spatie\Permission\PermissionRegistrar;
+
+uses(RefreshDatabase::class);
+
+/**
+ * Pengguna dengan izin aset penuh dan melihat semua lokasi/divisi.
+ *
+ * @param  list<string>  $permissions
+ */
+function assetAdmin(array $permissions = []): User
+{
+    app(PermissionRegistrar::class)->forgetCachedPermissions();
+
+    $permissions = $permissions ?: [
+        'assets.view', 'assets.create', 'assets.update', 'assets.delete', 'assets.export',
+        'asset-categories.view', 'asset-categories.create', 'asset-categories.update', 'asset-categories.delete',
+        'assets.view.all',
+    ];
+
+    foreach ($permissions as $permission) {
+        Permission::findOrCreate($permission, 'web');
+    }
+
+    // Selalu terdaftar agar can() bisa menjawab "tidak" alih-alih melempar galat.
+    Permission::findOrCreate(User::SCOPE_BYPASS_ASSETS, 'web');
+
+    $user = User::factory()->create();
+    $user->givePermissionTo($permissions);
+
+    return $user;
+}
+
+/** @return array<string, mixed> */
+function assetFixture(): array
+{
+    return [
+        'category' => AssetCategory::query()->create([
+            'code' => 'LAPTOP', 'name' => 'Laptop', 'asset_prefix' => 'LPT',
+            'requires_serial' => true, 'is_active' => true,
+        ]),
+        'branch' => Branch::query()->create(['code' => 'HO', 'name' => 'Head Office', 'is_active' => true]),
+        'otherBranch' => Branch::query()->create(['code' => 'SBY', 'name' => 'Surabaya', 'is_active' => true]),
+        'it' => Department::query()->create(['code' => 'IT', 'name' => 'IT', 'is_active' => true]),
+        'ops' => Department::query()->create(['code' => 'OPS', 'name' => 'Operasional', 'is_active' => true]),
+    ];
+}
+
+/** @return array<string, mixed> */
+function assetPayload(array $fixture, array $overrides = []): array
+{
+    return array_merge([
+        'category_id' => $fixture['category']->id,
+        'name' => 'Laptop Dell Latitude 5420',
+        'brand' => 'Dell',
+        'model' => 'Latitude 5420',
+        'serial_number' => 'SN-0001',
+        'owning_branch_id' => $fixture['branch']->id,
+        'current_branch_id' => $fixture['branch']->id,
+        'department_id' => $fixture['it']->id,
+        'status' => AssetStatus::Available->value,
+        'condition' => 'good',
+        'acquired_at' => '2026-01-15',
+        'acquisition_cost' => '15000000',
+        'warranty_expires_at' => '2029-01-15',
+    ], $overrides);
+}
+
+test('kode aset dibuat otomatis dari kategori dan lokasi pemilik', function () {
+    $fixture = assetFixture();
+
+    $this->actingAs(assetAdmin())
+        ->post(route('assets.store'), assetPayload($fixture))
+        ->assertRedirect();
+
+    $asset = Asset::query()->firstOrFail();
+
+    expect($asset->asset_code)->toBe('AST-LPT-HO-'.str_pad((string) $asset->id, 4, '0', STR_PAD_LEFT));
+});
+
+test('kode aset tidak berubah meski aset dipindah ke cabang lain', function () {
+    $fixture = assetFixture();
+    $admin = assetAdmin();
+
+    $this->actingAs($admin)->post(route('assets.store'), assetPayload($fixture));
+    $asset = Asset::query()->firstOrFail();
+    $code = $asset->asset_code;
+
+    $this->actingAs($admin)->put(route('assets.update', $asset), assetPayload($fixture, [
+        'current_branch_id' => $fixture['otherBranch']->id,
+    ]));
+
+    expect($asset->fresh()->asset_code)->toBe($code);
+});
+
+test('aset bisa dimiliki dua divisi sekaligus', function () {
+    $fixture = assetFixture();
+
+    $this->actingAs(assetAdmin())->post(route('assets.store'), assetPayload($fixture, [
+        'secondary_department_id' => $fixture['ops']->id,
+    ]));
+
+    $asset = Asset::query()->firstOrFail();
+
+    expect($asset->departments()->pluck('departments.id')->sort()->values()->all())
+        ->toBe(collect([$fixture['it']->id, $fixture['ops']->id])->sort()->values()->all());
+});
+
+test('divisi kedua tidak boleh sama dengan divisi pemilik', function () {
+    $fixture = assetFixture();
+
+    $this->actingAs(assetAdmin())
+        ->post(route('assets.store'), assetPayload($fixture, [
+            'secondary_department_id' => $fixture['it']->id,
+        ]))
+        ->assertSessionHasErrors('secondary_department_id');
+});
+
+test('kategori yang mewajibkan nomor seri menolak aset tanpa nomor seri', function () {
+    $fixture = assetFixture();
+
+    $this->actingAs(assetAdmin())
+        ->post(route('assets.store'), assetPayload($fixture, ['serial_number' => null]))
+        ->assertSessionHasErrors('serial_number');
+});
+
+test('nomor seri tidak boleh dipakai dua aset', function () {
+    $fixture = assetFixture();
+    $admin = assetAdmin();
+
+    $this->actingAs($admin)->post(route('assets.store'), assetPayload($fixture));
+
+    $this->actingAs($admin)
+        ->post(route('assets.store'), assetPayload($fixture, ['name' => 'Laptop kedua']))
+        ->assertSessionHasErrors('serial_number');
+});
+
+test('status dipegang tidak bisa dipilih dari formulir master', function () {
+    $fixture = assetFixture();
+
+    $this->actingAs(assetAdmin())
+        ->post(route('assets.store'), assetPayload($fixture, ['status' => AssetStatus::Assigned->value]))
+        ->assertSessionHasErrors('status');
+});
+
+test('aset yang sudah punya riwayat tidak bisa dihapus', function () {
+    $fixture = assetFixture();
+    $admin = assetAdmin();
+
+    $this->actingAs($admin)->post(route('assets.store'), assetPayload($fixture));
+    $asset = Asset::query()->firstOrFail();
+
+    // Status yang sudah berjalan menutup pintu penghapusan.
+    $asset->forceFill(['status' => AssetStatus::Retired->value])->save();
+
+    $this->actingAs($admin)->delete(route('assets.destroy', $asset))->assertRedirect();
+
+    expect(Asset::query()->whereKey($asset->id)->exists())->toBeTrue();
+});
+
+test('aset draft masih bisa dihapus', function () {
+    $fixture = assetFixture();
+    $admin = assetAdmin();
+
+    $this->actingAs($admin)->post(route('assets.store'), assetPayload($fixture, [
+        'status' => AssetStatus::Draft->value,
+    ]));
+    $asset = Asset::query()->firstOrFail();
+
+    $this->actingAs($admin)->delete(route('assets.destroy', $asset))->assertRedirect(route('assets.index'));
+
+    expect(Asset::query()->whereKey($asset->id)->exists())->toBeFalse();
+});
+
+test('formulir tambah dan ubah aset bisa dibuka', function () {
+    $fixture = assetFixture();
+    $admin = assetAdmin();
+
+    $this->actingAs($admin)->get(route('assets.create'))->assertOk()->assertSee('Divisi Kedua');
+
+    $this->actingAs($admin)->post(route('assets.store'), assetPayload($fixture));
+    $asset = Asset::query()->firstOrFail();
+
+    $this->actingAs($admin)->get(route('assets.edit', $asset))->assertOk()->assertSee($asset->asset_code);
+    $this->actingAs($admin)->get(route('assets.show', $asset))->assertOk()->assertSee('Berkas Aset');
+});
+
+test('status alur kerja ditampilkan sebagai keterangan, bukan pilihan yang bisa diubah', function () {
+    $fixture = assetFixture();
+    $admin = assetAdmin();
+
+    $this->actingAs($admin)->post(route('assets.store'), assetPayload($fixture));
+    $asset = Asset::query()->firstOrFail();
+    $asset->forceFill(['status' => AssetStatus::Assigned->value])->save();
+
+    $this->actingAs($admin)->get(route('assets.edit', $asset))
+        ->assertOk()
+        ->assertSee('Diatur oleh alur kerja');
+
+    // Menyunting data lain tidak boleh diam-diam mengembalikannya ke status manual.
+    $this->actingAs($admin)->put(route('assets.update', $asset), assetPayload($fixture, [
+        'name' => 'Laptop Dell (diperbarui)',
+        'status' => AssetStatus::Available->value,
+    ]));
+
+    expect($asset->fresh()->status)->toBe(AssetStatus::Assigned)
+        ->and($asset->fresh()->name)->toBe('Laptop Dell (diperbarui)');
+});
+
+test('formulir kategori aset bisa dibuka', function () {
+    $admin = assetAdmin();
+
+    $this->actingAs($admin)->get(route('assets.categories.index'))->assertOk();
+    $this->actingAs($admin)->get(route('assets.categories.create'))->assertOk()->assertSee('Prefix Kode Aset');
+
+    $category = AssetCategory::query()->create([
+        'code' => 'MON', 'name' => 'Monitor', 'asset_prefix' => 'MON', 'is_active' => true,
+    ]);
+
+    $this->actingAs($admin)->get(route('assets.categories.edit', $category))->assertOk()->assertSee('Monitor');
+});
+
+test('divisi yang dinonaktifkan tidak mengunci aset lama dari penyuntingan', function () {
+    $fixture = assetFixture();
+    $admin = assetAdmin();
+
+    $this->actingAs($admin)->post(route('assets.store'), assetPayload($fixture));
+    $asset = Asset::query()->firstOrFail();
+
+    $fixture['it']->forceFill(['is_active' => false])->save();
+
+    $this->actingAs($admin)->get(route('assets.edit', $asset))->assertOk()->assertSee('IT');
+
+    $this->actingAs($admin)
+        ->put(route('assets.update', $asset), assetPayload($fixture, ['name' => 'Laptop Dell (diperbaiki)']))
+        ->assertRedirect(route('assets.show', $asset));
+
+    expect($asset->fresh()->name)->toBe('Laptop Dell (diperbaiki)')
+        ->and($asset->fresh()->department_id)->toBe($fixture['it']->id);
+});

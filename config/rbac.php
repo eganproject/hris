@@ -58,6 +58,11 @@ return [
             'leave-balances' => ['label' => 'Kuota Cuti', 'actions' => ['view', 'update']],
         ],
 
+        'Aset' => [
+            'assets' => ['label' => 'Daftar Aset', 'actions' => ['view', 'create', 'update', 'delete', 'export']],
+            'asset-categories' => ['label' => 'Kategori Aset', 'actions' => ['view', 'create', 'update', 'delete']],
+        ],
+
         'Laporan' => [
             'reports.attendance' => ['label' => 'Rekap Kehadiran', 'actions' => ['view', 'export']],
             'reports.log' => ['label' => 'Log Absensi', 'actions' => ['view', 'export']],
@@ -100,6 +105,15 @@ return [
                 'label' => 'Absensi, jadwal, cuti & laporan: semua lokasi & divisi',
                 'actions' => ['view'],
                 'permissions' => ['view' => 'attendance.view.all'],
+            ],
+            // Aset punya barisnya sendiri: yang dijaga di sini bukan orangnya,
+            // melainkan barang milik perusahaan beserta nilai perolehannya —
+            // siapa yang boleh melihatnya lintas cabang adalah keputusan terpisah
+            // dari siapa yang boleh melihat data absensi.
+            'assets-scope' => [
+                'label' => 'Aset: semua lokasi & divisi',
+                'actions' => ['view'],
+                'permissions' => ['view' => 'assets.view.all'],
             ],
         ],
     ],

@@ -25,6 +25,8 @@ class User extends Authenticatable
 
     public const SCOPE_BYPASS_ATTENDANCE = 'attendance.view.all';
 
+    public const SCOPE_BYPASS_ASSETS = 'assets.view.all';
+
     /**
      * Nama peran yang diperlakukan sebagai superadmin. Dua ejaan dipertahankan
      * karena keduanya sudah ada di data lama.

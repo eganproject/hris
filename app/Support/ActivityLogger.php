@@ -134,7 +134,9 @@ class ActivityLogger
 
         // Data yang berkode dicari orang lewat kodenya, tapi kode saja tidak berarti
         // apa-apa setahun kemudian — jadi keduanya disimpan sekaligus.
-        $code = $model->getAttribute('code');
+        // asset_code ikut dibaca: aset dicari orang lewat kode yang tertempel di
+        // fisiknya, dan kolomnya memang tidak bisa bernama "code" begitu saja.
+        $code = $model->getAttribute('code') ?: $model->getAttribute('asset_code');
         $name = $model->getAttribute('full_name') ?: $model->getAttribute('name');
 
         if (is_string($code) && $code !== '' && is_string($name) && $name !== '') {

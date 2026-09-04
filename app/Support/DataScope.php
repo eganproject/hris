@@ -2,6 +2,7 @@
 
 namespace App\Support;
 
+use App\Models\Asset;
 use App\Models\Branch;
 use App\Models\Department;
 use App\Models\Employee;
@@ -13,6 +14,11 @@ use Illuminate\Database\Eloquent\Collection;
  * One place to answer "which employees may this user work with?", so every module
  * (absensi, jadwal, cuti, lembur, koreksi, laporan) applies the same rule instead
  * of re-deriving it. See Employee::scopeVisibleTo() for the rule itself.
+ *
+ * Modul Aset ikut di sini lewat forAssets(): pertanyaannya berbeda ("aset mana yang
+ * boleh saya lihat?") tapi sumber cakupannya sama — lokasi kerja & divisi yang
+ * ditetapkan di Kontrol Akses. Dua definisi cakupan yang berdiri sendiri akan
+ * berbeda diam-diam begitu salah satunya disesuaikan.
  */
 class DataScope
 {
@@ -81,6 +87,19 @@ class DataScope
         return new self($user, User::SCOPE_BYPASS_EMPLOYEES);
     }
 
+    /**
+     * Cakupan untuk modul Aset.
+     *
+     * Aset punya lokasi dan divisinya sendiri — ia bisa berada di gudang tanpa
+     * dipegang siapa pun — jadi penyaringannya tidak lewat daftar karyawan seperti
+     * modul lain, melainkan lewat kolom lokasi/divisi di baris asetnya sendiri.
+     * Lihat Asset::scopeVisibleTo() untuk aturannya.
+     */
+    public static function forAssets(User $user): self
+    {
+        return new self($user, User::SCOPE_BYPASS_ASSETS);
+    }
+
     /** The user sees everything: no filtering needed anywhere. */
     public function isUnrestricted(): bool
     {
@@ -123,6 +142,23 @@ class DataScope
         }
 
         return Employee::query()->visibleTo($this->user, $this->bypassPermission);
+    }
+
+    /** Aset yang boleh dilihat pengguna ini. */
+    public function assets(): Builder
+    {
+        return Asset::query()->visibleTo($this->user, $this->bypassPermission);
+    }
+
+    public function allowsAsset(?Asset $asset): bool
+    {
+        return $asset !== null && $asset->isVisibleTo($this->user, $this->bypassPermission);
+    }
+
+    /** 403 kecuali aset itu berada di dalam cakupan ini. */
+    public function authorizeAsset(?Asset $asset): void
+    {
+        abort_unless($this->allowsAsset($asset), 403);
     }
 
     /**

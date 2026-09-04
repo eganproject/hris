@@ -3,6 +3,8 @@
 namespace App\Observers;
 
 use App\Models\ActivityLog;
+use App\Models\Asset;
+use App\Models\AssetCategory;
 use App\Models\Branch;
 use App\Models\Department;
 use App\Models\Device;
@@ -38,6 +40,8 @@ class ActivityObserver
      * @var array<class-string<Model>, string>
      */
     public const WATCHED = [
+        Asset::class => 'assets',
+        AssetCategory::class => 'assets',
         Employee::class => 'employees',
         EmployeeContract::class => 'contracts',
         Shift::class => 'shifts',

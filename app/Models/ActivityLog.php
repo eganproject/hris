@@ -50,6 +50,7 @@ class ActivityLog extends Model
         'leave' => 'Cuti & Izin',
         'leave-types' => 'Jenis Cuti',
         'attendance' => 'Absensi',
+        'assets' => 'Aset',
         'organization' => 'Organisasi',
         'devices' => 'Perangkat',
         'holidays' => 'Hari Libur',

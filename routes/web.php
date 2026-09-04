@@ -2,6 +2,9 @@
 
 use App\Http\Controllers\AccessControlController;
 use App\Http\Controllers\ActivityLogController;
+use App\Http\Controllers\AssetCategoryController;
+use App\Http\Controllers\AssetController;
+use App\Http\Controllers\AssetDocumentController;
 use App\Http\Controllers\AttendanceController;
 use App\Http\Controllers\AttendanceCorrectionController;
 use App\Http\Controllers\AttendanceMapController;
@@ -209,6 +212,38 @@ Route::middleware('auth')->group(function () {
     Route::get('organization/chart', OrgChartController::class)
         ->middleware('permission:employees.view')
         ->name('organization.chart');
+
+    // Aset: master barang milik perusahaan.
+    //
+    // Rute literal (export, categories, create) dideklarasikan SEBELUM wildcard
+    // {asset} — kalau tidak, /assets/export akan dibaca sebagai permintaan membuka
+    // aset dengan kode "export" dan berakhir 404.
+    Route::prefix('assets')->name('assets.')->group(function () {
+        Route::get('/', [AssetController::class, 'index'])->middleware('permission:assets.view')->name('index');
+        Route::get('export', [AssetController::class, 'export'])->middleware('permission:assets.export')->name('export');
+
+        Route::get('categories', [AssetCategoryController::class, 'index'])->middleware('permission:asset-categories.view')->name('categories.index');
+        Route::get('categories/create', [AssetCategoryController::class, 'create'])->middleware('permission:asset-categories.create')->name('categories.create');
+        Route::post('categories', [AssetCategoryController::class, 'store'])->middleware('permission:asset-categories.create')->name('categories.store');
+        Route::get('categories/{category}/edit', [AssetCategoryController::class, 'edit'])->middleware('permission:asset-categories.update')->name('categories.edit');
+        Route::put('categories/{category}', [AssetCategoryController::class, 'update'])->middleware('permission:asset-categories.update')->name('categories.update');
+        Route::delete('categories/{category}', [AssetCategoryController::class, 'destroy'])->middleware('permission:asset-categories.delete')->name('categories.destroy');
+
+        Route::get('create', [AssetController::class, 'create'])->middleware('permission:assets.create')->name('create');
+        Route::post('/', [AssetController::class, 'store'])->middleware('permission:assets.create')->name('store');
+
+        Route::get('{asset}', [AssetController::class, 'show'])->middleware('permission:assets.view')->name('show');
+        Route::get('{asset}/edit', [AssetController::class, 'edit'])->middleware('permission:assets.update')->name('edit');
+        Route::put('{asset}', [AssetController::class, 'update'])->middleware('permission:assets.update')->name('update');
+        Route::delete('{asset}', [AssetController::class, 'destroy'])->middleware('permission:assets.delete')->name('destroy');
+
+        // Berkas aset. Mengunggah dan menghapus mengikuti izin mengubah aset;
+        // membacanya cukup izin melihat — tetapi keduanya tetap melewati pemeriksaan
+        // cakupan di controller-nya.
+        Route::post('{asset}/documents', [AssetDocumentController::class, 'store'])->middleware('permission:assets.update')->name('documents.store');
+        Route::get('{asset}/documents/{document}', [AssetDocumentController::class, 'show'])->middleware('permission:assets.view')->name('documents.show');
+        Route::delete('{asset}/documents/{document}', [AssetDocumentController::class, 'destroy'])->middleware('permission:assets.update')->name('documents.destroy');
+    });
 
     Route::prefix('organization')->name('organization.')->group(function () {
         Route::get('branches', [BranchController::class, 'index'])->middleware('permission:branches.view')->name('branches.index');
