@@ -1,6 +1,5 @@
 <?php
 
-use App\Models\DeviceCommunication;
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Schedule;
@@ -33,10 +32,9 @@ Schedule::command('devices:notify-offline')->everyFifteenMinutes();
 // dan tidak pernah menyusut sendiri.
 Schedule::command('activity:prune')->monthlyOn(1, '02:10');
 
-// Pangkas log komunikasi mesin agar tabel tetap ramping (simpan 14 hari terakhir).
-Schedule::call(function () {
-    DeviceCommunication::query()->where('created_at', '<', now()->subDays(14))->delete();
-})->dailyAt('00:10')->name('prune-device-communications');
+// Pangkas log komunikasi mesin: isi kiriman dibuang setelah 3 hari, ringkasannya
+// setelah 14 hari. Lihat PruneDeviceCommunications untuk alasan dua tahapnya.
+Schedule::command('devices:prune-communications')->dailyAt('00:10');
 
 // Pangkas foto selfie absen mandiri yang sudah lewat 6 bulan; datanya tetap ada,
 // hanya gambarnya yang dibuang agar storage tidak menumpuk.

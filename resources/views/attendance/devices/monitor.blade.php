@@ -77,7 +77,7 @@
             <div class="border-b border-gray-200 px-5 py-3"><h2 class="text-sm font-semibold text-gray-950">Log Komunikasi Terbaru</h2></div>
             <div class="overflow-x-auto">
                 <table class="data-table">
-                    <thead><tr><th>Waktu</th><th>Mesin</th><th>Peristiwa</th><th>Data</th><th>IP</th></tr></thead>
+                    <thead><tr><th>Waktu</th><th>Mesin</th><th>Peristiwa</th><th>Data</th><th>IP</th><th>Isi Kiriman</th></tr></thead>
                     <tbody>
                         @forelse ($recent as $log)
                             <tr>
@@ -86,9 +86,27 @@
                                 <td><x-status-badge :tone="$log->event_tone">{{ $log->event_label }}</x-status-badge></td>
                                 <td class="text-sm text-gray-600">{{ $log->event === 'attlog' ? $log->records_count.' punch' : '—' }}</td>
                                 <td class="font-mono text-xs text-gray-500">{{ $log->ip ?? '—' }}</td>
+                                <td>
+                                    {{-- Isi mentahnya dilipat: yang dicari orang biasanya satu baris di
+                                         antara ratusan, dan membentangkan semuanya membuat tabel ini
+                                         tidak bisa dibaca. --}}
+                                    @if ($log->payload)
+                                        <details class="text-xs">
+                                            <summary class="cursor-pointer select-none text-primary hover:underline">
+                                                Lihat ({{ $log->payloadSizeLabel() }})
+                                            </summary>
+                                            @if ($log->isTruncated())
+                                                <p class="mt-1 text-[11px] text-amber-600">Terlalu panjang — hanya bagian awalnya yang disimpan.</p>
+                                            @endif
+                                            <pre class="mt-1 max-h-64 max-w-md overflow-auto whitespace-pre-wrap break-all rounded bg-gray-50 p-2 font-mono text-[11px] leading-relaxed text-gray-700">{{ $log->payload }}</pre>
+                                        </details>
+                                    @else
+                                        <span class="text-xs text-gray-400">—</span>
+                                    @endif
+                                </td>
                             </tr>
                         @empty
-                            <tr><td colspan="5" class="cell-empty">Belum ada komunikasi tercatat. Pastikan mesin sudah dikonfigurasi menembak ke server ini.</td></tr>
+                            <tr><td colspan="6" class="cell-empty">Belum ada komunikasi tercatat. Pastikan mesin sudah dikonfigurasi menembak ke server ini.</td></tr>
                         @endforelse
                     </tbody>
                 </table>

@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Device;
+use App\Models\DeviceCommunication;
 use App\Services\DeviceCommandService;
 use App\Services\PunchIngestionService;
 use Illuminate\Http\Request;
@@ -137,10 +138,16 @@ class IclockController extends Controller
     {
         $device->markSeen($request->ip());
 
+        // Isi kiriman ikut disimpan apa adanya. Tanpa itu, kiriman yang salah bentuk
+        // atau ditolak tidak meninggalkan jejak sama sekali, dan pertanyaan "mesinnya
+        // benar-benar mengirim tap itu atau tidak" cuma bisa dijawab dengan menebak
+        // dari punch yang kebetulan berhasil masuk. Yang terlalu besar dipangkas —
+        // lihat DeviceCommunication::payloadColumnsFor().
         $device->communications()->create([
             'event' => $event,
             'records_count' => $count,
             'ip' => $request->ip(),
+            ...DeviceCommunication::payloadColumnsFor($request->getContent()),
         ]);
     }
 
