@@ -6,6 +6,7 @@ use App\Models\Attendance;
 use App\Models\Employee;
 use Carbon\CarbonInterface;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Collection;
 
 /**
  * Turns raw device punches into the clock-in/out for an employee-day and hands
@@ -35,6 +36,12 @@ class AttendanceRollup
      * Rebuild the attendance for one employee-day from device punches. Returns null
      * (and leaves any existing row untouched) when there are no punches in the window,
      * so this never erases manually-entered attendance.
+     *
+     * Jam yang sudah ditulis MANUSIA — koreksi absensi yang disetujui, atau absen
+     * mandiri berselfie — dipertahankan, dan punch yang datang sesudahnya mengisi sisi
+     * yang masih kosong. Tanpa itu, seorang karyawan yang jam masuknya diperbaiki lewat
+     * koreksi lalu tap pulang di mesin akan kehilangan jam masuknya: satu-satunya punch
+     * hari itu direbut menjadi jam masuk, dan jam pulangnya ikut hilang.
      */
     public function rebuild(Employee $employee, CarbonInterface $date): ?Attendance
     {
@@ -52,13 +59,60 @@ class AttendanceRollup
             return null;
         }
 
-        $first = $punches->first()->punched_at;
-        $last = $punches->last()->punched_at;
+        $existing = $employee->attendances()
+            ->whereDate('work_date', $date->toDateString())
+            ->first();
 
-        $clockIn = $first->format('H:i');
-        $clockOut = $last->equalTo($first) ? null : $last->format('H:i');
+        $times = $punches->pluck('punched_at');
 
-        return $this->resolver->resolve($employee, $date, $clockIn, $clockOut);
+        $keptIn = $this->humanEntered($existing?->clock_in, $times);
+        $keptOut = $this->humanEntered($existing?->clock_out, $times);
+
+        if ($keptIn) {
+            // Jam masuknya sudah ditetapkan manusia, jadi punch mana pun sesudahnya
+            // adalah kepulangan — bukan kedatangan.
+            $after = $times->filter(fn (CarbonInterface $time) => $time->greaterThan($keptIn));
+
+            $clockIn = $keptIn->format('H:i');
+            $clockOut = $keptOut?->format('H:i')
+                ?? $after->last()?->format('H:i')
+                ?? $existing?->clock_out?->format('H:i');
+        } else {
+            $first = $times->first();
+            $last = $times->last();
+
+            $clockIn = $first->format('H:i');
+            $clockOut = $keptOut?->format('H:i')
+                ?? ($last->equalTo($first) ? null : $last->format('H:i'));
+        }
+
+        // Catatannya ikut dibawa: ia menyimpan alasan koreksi, dan membiarkannya
+        // hilang membuat jam yang tidak berasal dari mesin jadi tak bisa dijelaskan.
+        return $this->resolver->resolve($employee, $date, $clockIn, $clockOut, $existing?->note);
+    }
+
+    /**
+     * Jam pada baris absensi yang tidak cocok dengan satu pun punch di hari itu.
+     *
+     * Nilai semacam itu tidak mungkin datang dari mesin, jadi ia pasti ditulis
+     * manusia — dan feed mesin tidak boleh menghapusnya. Pencocokannya memakai jam
+     * dan menit, karena itulah satuan yang disimpan resolver.
+     *
+     * @param  Collection<int, CarbonInterface>  $punchTimes
+     */
+    private function humanEntered(?CarbonInterface $value, Collection $punchTimes): ?Carbon
+    {
+        if (! $value) {
+            return null;
+        }
+
+        $value = Carbon::parse($value);
+
+        $fromMachine = $punchTimes->contains(
+            fn (CarbonInterface $time) => $time->format('H:i') === $value->format('H:i'),
+        );
+
+        return $fromMachine ? null : $value;
     }
 
     /**
