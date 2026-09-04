@@ -18,6 +18,8 @@
             </div>
         </section>
 
+@php $branchNames = $branches->pluck('name', 'id'); @endphp
+
         <x-scope-notice :has-no-scope="$hasNoScope" />
 
         @if ($limitedToSubordinates && ! $hasNoScope)
@@ -88,6 +90,16 @@
                     </select>
                 </div>
                 <div>
+                    <label for="asset_storage" class="block text-sm font-medium text-gray-700">Penyimpanan</label>
+                    <select id="asset_storage" name="storage" class="mt-2 block w-full rounded-md border border-gray-300 px-3 py-2.5 text-sm shadow-xs outline-none focus:border-primary focus:ring-2 focus:ring-primary/20">
+                        <option value="">Semua tempat</option>
+                        @foreach ($storageLocations as $location)
+                            <option value="{{ $location->id }}" @selected((string) ($filters['storage'] ?? '') === (string) $location->id)>{{ $branchNames[$location->branch_id] ?? '' }} › {{ $location->full_path }}</option>
+                        @endforeach
+                    </select>
+                    <p class="mt-1 text-xs text-gray-500">Memilih gudang ikut menampilkan isi rak di dalamnya.</p>
+                </div>
+                <div>
                     <label for="asset_warranty" class="block text-sm font-medium text-gray-700">Garansi</label>
                     <select id="asset_warranty" name="warranty" class="mt-2 block w-full rounded-md border border-gray-300 px-3 py-2.5 text-sm shadow-xs outline-none focus:border-primary focus:ring-2 focus:ring-primary/20">
                         <option value="">Semua</option>
@@ -130,6 +142,11 @@
                                 <td>{{ $asset->category?->name ?? '-' }}</td>
                                 <td>
                                     {{ $asset->currentBranch?->name ?? '-' }}
+                                    @if ($asset->storageLocation)
+                                        <p class="mt-0.5 text-xs text-gray-500">{{ $asset->storageLocation->full_path }}</p>
+                                    @elseif ($asset->status === \App\Enums\AssetStatus::Available)
+                                        <p class="mt-0.5 text-xs text-amber-600">Tempat penyimpanan belum diisi</p>
+                                    @endif
                                     @if ($asset->owning_branch_id !== $asset->current_branch_id)
                                         {{-- Sedang tidak berada di cabang pemiliknya: perlu terlihat sekilas,
                                              karena inilah baris yang biasanya dicari saat stock opname. --}}

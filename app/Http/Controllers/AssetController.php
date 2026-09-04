@@ -8,7 +8,9 @@ use App\Exports\AssetsExport;
 use App\Http\Requests\AssetRequest;
 use App\Models\Asset;
 use App\Models\AssetCategory;
+use App\Models\AssetStorageLocation;
 use App\Support\DataScope;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -37,12 +39,13 @@ class AssetController extends Controller
             'condition' => $request->input('condition'),
             'branch' => $request->input('branch'),
             'department' => $request->input('department'),
+            'storage' => $request->input('storage'),
             'warranty' => $request->input('warranty'),
         ];
 
         $assets = $scope->assets()
             ->matchingFilters($filters)
-            ->with(['category:id,name', 'currentBranch:id,name', 'owningBranch:id,name', 'department:id,name'])
+            ->with(['category:id,name', 'currentBranch:id,name', 'owningBranch:id,name', 'department:id,name', 'storageLocation:id,full_path'])
             ->withHistoryFlags()
             ->latest('id')
             ->paginate($perPage)
@@ -56,6 +59,7 @@ class AssetController extends Controller
             'categories' => AssetCategory::query()->orderBy('name')->get(['id', 'name']),
             'branches' => $scope->branches(),
             'departments' => $scope->departments(),
+            'storageLocations' => $this->storageLocations($scope, activeOnly: false),
             'statuses' => AssetStatus::labels(),
             'conditions' => AssetCondition::labels(),
             'hasNoScope' => $scope->isEmpty(),
@@ -131,6 +135,7 @@ class AssetController extends Controller
             'currentBranch:id,name,code',
             'department:id,name',
             'departments:id,name',
+            'storageLocation:id,full_path,branch_id',
             'creator:id,name',
             'documents' => fn ($query) => $query->with('uploader:id,name')->latest('id'),
         ]);
@@ -143,7 +148,7 @@ class AssetController extends Controller
         $scope = DataScope::forAssets($request->user());
         $scope->authorizeAsset($asset);
 
-        $asset->load('departments:id,name');
+        $asset->load('departments:id,name', 'storageLocation');
 
         $formData = $this->formData($scope);
 
@@ -154,6 +159,16 @@ class AssetController extends Controller
             ->unique('id')
             ->sortBy('name')
             ->values();
+
+        // Alasan yang sama untuk tempat penyimpanan yang sudah dinonaktifkan: aset
+        // yang terlanjur ada di sana harus tetap bisa disunting dan dipindahkan.
+        if ($asset->storageLocation) {
+            $formData['storageLocations'] = $formData['storageLocations']
+                ->concat([$asset->storageLocation])
+                ->unique('id')
+                ->sortBy('full_path')
+                ->values();
+        }
 
         return view('assets.edit', [
             'asset' => $asset,
@@ -205,7 +220,7 @@ class AssetController extends Controller
      */
     public function export(Request $request): BinaryFileResponse
     {
-        $filters = $request->only(['search', 'category', 'status', 'condition', 'branch', 'department', 'warranty']);
+        $filters = $request->only(['search', 'category', 'status', 'condition', 'branch', 'department', 'storage', 'warranty']);
 
         return Excel::download(
             new AssetsExport($filters, $request->user()),
@@ -224,8 +239,26 @@ class AssetController extends Controller
             'categories' => AssetCategory::query()->active()->orderBy('name')->get(['id', 'name', 'requires_serial']),
             'branches' => $scope->branches(),
             'departments' => $scope->departments(),
+            'storageLocations' => $this->storageLocations($scope),
             'statuses' => AssetStatus::manualLabels(),
             'conditions' => AssetCondition::labels(),
         ];
+    }
+
+    /**
+     * Tempat penyimpanan di seluruh lokasi kerja yang boleh diakses. Dikirim utuh ke
+     * formulir lalu disaring di layar mengikuti lokasi yang sedang dipilih — daftarnya
+     * pendek, dan memuatnya sekali menghindari satu permintaan tambahan tiap kali
+     * lokasinya diganti.
+     *
+     * @return Collection<int, AssetStorageLocation>
+     */
+    private function storageLocations(DataScope $scope, bool $activeOnly = true): Collection
+    {
+        return AssetStorageLocation::query()
+            ->whereIn('branch_id', $scope->branches()->pluck('id'))
+            ->when($activeOnly, fn ($query) => $query->active())
+            ->ordered()
+            ->get(['id', 'branch_id', 'full_path', 'depth', 'is_active']);
     }
 }

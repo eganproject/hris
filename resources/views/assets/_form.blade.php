@@ -83,6 +83,21 @@
             </select>
             @error('current_branch_id')<p class="mt-2 text-sm text-red-600">{{ $message }}</p>@enderror
         </div>
+        <div class="md:col-span-2">
+            <label for="storage_location_id" class="block text-sm font-medium text-gray-700">Tempat Penyimpanan
+                <span class="field-requirement" data-storage-required-mark @unless (old('status', $asset->status?->value) === \App\Enums\AssetStatus::Available->value) hidden @endunless aria-label="Wajib diisi">*</span>
+            </label>
+            <select id="storage_location_id" name="storage_location_id" data-storage-select class="mt-2 block w-full rounded-md border border-gray-300 px-3 py-2.5 text-sm shadow-xs outline-none focus:border-primary focus:ring-2 focus:ring-primary/20">
+                <option value="">Belum ditentukan</option>
+                @foreach ($storageLocations as $location)
+                    <option value="{{ $location->id }}" data-branch="{{ $location->branch_id }}" @selected((string) old('storage_location_id', $asset->storage_location_id) === (string) $location->id)>
+                        {{ $location->full_path }}@unless ($location->is_active) (nonaktif)@endunless
+                    </option>
+                @endforeach
+            </select>
+            <p class="mt-1 text-xs text-gray-500">Rak atau ruang tempat barangnya berada, mengikuti Lokasi Sekarang. Wajib diisi untuk aset berstatus <span class="font-medium">Tersedia</span> — aset yang tidak dipegang siapa pun harus jelas ada di mana.</p>
+            @error('storage_location_id')<p class="mt-2 text-sm text-red-600">{{ $message }}</p>@enderror
+        </div>
         <div>
             <label for="department_id" class="block text-sm font-medium text-gray-700">Divisi Pemilik <span class="field-requirement is-required" aria-label="Wajib diisi">*</span></label>
             <select id="department_id" name="department_id" required class="mt-2 block w-full rounded-md border border-gray-300 px-3 py-2.5 text-sm shadow-xs outline-none focus:border-primary focus:ring-2 focus:ring-primary/20">
@@ -149,3 +164,53 @@
         </div>
     </div>
 </section>
+
+@push('scripts')
+<script>
+    // Tempat penyimpanan hanya masuk akal di dalam lokasi kerja tempat barangnya
+    // berada, jadi pilihannya mengikuti "Lokasi Sekarang" yang sedang dipilih. Kalau
+    // lokasinya diganti, pilihan yang tidak lagi cocok ikut dilepas — daripada
+    // formulir terkirim dengan rak dari gudang cabang lain dan ditolak di server.
+    (function () {
+        const branch = document.getElementById('current_branch_id');
+        const storage = document.querySelector('[data-storage-select]');
+        const status = document.getElementById('status');
+        const requiredMark = document.querySelector('[data-storage-required-mark]');
+
+        if (!branch || !storage) return;
+
+        const syncOptions = () => {
+            const selected = branch.value;
+            let current = storage.value;
+
+            Array.from(storage.options).forEach((option) => {
+                if (!option.value) return;
+
+                const matches = option.dataset.branch === selected;
+                option.hidden = !matches;
+                option.disabled = !matches;
+
+                if (!matches && option.value === current) {
+                    current = '';
+                }
+            });
+
+            storage.value = current;
+        };
+
+        const syncRequired = () => {
+            if (!status || !requiredMark) return;
+
+            const isAvailable = status.value === 'available';
+            requiredMark.hidden = !isAvailable;
+            requiredMark.classList.toggle('is-required', isAvailable);
+        };
+
+        branch.addEventListener('change', syncOptions);
+        status?.addEventListener('change', syncRequired);
+
+        syncOptions();
+        syncRequired();
+    })();
+</script>
+@endpush

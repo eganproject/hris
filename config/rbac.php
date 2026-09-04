@@ -61,6 +61,7 @@ return [
         'Aset' => [
             'assets' => ['label' => 'Daftar Aset', 'actions' => ['view', 'create', 'update', 'delete', 'export']],
             'asset-categories' => ['label' => 'Kategori Aset', 'actions' => ['view', 'create', 'update', 'delete']],
+            'asset-storage-locations' => ['label' => 'Lokasi Penyimpanan Aset', 'actions' => ['view', 'create', 'update', 'delete']],
         ],
 
         'Laporan' => [

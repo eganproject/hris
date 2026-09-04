@@ -5,6 +5,7 @@ use App\Http\Controllers\ActivityLogController;
 use App\Http\Controllers\AssetCategoryController;
 use App\Http\Controllers\AssetController;
 use App\Http\Controllers\AssetDocumentController;
+use App\Http\Controllers\AssetStorageLocationController;
 use App\Http\Controllers\AttendanceController;
 use App\Http\Controllers\AttendanceCorrectionController;
 use App\Http\Controllers\AttendanceMapController;
@@ -228,6 +229,13 @@ Route::middleware('auth')->group(function () {
         Route::get('categories/{category}/edit', [AssetCategoryController::class, 'edit'])->middleware('permission:asset-categories.update')->name('categories.edit');
         Route::put('categories/{category}', [AssetCategoryController::class, 'update'])->middleware('permission:asset-categories.update')->name('categories.update');
         Route::delete('categories/{category}', [AssetCategoryController::class, 'destroy'])->middleware('permission:asset-categories.delete')->name('categories.destroy');
+
+        Route::get('storage-locations', [AssetStorageLocationController::class, 'index'])->middleware('permission:asset-storage-locations.view')->name('storage-locations.index');
+        Route::get('storage-locations/create', [AssetStorageLocationController::class, 'create'])->middleware('permission:asset-storage-locations.create')->name('storage-locations.create');
+        Route::post('storage-locations', [AssetStorageLocationController::class, 'store'])->middleware('permission:asset-storage-locations.create')->name('storage-locations.store');
+        Route::get('storage-locations/{storageLocation}/edit', [AssetStorageLocationController::class, 'edit'])->middleware('permission:asset-storage-locations.update')->name('storage-locations.edit');
+        Route::put('storage-locations/{storageLocation}', [AssetStorageLocationController::class, 'update'])->middleware('permission:asset-storage-locations.update')->name('storage-locations.update');
+        Route::delete('storage-locations/{storageLocation}', [AssetStorageLocationController::class, 'destroy'])->middleware('permission:asset-storage-locations.delete')->name('storage-locations.destroy');
 
         Route::get('create', [AssetController::class, 'create'])->middleware('permission:assets.create')->name('create');
         Route::post('/', [AssetController::class, 'store'])->middleware('permission:assets.create')->name('store');

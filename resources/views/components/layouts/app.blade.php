@@ -237,7 +237,7 @@
                         </div>
                     @endcanany
 
-                    @canany(['assets.view', 'asset-categories.view'])
+                    @canany(['assets.view', 'asset-categories.view', 'asset-storage-locations.view'])
                         @php $g = request()->routeIs('assets.*'); @endphp
                         <div @class(['sidebar-group', 'is-open' => $g]) data-sidebar-group="aset">
                             <button type="button" data-sidebar-group-toggle aria-expanded="{{ $g ? 'true' : 'false' }}" class="sidebar-group-toggle flex w-full items-center gap-2.5 rounded px-2.5 py-1.5 text-left transition hover:bg-white/70">
@@ -247,7 +247,7 @@
                             </button>
                             <div class="sidebar-group-items space-y-0.5" data-sidebar-group-items>
                                 @can('assets.view')
-                                    <a href="{{ route('assets.index') }}" @class(['sidebar-nav-link flex items-center gap-2.5 rounded px-2.5 py-1.5 text-[13px] font-medium transition', 'bg-white text-gray-950 shadow-xs ring-1 ring-gray-200' => request()->routeIs('assets.*') && ! request()->routeIs('assets.categories.*'), 'text-gray-600 hover:bg-white hover:text-gray-950' => ! request()->routeIs('assets.*') || request()->routeIs('assets.categories.*')]) title="Daftar Aset">
+                                    <a href="{{ route('assets.index') }}" @class(['sidebar-nav-link flex items-center gap-2.5 rounded px-2.5 py-1.5 text-[13px] font-medium transition', 'bg-white text-gray-950 shadow-xs ring-1 ring-gray-200' => request()->routeIs('assets.*') && ! request()->routeIs('assets.categories.*', 'assets.storage-locations.*'), 'text-gray-600 hover:bg-white hover:text-gray-950' => ! request()->routeIs('assets.*') || request()->routeIs('assets.categories.*', 'assets.storage-locations.*')]) title="Daftar Aset">
                                         <svg class="size-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/></svg>
                                         <span class="sidebar-label truncate">Daftar Aset</span>
                                     </a>
@@ -256,6 +256,12 @@
                                     <a href="{{ route('assets.categories.index') }}" @class(['sidebar-nav-link flex items-center gap-2.5 rounded px-2.5 py-1.5 text-[13px] font-medium transition', 'bg-white text-gray-950 shadow-xs ring-1 ring-gray-200' => request()->routeIs('assets.categories.*'), 'text-gray-600 hover:bg-white hover:text-gray-950' => ! request()->routeIs('assets.categories.*')]) title="Kategori Aset">
                                         <svg class="size-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12.83 2.18a2 2 0 0 0-1.66 0L2.6 6.08a1 1 0 0 0 0 1.83l8.58 3.91a2 2 0 0 0 1.66 0l8.58-3.9a1 1 0 0 0 0-1.83Z"/><path d="m22 12.5-9.17 4.16a2 2 0 0 1-1.66 0L2 12.5"/><path d="m22 17.5-9.17 4.16a2 2 0 0 1-1.66 0L2 17.5"/></svg>
                                         <span class="sidebar-label truncate">Kategori Aset</span>
+                                    </a>
+                                @endcan
+                                @can('asset-storage-locations.view')
+                                    <a href="{{ route('assets.storage-locations.index') }}" @class(['sidebar-nav-link flex items-center gap-2.5 rounded px-2.5 py-1.5 text-[13px] font-medium transition', 'bg-white text-gray-950 shadow-xs ring-1 ring-gray-200' => request()->routeIs('assets.storage-locations.*'), 'text-gray-600 hover:bg-white hover:text-gray-950' => ! request()->routeIs('assets.storage-locations.*')]) title="Lokasi Penyimpanan Aset">
+                                        <svg class="size-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 21V7l9-4 9 4v14"/><path d="M3 11h18"/><path d="M3 16h18"/><path d="M9 21V11"/></svg>
+                                        <span class="sidebar-label truncate">Lokasi Penyimpanan</span>
                                     </a>
                                 @endcan
                             </div>
