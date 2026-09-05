@@ -34,14 +34,18 @@
                     </select>
                     @error('leave_type_id')<p class="mt-2 text-sm text-red-600">{{ $message }}</p>@enderror
                 </div>
+                @php($earliestStart = now()->subDays(\App\Models\LeaveRequest::SELF_BACKDATE_DAYS)->format('Y-m-d'))
                 <div>
                     <label for="start_date" class="block text-sm font-medium text-gray-700">Tanggal Mulai <span class="field-requirement is-required" aria-label="Wajib diisi">*</span></label>
-                    <input id="start_date" name="start_date" type="date" value="{{ old('start_date', now()->format('Y-m-d')) }}" required class="mt-2 block w-full rounded-md border border-gray-300 px-3 py-2.5 text-sm shadow-xs outline-none focus:border-primary focus:ring-2 focus:ring-primary/20">
+                    {{-- Batas mundurnya sama dengan yang divalidasi di server, jadi pemilih
+                         tanggal tidak menawarkan tanggal yang pasti ditolak. --}}
+                    <input id="start_date" name="start_date" type="date" value="{{ old('start_date', now()->format('Y-m-d')) }}" min="{{ $earliestStart }}" required class="mt-2 block w-full rounded-md border border-gray-300 px-3 py-2.5 text-sm shadow-xs outline-none focus:border-primary focus:ring-2 focus:ring-primary/20">
+                    <p class="mt-2 text-xs text-gray-500">Boleh mundur sampai {{ \App\Models\LeaveRequest::SELF_BACKDATE_DAYS }} hari ke belakang (paling awal {{ now()->subDays(\App\Models\LeaveRequest::SELF_BACKDATE_DAYS)->translatedFormat('d M Y') }}) untuk sakit atau izin yang baru sempat diajukan.</p>
                     @error('start_date')<p class="mt-2 text-sm text-red-600">{{ $message }}</p>@enderror
                 </div>
                 <div>
                     <label for="end_date" class="block text-sm font-medium text-gray-700">Tanggal Selesai <span class="field-requirement is-required" aria-label="Wajib diisi">*</span></label>
-                    <input id="end_date" name="end_date" type="date" value="{{ old('end_date', now()->format('Y-m-d')) }}" required class="mt-2 block w-full rounded-md border border-gray-300 px-3 py-2.5 text-sm shadow-xs outline-none focus:border-primary focus:ring-2 focus:ring-primary/20">
+                    <input id="end_date" name="end_date" type="date" value="{{ old('end_date', now()->format('Y-m-d')) }}" min="{{ $earliestStart }}" required class="mt-2 block w-full rounded-md border border-gray-300 px-3 py-2.5 text-sm shadow-xs outline-none focus:border-primary focus:ring-2 focus:ring-primary/20">
                     @error('end_date')<p class="mt-2 text-sm text-red-600">{{ $message }}</p>@enderror
                 </div>
                 <div class="md:col-span-2">

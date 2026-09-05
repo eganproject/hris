@@ -262,3 +262,50 @@ test('an employee with no supervisor still has HR as the decider', function () {
     expect($leave->refresh()->status)->toBe(LeaveRequestStatus::Approved)
         ->and($leave->approved_by)->toBe($hr->id);
 });
+
+test('an employee may backdate a request within the rolling window but not beyond it', function () {
+    [$user, $employee] = employeeAccount(name: 'Budi');
+    $type = LeaveType::query()->create(['code' => 'IZ', 'name' => 'Izin', 'attendance_status' => 'leave', 'is_paid' => true, 'is_active' => true]);
+
+    // Sakit kemarin yang baru sempat diajukan hari ini.
+    $this->actingAs($user)->post('/my-leave', [
+        'leave_type_id' => $type->id,
+        'start_date' => now()->subDay()->toDateString(),
+        'end_date' => now()->toDateString(),
+    ])->assertRedirect(route('my-leave.index'))->assertSessionHasNoErrors();
+
+    expect(LeaveRequest::query()->count())->toBe(1);
+
+    // Di luar jendela: harus lewat HR, bukan pengajuan mandiri.
+    $tooOld = now()->subDays(LeaveRequest::SELF_BACKDATE_DAYS + 1);
+
+    $this->actingAs($user)->post('/my-leave', [
+        'leave_type_id' => $type->id,
+        'start_date' => $tooOld->toDateString(),
+        'end_date' => $tooOld->toDateString(),
+    ])->assertSessionHasErrors('start_date');
+
+    expect(LeaveRequest::query()->count())->toBe(1);
+});
+
+test('approving a backdated request rewrites the attendance of the days it covers', function () {
+    [$bossUser, $boss] = employeeAccount(name: 'Bos');
+    [$user, $employee] = employeeAccount(manager: $boss, name: 'Budi');
+    $type = LeaveType::query()->create(['code' => 'IZ', 'name' => 'Izin', 'attendance_status' => 'leave', 'is_paid' => true, 'is_active' => true]);
+
+    $start = now()->subDays(3)->toDateString();
+    $end = now()->subDays(2)->toDateString();
+
+    $this->actingAs($user)->post('/my-leave', [
+        'leave_type_id' => $type->id,
+        'start_date' => $start,
+        'end_date' => $end,
+    ])->assertRedirect(route('my-leave.index'));
+
+    $leave = LeaveRequest::query()->firstOrFail();
+
+    $this->actingAs($bossUser)->patch(route('my-leave.approve', $leave))->assertRedirect(route('my-leave.index'));
+
+    expect($leave->refresh()->status)->toBe(LeaveRequestStatus::Approved)
+        ->and(Attendance::query()->where('employee_id', $employee->id)->whereBetween('work_date', [$start, $end])->count())->toBe(2);
+});

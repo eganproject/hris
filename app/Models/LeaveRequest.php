@@ -51,6 +51,15 @@ class LeaveRequest extends Model
      */
     public const ATTACHMENT_MAX_MB = 5;
 
+    /**
+     * Sejauh mana karyawan boleh mengisi tanggal mulai ke belakang saat mengajukan
+     * sendiri. Sakit atau izin mendadak baru sempat diajukan setelah kejadiannya,
+     * jadi pengajuan mandiri tidak bisa dipaksa selalu ke depan. Jendelanya bergulir
+     * 30 hari — cukup untuk menyusul kejadian yang belum sempat dicatat, tanpa
+     * membuka riwayat lama yang rekap absensinya sudah dipakai.
+     */
+    public const SELF_BACKDATE_DAYS = 30;
+
     public function hasAttachment(): bool
     {
         return $this->attachment_path !== null;

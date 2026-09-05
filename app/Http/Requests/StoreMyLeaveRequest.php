@@ -24,9 +24,13 @@ class StoreMyLeaveRequest extends FormRequest
      */
     public function rules(): array
     {
+        // Pengajuan mandiri boleh mundur dalam jendela bergulir SELF_BACKDATE_DAYS
+        // hari; lebih jauh dari itu harus lewat HR, yang punya batasnya sendiri.
+        $earliest = $this->earliestStartDate();
+
         return [
             'leave_type_id' => ['required', 'integer', 'exists:leave_types,id'],
-            'start_date' => ['required', 'date', 'after_or_equal:today'],
+            'start_date' => ['required', 'date', 'after_or_equal:'.$earliest],
             'end_date' => ['required', 'date', 'after_or_equal:start_date'],
             'reason' => ['nullable', 'string', 'max:1000'],
             // Bukti pendukung: surat sakit, surat tugas, dsb. Untuk pengajuan sakit
@@ -38,6 +42,12 @@ class StoreMyLeaveRequest extends FormRequest
                 'max:'.(LeaveRequest::ATTACHMENT_MAX_MB * 1024),
             ],
         ];
+    }
+
+    /** Tanggal mulai paling awal yang masih boleh diajukan karyawan. */
+    private function earliestStartDate(): string
+    {
+        return now()->subDays(LeaveRequest::SELF_BACKDATE_DAYS)->toDateString();
     }
 
     /**
@@ -60,6 +70,7 @@ class StoreMyLeaveRequest extends FormRequest
         return [
             ...UploadMessages::attachment('attachment', LeaveRequest::ATTACHMENT_MAX_MB),
             'attachment.required' => 'Foto atau scan surat keterangan sakit wajib dilampirkan untuk pengajuan sakit.',
+            'start_date.after_or_equal' => 'Tanggal mulai paling jauh '.LeaveRequest::SELF_BACKDATE_DAYS.' hari ke belakang. Untuk tanggal yang lebih lama, hubungi HR.',
         ];
     }
 
