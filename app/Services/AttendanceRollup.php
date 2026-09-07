@@ -92,11 +92,24 @@ class AttendanceRollup
         if ($keptIn) {
             // Jam masuknya sudah ditetapkan manusia, jadi punch mana pun sesudahnya
             // adalah kepulangan — bukan kedatangan.
-            $after = $times->filter(fn (CarbonInterface $time) => $time->greaterThan($keptIn));
+            $after = $punches->filter(
+                fn (AttendancePunch $punch) => $punch->punched_at->greaterThan($keptIn),
+            );
+
+            // Bila hari itu punya tap bertanda pulang, itu yang dipakai — bukan sekadar
+            // tap terakhir. Tanpa ini, seorang karyawan yang jam masuknya dikoreksi lalu
+            // menempelkan jari sekali lagi saat datang (jari pertama tidak terbaca)
+            // akan tercatat pulang beberapa menit setelah masuk.
+            //
+            // Kalau tidak ada satu pun tap bertanda pulang, penandanya tidak memberi
+            // keterangan apa-apa dan tap terakhir yang dipakai, seperti sebelumnya.
+            $candidate = $punches->where('state', AttendancePunch::STATE_OUT)->isNotEmpty()
+                ? $after->where('state', AttendancePunch::STATE_OUT)->last()
+                : $after->last();
 
             $clockIn = $keptIn->format('H:i');
             $clockOut = $keptOut?->format('H:i')
-                ?? $after->last()?->format('H:i')
+                ?? $candidate?->punched_at->format('H:i')
                 ?? $existing?->clock_out?->format('H:i');
         } else {
             [$machineIn, $machineOut] = $this->sidesFrom($punches);
@@ -174,10 +187,25 @@ class AttendanceRollup
         $pulang = $punches->where('state', AttendancePunch::STATE_OUT);
 
         if ($masuk->isNotEmpty() && $pulang->isNotEmpty()) {
-            return [$masuk->first()->punched_at, $pulang->last()->punched_at];
+            $in = $masuk->first()->punched_at;
+            $out = $pulang->last()->punched_at;
+
+            // Penandanya hanya berarti bila kepulangannya memang SESUDAH kedatangannya.
+            // Sebuah tap "pulang" yang keliru ditekan sebelum masuk — lalu tidak pernah
+            // disusul tap pulang yang sebenarnya — akan menghasilkan jam pulang yang
+            // mendahului jam masuk, yang oleh resolver digulirkan ke hari berikutnya
+            // dan berubah menjadi rentang kerja hampir sehari penuh. Satu salah tekan
+            // tidak boleh berakibat sebesar itu; dalam keadaan ini urutan waktu lebih
+            // bisa dipercaya daripada penandanya.
+            if ($out->greaterThan($in)) {
+                return [$in, $out];
+            }
         }
 
-        if ($pulang->isNotEmpty()) {
+        // Hanya tap pulang sepanjang hari itu: jam masuknya memang tidak pernah
+        // tercatat. Syarat "masuk kosong" penting — tanpa itu, pasangan yang baru saja
+        // ditolak penjaga di atas akan jatuh ke sini dan jam masuknya ikut hilang.
+        if ($masuk->isEmpty() && $pulang->isNotEmpty()) {
             return [null, $pulang->last()->punched_at];
         }
 

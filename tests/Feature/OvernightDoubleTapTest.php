@@ -4,6 +4,7 @@ use App\Enums\AttendanceStatus;
 use App\Models\Employee;
 use App\Models\EmployeeSchedule;
 use App\Models\Shift;
+use App\Services\AttendanceResolver;
 use App\Services\AttendanceRollup;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
@@ -158,4 +159,51 @@ test('kalau penandanya seragam, urutan waktu yang dipakai seperti semula', funct
 
     expect($absensi->clock_in?->format('H:i'))->toBe('22:00')
         ->and($absensi->clock_out?->format('H:i'))->toBe('06:00');
+});
+
+test('tap pulang yang keliru ditekan sebelum masuk tidak membuat kerja sehari penuh', function () {
+    $shift = Shift::query()->create([
+        'code' => 'PAGI', 'name' => 'Pagi', 'start_time' => '08:00', 'end_time' => '17:00',
+        'crosses_midnight' => false, 'break_minutes' => 60, 'late_tolerance_minutes' => 10,
+        'overtime_starts_after_minutes' => 0, 'overtime_min_minutes' => 0, 'is_active' => true,
+    ]);
+    $employee = Employee::query()->create(['full_name' => 'Siti', 'employment_status' => 'active']);
+    EmployeeSchedule::query()->create([
+        'employee_id' => $employee->id, 'work_date' => '2026-02-10',
+        'shift_id' => $shift->id, 'is_day_off' => false, 'source' => 'generated',
+    ]);
+
+    // Salah tekan: penandanya masih "pulang" saat datang, baru dibetulkan lalu tap
+    // masuk. Sesudah itu ia lupa tap pulang.
+    $employee->punches()->create(['punched_at' => '2026-02-10 07:55:00', 'machine_user_id' => '9', 'status' => 'matched', 'state' => 1, 'dedup_hash' => 'salah-tekan']);
+    $employee->punches()->create(['punched_at' => '2026-02-10 08:05:00', 'machine_user_id' => '9', 'status' => 'matched', 'state' => 0, 'dedup_hash' => 'masuk']);
+
+    app(AttendanceRollup::class)->rebuild($employee, Carbon::parse('2026-02-10'));
+
+    $absensi = $employee->attendances()->whereDate('work_date', '2026-02-10')->firstOrFail();
+
+    // Kalau penandanya dipercaya mentah-mentah, jam pulang 07:55 akan digulirkan ke
+    // hari berikutnya dan menghasilkan rentang kerja hampir 24 jam.
+    expect($absensi->work_minutes)->toBeLessThan(600)
+        ->and($absensi->clock_in?->format('H:i'))->toBe('07:55')
+        ->and($absensi->clock_out?->format('H:i'))->toBe('08:05');
+});
+
+test('jam masuk hasil koreksi tidak ditutup oleh tap kedatangan kedua', function () {
+    [$employee, $malam] = nightShiftEmployee();
+
+    // HR membetulkan jam masuk. Karyawannya sempat menempel jari dua kali saat datang
+    // karena yang pertama tidak terbaca, lalu tap pulang seperti biasa.
+    app(AttendanceResolver::class)->resolve($employee, $malam, '22:00', null, 'Koreksi disetujui.');
+
+    $employee->punches()->create(['punched_at' => '2026-02-10 22:03:00', 'machine_user_id' => '17', 'status' => 'matched', 'state' => 0, 'dedup_hash' => 'masuk-ulang']);
+    $employee->punches()->create(['punched_at' => '2026-02-11 06:01:00', 'machine_user_id' => '17', 'status' => 'matched', 'state' => 1, 'dedup_hash' => 'pulang']);
+
+    app(AttendanceRollup::class)->rebuild($employee, $malam);
+
+    $absensi = $employee->attendances()->whereDate('work_date', '2026-02-10')->firstOrFail();
+
+    expect($absensi->clock_in?->format('H:i'))->toBe('22:00')
+        // Bukan 22:03 — tap itu bertanda kedatangan, bukan kepulangan.
+        ->and($absensi->clock_out?->format('H:i'))->toBe('06:01');
 });
