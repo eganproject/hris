@@ -102,3 +102,37 @@ test('log komunikasi beserta isinya hanya terbuka bagi yang boleh melihat perang
     $this->actingAs($boleh)->get(route('attendance.devices.monitor'))->assertOk()->assertSee('Isi Kiriman');
     $this->actingAs($tidak)->get(route('attendance.devices.monitor'))->assertForbidden();
 });
+
+test('log komunikasi menyembunyikan polling secara bawaan', function () {
+    $device = pushDevice();
+
+    $device->communications()->create(['event' => 'attlog', 'records_count' => 2, 'payload' => "17\t2026-02-10 08:05:00", 'payload_bytes' => 21]);
+    $device->communications()->create(['event' => 'poll', 'records_count' => 0]);
+    $device->communications()->create(['event' => 'handshake', 'records_count' => 0]);
+
+    app(PermissionRegistrar::class)->forgetCachedPermissions();
+    Permission::findOrCreate('devices.view', 'web');
+    $user = User::factory()->create();
+    $user->givePermissionTo('devices.view');
+
+    // Bawaan: polling tidak ikut, dan penyaringannya disebutkan supaya tidak terbaca
+    // sebagai mesin yang berhenti menyapa.
+    $this->actingAs($user)->get(route('attendance.devices.monitor'))
+        ->assertOk()
+        ->assertSee('Polling disembunyikan')
+        ->assertSee('data-event="attlog"', escape: false)
+        ->assertSee('data-event="handshake"', escape: false)
+        ->assertDontSee('data-event="poll"', escape: false);
+
+    // Masih bisa dibuka semuanya.
+    $this->actingAs($user)->get(route('attendance.devices.monitor', ['event' => 'all']))
+        ->assertOk()
+        ->assertSee('data-event="poll"', escape: false);
+
+    // Dan bisa dipersempit ke satu jenis saja.
+    $this->actingAs($user)->get(route('attendance.devices.monitor', ['event' => 'attlog']))
+        ->assertOk()
+        ->assertSee('data-event="attlog"', escape: false)
+        ->assertDontSee('data-event="handshake"', escape: false)
+        ->assertDontSee('data-event="poll"', escape: false);
+});

@@ -81,15 +81,21 @@ class DeviceCommunication extends Model
         return $this->belongsTo(Device::class);
     }
 
+    /**
+     * Jenis kiriman => labelnya. Sebagai konstanta, bukan match di dalam accessor,
+     * supaya penyaring di layar mengambil daftarnya dari sini dan tidak bisa
+     * menyebut jenis yang tidak dikenal model.
+     */
+    public const EVENT_LABELS = [
+        'attlog' => 'Kirim absensi',
+        'handshake' => 'Handshake',
+        'poll' => 'Polling',
+        'command' => 'Perintah',
+    ];
+
     public function getEventLabelAttribute(): string
     {
-        return match ($this->event) {
-            'handshake' => 'Handshake',
-            'attlog' => 'Kirim absensi',
-            'poll' => 'Polling',
-            'command' => 'Perintah',
-            default => 'Data',
-        };
+        return self::EVENT_LABELS[$this->event] ?? 'Data';
     }
 
     public function getEventToneAttribute(): string

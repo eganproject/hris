@@ -38,7 +38,7 @@ class DeviceController extends Controller
      * Live monitor of device communication: online status, last contact, and a
      * rolling log of iclock interactions (handshake / attendance push / polling).
      */
-    public function monitor(): View
+    public function monitor(Request $request): View
     {
         $devices = Device::query()
             ->with(['branch', 'latestCommunication'])
@@ -53,8 +53,20 @@ class DeviceController extends Controller
             ->groupBy('device_id')
             ->pluck('total', 'device_id');
 
+        // Polling disembunyikan secara bawaan. Mesin yang sehat menyapa server
+        // sepanjang hari tanpa membawa data apa pun, dan sapaan itu menenggelamkan
+        // kiriman absensi yang justru dicari orang saat membuka halaman ini. Apakah
+        // mesinnya hidup sudah dijawab kartu per perangkat di atas, bukan oleh
+        // deretan baris polling.
+        $event = (string) $request->input('event', 'no-poll');
+
         $recent = DeviceCommunication::query()
             ->with('device')
+            ->when($event === 'no-poll', fn ($query) => $query->where('event', '!=', 'poll'))
+            ->when(
+                array_key_exists($event, DeviceCommunication::EVENT_LABELS),
+                fn ($query) => $query->where('event', $event),
+            )
             ->latest('id')
             ->limit(80)
             ->get();
@@ -63,6 +75,7 @@ class DeviceController extends Controller
             'devices' => $devices,
             'punchesToday' => $punchesToday,
             'recent' => $recent,
+            'event' => $event,
             'onlineWithin' => Device::ONLINE_WITHIN_MINUTES,
             'onlineCount' => $devices->filter->isOnline()->count(),
         ]);

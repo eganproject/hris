@@ -74,13 +74,39 @@
 
         {{-- Communication log --}}
         <section class="overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm">
-            <div class="border-b border-gray-200 px-5 py-3"><h2 class="text-sm font-semibold text-gray-950">Log Komunikasi Terbaru</h2></div>
+            <div class="flex flex-col gap-3 border-b border-gray-200 px-5 py-3 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                    <h2 class="text-sm font-semibold text-gray-950">Log Komunikasi Terbaru</h2>
+                    @if ($event === 'no-poll')
+                        {{-- Penyaringan yang berjalan diam-diam membuat orang mengira
+                             mesinnya berhenti menyapa. Jadi disebutkan apa adanya. --}}
+                        <p class="mt-0.5 text-xs text-gray-500">Polling disembunyikan — 80 kiriman terakhir selain polling.</p>
+                    @else
+                        <p class="mt-0.5 text-xs text-gray-500">80 kiriman terakhir.</p>
+                    @endif
+                </div>
+
+                <form method="GET" action="{{ route('attendance.devices.monitor') }}" class="flex items-center gap-2">
+                    <label for="comm-event" class="text-xs font-medium text-gray-600">Peristiwa</label>
+                    <select id="comm-event" name="event" onchange="this.form.submit()" class="rounded-md border border-gray-300 px-3 py-1.5 text-sm shadow-xs outline-none focus:border-primary focus:ring-2 focus:ring-primary/20">
+                        <option value="no-poll" @selected($event === 'no-poll')>Tanpa polling</option>
+                        <option value="all" @selected($event === 'all')>Semua peristiwa</option>
+                        @foreach (\App\Models\DeviceCommunication::EVENT_LABELS as $value => $text)
+                            <option value="{{ $value }}" @selected($event === $value)>Hanya {{ $text }}</option>
+                        @endforeach
+                    </select>
+                    <noscript><button type="submit" class="rounded-md border border-gray-200 px-3 py-1.5 text-sm font-medium text-gray-700">Terapkan</button></noscript>
+                </form>
+            </div>
             <div class="overflow-x-auto">
                 <table class="data-table">
                     <thead><tr><th>Waktu</th><th>Mesin</th><th>Peristiwa</th><th>Data</th><th>IP</th><th>Isi Kiriman</th></tr></thead>
                     <tbody>
                         @forelse ($recent as $log)
-                            <tr>
+                            {{-- Jenis kirimannya ikut ditulis sebagai atribut: penyaring
+                                 di atas hanya bisa dipercaya kalau keadaannya bisa
+                                 diperiksa, dan label di lencana juga muncul di dropdown. --}}
+                            <tr data-event="{{ $log->event }}">
                                 <td class="whitespace-nowrap text-sm text-gray-700">{{ $log->created_at->format('d M H:i:s') }}</td>
                                 <td class="text-sm text-gray-700">{{ $log->device?->name ?? '—' }}</td>
                                 <td><x-status-badge :tone="$log->event_tone">{{ $log->event_label }}</x-status-badge></td>
