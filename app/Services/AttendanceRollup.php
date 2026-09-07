@@ -56,6 +56,26 @@ class AttendanceRollup
             ->orderBy('punched_at')
             ->get();
 
+        // Sebuah punch hanya boleh dimiliki SATU tanggal kerja.
+        //
+        // Jendela di atas sengaja longgar supaya tidak ada tap yang tercecer, tapi
+        // kelonggaran itu membuat jendela dua hari berturut-turut bisa bertumpuk: tap
+        // pulang shift malam pukul 06:00 berada di dalam jendela tanggal kemarin, dan
+        // juga di dalam jendela hari ini ketika hari ini tidak terjadwal — sebab hari
+        // tanpa jadwal mengklaim satu hari kalender penuh.
+        //
+        // Akibatnya tap pulang itu dihitung dua kali: sekali dengan benar sebagai jam
+        // pulang shift malam, sekali lagi sebagai absensi baru keesokan harinya. Bila
+        // tapnya dua kali — dan di lapangan itu sering terjadi — hari berikutnya bahkan
+        // terbaca "Hadir" dengan jam masuk dan jam pulang berjarak beberapa detik.
+        //
+        // workDateFor() adalah aturan yang sudah dipakai absen mandiri untuk menjawab
+        // "momen ini milik tanggal kerja yang mana". Dipakai di sini juga, kepemilikan
+        // sebuah punch jadi tunggal dan dijawab oleh satu aturan yang sama.
+        $punches = $punches->filter(
+            fn (AttendancePunch $punch) => $this->workDateFor($employee, $punch->punched_at)->equalTo($date),
+        );
+
         if ($punches->isEmpty()) {
             return null;
         }
@@ -79,12 +99,10 @@ class AttendanceRollup
                 ?? $after->last()?->format('H:i')
                 ?? $existing?->clock_out?->format('H:i');
         } else {
-            $first = $times->first();
-            $last = $times->last();
+            [$machineIn, $machineOut] = $this->sidesFrom($punches);
 
-            $clockIn = $first->format('H:i');
-            $clockOut = $keptOut?->format('H:i')
-                ?? ($last->equalTo($first) ? null : $last->format('H:i'));
+            $clockIn = $machineIn?->format('H:i');
+            $clockOut = $keptOut?->format('H:i') ?? $machineOut?->format('H:i');
         }
 
         // Catatannya ikut dibawa: ia menyimpan alasan koreksi, dan membiarkannya
@@ -129,6 +147,44 @@ class AttendanceRollup
         // hari yang jam masuknya baru saja hilang bukan lagi "hadir".
         return $this->rebuild($employee, $date)
             ?? ($attendance ? $this->resolver->reprocess($employee, $date) : null);
+    }
+
+    /**
+     * Tentukan jam masuk dan jam pulang dari sekumpulan punch satu hari.
+     *
+     * Penanda masuk/pulang yang dipilih karyawan di mesin dipakai bila — dan hanya
+     * bila — ia benar-benar MEMBEDAKAN, yaitu ada tap bertanda masuk dan ada tap
+     * bertanda pulang pada hari itu. Kalau semuanya bertanda sama, penandanya tidak
+     * memberi keterangan apa pun: bisa jadi prosedurnya terlewat, bisa jadi firmware
+     * mesinnya memang selalu mengirim angka yang sama. Dalam keadaan itu urutan waktu
+     * yang dipakai — aturan yang mungkin keliru pada kasus aneh, tapi tidak pernah
+     * gagal total untuk semua orang sekaligus.
+     *
+     * Satu keadaan yang sekarang bisa dijawab jujur: hari yang hanya berisi tap
+     * PULANG. Dulu tap itu dicatat sebagai jam masuk, sehingga orangnya terlihat baru
+     * datang sore hari. Sekarang ia dicatat sebagai jam pulang tanpa jam masuk —
+     * keadaan yang memang perlu koreksi, dan sekarang terlihat sebagai apa adanya.
+     *
+     * @param  Collection<int, AttendancePunch>  $punches  terurut menaik
+     * @return array{0: ?Carbon, 1: ?Carbon}
+     */
+    private function sidesFrom($punches): array
+    {
+        $masuk = $punches->where('state', AttendancePunch::STATE_IN);
+        $pulang = $punches->where('state', AttendancePunch::STATE_OUT);
+
+        if ($masuk->isNotEmpty() && $pulang->isNotEmpty()) {
+            return [$masuk->first()->punched_at, $pulang->last()->punched_at];
+        }
+
+        if ($pulang->isNotEmpty()) {
+            return [null, $pulang->last()->punched_at];
+        }
+
+        $first = $punches->first()->punched_at;
+        $last = $punches->last()->punched_at;
+
+        return [$first, $last->equalTo($first) ? null : $last];
     }
 
     /**

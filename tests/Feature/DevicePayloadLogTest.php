@@ -1,5 +1,6 @@
 <?php
 
+use App\Models\AttendancePunch;
 use App\Models\Device;
 use App\Models\DeviceCommunication;
 use App\Models\Employee;
@@ -202,4 +203,44 @@ test('detail kiriman ikut terkunci izin melihat perangkat', function () {
     $tidak->givePermissionTo('punches.view');
 
     $this->actingAs($tidak)->get(route('attendance.devices.communications.show', $log))->assertForbidden();
+});
+
+test('baris X100-C dengan kolom cadangan tetap terbaca utuh', function () {
+    $device = pushDevice();
+
+    $budi = Employee::query()->create(['full_name' => 'Budi', 'employment_status' => 'active']);
+    EmployeeDevice::query()->create([
+        'employee_id' => $budi->id, 'device_id' => $device->id, 'machine_user_id' => '17',
+    ]);
+
+    // Bentuk asli kiriman Solution X100-C: sepuluh kolom, enam terakhir cadangan.
+    $body = "17\t2026-09-07 09:43:26\t0\t1\t0\t0\t0\t0\t0\t0";
+
+    $this->call('POST', "/iclock/cdata?SN={$device->serial_number}&table=ATTLOG", [], [], [], ['CONTENT_TYPE' => 'text/plain'], $body)
+        ->assertOk()
+        ->assertSee('OK: 1');
+
+    $punch = AttendancePunch::query()->firstOrFail();
+
+    expect($punch->machine_user_id)->toBe('17')
+        ->and($punch->punched_at->format('Y-m-d H:i:s'))->toBe('2026-09-07 09:43:26')
+        ->and($punch->state)->toBe(0)
+        ->and($punch->verify_mode)->toBe(1)
+        ->and($punch->status)->toBe(AttendancePunch::STATUS_MATCHED);
+
+    app(PermissionRegistrar::class)->forgetCachedPermissions();
+    Permission::findOrCreate('devices.view', 'web');
+    $user = User::factory()->create();
+    $user->givePermissionTo('devices.view');
+
+    $log = DeviceCommunication::query()->where('event', 'attlog')->firstOrFail();
+
+    // Cara verifikasi diberi nama, bukan ditinggal sebagai angka mentah.
+    $this->actingAs($user)->get(route('attendance.devices.communications.show', $log))
+        ->assertOk()
+        ->assertSee('Sidik jari')
+        ->assertSee('Tercatat')
+        // State ditampilkan apa adanya, tanpa mengklaim "masuk" atau "pulang".
+        ->assertDontSee('menurut mesin')
+        ->assertSee('tidak memakainya', escape: false);
 });

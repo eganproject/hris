@@ -85,11 +85,15 @@
                                     @else
                                         <td class="font-mono text-sm text-gray-900">{{ $parsed['pin'] }}</td>
                                         <td class="whitespace-nowrap text-sm text-gray-900">{{ $parsed['punched_at']->translatedFormat('d M Y, H:i:s') }}</td>
-                                        {{-- State dari mesin ditampilkan apa adanya. Aplikasi ini tidak
-                                             memakainya untuk menentukan masuk/pulang — mesin X100-C sering
-                                             menandainya sembarang kalau tombolnya tidak ditekan. --}}
-                                        <td class="text-sm text-gray-600">{{ $parsed['state'] }} <span class="text-xs text-gray-400">({{ $parsed['state'] === 0 ? 'masuk' : 'pulang' }} menurut mesin)</span></td>
-                                        <td class="text-sm text-gray-600">{{ $parsed['verify'] }}</td>
+                                        {{-- Penanda yang DIPILIH di mesin sebelum jari ditempelkan.
+                                             Ditulis sebagai angkanya plus arti yang diakui mesin, bukan
+                                             sebagai kesimpulan aplikasi — yang menentukan jam masuk dan
+                                             pulang tetap urutan waktu. Lihat keterangan di bawah tabel. --}}
+                                        <td class="text-sm text-gray-600">
+                                            {{ $parsed['state'] }}
+                                            <span class="mt-0.5 block text-xs text-gray-400">{{ $parsed['state'] === 0 ? 'dipilih: masuk' : ($parsed['state'] === 1 ? 'dipilih: pulang' : 'lainnya') }}</span>
+                                        </td>
+                                        <td class="text-sm text-gray-600">{{ \App\Models\AttendancePunch::verifyLabel($parsed['verify']) }}</td>
                                         <td>
                                             @if (! $punch)
                                                 <x-status-badge tone="warning">Tidak tersimpan</x-status-badge>
@@ -109,11 +113,19 @@
                     </table>
                 </div>
 
-                @if ($tercatat->count() < $terurai->count())
-                    <p class="border-t border-gray-100 px-5 py-3 text-xs text-gray-500">
-                        Baris bertanda <span class="font-medium">Tidak tersimpan</span> tidak menghasilkan punch — biasanya karena PIN atau waktunya tidak terbaca mesin dengan benar. Baris yang sudah pernah dikirim sebelumnya tetap tampil sebagai <span class="font-medium">Tercatat</span>, karena punch-nya memang sudah ada.
+                <div class="space-y-1.5 border-t border-gray-100 px-5 py-3 text-xs text-gray-500">
+                    <p>
+                        <span class="font-medium text-gray-700">State</span> adalah penanda masuk/pulang yang dipilih di mesin sebelum jari ditempelkan (0 = masuk, 1 = pulang). Aplikasi ini <span class="font-medium">tidak memakainya</span> untuk menentukan jam masuk dan pulang — keduanya ditentukan dari urutan waktu, supaya tap yang lupa diubah penandanya tidak tercatat terbalik.
                     </p>
-                @endif
+                    <p>
+                        Kolom setelah Verifikasi pada kiriman mesin (work code dan kolom cadangan) tidak dipakai dan sengaja tidak ditampilkan.
+                    </p>
+                    @if ($tercatat->count() < $terurai->count())
+                        <p>
+                            Baris bertanda <span class="font-medium text-gray-700">Tidak tersimpan</span> tidak menghasilkan punch — biasanya karena PIN atau waktunya tidak terbaca dengan benar. Baris yang sudah pernah dikirim sebelumnya tetap tampil sebagai <span class="font-medium text-gray-700">Tercatat</span>, karena punch-nya memang sudah ada.
+                        </p>
+                    @endif
+                </div>
             </section>
         @endif
 
