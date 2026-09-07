@@ -34,26 +34,16 @@ class PunchIngestionService
                 continue;
             }
 
-            $parts = preg_split('/\t+/', trim($line));
+            $parsed = $this->parseLine($device, $line);
 
-            if (count($parts) < 2) {
+            if (! $parsed) {
                 continue;
             }
 
-            $pin = trim($parts[0]);
-            $time = trim($parts[1]);
-
-            $punchedAt = $this->parseTime($device, $time);
-
-            if (! $pin || ! $punchedAt) {
-                continue;
-            }
-
-            $state = isset($parts[2]) ? (int) $parts[2] : 0;
-            $verify = isset($parts[3]) ? (int) $parts[3] : 0;
+            ['pin' => $pin, 'punched_at' => $punchedAt, 'state' => $state, 'verify' => $verify] = $parsed;
 
             $employee = $this->resolveEmployee($device, $pin);
-            $dedup = sha1("{$device->id}|{$pin}|{$punchedAt->toIso8601String()}|{$state}");
+            $dedup = $this->dedupHash($device, $parsed);
 
             $punch = AttendancePunch::query()->firstOrNew(['dedup_hash' => $dedup]);
 
@@ -140,6 +130,48 @@ class PunchIngestionService
             ->first();
 
         return $mapping?->employee;
+    }
+
+    /**
+     * Uraikan satu baris ATTLOG. Dipakai bersama oleh penerimaan kiriman dan halaman
+     * detail log — satu-satunya cara memastikan yang ditampilkan di layar dibaca
+     * dengan aturan yang sama seperti saat datanya masuk.
+     *
+     * @return array{pin: string, punched_at: Carbon, state: int, verify: int}|null
+     */
+    public function parseLine(Device $device, string $line): ?array
+    {
+        $parts = preg_split('/\t+/', trim($line));
+
+        if (count($parts) < 2) {
+            return null;
+        }
+
+        $pin = trim($parts[0]);
+        $punchedAt = $this->parseTime($device, trim($parts[1]));
+
+        if (! $pin || ! $punchedAt) {
+            return null;
+        }
+
+        return [
+            'pin' => $pin,
+            'punched_at' => $punchedAt,
+            'state' => isset($parts[2]) ? (int) $parts[2] : 0,
+            'verify' => isset($parts[3]) ? (int) $parts[3] : 0,
+        ];
+    }
+
+    /**
+     * Sidik jari sebuah punch: mesin, PIN, waktu, dan state-nya. Rumusnya diberi nama
+     * supaya halaman detail bisa menanyakan "baris ini menjadi punch yang mana" dengan
+     * kunci yang sama persis, bukan dengan salinan rumus yang bisa bergeser.
+     *
+     * @param  array{pin: string, punched_at: Carbon, state: int, verify: int}  $parsed
+     */
+    public function dedupHash(Device $device, array $parsed): string
+    {
+        return sha1("{$device->id}|{$parsed['pin']}|{$parsed['punched_at']->toIso8601String()}|{$parsed['state']}");
     }
 
     private function parseTime(Device $device, string $time): ?Carbon

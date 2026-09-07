@@ -100,7 +100,7 @@
             </div>
             <div class="overflow-x-auto">
                 <table class="data-table">
-                    <thead><tr><th>Waktu</th><th>Mesin</th><th>Peristiwa</th><th>Data</th><th>IP</th><th>Isi Kiriman</th></tr></thead>
+                    <thead><tr><th>Waktu</th><th>Mesin</th><th>Peristiwa</th><th>Data</th><th>IP</th><th>Isi Kiriman</th><th class="text-right">Aksi</th></tr></thead>
                     <tbody>
                         @forelse ($recent as $log)
                             {{-- Jenis kirimannya ikut ditulis sebagai atribut: penyaring
@@ -113,26 +113,25 @@
                                 <td class="text-sm text-gray-600">{{ $log->event === 'attlog' ? $log->records_count.' punch' : '—' }}</td>
                                 <td class="font-mono text-xs text-gray-500">{{ $log->ip ?? '—' }}</td>
                                 <td>
-                                    {{-- Isi mentahnya dilipat: yang dicari orang biasanya satu baris di
-                                         antara ratusan, dan membentangkan semuanya membuat tabel ini
-                                         tidak bisa dibaca. --}}
+                                    {{-- Cukup ukurannya di sini. Isi utuhnya pindah ke halaman detail:
+                                         membentangkan ratusan baris di dalam satu sel membuat tabel ini
+                                         tidak terbaca, dan dua tempat menampilkan hal yang sama hanya
+                                         menambah kebingungan. --}}
                                     @if ($log->payload)
-                                        <details class="text-xs">
-                                            <summary class="cursor-pointer select-none text-primary hover:underline">
-                                                Lihat ({{ $log->payloadSizeLabel() }})
-                                            </summary>
-                                            @if ($log->isTruncated())
-                                                <p class="mt-1 text-[11px] text-amber-600">Terlalu panjang — hanya bagian awalnya yang disimpan.</p>
-                                            @endif
-                                            <pre class="mt-1 max-h-64 max-w-md overflow-auto whitespace-pre-wrap break-all rounded bg-gray-50 p-2 font-mono text-[11px] leading-relaxed text-gray-700">{{ $log->payload }}</pre>
-                                        </details>
+                                        <span class="text-xs text-gray-600">{{ $log->payloadSizeLabel() }}</span>
+                                        @if ($log->isTruncated())
+                                            <span class="ml-1 text-[11px] text-amber-600">(dipangkas)</span>
+                                        @endif
                                     @else
                                         <span class="text-xs text-gray-400">—</span>
                                     @endif
                                 </td>
+                                <td class="text-right">
+                                    <a href="{{ route('attendance.devices.communications.show', $log) }}" class="text-xs font-semibold text-primary hover:underline">Detail</a>
+                                </td>
                             </tr>
                         @empty
-                            <tr><td colspan="6" class="cell-empty">Belum ada komunikasi tercatat. Pastikan mesin sudah dikonfigurasi menembak ke server ini.</td></tr>
+                            <tr><td colspan="7" class="cell-empty">Belum ada komunikasi tercatat. Pastikan mesin sudah dikonfigurasi menembak ke server ini.</td></tr>
                         @endforelse
                     </tbody>
                 </table>

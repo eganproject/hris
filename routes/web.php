@@ -310,6 +310,7 @@ Route::middleware('auth')->group(function () {
 
         Route::get('devices', [DeviceController::class, 'index'])->middleware('permission:devices.view')->name('devices.index');
         Route::get('devices/monitor', [DeviceController::class, 'monitor'])->middleware('permission:devices.view')->name('devices.monitor');
+        Route::get('devices/communications/{communication}', [DeviceController::class, 'communication'])->middleware('permission:devices.view')->name('devices.communications.show');
         Route::get('devices/create', [DeviceController::class, 'create'])->middleware('permission:devices.create')->name('devices.create');
         Route::post('devices', [DeviceController::class, 'store'])->middleware('permission:devices.create')->name('devices.store');
         Route::get('devices/{device}/edit', [DeviceController::class, 'edit'])->middleware('permission:devices.update')->name('devices.edit');

@@ -136,3 +136,70 @@ test('log komunikasi menyembunyikan polling secara bawaan', function () {
         ->assertDontSee('data-event="handshake"', escape: false)
         ->assertDontSee('data-event="poll"', escape: false);
 });
+
+test('detail kiriman menguraikan tiap baris beserta punch yang dihasilkannya', function () {
+    $device = pushDevice();
+
+    $budi = Employee::query()->create(['full_name' => 'Budi', 'employment_status' => 'active']);
+    EmployeeDevice::query()->create([
+        'employee_id' => $budi->id, 'device_id' => $device->id, 'machine_user_id' => '17',
+    ]);
+
+    // PIN 17 sudah dipetakan; PIN 99 belum dikenal siapa pun.
+    $body = "17\t2026-02-10 08:05:00\t0\t1\n99\t2026-02-10 08:06:00\t0\t1";
+
+    $this->call('POST', "/iclock/cdata?SN={$device->serial_number}&table=ATTLOG", [], [], [], ['CONTENT_TYPE' => 'text/plain'], $body);
+
+    $log = DeviceCommunication::query()->where('event', 'attlog')->firstOrFail();
+
+    app(PermissionRegistrar::class)->forgetCachedPermissions();
+    Permission::findOrCreate('devices.view', 'web');
+    $user = User::factory()->create();
+    $user->givePermissionTo('devices.view');
+
+    $this->actingAs($user)->get(route('attendance.devices.communications.show', $log))
+        ->assertOk()
+        ->assertSee('Baris Kiriman')
+        // Baris yang cocok karyawan tercatat lengkap dengan namanya.
+        ->assertSee('Tercatat')
+        ->assertSee('Budi')
+        // Baris yang PIN-nya belum dipetakan dibedakan, bukan didiamkan.
+        ->assertSee('PIN belum dipetakan')
+        ->assertSee('2 dari 2 baris tercatat')
+        // Isi mentahnya tetap ditampilkan apa adanya.
+        ->assertSee('Isi Mentah');
+});
+
+test('baris kiriman yang tidak terbaca ditandai, bukan didiamkan', function () {
+    $device = pushDevice();
+
+    $log = $device->communications()->create([
+        'event' => 'attlog',
+        'records_count' => 0,
+        'payload' => 'ini bukan baris absensi',
+        'payload_bytes' => 23,
+    ]);
+
+    app(PermissionRegistrar::class)->forgetCachedPermissions();
+    Permission::findOrCreate('devices.view', 'web');
+    $user = User::factory()->create();
+    $user->givePermissionTo('devices.view');
+
+    $this->actingAs($user)->get(route('attendance.devices.communications.show', $log))
+        ->assertOk()
+        ->assertSee('Tidak terbaca');
+});
+
+test('detail kiriman ikut terkunci izin melihat perangkat', function () {
+    $device = pushDevice();
+    $log = $device->communications()->create(['event' => 'poll', 'records_count' => 0]);
+
+    app(PermissionRegistrar::class)->forgetCachedPermissions();
+    foreach (['devices.view', 'punches.view'] as $permission) {
+        Permission::findOrCreate($permission, 'web');
+    }
+    $tidak = User::factory()->create();
+    $tidak->givePermissionTo('punches.view');
+
+    $this->actingAs($tidak)->get(route('attendance.devices.communications.show', $log))->assertForbidden();
+});

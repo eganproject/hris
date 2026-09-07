@@ -20,8 +20,7 @@ class DeviceController extends Controller
     public function __construct(
         private readonly PunchIngestionService $ingestion,
         private readonly DeviceCommandService $commands,
-    ) {
-    }
+    ) {}
 
     public function index(Request $request): View
     {
@@ -79,6 +78,63 @@ class DeviceController extends Controller
             'onlineWithin' => Device::ONLINE_WITHIN_MINUTES,
             'onlineCount' => $devices->filter->isOnline()->count(),
         ]);
+    }
+
+    /**
+     * Rincian satu kiriman mesin: ringkasannya, isi mentahnya, dan — untuk kiriman
+     * absensi — tiap barisnya diuraikan beserta punch yang dihasilkannya.
+     *
+     * Penguraiannya memakai parser dan kunci dedup milik PunchIngestionService, bukan
+     * salinannya. Halaman yang menjelaskan "kenapa baris ini tidak masuk" tidak ada
+     * gunanya kalau ia membaca kirimannya dengan aturan yang berbeda dari yang
+     * sebenarnya dipakai saat data itu diterima.
+     */
+    public function communication(DeviceCommunication $communication, PunchIngestionService $ingestion): View
+    {
+        $communication->loadMissing('device');
+
+        $lines = [];
+        $device = $communication->device;
+
+        foreach ($this->payloadLines($communication) as $line) {
+            $parsed = $device ? $ingestion->parseLine($device, $line) : null;
+
+            $lines[] = [
+                'raw' => $line,
+                'parsed' => $parsed,
+                'punch' => $parsed
+                    ? AttendancePunch::query()
+                        ->with('employee:id,full_name')
+                        ->firstWhere('dedup_hash', $ingestion->dedupHash($device, $parsed))
+                    : null,
+            ];
+        }
+
+        return view('attendance.devices.communication', [
+            'communication' => $communication,
+            'lines' => $lines,
+        ]);
+    }
+
+    /**
+     * Baris isi kiriman, tanpa baris kosong dan tanpa penanda pemangkasan — penanda
+     * itu tulisan kita sendiri, bukan kiriman mesin, dan menguraikannya hanya akan
+     * melaporkan sebuah baris yang "tidak terbaca".
+     *
+     * @return list<string>
+     */
+    private function payloadLines(DeviceCommunication $communication): array
+    {
+        if (! $communication->payload) {
+            return [];
+        }
+
+        return collect(preg_split('/\r\n|\r|\n/', trim($communication->payload)))
+            ->map(fn (string $line) => trim($line))
+            ->filter()
+            ->reject(fn (string $line) => $line === DeviceCommunication::TRUNCATION_MARK)
+            ->values()
+            ->all();
     }
 
     public function create(): View
