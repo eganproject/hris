@@ -418,7 +418,8 @@ test('halaman detail aset menampilkan panel serah-terima dan riwayatnya', functi
         ->assertSee('Pemegang Saat Ini')
         ->assertSee('Serahkan ke Karyawan')
         ->assertSee('Riwayat Perpindahan')
-        ->assertSee('Aset ini sedang tidak dipegang siapa pun.');
+        ->assertSee('Tidak dipegang siapa pun')
+        ->assertSee('Aset siap diserahkan kepada karyawan.');
 
     $this->actingAs($officer)->post(route('assets.assign', $f['asset']), [
         'employee_id' => $f['employee']->id, 'condition_out' => 'good',
@@ -430,4 +431,56 @@ test('halaman detail aset menampilkan panel serah-terima dan riwayatnya', functi
         ->assertSee('Menunggu konfirmasi karyawan')
         ->assertSee('Terima Kembali')
         ->assertSee('Diserahkan');
+});
+
+test('tombol aksi dan panel formulirnya selalu muncul bersamaan', function () {
+    $f = custodyFixture();
+    $officer = custodyOfficer();
+
+    // Aset tersedia: boleh diserahkan dan boleh dipindah, belum bisa diterima kembali.
+    $this->actingAs($officer)->get(route('assets.show', $f['asset']))
+        ->assertSee('Serahkan ke Karyawan')
+        ->assertSee('data-panel="assign"', escape: false)
+        ->assertSee('data-panel="transfer"', escape: false)
+        ->assertDontSee('data-panel="return"', escape: false);
+
+    $this->actingAs($officer)->post(route('assets.assign', $f['asset']), [
+        'employee_id' => $f['employee']->id, 'condition_out' => 'good',
+    ]);
+
+    // Sudah dipegang: kebalikannya, dan tidak ada tombol yang menganggur tanpa panel.
+    $this->actingAs($officer)->get(route('assets.show', $f['asset']))
+        ->assertSee('Terima Kembali')
+        ->assertSee('data-panel="return"', escape: false)
+        ->assertDontSee('data-panel="assign"', escape: false)
+        ->assertDontSee('data-panel="transfer"', escape: false);
+});
+
+test('panel yang gagal validasi dibuka kembali oleh halaman', function () {
+    $f = custodyFixture();
+    $officer = custodyOfficer();
+
+    // Karyawan tidak dipilih: validasi gagal, dan panelnya harus terbuka lagi supaya
+    // pesan kesalahannya terlihat.
+    $this->actingAs($officer)
+        ->from(route('assets.show', $f['asset']))
+        ->post(route('assets.assign', $f['asset']), ['condition_out' => 'good'])
+        ->assertRedirect(route('assets.show', $f['asset']));
+
+    $this->actingAs($officer)->get(route('assets.show', $f['asset']))
+        ->assertOk()
+        ->assertSee('data-panel-initial="assign"', escape: false);
+});
+
+test('detail aset tersusun dalam tab detail, riwayat, dan berkas', function () {
+    $f = custodyFixture();
+
+    $this->actingAs(custodyOfficer())->get(route('assets.show', $f['asset']))
+        ->assertOk()
+        ->assertSee('data-tab-button="detail"', escape: false)
+        ->assertSee('data-tab-button="riwayat"', escape: false)
+        ->assertSee('data-tab-button="berkas"', escape: false)
+        ->assertSee('data-tab-panel="detail"', escape: false)
+        ->assertSee('data-tab-panel="riwayat"', escape: false)
+        ->assertSee('data-tab-panel="berkas"', escape: false);
 });
