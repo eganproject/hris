@@ -64,8 +64,10 @@ class MyOvertimeController extends Controller
             return back()->withInput()->withErrors(['end_time' => 'Jam selesai harus menghasilkan durasi lembur lebih dari 0 menit.']);
         }
 
-        if ($minutes > 720) {
-            return back()->withInput()->withErrors(['end_time' => 'Durasi lembur tidak wajar (lebih dari 12 jam). Periksa kembali jam mulai & selesai.']);
+        if ($minutes > OvertimeApproval::MAX_REQUEST_MINUTES) {
+            $maxHours = intdiv(OvertimeApproval::MAX_REQUEST_MINUTES, 60);
+
+            return back()->withInput()->withErrors(['end_time' => "Durasi lembur tidak wajar (lebih dari {$maxHours} jam). Periksa kembali jam mulai & selesai."]);
         }
 
         $alreadyRequested = OvertimeApproval::query()
@@ -121,7 +123,7 @@ class MyOvertimeController extends Controller
         $this->authorizeSupervisor($overtime);
 
         $approved = $request->filled('approved_minutes')
-            ? max(0, min(720, (int) $request->input('approved_minutes')))
+            ? max(0, min($overtime->requested_minutes, (int) $request->input('approved_minutes')))
             : $overtime->requested_minutes;
 
         $overtime->update([

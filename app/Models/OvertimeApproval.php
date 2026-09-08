@@ -16,6 +16,13 @@ class OvertimeApproval extends Model
 
     public const STATUS_REJECTED = 'rejected';
 
+    /**
+     * Batas atas durasi lembur sekali pengajuan. Ini bukan aturan upah, hanya
+     * penjaga salah ketik jam: shift panjang seperti 08:00-23:00 tetap lolos,
+     * sedangkan jam yang kebalik (mis. 23:00 ditulis di kolom mulai) tertahan.
+     */
+    public const MAX_REQUEST_MINUTES = 1080;
+
     /** @var list<string> */
     protected $fillable = [
         'employee_id',
