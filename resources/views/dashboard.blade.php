@@ -293,7 +293,7 @@
                     <x-dashboard.card title="Aksi Cepat" subtitle="Pintasan menu yang paling sering dibuka." icon="plus" tone="primary">
                         <div class="grid grid-cols-2 gap-2">
                             @can('employees.create')<x-dashboard.action :href="route('employees.create')" icon="plus" label="Tambah Karyawan"/>@endcan
-                            @canany(['reports.attendance.view', 'reports.log.view', 'reports.leave.view'])
+                            @canany(['reports.attendance.view', 'reports.log.view', 'reports.leave.view', 'reports.assets.view'])
                                 <x-dashboard.action :href="route('reports.index')" icon="download" label="Laporan"/>
                             @endcanany
                             @can('attendance-daily.view')<x-dashboard.action :href="route('attendance.daily.index')" icon="clock" label="Absensi Harian"/>@endcan

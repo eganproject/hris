@@ -76,6 +76,7 @@ return [
             'reports.attendance' => ['label' => 'Rekap Kehadiran', 'actions' => ['view', 'export']],
             'reports.log' => ['label' => 'Log Absensi', 'actions' => ['view', 'export']],
             'reports.leave' => ['label' => 'Rekap Cuti', 'actions' => ['view', 'export']],
+            'reports.assets' => ['label' => 'Register Aset', 'actions' => ['view', 'export']],
         ],
 
         'Organisasi' => [
@@ -158,6 +159,7 @@ return [
             'reports.attendance.view', 'reports.attendance.export',
             'reports.log.view', 'reports.log.export',
             'reports.leave.view', 'reports.leave.export',
+            'reports.assets.view', 'reports.assets.export',
             'organization.view',
             'branches.view', 'branches.create', 'branches.update', 'branches.delete',
             'departments.view', 'departments.create', 'departments.update', 'departments.delete',

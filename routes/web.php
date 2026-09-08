@@ -114,7 +114,7 @@ Route::middleware('auth')->group(function () {
     Route::prefix('reports')->name('reports.')->group(function () {
         // Halaman indeks cukup dibuka bila salah satu laporan boleh dilihat.
         Route::get('/', [ReportController::class, 'index'])
-            ->middleware('permission:reports.attendance.view|reports.log.view|reports.leave.view')
+            ->middleware('permission:reports.attendance.view|reports.log.view|reports.leave.view|reports.assets.view')
             ->name('index');
 
         Route::get('attendance', [ReportController::class, 'attendance'])->middleware('permission:reports.attendance.view')->name('attendance');
@@ -133,6 +133,12 @@ Route::middleware('auth')->group(function () {
         Route::get('leave/export', [ReportController::class, 'leaveExport'])->middleware('permission:reports.leave.export')->name('leave.export');
         Route::get('leave/pdf', [ReportController::class, 'leavePdf'])->middleware('permission:reports.leave.export')->name('leave.pdf');
         Route::get('leave/{employee}', [ReportController::class, 'employeeLeave'])->middleware('permission:reports.leave.view')->name('leave.detail');
+
+        // Register aset. Cakupannya modul Aset (lokasi/divisi di baris asetnya),
+        // bukan garis atasan seperti laporan absensi & cuti di atas.
+        Route::get('assets', [ReportController::class, 'assets'])->middleware('permission:reports.assets.view')->name('assets');
+        Route::get('assets/export', [ReportController::class, 'assetsExport'])->middleware('permission:reports.assets.export')->name('assets.export');
+        Route::get('assets/pdf', [ReportController::class, 'assetsPdf'])->middleware('permission:reports.assets.export')->name('assets.pdf');
     });
 
     Route::prefix('employees')->name('employees.')->group(function () {

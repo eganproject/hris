@@ -2,17 +2,22 @@
 
 namespace App\Http\Controllers;
 
+use App\Enums\AssetCondition;
+use App\Enums\AssetStatus;
 use App\Enums\AttendanceStatus;
 use App\Enums\LeaveRequestStatus;
+use App\Exports\AssetRegisterExport;
 use App\Exports\AttendanceLogExport;
 use App\Exports\AttendanceReportExport;
 use App\Exports\LeaveReportExport;
+use App\Models\AssetCategory;
 use App\Models\Attendance;
 use App\Models\Branch;
 use App\Models\Department;
 use App\Models\Employee;
 use App\Models\JobPosition;
 use App\Models\LeaveRequest;
+use App\Support\AssetRegisterReport;
 use App\Support\AttendanceReport;
 use App\Support\DataScope;
 use App\Support\LeaveReport;
@@ -33,6 +38,7 @@ class ReportController extends Controller
     public function __construct(
         private readonly AttendanceReport $attendanceReport,
         private readonly LeaveReport $leaveReport,
+        private readonly AssetRegisterReport $assetRegister,
     ) {}
 
     public function index(): View
@@ -371,6 +377,109 @@ class ReportController extends Controller
             'year' => $year,
             'approvedDays' => (int) $requests->where('status', LeaveRequestStatus::Approved)->sum(fn (LeaveRequest $r) => $r->days),
         ]);
+    }
+
+    /**
+     * Register aset: seluruh aset dalam cakupan pengguna, diringkas per satu sumbu
+     * lalu didaftar satu per satu.
+     *
+     * Memakai DataScope::forAssets(), bukan forTeam() seperti laporan lain di kelas
+     * ini: yang didaftar adalah barang, bukan orang. Sebuah aset bisa tergeletak di
+     * gudang tanpa dipegang siapa pun, jadi ia disaring lewat lokasi/divisi di baris
+     * asetnya sendiri — dan bagi akun yang dipersempit ke bawahan, forAssets() sudah
+     * menyempit ke aset yang SEDANG DIPEGANG bawahannya (Asset::scopeVisibleTo).
+     */
+    public function assets(Request $request): View
+    {
+        $scope = DataScope::forAssets($request->user());
+        $filters = $this->assetFilters($request);
+        $groupBy = AssetRegisterReport::resolveGroup($request->input('group'));
+        $perPage = min(max((int) $request->input('per_page', 50), 25), 200);
+
+        return view('reports.assets', [
+            'assets' => $this->assetRegister->register($scope, $filters)->paginate($perPage)->withQueryString(),
+            'summary' => $this->assetRegister->summary($scope, $filters),
+            'groups' => $this->assetRegister->groups($scope, $filters, $groupBy),
+            'groupBy' => $groupBy,
+            'groupLabel' => AssetRegisterReport::GROUPS[$groupBy],
+            'groupOptions' => AssetRegisterReport::GROUPS,
+            'filters' => $filters,
+            'perPage' => $perPage,
+            'categories' => AssetCategory::query()->orderBy('name')->get(['id', 'name']),
+            'branches' => $scope->branches(),
+            'departments' => $scope->departments(),
+            'statuses' => AssetStatus::labels(),
+            'conditions' => AssetCondition::labels(),
+            'hasNoScope' => $scope->isEmpty(),
+            'limitedToSubordinates' => $request->user()->isLimitedToSubordinates(),
+        ]);
+    }
+
+    public function assetsExport(Request $request): BinaryFileResponse
+    {
+        [$scope, $filters, $groupBy] = $this->assetReportInput($request);
+
+        return Excel::download(
+            new AssetRegisterExport(
+                assets: $this->assetRegister->register($scope, $filters)->get(),
+                groups: $this->assetRegister->groups($scope, $filters, $groupBy),
+                summary: $this->assetRegister->summary($scope, $filters),
+                filterLabels: $this->assetRegister->filterLabels($filters, $groupBy),
+                groupLabel: AssetRegisterReport::GROUPS[$groupBy],
+                generatedBy: $request->user()->name,
+            ),
+            'register-aset-'.now()->format('Y-m-d').'.xlsx',
+        );
+    }
+
+    public function assetsPdf(Request $request): Response
+    {
+        [$scope, $filters, $groupBy] = $this->assetReportInput($request);
+
+        $pdf = Pdf::loadView('reports.pdf.assets', [
+            'assets' => $this->assetRegister->register($scope, $filters)->get(),
+            'groups' => $this->assetRegister->groups($scope, $filters, $groupBy),
+            'summary' => $this->assetRegister->summary($scope, $filters),
+            'groupLabel' => AssetRegisterReport::GROUPS[$groupBy],
+            'filterLabels' => $this->assetRegister->filterLabels($filters, $groupBy),
+        ])->setPaper('a4', 'landscape');
+
+        return $pdf->download('register-aset-'.now()->format('Y-m-d').'.pdf');
+    }
+
+    /**
+     * Cakupan + penyaring untuk ekspor dan cetak, dibaca dari permintaan yang sama
+     * dengan layarnya. Berkas yang diunduh tidak boleh berisi satu baris pun di luar
+     * yang tampil.
+     *
+     * @return array{0: DataScope, 1: array<string, mixed>, 2: string}
+     */
+    private function assetReportInput(Request $request): array
+    {
+        return [
+            DataScope::forAssets($request->user()),
+            $this->assetFilters($request),
+            AssetRegisterReport::resolveGroup($request->input('group')),
+        ];
+    }
+
+    /**
+     * Bentuknya mengikuti Asset::scopeMatchingFilters(), sama persis dengan yang
+     * dipakai halaman Daftar Aset.
+     *
+     * @return array<string, mixed>
+     */
+    private function assetFilters(Request $request): array
+    {
+        return [
+            'search' => $request->string('search')->toString(),
+            'category' => $request->input('category'),
+            'status' => $request->input('status'),
+            'condition' => $request->input('condition'),
+            'branch' => $request->input('branch'),
+            'department' => $request->input('department'),
+            'warranty' => $request->input('warranty'),
+        ];
     }
 
     private function resolveYear(?string $value): int

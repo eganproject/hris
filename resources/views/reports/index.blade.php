@@ -3,7 +3,7 @@
         <section>
             <p class="text-sm font-medium text-gray-500">Pusat laporan</p>
             <h1 class="mt-1 text-2xl font-semibold text-gray-950">Laporan</h1>
-            <p class="mt-1 text-sm text-gray-500">Rekap data kehadiran, lembur, dan cuti per periode. Bisa diekspor ke Excel.</p>
+            <p class="mt-1 text-sm text-gray-500">Rekap data kehadiran, lembur, cuti, dan aset. Bisa diekspor ke Excel & PDF.</p>
         </section>
 
         <section class="grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -46,6 +46,21 @@
                     <p class="mt-1 text-xs text-gray-500">Jumlah hari cuti disetujui yang terpakai & sisa kuota tahunan per karyawan.</p>
                 </div>
             </a>
+
+            {{-- Satu-satunya kartu yang dijaga izin: laporan aset berdiri di luar izin
+                 absensi yang memayungi tiga kartu di atas, jadi tanpa penjagaan ini
+                 pengguna absensi akan mengklik kartu yang membalas 403. --}}
+            @can('reports.assets.view')
+                <a href="{{ route('reports.assets') }}" class="group flex items-start gap-4 rounded-lg border border-gray-200 bg-white p-5 shadow-sm transition hover:border-primary hover:shadow-md">
+                    <span class="flex size-10 flex-none items-center justify-center rounded-md bg-primary-soft text-gray-700">
+                        <x-icon name="box" class="size-5"/>
+                    </span>
+                    <div>
+                        <h2 class="text-sm font-semibold text-gray-950">Register Aset</h2>
+                        <p class="mt-1 text-xs text-gray-500">Seluruh aset beserta status, kondisi, pemegang, dan nilai perolehan — diringkas per kategori, lokasi, divisi, status, atau kondisi.</p>
+                    </div>
+                </a>
+            @endcan
         </section>
     </div>
 </x-layouts.app>
