@@ -34,6 +34,17 @@ class MyOvertimeController extends Controller
                 ->with('employee')
                 ->latest('work_date')
                 ->get(),
+            // Riwayat keputusan atasan. Dipaginasi terpisah ('riwayat') agar
+            // penelusuran halaman lama tidak menggeser dua daftar di atasnya.
+            'decidedByMe' => OvertimeApproval::query()
+                ->where('supervisor_id', $employee->id)
+                ->whereIn('status', [OvertimeApproval::STATUS_APPROVED, OvertimeApproval::STATUS_REJECTED])
+                ->with(['employee', 'reviewer'])
+                ->latest('decided_at')
+                ->latest('id')
+                ->paginate(15, ['*'], 'riwayat')
+                ->withQueryString(),
+            'isSupervisor' => (bool) $employee->subordinates()->exists(),
             'hasSupervisor' => (bool) $employee->manager_id,
         ]);
     }
@@ -155,14 +166,39 @@ class MyOvertimeController extends Controller
         return redirect()->route('my-overtime.index')->with('status', 'Pengajuan lembur bawahan ditolak.');
     }
 
-    private function authorizeSupervisor(OvertimeApproval $overtime): void
+    /**
+     * Tarik kembali persetujuan yang baru saja diberikan: pengajuan kembali ke
+     * status menunggu sehingga atasan bisa memutuskan ulang. Hanya berlaku di
+     * hari yang sama dengan persetujuannya (lihat OvertimeApproval::isRevocable).
+     */
+    public function revoke(OvertimeApproval $overtime): RedirectResponse
+    {
+        $this->authorizeSupervisor($overtime, OvertimeApproval::STATUS_APPROVED);
+
+        if (! $overtime->isRevocable()) {
+            return back()->with('error', 'Persetujuan hanya bisa dibatalkan pada hari yang sama saat disetujui. Hubungi HR untuk koreksi lembur hari sebelumnya.');
+        }
+
+        $overtime->update([
+            'status' => OvertimeApproval::STATUS_PENDING,
+            'approved_minutes' => 0,
+            'reviewed_by' => null,
+            'decided_at' => null,
+        ]);
+
+        app(ApprovalNotifier::class)->overtimeApprovalRevoked($overtime);
+
+        return redirect()->route('my-overtime.index')->with('status', 'Persetujuan dibatalkan. Pengajuan kembali menunggu keputusan Anda.');
+    }
+
+    private function authorizeSupervisor(OvertimeApproval $overtime, string $expectedStatus = OvertimeApproval::STATUS_PENDING): void
     {
         // Pemisahan wewenang: tidak bisa memutuskan pengajuan lembur sendiri.
         abort_if($overtime->employee_id === $this->employee()->id, 403, 'Anda tidak bisa memutuskan pengajuan lembur Anda sendiri.');
 
         abort_unless(
             $overtime->supervisor_id === $this->employee()->id
-                && $overtime->status === OvertimeApproval::STATUS_PENDING,
+                && $overtime->status === $expectedStatus,
             403,
         );
     }

@@ -457,6 +457,7 @@ Route::middleware('auth')->group(function () {
         Route::delete('{overtime}', [MyOvertimeController::class, 'cancel'])->name('cancel');
         Route::patch('{overtime}/approve', [MyOvertimeController::class, 'approve'])->name('approve');
         Route::patch('{overtime}/reject', [MyOvertimeController::class, 'reject'])->name('reject');
+        Route::patch('{overtime}/revoke', [MyOvertimeController::class, 'revoke'])->name('revoke');
     });
 
     Route::prefix('access-control')->name('access-control.')->group(function () {

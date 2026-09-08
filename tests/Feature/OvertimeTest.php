@@ -71,11 +71,11 @@ function overtimeStaff(int $computedMinutes = 90): array
 }
 
 /** The employee files the request their supervisor then has to decide on. */
-function requestOvertime(User $employeeUser, string $date, string $end = '18:30'): OvertimeApproval
+function requestOvertime(User $employeeUser, string $date, string $end = '18:30', string $start = '17:00'): OvertimeApproval
 {
     test()->actingAs($employeeUser)->post('/my-overtime', [
         'work_date' => $date,
-        'start_time' => '17:00',
+        'start_time' => $start,
         'end_time' => $end,
         'reason' => 'Kejar target produksi.',
     ])->assertRedirect('/my-overtime');
@@ -150,4 +150,123 @@ test('the overtime approval and recap pages render', function () {
 
     $this->actingAs($hr)->get('/attendance/overtime')->assertOk()->assertSee('Persetujuan Lembur');
     $this->actingAs($hr)->get('/attendance/overtime/recap')->assertOk()->assertSee('Rekap Lembur');
+});
+
+test('a long but real shift like 08:00-23:00 can be filed', function () {
+    [$employeeUser, , , $date] = overtimeStaff(90);
+
+    $overtime = requestOvertime($employeeUser, $date, '23:00', '08:00');
+
+    expect($overtime->requested_minutes)->toBe(900);
+});
+
+test('an implausible duration is still refused', function () {
+    [$employeeUser, , , $date] = overtimeStaff(90);
+
+    // 08:00 di kolom selesai dengan 09:00 di kolom mulai: pola jam kebalik yang
+    // dihitung sebagai 23 jam lewat tengah malam.
+    $this->actingAs($employeeUser)->post('/my-overtime', [
+        'work_date' => $date,
+        'start_time' => '09:00',
+        'end_time' => '08:00',
+        'reason' => 'Salah ketik.',
+    ])->assertSessionHasErrors('end_time');
+
+    expect(OvertimeApproval::query()->count())->toBe(0);
+});
+
+test('approving a long shift in full does not silently trim it', function () {
+    [$employeeUser, , $supervisorUser, $date] = overtimeStaff(900);
+
+    $overtime = requestOvertime($employeeUser, $date, '23:00', '08:00');
+
+    $this->actingAs($supervisorUser)
+        ->patch("/my-overtime/{$overtime->id}/approve", ['approved_minutes' => 900])
+        ->assertRedirect('/my-overtime');
+
+    expect($overtime->fresh()->approved_minutes)->toBe(900);
+});
+
+test('a supervisor cannot approve more minutes than were requested', function () {
+    [$employeeUser, , $supervisorUser, $date] = overtimeStaff(90);
+
+    $overtime = requestOvertime($employeeUser, $date); // 90 menit diajukan
+
+    $this->actingAs($supervisorUser)
+        ->patch("/my-overtime/{$overtime->id}/approve", ['approved_minutes' => 600]);
+
+    expect($overtime->fresh()->approved_minutes)->toBe(90);
+});
+
+test('the supervisor sees their own decision history', function () {
+    [$employeeUser, , $supervisorUser, $date] = overtimeStaff(90);
+
+    $overtime = requestOvertime($employeeUser, $date);
+    $this->actingAs($supervisorUser)->patch("/my-overtime/{$overtime->id}/approve");
+
+    $this->actingAs($supervisorUser)->get('/my-overtime')
+        ->assertOk()
+        ->assertSee('Riwayat Keputusan Anda')
+        ->assertSee('Budi')
+        ->assertSee('Batalkan Persetujuan');
+});
+
+test('the supervisor can revoke an approval made today', function () {
+    [$employeeUser, , $supervisorUser, $date] = overtimeStaff(90);
+
+    $overtime = requestOvertime($employeeUser, $date);
+    $this->actingAs($supervisorUser)->patch("/my-overtime/{$overtime->id}/approve");
+
+    $this->actingAs($supervisorUser)
+        ->patch("/my-overtime/{$overtime->id}/revoke")
+        ->assertRedirect('/my-overtime');
+
+    $overtime->refresh();
+
+    expect($overtime->status)->toBe('pending')
+        ->and($overtime->approved_minutes)->toBe(0)
+        ->and($overtime->decided_at)->toBeNull()
+        ->and($overtime->reviewed_by)->toBeNull();
+});
+
+test('an approval from a previous day can no longer be revoked', function () {
+    [$employeeUser, , $supervisorUser, $date] = overtimeStaff(90);
+
+    $overtime = requestOvertime($employeeUser, $date);
+    $this->actingAs($supervisorUser)->patch("/my-overtime/{$overtime->id}/approve");
+
+    $overtime->forceFill(['decided_at' => now()->subDay()])->save();
+
+    $this->actingAs($supervisorUser)->patch("/my-overtime/{$overtime->id}/revoke");
+
+    expect($overtime->fresh()->status)->toBe('approved');
+
+    $this->actingAs($supervisorUser)->get('/my-overtime')
+        ->assertOk()
+        ->assertDontSee('Batalkan Persetujuan');
+});
+
+test('only the deciding supervisor can revoke an approval', function () {
+    [$employeeUser, , $supervisorUser, $date] = overtimeStaff(90);
+
+    $overtime = requestOvertime($employeeUser, $date);
+    $this->actingAs($supervisorUser)->patch("/my-overtime/{$overtime->id}/approve");
+
+    $this->actingAs($employeeUser)
+        ->patch("/my-overtime/{$overtime->id}/revoke")
+        ->assertForbidden();
+
+    expect($overtime->fresh()->status)->toBe('approved');
+});
+
+test('a pending request has no approval to revoke', function () {
+    [$employeeUser, , $supervisorUser, $date] = overtimeStaff(90);
+
+    $overtime = requestOvertime($employeeUser, $date);
+
+    $this->actingAs($supervisorUser)
+        ->patch("/my-overtime/{$overtime->id}/revoke")
+        ->assertForbidden();
+
+    expect($overtime->fresh()->status)->toBe('pending');
 });

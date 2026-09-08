@@ -383,6 +383,20 @@ class ApprovalNotifier
         ));
     }
 
+    /** Atasan menarik kembali persetujuannya: karyawan perlu tahu lemburnya menunggu lagi. */
+    public function overtimeApprovalRevoked(OvertimeApproval $overtime): void
+    {
+        $overtime->loadMissing('employee', 'supervisor');
+
+        $this->toEmployee($overtime->employee, new ApprovalNotification(
+            title: 'Persetujuan lembur dibatalkan',
+            message: ($overtime->supervisor?->full_name ?? 'Atasan').' membatalkan persetujuan lembur Anda — '.$this->overtimePeriod($overtime)
+                .'. Pengajuan kembali menunggu keputusan.',
+            url: route('my-overtime.index'),
+            category: 'overtime',
+        ));
+    }
+
     /**
      * @param  string|null  $decidedBy  "atasan" atau "HR" — tanpa ini karyawan tidak tahu
      *                                  di tahap mana pengajuannya ditolak/disetujui.

@@ -68,6 +68,19 @@ class OvertimeApproval extends Model
         return (int) $startAt->diffInMinutes($endAt);
     }
 
+    /**
+     * Atasan boleh menarik kembali persetujuan selama masih di hari yang sama
+     * dengan saat ia menyetujui. Batas ini disengaja: lembur yang sudah disetujui
+     * ikut terhitung di rekap bulanan yang dipakai payroll, jadi perubahan
+     * retroaktif setelah hari berganti harus lewat HR, bukan diam-diam di sini.
+     */
+    public function isRevocable(): bool
+    {
+        return $this->status === self::STATUS_APPROVED
+            && $this->decided_at !== null
+            && $this->decided_at->isToday();
+    }
+
     public function getTimeRangeLabelAttribute(): ?string
     {
         if (! $this->start_time || ! $this->end_time) {

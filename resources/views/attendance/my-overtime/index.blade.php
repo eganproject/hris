@@ -47,6 +47,63 @@
             </section>
         @endif
 
+        {{-- Decision history for me as a supervisor --}}
+        @if ($isSupervisor || $decidedByMe->isNotEmpty())
+            <section class="overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm">
+                <div class="flex flex-wrap items-center justify-between gap-2 border-b border-gray-200 px-5 py-3">
+                    <h2 class="text-sm font-semibold text-gray-950">Riwayat Keputusan Anda</h2>
+                    <p class="text-xs text-gray-500">Pengajuan lembur bawahan yang sudah Anda setujui atau tolak.</p>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="data-table">
+                        <thead><tr><th>Karyawan</th><th>Tanggal</th><th>Jam</th><th>Durasi</th><th>Status</th><th>Diputuskan</th><th class="text-right">Aksi</th></tr></thead>
+                        <tbody>
+                            @forelse ($decidedByMe as $req)
+                                <tr>
+                                    <td class="text-sm text-gray-700">
+                                        {{ $req->employee?->full_name ?? '—' }}
+                                        <span class="block text-xs text-gray-400">{{ $req->employee?->employee_number }}</span>
+                                    </td>
+                                    <td class="text-sm text-gray-600">{{ $req->work_date->translatedFormat('D, d M Y') }}</td>
+                                    <td class="text-sm text-gray-600">{{ $req->time_range_label ?? '—' }}</td>
+                                    <td class="text-sm font-medium text-gray-800">
+                                        @if ($req->status === 'approved')
+                                            {{ intdiv($req->approved_minutes, 60) }}j {{ $req->approved_minutes % 60 }}m
+                                            @if ($req->approved_minutes !== $req->requested_minutes)
+                                                <span class="block text-xs font-normal text-gray-400">diajukan {{ intdiv($req->requested_minutes, 60) }}j {{ $req->requested_minutes % 60 }}m</span>
+                                            @endif
+                                        @else
+                                            <span class="text-gray-400">{{ intdiv($req->requested_minutes, 60) }}j {{ $req->requested_minutes % 60 }}m</span>
+                                        @endif
+                                    </td>
+                                    <td>
+                                        <x-status-badge :tone="$req->status_tone">{{ $req->status_label }}</x-status-badge>
+                                        @if ($req->status === 'rejected' && $req->notes)<p class="mt-1 text-xs text-gray-400">{{ $req->notes }}</p>@endif
+                                    </td>
+                                    <td class="text-sm text-gray-500">{{ $req->decided_at?->translatedFormat('d M Y H:i') ?? '—' }}</td>
+                                    <td class="text-right">
+                                        @if ($req->isRevocable())
+                                            <form method="POST" action="{{ route('my-overtime.revoke', $req) }}" data-confirm-message="Batalkan persetujuan lembur {{ $req->employee?->full_name ?? 'karyawan ini' }}? Pengajuan kembali menunggu keputusan Anda." data-confirm-approve="Ya, batalkan">
+                                                @csrf @method('PATCH')
+                                                <button class="text-sm text-amber-700 hover:text-amber-800">Batalkan Persetujuan</button>
+                                            </form>
+                                        @elseif ($req->status === 'approved')
+                                            <span class="text-xs text-gray-400" title="Persetujuan hanya bisa dibatalkan pada hari yang sama saat disetujui.">Terkunci</span>
+                                        @endif
+                                    </td>
+                                </tr>
+                            @empty
+                                <tr><td colspan="7" class="cell-empty">Belum ada pengajuan lembur bawahan yang Anda putuskan.</td></tr>
+                            @endforelse
+                        </tbody>
+                    </table>
+                </div>
+                @if ($decidedByMe->hasPages())
+                    <div class="border-t border-gray-200 px-5 py-4">{{ $decidedByMe->links() }}</div>
+                @endif
+            </section>
+        @endif
+
         {{-- My own overtime requests --}}
         <section class="overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm">
             <div class="border-b border-gray-200 px-5 py-3"><h2 class="text-sm font-semibold text-gray-950">Pengajuan Saya</h2></div>
