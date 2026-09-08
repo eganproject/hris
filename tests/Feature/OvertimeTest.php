@@ -270,3 +270,29 @@ test('a pending request has no approval to revoke', function () {
 
     expect($overtime->fresh()->status)->toBe('pending');
 });
+
+test('an employee can file again for a date whose earlier request was rejected', function () {
+    [$employeeUser, , $supervisorUser, $date] = overtimeStaff(90);
+
+    $overtime = requestOvertime($employeeUser, $date);
+    $this->actingAs($supervisorUser)->patch("/my-overtime/{$overtime->id}/reject", ['notes' => 'Kurang rinci.']);
+
+    $this->actingAs($employeeUser)->post('/my-overtime', [
+        'work_date' => $date,
+        'start_time' => '17:00',
+        'end_time' => '19:00',
+        'reason' => 'Kejar target produksi — rincian lengkap.',
+    ])->assertRedirect('/my-overtime');
+
+    expect(OvertimeApproval::query()->count())->toBe(1);
+
+    $overtime->refresh();
+
+    expect($overtime->status)->toBe('pending')
+        ->and($overtime->requested_minutes)->toBe(120)
+        ->and($overtime->reason)->toBe('Kejar target produksi — rincian lengkap.')
+        ->and($overtime->notes)->toBeNull()
+        ->and($overtime->decided_at)->toBeNull()
+        ->and($overtime->reviewed_by)->toBeNull()
+        ->and($overtime->approved_minutes)->toBe(0);
+});

@@ -81,13 +81,14 @@ class MyOvertimeController extends Controller
             return back()->withInput()->withErrors(['end_time' => "Durasi lembur tidak wajar (lebih dari {$maxHours} jam). Periksa kembali jam mulai & selesai."]);
         }
 
-        $alreadyRequested = OvertimeApproval::query()
+        // Satu baris per karyawan per tanggal (unique key di tabelnya), jadi tanggal
+        // yang sudah punya pengajuan tidak boleh diinsert lagi.
+        $existing = OvertimeApproval::query()
             ->where('employee_id', $employee->id)
             ->where('work_date', $data['work_date'])
-            ->whereIn('status', [OvertimeApproval::STATUS_PENDING, OvertimeApproval::STATUS_APPROVED])
-            ->exists();
+            ->first();
 
-        if ($alreadyRequested) {
+        if ($existing && $existing->status !== OvertimeApproval::STATUS_REJECTED) {
             return back()->withInput()->withErrors(['work_date' => 'Anda sudah mengajukan lembur untuk tanggal ini.']);
         }
 
@@ -96,10 +97,14 @@ class MyOvertimeController extends Controller
             ->where('work_date', $data['work_date'])
             ->value('overtime_minutes') ?? 0);
 
-        $overtime = OvertimeApproval::query()->create([
+        // Pengajuan yang pernah ditolak boleh diperbaiki dan diajukan ulang: barisnya
+        // dipakai ulang (insert baru menabrak unique key) dan jejak keputusan lama
+        // dibersihkan agar catatan penolakan sebelumnya tidak ikut terbawa.
+        $overtime = OvertimeApproval::query()->updateOrCreate([
             'employee_id' => $employee->id,
-            'supervisor_id' => $employee->manager_id,
             'work_date' => $data['work_date'],
+        ], [
+            'supervisor_id' => $employee->manager_id,
             'start_time' => $data['start_time'],
             'end_time' => $data['end_time'],
             'requested_minutes' => $minutes,
@@ -108,6 +113,9 @@ class MyOvertimeController extends Controller
             'computed_minutes' => $computed,
             'approved_minutes' => 0,
             'status' => OvertimeApproval::STATUS_PENDING,
+            'reviewed_by' => null,
+            'decided_at' => null,
+            'notes' => null,
         ]);
 
         app(ApprovalNotifier::class)->overtimeRequested($overtime);
