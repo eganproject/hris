@@ -116,7 +116,9 @@ class AssetsImport implements SkipsEmptyRows, ToCollection, WithHeadingRow, With
             ['key' => 'lokasi_sekarang', 'header' => 'Lokasi Sekarang', 'required' => false, 'example' => 'Head Office', 'desc' => 'Tempat barangnya berada saat ini. Dikosongkan berarti sama dengan Lokasi Pemilik.'],
             ['key' => 'divisi_pemilik', 'header' => 'Divisi Pemilik', 'required' => true, 'example' => 'IT', 'desc' => 'Divisi yang memiliki aset. Harus sudah terdaftar.'],
             ['key' => 'divisi_kedua', 'header' => 'Divisi Kedua', 'required' => false, 'example' => '', 'desc' => 'Opsional, untuk aset yang dimiliki bersama dua divisi. Harus berbeda dari Divisi Pemilik.'],
-            ['key' => 'status', 'header' => 'Status', 'required' => false, 'example' => 'Tersedia', 'desc' => 'Tersedia, Draft, Perawatan, Hilang, atau Tidak Dipakai. Dikosongkan berarti Tersedia. "Dipegang" tidak bisa diimpor — status itu hanya lahir dari penyerahan aset, supaya selalu punya pemegang yang tercatat.'],
+            // Daftar statusnya diturunkan dari enum, bukan diketik: sebelumnya ditulis
+            // manual dan langsung basi begitu ada status baru.
+            ['key' => 'status', 'header' => 'Status', 'required' => false, 'example' => 'Tersedia', 'desc' => self::manualStatusList().'. Dikosongkan berarti Tersedia. "Dipegang" tidak bisa diimpor — status itu hanya lahir dari penyerahan aset, supaya selalu punya pemegang yang tercatat.'],
             ['key' => 'kondisi', 'header' => 'Kondisi', 'required' => false, 'example' => 'Baik', 'desc' => 'Baru, Baik, Cukup, Rusak, atau Tidak Layak. Dikosongkan berarti Baik.'],
             ['key' => 'tanggal_perolehan', 'header' => 'Tanggal Perolehan', 'required' => false, 'example' => '2026-01-15', 'desc' => 'Format YYYY-MM-DD. Tidak boleh di masa depan.'],
             ['key' => 'nilai_perolehan', 'header' => 'Nilai Perolehan', 'required' => false, 'example' => '15000000', 'desc' => 'Angka rupiah, tanpa titik atau koma pemisah ribuan.'],
@@ -346,6 +348,15 @@ class AssetsImport implements SkipsEmptyRows, ToCollection, WithHeadingRow, With
         }
 
         return $id;
+    }
+
+    /** "Tersedia, Draft, Dipakai, ... atau Tidak Dipakai" — untuk keterangan kolom. */
+    private static function manualStatusList(): string
+    {
+        $labels = array_map(fn (AssetStatus $s) => $s->label(), AssetStatus::MANUAL);
+        $last = array_pop($labels);
+
+        return implode(', ', $labels).', atau '.$last;
     }
 
     /**

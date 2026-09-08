@@ -307,3 +307,70 @@ test('menyimpan ulang aset tidak membangkitkan kode baru', function () {
 
     expect($asset->fresh()->asset_code)->toBe($code);
 });
+
+test('status dipakai bisa dipilih dari formulir master', function () {
+    $fixture = assetFixture();
+    $admin = assetAdmin();
+
+    $this->actingAs($admin)->get(route('assets.create'))->assertOk()->assertSee('Dipakai');
+
+    $this->actingAs($admin)
+        ->post(route('assets.store'), assetPayload($fixture, [
+            'name' => 'Handphone hostlive',
+            'serial_number' => 'SN-HOSTLIVE-1',
+            'status' => AssetStatus::InUse->value,
+        ]))
+        ->assertRedirect();
+
+    $asset = Asset::query()->firstOrFail();
+
+    expect($asset->status)->toBe(AssetStatus::InUse)
+        ->and($asset->status_label)->toBe('Dipakai');
+});
+
+test('status dipakai masih bisa dikembalikan ke tersedia lewat formulir', function () {
+    $fixture = assetFixture();
+    $admin = assetAdmin();
+
+    $this->actingAs($admin)->post(route('assets.store'), assetPayload($fixture, [
+        'status' => AssetStatus::InUse->value,
+    ]));
+    $asset = Asset::query()->firstOrFail();
+
+    $this->actingAs($admin)->put(route('assets.update', $asset), assetPayload($fixture, [
+        'status' => AssetStatus::Available->value,
+    ]));
+
+    expect($asset->fresh()->status)->toBe(AssetStatus::Available);
+});
+
+test('aset yang sedang dipakai bersama tidak bisa dihapus', function () {
+    $fixture = assetFixture();
+    $admin = assetAdmin();
+
+    $this->actingAs($admin)->post(route('assets.store'), assetPayload($fixture, [
+        'status' => AssetStatus::InUse->value,
+    ]));
+    $asset = Asset::query()->firstOrFail();
+
+    $this->actingAs($admin)->delete(route('assets.destroy', $asset))->assertRedirect();
+
+    expect(Asset::query()->whereKey($asset->id)->exists())->toBeTrue();
+});
+
+test('daftar aset bisa disaring ke status dipakai', function () {
+    $fixture = assetFixture();
+    $admin = assetAdmin();
+
+    $this->actingAs($admin)->post(route('assets.store'), assetPayload($fixture, [
+        'name' => 'Handphone hostlive', 'serial_number' => 'SN-SHARED', 'status' => AssetStatus::InUse->value,
+    ]));
+    $this->actingAs($admin)->post(route('assets.store'), assetPayload($fixture, [
+        'name' => 'Laptop cadangan', 'serial_number' => 'SN-SPARE', 'status' => AssetStatus::Available->value,
+    ]));
+
+    $this->actingAs($admin)->get(route('assets.index', ['status' => AssetStatus::InUse->value]))
+        ->assertOk()
+        ->assertSee('Handphone hostlive')
+        ->assertDontSee('Laptop cadangan');
+});

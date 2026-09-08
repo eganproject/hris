@@ -484,3 +484,20 @@ test('detail aset tersusun dalam tab detail, riwayat, dan berkas', function () {
         ->assertSee('data-tab-panel="riwayat"', escape: false)
         ->assertSee('data-tab-panel="berkas"', escape: false);
 });
+
+test('aset pakai bersama tidak bisa diserahkan ke satu karyawan', function () {
+    $f = custodyFixture();
+    $f['asset']->forceFill(['status' => AssetStatus::InUse->value])->save();
+
+    $this->actingAs(custodyOfficer())
+        ->post(route('assets.assign', $f['asset']), [
+            'employee_id' => $f['employee']->id,
+            'condition_out' => 'good',
+        ])
+        ->assertRedirect();
+
+    $asset = $f['asset']->fresh();
+
+    expect($asset->status)->toBe(AssetStatus::InUse)
+        ->and($asset->currentAssignment)->toBeNull();
+});

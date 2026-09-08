@@ -212,3 +212,15 @@ test('hak menambah aset tidak dengan sendirinya memberi hak mengimpor', function
     $this->actingAs($penambah)->get(route('assets.import.template'))->assertForbidden();
     $this->actingAs($penambah)->post(route('assets.import'), [])->assertForbidden();
 });
+
+test('status dipakai bisa diimpor untuk barang yang terpakai bersama', function () {
+    importFixture();
+
+    $this->actingAs(assetImporter())
+        ->post(route('assets.import'), ['file' => assetWorkbook([
+            ['nama_aset' => 'Handphone hostlive', 'kategori' => 'Laptop', 'nomor_seri' => 'SN-HL-1', 'lokasi_pemilik' => 'Head Office', 'divisi_pemilik' => 'IT', 'status' => 'Dipakai'],
+        ])]);
+
+    expect(session('import_errors'))->toBeEmpty()
+        ->and(Asset::query()->firstOrFail()->status->value)->toBe('in_use');
+});
