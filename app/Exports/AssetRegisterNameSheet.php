@@ -41,21 +41,20 @@ class AssetRegisterNameSheet implements FromArray, ShouldAutoSize, WithEvents, W
     public function array(): array
     {
         $rows = [
-            ['Nama Aset', 'Jumlah Unit', 'Nilai Perolehan', 'Variasi Ejaan'],
+            ['Nama Aset', 'Jumlah Unit', 'Variasi Ejaan'],
         ];
 
         foreach ($this->names as $name) {
             $rows[] = [
                 $name['name'],
                 $name['units'],
-                $name['value'],
                 // 1 ditulis sebagai teks kosong supaya mata langsung jatuh ke baris
                 // yang bermasalah, bukan ke kolom penuh angka 1 yang tidak berarti apa-apa.
                 $name['spellings'] > 1 ? $name['spellings'].' ejaan berbeda' : '',
             ];
         }
 
-        $rows[] = ['TOTAL', (int) $this->summary['total'], (float) $this->summary['value'], ''];
+        $rows[] = ['TOTAL', (int) $this->summary['total'], ''];
 
         return $rows;
     }
@@ -68,9 +67,8 @@ class AssetRegisterNameSheet implements FromArray, ShouldAutoSize, WithEvents, W
                 $sheet = $event->sheet->getDelegate();
                 $last = $this->names->count() + 2;
 
-                $sheet->getStyle('A1:D1')->getFont()->setBold(true);
-                $sheet->getStyle("A{$last}:D{$last}")->getFont()->setBold(true);
-                $sheet->getStyle("C2:C{$last}")->getNumberFormat()->setFormatCode('#,##0');
+                $sheet->getStyle('A1:C1')->getFont()->setBold(true);
+                $sheet->getStyle("A{$last}:C{$last}")->getFont()->setBold(true);
                 $sheet->freezePane('A2');
             },
         ];

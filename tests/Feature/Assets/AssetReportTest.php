@@ -11,6 +11,7 @@ use App\Models\User;
 use App\Support\AssetRegisterReport;
 use App\Support\DataScope;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Str;
 use Maatwebsite\Excel\Facades\Excel;
 use Spatie\Permission\Models\Permission;
 use Spatie\Permission\PermissionRegistrar;
@@ -76,9 +77,16 @@ test('register aset menampilkan rekap per kategori beserta totalnya', function (
         ->assertSee('Register Aset')
         ->assertSee('Rekap per Kategori')
         ->assertSee('Laptop')
-        ->assertSee('Handphone')
-        // 2 laptop + 1 handphone, total nilai 18 juta.
-        ->assertSee('Rp 18.000.000');
+        ->assertSee('Handphone');
+
+    // Rekapnya dibuktikan lewat cacahnya, bukan rupiah: laporan ini memang tidak
+    // lagi menghitung nilai perolehan.
+    $response = $this->actingAs(assetReportUser())->get(route('reports.assets'));
+    $groups = collect($response->viewData('groups'));
+
+    expect($response->viewData('summary')['total'])->toBe(3)
+        ->and($groups->firstWhere('label', 'Laptop')['count'])->toBe(2)
+        ->and($groups->firstWhere('label', 'Handphone')['count'])->toBe(1);
 });
 
 test('rekap bisa dikelompokkan per sumbu lain', function () {
@@ -102,13 +110,15 @@ test('sumbu pengelompokan yang tidak dikenal jatuh ke bawaannya, bukan galat', f
 test('penyaring laporan mempersempit rekap dan daftarnya sekaligus', function () {
     $f = assetReportFixture();
 
-    $this->actingAs(assetReportUser())->get(route('reports.assets', ['category' => $f['phoneCategory']->id]))
+    $response = $this->actingAs(assetReportUser())
+        ->get(route('reports.assets', ['category' => $f['phoneCategory']->id]))
         ->assertOk()
         ->assertSee('Handphone hostlive')
-        ->assertDontSee('Laptop Dell')
-        // Hanya handphone yang terhitung, jadi totalnya bukan lagi 18 juta.
-        ->assertSee('Rp 3.000.000')
-        ->assertDontSee('Rp 18.000.000');
+        ->assertDontSee('Laptop Dell');
+
+    // Rekap dan daftarnya menyusut bersama-sama, bukan cuma salah satunya.
+    expect($response->viewData('summary')['total'])->toBe(1)
+        ->and($response->viewData('groups'))->toHaveCount(1);
 });
 
 test('laporan hanya memuat aset di dalam cakupan penggunanya', function () {
@@ -119,11 +129,12 @@ test('laporan hanya memuat aset di dalam cakupan penggunanya', function () {
     $user = assetReportUser(['reports.assets.view', 'reports.assets.export']);
     $user->accessBranches()->sync([$f['ho']->id]);
 
-    $this->actingAs($user)->get(route('reports.assets'))
+    $response = $this->actingAs($user)->get(route('reports.assets'))
         ->assertOk()
         ->assertSee('Laptop Dell')
-        ->assertDontSee('Handphone hostlive')
-        ->assertSee('Rp 15.000.000');
+        ->assertDontSee('Handphone hostlive');
+
+    expect($response->viewData('summary')['total'])->toBe(2);
 });
 
 test('unduhan excel dan pdf mengikuti cakupan serta penyaring yang sama', function () {
@@ -439,4 +450,73 @@ test('kelompok tanpa nilai tidak bisa diklik karena penyaringnya tidak bisa meny
     // Divisi yang punya nilai tetap bisa diklik, jadi ketidakadaan tautan di atas
     // memang karena null-nya, bukan karena tautannya hilang seluruhnya.
     expect($rekap)->toContain('href=');
+});
+
+test('kolom nilai perolehan diganti spesifikasi, dan angkanya tidak muncul di mana pun', function () {
+    $f = assetReportFixture();
+
+    $f['laptopA']->forceFill(['specification' => 'Core i7, RAM 16GB, SSD 512GB'])->save();
+
+    $html = $this->actingAs(assetReportUser())->get(route('reports.assets'))->assertOk()->getContent();
+
+    expect($html)->toContain('Spesifikasi')
+        ->and($html)->toContain('Core i7, RAM 16GB, SSD 512GB')
+        // Fixture-nya bernilai 10jt, 5jt, dan 3jt. Tidak satu pun boleh terbawa,
+        // termasuk lewat kartu ringkas dan tabel rekap yang dulu menjumlahkannya.
+        ->and($html)->not->toContain('Nilai Perolehan')
+        ->and($html)->not->toContain('Nilai perolehan:')
+        ->and($html)->not->toContain('Rp 10.000.000')
+        ->and($html)->not->toContain('Rp 18.000.000');
+
+    // Perhitungannya juga berhenti, bukan cuma tampilannya yang disembunyikan.
+    $summary = app(AssetRegisterReport::class)->summary(DataScope::forAssets(assetReportUser()), []);
+
+    expect($summary)->not->toHaveKey('value');
+});
+
+test('spesifikasi yang panjang dipotong tapi tetap terbawa utuh untuk dibaca', function () {
+    $f = assetReportFixture();
+
+    $panjang = 'Spesifikasi sangat panjang '.str_repeat('dengan banyak sekali keterangan ', 20);
+    $f['laptopA']->forceFill(['specification' => $panjang])->save();
+
+    $html = $this->actingAs(assetReportUser())->get(route('reports.assets'))->assertOk()->getContent();
+
+    // Yang tampil dipotong supaya satu baris tidak meregangkan seluruh tabel,
+    // tapi teks utuhnya tetap ada di title agar tidak ada keterangan yang hilang.
+    expect($html)->toContain(Str::limit($panjang, 120))
+        ->and($html)->toContain(e($panjang))
+        ->and($html)->not->toContain('>'.e($panjang).'<');
+});
+
+test('unit di dalam grup menampilkan merek dan model, kode asetnya jadi keterangan kecil', function () {
+    $f = assetReportFixture();
+
+    $unit = fn (?string $brand, ?string $model, ?string $sn) => Asset::query()->create([
+        'category_id' => $f['laptop']->id, 'name' => 'iPhone XR',
+        'brand' => $brand, 'model' => $model, 'serial_number' => $sn,
+        'owning_branch_id' => $f['ho']->id, 'current_branch_id' => $f['ho']->id,
+        'department_id' => $f['it']->id,
+        'status' => AssetStatus::Available->value, 'condition' => 'good',
+    ]);
+
+    $lengkap = $unit('Apple', 'MRY62', 'SN-A1');
+    $merekSaja = $unit('Apple', null, null);
+    $modelSaja = $unit(null, 'MRY72', null);
+    $kosong = $unit(null, null, null);
+
+    $html = $this->actingAs(assetReportUser())->get(route('reports.assets'))->assertOk()->getContent();
+
+    expect($html)->toContain('Apple MRY62')
+        // Yang cuma punya salah satunya tidak boleh menyisakan spasi menggantung.
+        ->and($html)->not->toContain('Apple  ')
+        ->and($html)->not->toContain(' MRY72</p>');
+
+    // Yang merek dan modelnya kosong tetap terbaca lewat kode asetnya — barisnya
+    // tidak boleh berakhir kosong hanya karena datanya belum diisi.
+    foreach ([$lengkap, $merekSaja, $modelSaja, $kosong] as $asset) {
+        expect($html)->toContain($asset->refresh()->asset_code);
+    }
+
+    expect($html)->toContain('SN SN-A1');
 });

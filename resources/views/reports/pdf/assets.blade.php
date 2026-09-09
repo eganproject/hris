@@ -27,7 +27,6 @@
         @endforeach
         <br>Dicetak: {{ now()->translatedFormat('d M Y H:i') }}
         &middot; Jumlah aset: {{ number_format($summary['total']) }}
-        &middot; Nilai perolehan: Rp {{ number_format($summary['value'], 0, ',', '.') }}
         {{-- Dua angka, bukan satu "sedang terpakai": hanya Dipegang yang punya nama
              penanggung jawab, dan cetakan inilah yang dibawa saat stock opname. --}}
         &middot; Dipegang karyawan: {{ number_format($summary['assigned']) }}
@@ -40,7 +39,6 @@
             <tr>
                 <th class="l">{{ $groupLabel }}</th>
                 <th>Jumlah Aset</th>
-                <th>Nilai Perolehan</th>
                 <th>% Jumlah</th>
             </tr>
         </thead>
@@ -49,11 +47,10 @@
                 <tr>
                     <td class="l">{{ $group['label'] }}</td>
                     <td class="r">{{ number_format($group['count']) }}</td>
-                    <td class="r">{{ number_format($group['value'], 0, ',', '.') }}</td>
                     <td class="r">{{ $summary['total'] > 0 ? number_format($group['count'] / $summary['total'] * 100, 1) : '0,0' }}%</td>
                 </tr>
             @empty
-                <tr><td colspan="4" style="text-align:center; padding:12px; color:#9ca3af;">Tidak ada aset yang cocok dengan penyaring ini.</td></tr>
+                <tr><td colspan="3" style="text-align:center; padding:12px; color:#9ca3af;">Tidak ada aset yang cocok dengan penyaring ini.</td></tr>
             @endforelse
         </tbody>
         @if ($groups->isNotEmpty())
@@ -61,7 +58,6 @@
                 <tr>
                     <td class="l">Total</td>
                     <td class="r">{{ number_format($summary['total']) }}</td>
-                    <td class="r">{{ number_format($summary['value'], 0, ',', '.') }}</td>
                     <td class="r">100,0%</td>
                 </tr>
             </tfoot>
@@ -77,7 +73,6 @@
             <tr>
                 <th class="l">Nama Aset</th>
                 <th>Jumlah Unit</th>
-                <th>Nilai Perolehan</th>
                 <th class="l">Catatan</th>
             </tr>
         </thead>
@@ -86,11 +81,10 @@
                 <tr>
                     <td class="l">{{ $name['name'] }}</td>
                     <td class="r">{{ number_format($name['units']) }}</td>
-                    <td class="r">{{ number_format($name['value'], 0, ',', '.') }}</td>
                     <td class="l">{{ $name['spellings'] > 1 ? $name['spellings'].' ejaan berbeda' : '' }}</td>
                 </tr>
             @empty
-                <tr><td colspan="4" style="text-align:center; padding:12px; color:#9ca3af;">Tidak ada aset yang cocok dengan penyaring ini.</td></tr>
+                <tr><td colspan="3" style="text-align:center; padding:12px; color:#9ca3af;">Tidak ada aset yang cocok dengan penyaring ini.</td></tr>
             @endforelse
         </tbody>
         @if ($names->isNotEmpty())
@@ -98,7 +92,6 @@
                 <tr>
                     <td class="l">Total {{ number_format($names->count()) }} nama</td>
                     <td class="r">{{ number_format($summary['total']) }}</td>
-                    <td class="r">{{ number_format($summary['value'], 0, ',', '.') }}</td>
                     <td class="l"></td>
                 </tr>
             </tfoot>
@@ -118,7 +111,7 @@
                 <th>Status</th>
                 <th>Kondisi</th>
                 <th class="l">Pemegang</th>
-                <th>Nilai Perolehan</th>
+                <th class="l">Spesifikasi</th>
             </tr>
         </thead>
         <tbody>
@@ -131,7 +124,10 @@
                     <td class="c">{{ $asset->status_label }}</td>
                     <td class="c">{{ $asset->condition_label }}</td>
                     <td class="l">{{ $asset->currentAssignment?->employee?->full_name ?? ($asset->status?->isSharedUse() ? 'Pakai bersama' : '—') }}</td>
-                    <td class="r">{{ $asset->acquisition_cost === null ? '—' : number_format((float) $asset->acquisition_cost, 0, ',', '.') }}</td>
+                    {{-- Dipotong lebih pendek daripada di layar: di kertas tidak ada
+                         kursor yang bisa berhenti untuk membaca sisanya, dan satu sel
+                         panjang akan menarik tinggi seluruh barisnya. --}}
+                    <td class="l">{{ \Illuminate\Support\Str::limit((string) $asset->specification, 90) ?: '—' }}</td>
                 </tr>
             @empty
                 <tr><td colspan="8" style="text-align:center; padding:16px; color:#9ca3af;">Tidak ada aset yang cocok dengan penyaring ini.</td></tr>

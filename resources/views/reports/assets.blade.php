@@ -4,7 +4,7 @@
             <div>
                 <p class="text-sm font-medium text-gray-500"><a href="{{ route('reports.index') }}" class="hover:text-gray-700">Laporan</a> · Per {{ now()->translatedFormat('d M Y') }}</p>
                 <h1 class="mt-1 text-2xl font-semibold text-gray-950">Register Aset</h1>
-                <p class="mt-1 text-sm text-gray-500">Seluruh aset beserta status, kondisi, pemegang, dan nilai perolehannya — diringkas per {{ strtolower($groupLabel) }}.</p>
+                <p class="mt-1 text-sm text-gray-500">Seluruh aset beserta status, kondisi, pemegang, dan spesifikasinya — diringkas per {{ strtolower($groupLabel) }}.</p>
             </div>
             @can('reports.assets.export')
                 <div class="flex items-center gap-2">
@@ -103,9 +103,8 @@
         {{-- Dipegang dan Dipakai dihitung sebagai dua angka, bukan satu "sedang
              terpakai": hanya yang Dipegang punya nama karyawan yang bisa dimintai
              pertanggungjawaban, dan laporan inilah yang dipakai untuk menagih. --}}
-        <section class="grid grid-cols-2 gap-4 lg:grid-cols-5">
+        <section class="grid grid-cols-2 gap-4 lg:grid-cols-4">
             <x-stat-card label="Jumlah aset" :value="number_format($summary['total'])" tone="primary"><x-icon name="box"/></x-stat-card>
-            <x-stat-card label="Nilai perolehan" :value="'Rp '.number_format($summary['value'], 0, ',', '.')" tone="gray"><x-icon name="banknote"/></x-stat-card>
             <x-stat-card label="Dipegang karyawan" :value="number_format($summary['assigned'])" tone="sky" hint="Ada pemegangnya"><x-icon name="user-check"/></x-stat-card>
             <x-stat-card label="Dipakai bersama" :value="number_format($summary['in_use'])" tone="violet" hint="Tanpa pemegang"><x-icon name="users"/></x-stat-card>
             <x-stat-card label="Garansi ≤30 hari" :value="number_format($summary['warranty_expiring'])" tone="amber"><x-icon name="refresh"/></x-stat-card>
@@ -141,7 +140,7 @@
             </div>
             <div class="overflow-x-auto">
                 <table class="data-table">
-                    <thead><tr><th>{{ $groupLabel }}</th><th class="text-right">Jumlah Aset</th><th class="text-right">Nilai Perolehan</th><th class="text-right">% Jumlah</th></tr></thead>
+                    <thead><tr><th>{{ $groupLabel }}</th><th class="text-right">Jumlah Aset</th><th class="text-right">% Jumlah</th></tr></thead>
                     <tbody>
                         @forelse ($groups as $group)
                             @php
@@ -166,11 +165,10 @@
                                     @endif
                                 </td>
                                 <td class="text-right text-sm text-gray-700">{{ number_format($group['count']) }}</td>
-                                <td class="text-right text-sm text-gray-700">Rp {{ number_format($group['value'], 0, ',', '.') }}</td>
                                 <td class="text-right text-sm text-gray-500">{{ $summary['total'] > 0 ? number_format($group['count'] / $summary['total'] * 100, 1) : '0,0' }}%</td>
                             </tr>
                         @empty
-                            <tr><td colspan="4" class="cell-empty">Tidak ada aset yang cocok dengan penyaring ini.</td></tr>
+                            <tr><td colspan="3" class="cell-empty">Tidak ada aset yang cocok dengan penyaring ini.</td></tr>
                         @endforelse
                     </tbody>
                     @if ($groups->isNotEmpty())
@@ -178,7 +176,6 @@
                             <tr class="border-t border-gray-200 bg-gray-50">
                                 <td class="text-sm font-semibold text-gray-900">Total</td>
                                 <td class="text-right text-sm font-semibold text-gray-900">{{ number_format($summary['total']) }}</td>
-                                <td class="text-right text-sm font-semibold text-gray-900">Rp {{ number_format($summary['value'], 0, ',', '.') }}</td>
                                 <td class="text-right text-sm font-semibold text-gray-900">100,0%</td>
                             </tr>
                         </tfoot>
@@ -213,7 +210,7 @@
                             <th>Status</th>
                             <th>Kondisi</th>
                             <th>Pemegang</th>
-                            <th class="text-right">Nilai Perolehan</th>
+                            <th>Spesifikasi</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -287,7 +284,10 @@
                                         </div>
                                     </td>
                                     <td class="text-sm text-gray-600">{{ $dipegang > 0 ? $dipegang.' dipegang' : '—' }}</td>
-                                    <td class="text-right text-sm font-semibold text-gray-900">Rp {{ number_format($group['value'], 0, ',', '.') }}</td>
+                                    {{-- Spesifikasi yang seragam ditulis apa adanya; yang berbeda-beda
+                                         hanya disebut jumlahnya, karena memilih salah satu akan membuat
+                                         pembaca mengira unit lain spesifikasinya sama. --}}
+                                    <td class="text-sm text-gray-600">{{ \Illuminate\Support\Str::limit($ringkas($units->map(fn ($asset) => $asset->specification), 'spesifikasi'), 120) }}</td>
                                 </tr>
 
                                 @foreach ($units as $asset)
@@ -312,7 +312,7 @@
             @endif
         </section>
 
-        <p class="text-xs text-gray-400">Nilai perolehan adalah harga beli yang tercatat saat aset didaftarkan, bukan nilai buku — penyusutan belum dihitung sistem. Kolom Pemegang hanya terisi untuk aset yang sedang diserahkan ke seorang karyawan. Status &ldquo;Dipegang&rdquo; berarti ada satu nama yang bisa dimintai pertanggungjawaban; &ldquo;Dipakai&rdquo; berarti barangnya terpakai bersama dan memang tidak punya pemegang — keduanya dihitung dan diwarnai terpisah, jangan dijumlahkan sebagai satu angka.
+        <p class="text-xs text-gray-400">Spesifikasi dipotong bila terlalu panjang — arahkan kursor ke atasnya untuk membaca utuh, atau buka detail asetnya. Laporan ini tidak lagi menampilkan nilai perolehan; angkanya tetap tersimpan di master aset dan bisa dilihat di halaman detail tiap aset. Kolom Pemegang hanya terisi untuk aset yang sedang diserahkan ke seorang karyawan. Status &ldquo;Dipegang&rdquo; berarti ada satu nama yang bisa dimintai pertanggungjawaban; &ldquo;Dipakai&rdquo; berarti barangnya terpakai bersama dan memang tidak punya pemegang — keduanya dihitung dan diwarnai terpisah, jangan dijumlahkan sebagai satu angka.
             @if ($view === 'grouped')
                 Tampilan ringkas menggabungkan aset yang <span class="font-medium">namanya sama</span> setelah besar-kecil huruf dan spasi tepinya diabaikan; penulisan yang benar-benar berbeda seperti &ldquo;iPhone XR&rdquo; dan &ldquo;iPhone XR 64GB&rdquo; tetap terpisah, dan itu memang harus dirapikan di master aset, bukan di laporan.
             @endif

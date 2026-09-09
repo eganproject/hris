@@ -18,6 +18,10 @@ use PhpOffice\PhpSpreadsheet\Worksheet\Worksheet;
  * Berbeda dari AssetsExport yang kolomnya sengaja dibuat bisa diimpor kembali,
  * lembar ini laporan: ia membawa pemegang aset dan tanggal serah terima, yang justru
  * tidak boleh ada di berkas impor karena kepemilikan hanya lahir dari serah terima.
+ *
+ * Nilai perolehan tidak ada di sini — register aset menjawab "barang apa dan di
+ * mana", bukan berapa nilainya. Untuk angkanya, buka detail asetnya atau ekspor
+ * master lewat halaman Daftar Aset.
  */
 class AssetRegisterListSheet implements FromCollection, ShouldAutoSize, WithHeadings, WithMapping, WithStyles, WithTitle
 {
@@ -39,10 +43,13 @@ class AssetRegisterListSheet implements FromCollection, ShouldAutoSize, WithHead
     public function headings(): array
     {
         return [
-            'Kode Aset', 'Nama Aset', 'Kategori', 'Merek', 'Model', 'Nomor Seri',
+            // Spesifikasi berdiri bersama Merek/Model/Nomor Seri — semuanya menjawab
+            // "barang ini apa", jadi mata tidak perlu melompati kolom lokasi dan
+            // status untuk merangkainya.
+            'Kode Aset', 'Nama Aset', 'Kategori', 'Merek', 'Model', 'Nomor Seri', 'Spesifikasi',
             'Lokasi Pemilik', 'Lokasi Sekarang', 'Divisi Pemilik',
             'Status', 'Kondisi', 'Pemegang', 'No. Karyawan', 'Sejak',
-            'Tanggal Perolehan', 'Nilai Perolehan', 'Garansi Berakhir',
+            'Tanggal Perolehan', 'Garansi Berakhir',
         ];
     }
 
@@ -61,6 +68,9 @@ class AssetRegisterListSheet implements FromCollection, ShouldAutoSize, WithHead
             $asset->brand,
             $asset->model,
             $asset->serial_number,
+            // Utuh, tidak dipotong seperti di layar dan cetakan: lembar ini justru
+            // yang dibuka orang ketika ingin membaca spesifikasi selengkapnya.
+            $asset->specification,
             $asset->owningBranch?->name,
             $asset->currentBranch?->name,
             $asset->department?->name,
@@ -70,7 +80,6 @@ class AssetRegisterListSheet implements FromCollection, ShouldAutoSize, WithHead
             $assignment?->employee?->employee_number,
             $assignment?->assigned_at?->format('Y-m-d'),
             $asset->acquired_at?->format('Y-m-d'),
-            $asset->acquisition_cost === null ? null : (float) $asset->acquisition_cost,
             $asset->warranty_expires_at?->format('Y-m-d'),
         ];
     }

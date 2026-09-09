@@ -9,7 +9,7 @@ use Maatwebsite\Excel\Concerns\WithEvents;
 use Maatwebsite\Excel\Concerns\WithTitle;
 use Maatwebsite\Excel\Events\AfterSheet;
 
-/** Rekap jumlah dan nilai aset per sumbu yang dipilih, plus barisan totalnya. */
+/** Rekap jumlah aset per sumbu yang dipilih, plus barisan totalnya. */
 class AssetRegisterSummarySheet implements FromArray, ShouldAutoSize, WithEvents, WithTitle
 {
     /**
@@ -33,19 +33,18 @@ class AssetRegisterSummarySheet implements FromArray, ShouldAutoSize, WithEvents
         $total = max(1, (int) $this->summary['total']);
 
         $rows = [
-            [$this->groupLabel, 'Jumlah Aset', 'Nilai Perolehan', '% Jumlah'],
+            [$this->groupLabel, 'Jumlah Aset', '% Jumlah'],
         ];
 
         foreach ($this->groups as $group) {
             $rows[] = [
                 $group['label'],
                 $group['count'],
-                $group['value'],
                 round($group['count'] / $total * 100, 1),
             ];
         }
 
-        $rows[] = ['TOTAL', (int) $this->summary['total'], (float) $this->summary['value'], 100];
+        $rows[] = ['TOTAL', (int) $this->summary['total'], 100];
 
         return $rows;
     }
@@ -58,9 +57,8 @@ class AssetRegisterSummarySheet implements FromArray, ShouldAutoSize, WithEvents
                 $sheet = $event->sheet->getDelegate();
                 $last = $this->groups->count() + 2;
 
-                $sheet->getStyle('A1:D1')->getFont()->setBold(true);
-                $sheet->getStyle("A{$last}:D{$last}")->getFont()->setBold(true);
-                $sheet->getStyle("C2:C{$last}")->getNumberFormat()->setFormatCode('#,##0');
+                $sheet->getStyle('A1:C1')->getFont()->setBold(true);
+                $sheet->getStyle("A{$last}:C{$last}")->getFont()->setBold(true);
             },
         ];
     }

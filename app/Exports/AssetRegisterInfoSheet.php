@@ -44,7 +44,6 @@ class AssetRegisterInfoSheet implements FromArray, ShouldAutoSize, WithEvents, W
 
         $rows[] = ['', ''];
         $rows[] = ['Jumlah aset', (string) $this->summary['total']];
-        $rows[] = ['Nilai perolehan', 'Rp '.number_format((float) $this->summary['value'], 0, ',', '.')];
         // Dua baris, bukan satu "sedang terpakai": angka yang digabung menghapus beda
         // antara barang yang bisa ditagih ke seseorang dan barang yang tidak.
         $rows[] = ['Dipegang karyawan', (string) $this->summary['assigned']];
@@ -54,7 +53,8 @@ class AssetRegisterInfoSheet implements FromArray, ShouldAutoSize, WithEvents, W
         $rows[] = ['', ''];
         $rows[] = ['CARA MEMBACA', ''];
         $rows[] = ['Cakupan', 'Berkas ini hanya memuat aset yang boleh dilihat oleh akun pembuatnya. Dua orang dengan cakupan berbeda akan menghasilkan angka berbeda dari filter yang sama.'];
-        $rows[] = ['Nilai Perolehan', 'Harga beli yang tercatat saat aset didaftarkan, bukan nilai buku. Penyusutan belum dihitung sistem.'];
+        $rows[] = ['Spesifikasi', 'Keterangan teknis yang diisi di master aset. Di lembar ini ditulis utuh; di layar dan cetakan PDF ia dipotong agar tabelnya tetap terbaca.'];
+        $rows[] = ['Nilai perolehan', 'Sengaja tidak ada di berkas ini. Register aset menjawab barang apa, di mana, dipegang siapa, dan spesifikasinya apa — bukan berapa nilainya. Angkanya tetap tersimpan dan bisa dilihat di halaman detail tiap aset atau diekspor dari halaman Daftar Aset.'];
         $rows[] = ['Pemegang', 'Karyawan yang masa pegangnya masih berjalan. Kosong berarti aset tidak sedang diserahkan ke siapa pun.'];
         $rows[] = ['Dipegang vs Dipakai', 'Dua status yang berbeda dan tidak boleh dijumlahkan. "Dipegang" lahir dari serah terima, jadi ada satu karyawan yang bisa dimintai pertanggungjawaban dan kolom Pemegang terisi. "Dipakai" adalah barang pakai bersama yang menetap di satu ruangan — memang terpakai, tapi kolom Pemegangnya sengaja kosong karena tidak ada yang menandatangani.'];
         $rows[] = ['Ringkas per Nama vs Register Aset', 'Dua bentuk dari data yang sama, sengaja dua-duanya ada. "Ringkas per Nama" menggabungkan aset yang namanya sama menjadi satu baris — untuk membaca cepat barang apa yang menumpuk. "Register Aset" tetap satu baris per unit — untuk menelusuri unit tertentu dan untuk diolah sendiri dengan filter atau pivot. Totalnya selalu sama.'];

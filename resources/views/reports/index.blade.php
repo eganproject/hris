@@ -57,7 +57,7 @@
                     </span>
                     <div>
                         <h2 class="text-sm font-semibold text-gray-950">Register Aset</h2>
-                        <p class="mt-1 text-xs text-gray-500">Seluruh aset beserta status, kondisi, pemegang, dan nilai perolehan — diringkas per kategori, lokasi, divisi, status, atau kondisi.</p>
+                        <p class="mt-1 text-xs text-gray-500">Seluruh aset beserta status, kondisi, pemegang, dan spesifikasinya — diringkas per kategori, lokasi, divisi, status, atau kondisi.</p>
                     </div>
                 </a>
             @endcan

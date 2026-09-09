@@ -168,7 +168,7 @@ class AssetRegisterReport
      * satu nama selalu utuh dalam satu halaman.
      *
      * @param  array<string, mixed>  $filters
-     * @return LengthAwarePaginator<int, array{key: string, name: string, spellings: int, units: int, value: float, assets: Collection<int, Asset>}>
+     * @return LengthAwarePaginator<int, array{key: string, name: string, spellings: int, units: int, assets: Collection<int, Asset>}>
      */
     public function nameGroups(DataScope $scope, array $filters, int $perPage): LengthAwarePaginator
     {
@@ -184,7 +184,7 @@ class AssetRegisterReport
      * seluruh grup sekaligus dan tidak perlu barisan detailnya.
      *
      * @param  array<string, mixed>  $filters
-     * @return Collection<int, array{key: string, name: string, spellings: int, units: int, value: float}>
+     * @return Collection<int, array{key: string, name: string, spellings: int, units: int}>
      */
     public function nameSummary(DataScope $scope, array $filters): Collection
     {
@@ -193,12 +193,11 @@ class AssetRegisterReport
             'name' => (string) $row->display_name,
             'spellings' => (int) $row->spellings,
             'units' => (int) $row->units,
-            'value' => (float) $row->units_value,
         ]);
     }
 
     /**
-     * Satu baris per nama: berapa unit, berapa nilainya, dan berapa variasi ejaannya.
+     * Satu baris per nama: berapa unit dan berapa variasi ejaannya.
      *
      * Ketika satu nama ditulis beberapa cara, ejaan mana yang dipakai sebagai nama
      * tampil ditentukan collation basis data dan boleh berbeda antar mesin — yang
@@ -224,8 +223,7 @@ class AssetRegisterReport
                 // terhitung satu ejaan dan peringatannya tidak pernah muncul justru pada
                 // kasus yang paling sering terjadi. Membandingkan bytenya membuat
                 // hitungan ini sama persis di MySQL maupun SQLite.
-                .'count(distinct hex(name)) as spellings, count(*) as units, '
-                .'coalesce(sum(acquisition_cost), 0) as units_value'
+                .'count(distinct hex(name)) as spellings, count(*) as units'
             )
             ->orderByDesc('units')
             ->orderBy('display_name');
@@ -260,14 +258,16 @@ class AssetRegisterReport
             'name' => (string) $row->display_name,
             'spellings' => (int) $row->spellings,
             'units' => (int) $row->units,
-            'value' => (float) $row->units_value,
             'assets' => $members->get((string) $row->group_key, collect()),
         ]);
     }
 
     /**
      * @param  array<string, mixed>  $filters
-     * @return array{total: int, value: float, warranty_expiring: int, assigned: int, in_use: int}
+     *                                         Nilai perolehan sengaja tidak ikut dihitung di mana pun pada laporan ini:
+     *                                         register aset menjawab "barang apa, di mana, dipegang siapa, spesifikasinya
+     *                                         apa", bukan berapa nilainya. Angkanya tetap tersimpan di master aset.
+     * @return array{total: int, warranty_expiring: int, assigned: int, in_use: int}
      */
     public function summary(DataScope $scope, array $filters): array
     {
@@ -275,7 +275,6 @@ class AssetRegisterReport
 
         return [
             'total' => $base()->count(),
-            'value' => (float) ($base()->sum('acquisition_cost') ?: 0),
             'warranty_expiring' => $base()
                 ->whereNotNull('warranty_expires_at')
                 ->whereBetween('warranty_expires_at', [today(), today()->addDays(30)])
@@ -290,14 +289,14 @@ class AssetRegisterReport
     }
 
     /**
-     * Rekap per satu sumbu: berapa aset dan berapa nilainya di tiap kelompok.
+     * Rekap per satu sumbu: berapa aset di tiap kelompok.
      *
      * Dihitung dengan satu GROUP BY lalu namanya dicarikan setelahnya, bukan lewat
      * join — dengan begitu aturan cakupan di base() tetap satu-satunya yang membatasi
      * baris, dan tidak ada join yang diam-diam ikut menyaring atau menggandakan.
      *
      * @param  array<string, mixed>  $filters
-     * @return Collection<int, array{key: int|string|null, label: string, count: int, value: float}>
+     * @return Collection<int, array{key: int|string|null, label: string, count: int}>
      */
     public function groups(DataScope $scope, array $filters, string $groupBy): Collection
     {
@@ -307,7 +306,7 @@ class AssetRegisterReport
         $rows = $this->base($scope, $filters)
             ->reorder()
             ->groupBy($column)
-            ->selectRaw("{$column} as group_key, count(*) as assets_count, coalesce(sum(acquisition_cost), 0) as assets_value")
+            ->selectRaw("{$column} as group_key, count(*) as assets_count")
             ->get();
 
         $names = $this->groupNames($groupBy, $rows->pluck('group_key'));
@@ -317,7 +316,6 @@ class AssetRegisterReport
                 'key' => $row->group_key,
                 'label' => $names[$row->group_key] ?? 'Tanpa '.self::GROUPS[$groupBy],
                 'count' => (int) $row->assets_count,
-                'value' => (float) $row->assets_value,
             ])
             ->sortByDesc('count')
             ->values();
