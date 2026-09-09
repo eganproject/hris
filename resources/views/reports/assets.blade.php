@@ -112,14 +112,59 @@
         </section>
 
         <section class="overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm">
-            <div class="border-b border-gray-200 px-5 py-3"><h2 class="text-sm font-semibold text-gray-950">Rekap per {{ $groupLabel }}</h2></div>
+            @php
+                $filterName = \App\Support\AssetRegisterReport::GROUP_FILTERS[$groupBy];
+                $activeFilter = (string) ($filters[$filterName] ?? '');
+                $filterIsExact = \App\Support\AssetRegisterReport::groupFilterIsExact($groupBy);
+
+                // Penyaringnya dipasang lewat URL, bukan parameter baru: dengan begitu
+                // kartu ringkas, rekap, dan daftar tetap dihitung dari satu himpunan
+                // yang sama, dan hasil kliknya bisa ditautkan ke orang lain apa adanya.
+                // 'page' dibuang supaya tidak mendarat di halaman yang sudah tidak ada.
+                $rekapUrl = fn (?string $value) => route('reports.assets', array_filter(
+                    array_merge(request()->query(), [$filterName => $value, 'page' => null]),
+                    fn ($v) => $v !== null && $v !== '',
+                ));
+            @endphp
+
+            <div class="flex flex-wrap items-center justify-between gap-2 border-b border-gray-200 px-5 py-3">
+                <h2 class="text-sm font-semibold text-gray-950">Rekap per {{ $groupLabel }}</h2>
+                <p class="text-xs text-gray-500">
+                    Klik baris untuk menyaring seluruh halaman; klik lagi untuk melepas.
+                    @unless ($filterIsExact)
+                        {{-- Kejujuran yang perlu disebut di tempat kliknya terjadi: kalau
+                             tidak, orang akan mengira angkanya salah ketika daftar yang
+                             muncul lebih banyak daripada baris yang barusan diklik. --}}
+                        Penyaring {{ strtolower($filterName === 'branch' ? 'lokasi' : 'divisi') }} lebih luas daripada sumbu ini, jadi hasilnya bisa memuat lebih banyak aset daripada barisnya.
+                    @endunless
+                </p>
+            </div>
             <div class="overflow-x-auto">
                 <table class="data-table">
                     <thead><tr><th>{{ $groupLabel }}</th><th class="text-right">Jumlah Aset</th><th class="text-right">Nilai Perolehan</th><th class="text-right">% Jumlah</th></tr></thead>
                     <tbody>
                         @forelse ($groups as $group)
-                            <tr>
-                                <td class="text-sm font-medium text-gray-800">{{ $group['label'] }}</td>
+                            @php
+                                $value = $group['key'] === null ? null : (string) $group['key'];
+                                $active = $value !== null && $activeFilter === $value;
+                            @endphp
+
+                            <tr @class(['bg-primary-soft' => $active, 'transition hover:bg-gray-50' => $value !== null])>
+                                <td class="text-sm font-medium text-gray-800">
+                                    @if ($value === null)
+                                        {{-- "Tanpa Divisi" tidak bisa dinyatakan sebagai nilai penyaring,
+                                             jadi barisnya sengaja tidak bisa diklik daripada menautkan ke
+                                             daftar yang isinya bukan baris ini. --}}
+                                        {{ $group['label'] }}
+                                    @else
+                                        <a href="{{ $rekapUrl($active ? null : $value) }}" class="flex items-center gap-1.5 hover:text-primary hover:underline">
+                                            {{ $group['label'] }}
+                                            @if ($active)
+                                                <span class="inline-flex items-center gap-1 rounded-md bg-white px-1.5 py-0.5 text-xs font-semibold text-gray-600 ring-1 ring-gray-200 ring-inset">disaring <x-icon name="x" class="size-3"/></span>
+                                            @endif
+                                        </a>
+                                    @endif
+                                </td>
                                 <td class="text-right text-sm text-gray-700">{{ number_format($group['count']) }}</td>
                                 <td class="text-right text-sm text-gray-700">Rp {{ number_format($group['value'], 0, ',', '.') }}</td>
                                 <td class="text-right text-sm text-gray-500">{{ $summary['total'] > 0 ? number_format($group['count'] / $summary['total'] * 100, 1) : '0,0' }}%</td>
@@ -195,6 +240,19 @@
                                     $dipegang = $units->filter(fn ($asset) => $asset->currentAssignment?->employee !== null)->count();
                                 @endphp
 
+                                @if ($group['units'] === 1 && $units->count() === 1)
+                                    {{-- Tidak ada yang perlu dibuka: barisnya langsung unit itu sendiri.
+                                         Sebuah tombol yang membuka satu baris berisi keterangan yang
+                                         nyaris sama hanya menambah satu klik tanpa menambah apa pun.
+
+                                         $units->count() ikut diperiksa, bukan cuma hitungan dari SQL:
+                                         keduanya memang selalu sama, tapi kalau suatu saat tidak, yang
+                                         terjadi adalah baris yang isinya diam-diam tidak tampil. --}}
+                                    @include('reports._asset-row', ['asset' => $units->first(), 'variant' => 'single', 'groupId' => null])
+
+                                    @continue
+                                @endif
+
                                 <tr class="border-t-2 border-gray-200">
                                     <td>
                                         <button type="button" data-group-toggle="{{ $id }}" aria-expanded="false" class="flex items-center gap-2 text-left">
@@ -233,14 +291,14 @@
                                 </tr>
 
                                 @foreach ($units as $asset)
-                                    @include('reports._asset-row', ['asset' => $asset, 'nested' => true, 'groupId' => $id])
+                                    @include('reports._asset-row', ['asset' => $asset, 'variant' => 'child', 'groupId' => $id])
                                 @endforeach
                             @empty
                                 <tr><td colspan="8" class="cell-empty">Tidak ada aset yang cocok dengan penyaring ini.</td></tr>
                             @endforelse
                         @else
                             @forelse ($assets as $asset)
-                                @include('reports._asset-row', ['asset' => $asset, 'nested' => false, 'groupId' => null])
+                                @include('reports._asset-row', ['asset' => $asset, 'variant' => 'flat', 'groupId' => null])
                             @empty
                                 <tr><td colspan="8" class="cell-empty">Tidak ada aset yang cocok dengan penyaring ini.</td></tr>
                             @endforelse

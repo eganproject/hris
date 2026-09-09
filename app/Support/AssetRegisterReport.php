@@ -74,6 +74,33 @@ class AssetRegisterReport
      */
     private const NAME_KEY = 'lower(trim(name))';
 
+    /**
+     * Penyaring yang dipasang ketika sebuah baris rekap diklik.
+     *
+     * Tiga sumbu pertama menyaring kolom yang sama persis dengan yang dipakai
+     * mengelompokkan, jadi setelah diklik rekapnya menyusut menjadi satu baris dengan
+     * angka yang sama — betul-betul menelusuri ke bawah.
+     *
+     * Lokasi dan divisi tidak sepersis itu, dan ini disengaja. Penyaring lokasi
+     * mencari lokasi pemilik ATAU lokasi sekarang supaya aset yang dititipkan ke
+     * cabang lain tidak hilang dari kedua sisi, sementara rekapnya mengelompokkan
+     * satu kolom saja; penyaring divisi juga ikut membaca divisi kedua. Hasil kliknya
+     * karena itu bisa lebih luas daripada baris yang diklik. Membuat penyaring khusus
+     * yang persis akan menghasilkan dua arti "lokasi" di satu halaman — yang lebih
+     * membingungkan daripada satu penyaring yang perilakunya sudah dijelaskan.
+     */
+    public const GROUP_FILTERS = [
+        'category' => 'category',
+        'status' => 'status',
+        'condition' => 'condition',
+        'owning_branch' => 'branch',
+        'current_branch' => 'branch',
+        'department' => 'department',
+    ];
+
+    /** @var list<string> Sumbu yang penyaringnya menyaring persis kolom yang sama. */
+    private const EXACT_GROUP_FILTERS = ['category', 'status', 'condition'];
+
     /** Kolom yang menyimpan tiap sumbu — dipakai untuk GROUP BY. */
     private const GROUP_COLUMNS = [
         'category' => 'category_id',
@@ -92,6 +119,12 @@ class AssetRegisterReport
     public static function resolveView(?string $view): string
     {
         return array_key_exists((string) $view, self::VIEWS) ? (string) $view : self::DEFAULT_VIEW;
+    }
+
+    /** Apakah mengklik baris rekap sumbu ini menghasilkan daftar yang persis sebesar barisnya. */
+    public static function groupFilterIsExact(string $groupBy): bool
+    {
+        return in_array(self::resolveGroup($groupBy), self::EXACT_GROUP_FILTERS, true);
     }
 
     /**

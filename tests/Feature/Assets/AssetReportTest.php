@@ -333,3 +333,110 @@ test('unduhan excel membawa lembar datar dan lembar tercollapse sekaligus', func
             && in_array('Register Aset', $titles, true);
     });
 });
+
+test('nama yang hanya punya satu unit tampil langsung, tanpa tombol buka', function () {
+    $f = assetReportFixture();
+    assetNamedUnits($f, 'iPhone XR', 2);
+
+    $html = $this->actingAs(assetReportUser())->get(route('reports.assets'))->assertOk()->getContent();
+
+    // Fixture-nya berisi tiga nama yang masing-masing satu unit; hanya iPhone XR
+    // yang berjumlah dua. Jadi tepat satu tombol buka yang boleh ada.
+    expect(substr_count($html, 'data-group-toggle='))->toBe(1);
+
+    // Yang tunggal tetap membawa kode asetnya di baris yang sama — kalau ia hanya
+    // ditampilkan sebagai nama, keterangan unitnya justru hilang dibanding sebelumnya.
+    $laptop = Asset::query()->where('name', 'Laptop Dell')->firstOrFail();
+
+    expect($html)->toContain($laptop->asset_code)
+        ->and($html)->not->toContain('grup-'.md5('laptop dell'));
+});
+
+test('baris rekap menautkan ke halaman yang tersaring ke baris itu', function () {
+    $f = assetReportFixture();
+
+    $response = $this->actingAs(assetReportUser())->get(route('reports.assets'))->assertOk();
+
+    // Tautan membawa penyaring kategorinya, bukan parameter baru — supaya kartu,
+    // rekap, dan daftar tetap dihitung dari himpunan yang sama.
+    $response->assertSee(route('reports.assets', ['category' => $f['phoneCategory']->id]), false);
+
+    $tersaring = $this->actingAs(assetReportUser())
+        ->get(route('reports.assets', ['category' => $f['phoneCategory']->id]))
+        ->assertOk();
+
+    // Kategori Handphone hanya berisi satu aset, dan seluruh halaman ikut menyusut.
+    expect($tersaring->viewData('summary')['total'])->toBe(1)
+        ->and($tersaring->viewData('groups'))->toHaveCount(1)
+        ->and($tersaring->viewData('nameGroups')->total())->toBe(1);
+
+    $tersaring->assertSee('Handphone hostlive')->assertDontSee('Laptop Dell');
+});
+
+/** Potongan HTML tabel Rekap saja, supaya assertion tidak tertipu tautan di bagian lain halaman. */
+function assetRecapHtml(string $html): string
+{
+    $start = strpos($html, 'Rekap per');
+    $end = strpos($html, 'Daftar Aset</h2>');
+
+    return substr($html, $start, $end - $start);
+}
+
+test('baris rekap yang sedang aktif menautkan ke pelepasan penyaringnya', function () {
+    $f = assetReportFixture();
+
+    $html = $this->actingAs(assetReportUser())
+        ->get(route('reports.assets', ['category' => $f['phoneCategory']->id]))
+        ->assertOk()
+        ->getContent();
+
+    $rekap = assetRecapHtml($html);
+
+    preg_match_all('/href="([^"]*)"/', $rekap, $matches);
+
+    // Diklik lagi berarti lepas: tanpa ini pengguna terjebak, karena rekapnya sudah
+    // menyusut jadi satu baris dan tidak ada kategori lain yang bisa diklik.
+    expect($rekap)->toContain('disaring')
+        ->and($matches[1])->not->toBeEmpty();
+
+    foreach ($matches[1] as $href) {
+        expect($href)->not->toContain('category=');
+    }
+});
+
+test('kelompok tanpa nilai tidak bisa diklik karena penyaringnya tidak bisa menyatakannya', function () {
+    $f = assetReportFixture();
+
+    Asset::query()->create([
+        'category_id' => $f['laptop']->id,
+        'name' => 'Proyektor tanpa divisi',
+        'owning_branch_id' => $f['ho']->id,
+        'current_branch_id' => $f['ho']->id,
+        'department_id' => null,
+        'status' => AssetStatus::Available->value,
+        'condition' => 'good',
+    ]);
+
+    $response = $this->actingAs(assetReportUser())
+        ->get(route('reports.assets', ['group' => 'department']))
+        ->assertOk();
+
+    $tanpa = collect($response->viewData('groups'))->firstWhere('key', null);
+
+    expect($tanpa)->not->toBeNull()
+        ->and($tanpa['count'])->toBe(1);
+
+    $rekap = assetRecapHtml($response->getContent());
+
+    // Barisnya ada, tapi labelnya tidak dibungkus tautan: "Tanpa Divisi" tidak bisa
+    // dinyatakan sebagai nilai penyaring, jadi mengkliknya akan menampilkan daftar
+    // yang isinya bukan baris itu.
+    preg_match('/<td[^>]*>(?:(?!<\/td>).)*Tanpa Divisi Pemilik(?:(?!<\/td>).)*<\/td>/s', $rekap, $cell);
+
+    expect($cell)->not->toBeEmpty()
+        ->and($cell[0])->not->toContain('<a ');
+
+    // Divisi yang punya nilai tetap bisa diklik, jadi ketidakadaan tautan di atas
+    // memang karena null-nya, bukan karena tautannya hilang seluruhnya.
+    expect($rekap)->toContain('href=');
+});
