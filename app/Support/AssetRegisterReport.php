@@ -8,9 +8,12 @@ use App\Models\Asset;
 use App\Models\AssetCategory;
 use App\Models\Branch;
 use App\Models\Department;
+use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Query\Builder as QueryBuilder;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 
 /**
  * Register aset: seluruh aset yang boleh dilihat pengguna, disaring, diringkas per
@@ -43,6 +46,34 @@ class AssetRegisterReport
 
     public const DEFAULT_GROUP = 'category';
 
+    /**
+     * Bentuk daftar asetnya: satu baris per unit, atau satu baris per nama yang bisa
+     * dibuka isinya.
+     *
+     * Sama seperti GROUPS, kuncinya ikut ke URL dan ke nama sheet ekspor.
+     */
+    public const VIEWS = [
+        'grouped' => 'Ringkas per nama',
+        'detail' => 'Rinci per unit',
+    ];
+
+    public const DEFAULT_VIEW = 'grouped';
+
+    /**
+     * Kunci penggabungan nama: huruf dikecilkan dan spasi tepinya dibuang.
+     *
+     * Kolom name adalah teks bebas, jadi "iPhone XR", "IPHONE XR", dan "iPhone XR "
+     * adalah tiga tulisan untuk satu barang yang sama. Menormalkan kuncinya membuat
+     * ketiganya berkumpul — dan membuat hasilnya sama di MySQL (yang collation-nya
+     * biasanya sudah mengabaikan besar-kecil huruf) maupun SQLite (yang tidak).
+     *
+     * Yang TIDAK bisa diselesaikan di sini: "iPhone XR" vs "iPhone XR 64GB". Itu dua
+     * tulisan yang memang berbeda, dan hanya disiplin penamaan yang bisa merapikannya.
+     * Laporan ini justru menampilkannya sebagai dua grup berdampingan supaya
+     * ketidakkonsistenannya kelihatan, bukan tertutup diam-diam.
+     */
+    private const NAME_KEY = 'lower(trim(name))';
+
     /** Kolom yang menyimpan tiap sumbu — dipakai untuk GROUP BY. */
     private const GROUP_COLUMNS = [
         'category' => 'category_id',
@@ -56,6 +87,11 @@ class AssetRegisterReport
     public static function resolveGroup(?string $group): string
     {
         return array_key_exists((string) $group, self::GROUPS) ? (string) $group : self::DEFAULT_GROUP;
+    }
+
+    public static function resolveView(?string $view): string
+    {
+        return array_key_exists((string) $view, self::VIEWS) ? (string) $view : self::DEFAULT_VIEW;
     }
 
     /**
@@ -86,6 +122,114 @@ class AssetRegisterReport
                 'currentAssignment.employee:id,full_name,employee_number',
             ])
             ->orderBy('asset_code');
+    }
+
+    /**
+     * Aset yang bernama sama, dikumpulkan jadi satu baris yang bisa dibuka isinya.
+     *
+     * Yang dipaginasi adalah GRUPNYA, bukan unitnya — dan ini bukan pilihan gaya.
+     * Kalau unit yang dipaginasi lalu digabung di tampilan, dua unit iPhone XR yang
+     * kebetulan jatuh di halaman 1 dan 2 akan muncul sebagai dua grup berisi satu
+     * unit. Sebuah laporan stock opname yang menulis "1" untuk barang yang ada dua
+     * lebih berbahaya daripada daftar panjang yang jujur. Dengan memaginasi grup,
+     * satu nama selalu utuh dalam satu halaman.
+     *
+     * @param  array<string, mixed>  $filters
+     * @return LengthAwarePaginator<int, array{key: string, name: string, spellings: int, units: int, value: float, assets: Collection<int, Asset>}>
+     */
+    public function nameGroups(DataScope $scope, array $filters, int $perPage): LengthAwarePaginator
+    {
+        $paginator = $this->nameGroupQuery($scope, $filters)->paginate($perPage);
+
+        $paginator->setCollection($this->attachMembers($scope, $filters, collect($paginator->items())));
+
+        return $paginator;
+    }
+
+    /**
+     * Rekap nama tanpa unitnya — untuk lembar Excel dan tabel PDF, yang memuat
+     * seluruh grup sekaligus dan tidak perlu barisan detailnya.
+     *
+     * @param  array<string, mixed>  $filters
+     * @return Collection<int, array{key: string, name: string, spellings: int, units: int, value: float}>
+     */
+    public function nameSummary(DataScope $scope, array $filters): Collection
+    {
+        return $this->nameGroupQuery($scope, $filters)->get()->map(fn ($row) => [
+            'key' => (string) $row->group_key,
+            'name' => (string) $row->display_name,
+            'spellings' => (int) $row->spellings,
+            'units' => (int) $row->units,
+            'value' => (float) $row->units_value,
+        ]);
+    }
+
+    /**
+     * Satu baris per nama: berapa unit, berapa nilainya, dan berapa variasi ejaannya.
+     *
+     * Ketika satu nama ditulis beberapa cara, ejaan mana yang dipakai sebagai nama
+     * tampil ditentukan collation basis data dan boleh berbeda antar mesin — yang
+     * penting kelompoknya, jumlahnya, dan peringatan "N ejaan berbeda" yang menyuruh
+     * merapikannya. Spasi tepinya dibuang supaya nama tampilnya tidak pernah terlihat
+     * menjorok sendiri di tengah daftar.
+     *
+     * Terbanyak lebih dulu, lalu menurut abjad — barang yang menumpuk itulah yang
+     * dicari orang saat membuka laporan ini, dan urutannya tetap sama di dua kali
+     * cetak.
+     *
+     * @param  array<string, mixed>  $filters
+     */
+    private function nameGroupQuery(DataScope $scope, array $filters): QueryBuilder
+    {
+        return $this->base($scope, $filters)
+            ->toBase()
+            ->groupByRaw(self::NAME_KEY)
+            ->selectRaw(
+                self::NAME_KEY.' as group_key, min(trim(name)) as display_name, '
+                // hex(), bukan count(distinct name) begitu saja: collation bawaan MySQL
+                // mengabaikan besar-kecil huruf, jadi "iPhone XR" dan "IPHONE XR" akan
+                // terhitung satu ejaan dan peringatannya tidak pernah muncul justru pada
+                // kasus yang paling sering terjadi. Membandingkan bytenya membuat
+                // hitungan ini sama persis di MySQL maupun SQLite.
+                .'count(distinct hex(name)) as spellings, count(*) as units, '
+                .'coalesce(sum(acquisition_cost), 0) as units_value'
+            )
+            ->orderByDesc('units')
+            ->orderBy('display_name');
+    }
+
+    /**
+     * Isi tiap grup: seluruh unit milik nama-nama yang ada di halaman ini.
+     *
+     * Kunci grupnya ikut dipilih dari SQL, bukan dihitung ulang di PHP. lower() milik
+     * basis data dan mb_strtolower() milik PHP tidak selalu sepakat pada huruf
+     * beraksen, dan kalau keduanya berbeda satu grup akan tampil kosong padahal
+     * hitungannya bilang ada isinya.
+     *
+     * @param  array<string, mixed>  $filters
+     * @param  Collection<int, object>  $rows
+     * @return Collection<int, array<string, mixed>>
+     */
+    private function attachMembers(DataScope $scope, array $filters, Collection $rows): Collection
+    {
+        $keys = $rows->pluck('group_key')->all();
+
+        $members = $keys === []
+            ? collect()
+            : $this->register($scope, $filters)
+                ->select(['assets.*', DB::raw(self::NAME_KEY.' as group_key')])
+                ->whereIn(DB::raw(self::NAME_KEY), $keys)
+                ->get()
+                ->groupBy('group_key');
+
+        return $rows->map(fn ($row) => [
+            'key' => (string) $row->group_key,
+            'name' => (string) $row->display_name,
+            'spellings' => (int) $row->spellings,
+            'units' => (int) $row->units,
+            'value' => (float) $row->units_value,
+            'assets' => $members->get((string) $row->group_key, collect()),
+        ]);
     }
 
     /**

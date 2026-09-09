@@ -394,15 +394,30 @@ class ReportController extends Controller
         $scope = DataScope::forAssets($request->user());
         $filters = $this->assetFilters($request);
         $groupBy = AssetRegisterReport::resolveGroup($request->input('group'));
-        $perPage = min(max((int) $request->input('per_page', 50), 25), 200);
+        $view = AssetRegisterReport::resolveView($request->input('view'));
+
+        // Mode ringkas memaginasi nama, bukan unit. Satu nama membawa seluruh unitnya
+        // ikut termuat, jadi jatah per halamannya lebih kecil daripada daftar rinci —
+        // 25 nama yang masing-masing berisi beberapa unit sudah setara satu halaman
+        // penuh baris.
+        $perPage = $view === 'grouped'
+            ? min(max((int) $request->input('per_page', 25), 10), 100)
+            : min(max((int) $request->input('per_page', 50), 25), 200);
 
         return view('reports.assets', [
-            'assets' => $this->assetRegister->register($scope, $filters)->paginate($perPage)->withQueryString(),
+            'assets' => $view === 'detail'
+                ? $this->assetRegister->register($scope, $filters)->paginate($perPage)->withQueryString()
+                : null,
+            'nameGroups' => $view === 'grouped'
+                ? $this->assetRegister->nameGroups($scope, $filters, $perPage)->withQueryString()
+                : null,
             'summary' => $this->assetRegister->summary($scope, $filters),
             'groups' => $this->assetRegister->groups($scope, $filters, $groupBy),
             'groupBy' => $groupBy,
             'groupLabel' => AssetRegisterReport::GROUPS[$groupBy],
             'groupOptions' => AssetRegisterReport::GROUPS,
+            'view' => $view,
+            'viewOptions' => AssetRegisterReport::VIEWS,
             'filters' => $filters,
             'perPage' => $perPage,
             'categories' => AssetCategory::query()->orderBy('name')->get(['id', 'name']),
@@ -423,6 +438,7 @@ class ReportController extends Controller
             new AssetRegisterExport(
                 assets: $this->assetRegister->register($scope, $filters)->get(),
                 groups: $this->assetRegister->groups($scope, $filters, $groupBy),
+                names: $this->assetRegister->nameSummary($scope, $filters),
                 summary: $this->assetRegister->summary($scope, $filters),
                 filterLabels: $this->assetRegister->filterLabels($filters, $groupBy),
                 groupLabel: AssetRegisterReport::GROUPS[$groupBy],
@@ -439,6 +455,7 @@ class ReportController extends Controller
         $pdf = Pdf::loadView('reports.pdf.assets', [
             'assets' => $this->assetRegister->register($scope, $filters)->get(),
             'groups' => $this->assetRegister->groups($scope, $filters, $groupBy),
+            'names' => $this->assetRegister->nameSummary($scope, $filters),
             'summary' => $this->assetRegister->summary($scope, $filters),
             'groupLabel' => AssetRegisterReport::GROUPS[$groupBy],
             'filterLabels' => $this->assetRegister->filterLabels($filters, $groupBy),
@@ -451,6 +468,10 @@ class ReportController extends Controller
      * Cakupan + penyaring untuk ekspor dan cetak, dibaca dari permintaan yang sama
      * dengan layarnya. Berkas yang diunduh tidak boleh berisi satu baris pun di luar
      * yang tampil.
+     *
+     * Pilihan tampilan sengaja TIDAK ikut: berkas unduhan selalu memuat kedua
+     * bentuknya sekaligus — yang datar dan yang tercollapse — jadi ia tidak
+     * bergantung pada mode yang kebetulan sedang aktif di layar.
      *
      * @return array{0: DataScope, 1: array<string, mixed>, 2: string}
      */

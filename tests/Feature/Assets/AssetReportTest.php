@@ -1,6 +1,7 @@
 <?php
 
 use App\Enums\AssetStatus;
+use App\Exports\AssetRegisterExport;
 use App\Models\Asset;
 use App\Models\AssetCategory;
 use App\Models\Branch;
@@ -10,6 +11,7 @@ use App\Models\User;
 use App\Support\AssetRegisterReport;
 use App\Support\DataScope;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Maatwebsite\Excel\Facades\Excel;
 use Spatie\Permission\Models\Permission;
 use Spatie\Permission\PermissionRegistrar;
 
@@ -215,4 +217,119 @@ test('dipegang dan dipakai dihitung sebagai dua angka terpisah, bukan satu', fun
         // Kolom Pemegang barang pakai bersama tidak boleh tampil sama dengan aset
         // menganggur: kosongnya disengaja, bukan luput dicatat.
         ->assertSee('Pakai bersama');
+});
+
+/** Beberapa unit bernama sama, dengan ejaan yang sengaja tidak seragam. */
+function assetNamedUnits(array $f, string $name, int $count, array $spellings = []): void
+{
+    foreach (range(1, $count) as $i) {
+        Asset::query()->create([
+            'category_id' => $f['laptop']->id,
+            'name' => $spellings[$i - 1] ?? $name,
+            'owning_branch_id' => $f['ho']->id,
+            'current_branch_id' => $f['ho']->id,
+            'department_id' => $f['it']->id,
+            'status' => AssetStatus::Available->value,
+            'condition' => 'good',
+            'acquisition_cost' => '5000000',
+        ]);
+    }
+}
+
+test('tampilan ringkas menggabungkan aset yang bernama sama menjadi satu baris', function () {
+    $f = assetReportFixture();
+    assetNamedUnits($f, 'iPhone XR', 2);
+
+    $response = $this->actingAs(assetReportUser())->get(route('reports.assets'))->assertOk();
+
+    // Bawaannya memang ringkas.
+    expect($response->viewData('view'))->toBe('grouped');
+
+    $groups = $response->viewData('nameGroups');
+    $iphone = collect($groups->items())->firstWhere('key', 'iphone xr');
+
+    expect($iphone)->not->toBeNull()
+        ->and($iphone['units'])->toBe(2)
+        ->and($iphone['assets'])->toHaveCount(2);
+
+    $response->assertSee('2 unit');
+});
+
+test('ejaan yang tidak seragam tetap tergabung dan ditandai untuk dirapikan', function () {
+    $f = assetReportFixture();
+    assetNamedUnits($f, 'iPhone XR', 3, ['iPhone XR', 'IPHONE XR', '  iPhone XR  ']);
+
+    $response = $this->actingAs(assetReportUser())->get(route('reports.assets'))->assertOk();
+
+    // Dicari lewat kunci grupnya, bukan nama tampilnya: ketika ejaannya beragam,
+    // ejaan mana yang terpilih untuk ditampilkan bergantung pada collation basis
+    // datanya. Yang dijamin sama di mana pun adalah kunci, jumlah, dan peringatannya.
+    $iphone = collect($response->viewData('nameGroups')->items())->firstWhere('key', 'iphone xr');
+
+    expect($iphone['units'])->toBe(3)
+        // Nama tampilnya rapi tanpa spasi tepi, tapi ketidakseragamannya tidak ikut
+        // hilang — itu yang harus diperbaiki di master aset.
+        ->and($iphone['name'])->toBe(trim($iphone['name']))
+        ->and($iphone['spellings'])->toBe(3);
+
+    $response->assertSee('3 ejaan berbeda');
+});
+
+test('satu nama tidak pernah terbelah oleh paginasi', function () {
+    $f = assetReportFixture();
+    assetNamedUnits($f, 'iPhone XR', 4);
+
+    // Satu grup per halaman: kalau yang dipaginasi unit dan bukan nama, iPhone XR
+    // akan muncul sebagai beberapa grup berisi satu unit — angka yang salah di
+    // laporan yang dipakai menghitung barang.
+    $response = $this->actingAs(assetReportUser())
+        ->get(route('reports.assets', ['per_page' => 10]))
+        ->assertOk();
+
+    $groups = $response->viewData('nameGroups');
+    $iphone = collect($groups->items())->firstWhere('key', 'iphone xr');
+
+    expect($groups->perPage())->toBe(10)
+        ->and($iphone['units'])->toBe(4)
+        ->and($iphone['assets'])->toHaveCount(4)
+        // Yang dihitung paginator adalah nama, bukan unit: 3 dari fixture + iPhone XR.
+        ->and($groups->total())->toBe(4);
+});
+
+test('tampilan rinci tetap bisa dipilih dan memuat satu baris per unit', function () {
+    $f = assetReportFixture();
+    assetNamedUnits($f, 'iPhone XR', 2);
+
+    $response = $this->actingAs(assetReportUser())
+        ->get(route('reports.assets', ['view' => 'detail']))
+        ->assertOk();
+
+    expect($response->viewData('view'))->toBe('detail')
+        ->and($response->viewData('nameGroups'))->toBeNull()
+        ->and($response->viewData('assets')->total())->toBe(5);
+});
+
+test('nilai tampilan yang tidak dikenal jatuh ke bawaannya, bukan galat', function () {
+    assetReportFixture();
+
+    $this->actingAs(assetReportUser())->get(route('reports.assets', ['view' => 'sembarang']))
+        ->assertOk()
+        ->assertViewHas('view', 'grouped');
+});
+
+test('unduhan excel membawa lembar datar dan lembar tercollapse sekaligus', function () {
+    $f = assetReportFixture();
+    assetNamedUnits($f, 'iPhone XR', 2);
+
+    Excel::fake();
+
+    $this->actingAs(assetReportUser())->get(route('reports.assets.export'))->assertOk();
+
+    Excel::assertDownloaded('register-aset-'.now()->format('Y-m-d').'.xlsx', function (AssetRegisterExport $export) {
+        $titles = array_map(fn ($sheet) => $sheet->title(), $export->sheets());
+
+        // Keduanya harus ada: yang ringkas untuk dibaca, yang datar untuk diolah.
+        return in_array('Ringkas per Nama', $titles, true)
+            && in_array('Register Aset', $titles, true);
+    });
 });

@@ -68,7 +68,46 @@
         @endif
     </table>
 
-    <h2>Daftar Aset</h2>
+    {{-- Padanan tampilan tercollapse di layar. Di kertas tidak ada yang bisa diklik,
+         jadi bentuknya tabel tersendiri: barang apa yang menumpuk dan berapa
+         banyak, sebelum masuk ke daftar per unit di bawahnya. --}}
+    <h2>Ringkas per Nama Aset</h2>
+    <table>
+        <thead>
+            <tr>
+                <th class="l">Nama Aset</th>
+                <th>Jumlah Unit</th>
+                <th>Nilai Perolehan</th>
+                <th class="l">Catatan</th>
+            </tr>
+        </thead>
+        <tbody>
+            @forelse ($names as $name)
+                <tr>
+                    <td class="l">{{ $name['name'] }}</td>
+                    <td class="r">{{ number_format($name['units']) }}</td>
+                    <td class="r">{{ number_format($name['value'], 0, ',', '.') }}</td>
+                    <td class="l">{{ $name['spellings'] > 1 ? $name['spellings'].' ejaan berbeda' : '' }}</td>
+                </tr>
+            @empty
+                <tr><td colspan="4" style="text-align:center; padding:12px; color:#9ca3af;">Tidak ada aset yang cocok dengan penyaring ini.</td></tr>
+            @endforelse
+        </tbody>
+        @if ($names->isNotEmpty())
+            <tfoot>
+                <tr>
+                    <td class="l">Total {{ number_format($names->count()) }} nama</td>
+                    <td class="r">{{ number_format($summary['total']) }}</td>
+                    <td class="r">{{ number_format($summary['value'], 0, ',', '.') }}</td>
+                    <td class="l"></td>
+                </tr>
+            </tfoot>
+        @endif
+    </table>
+
+    {{-- Versi datarnya tetap dicetak utuh: yang tercollapse untuk dibaca, yang ini
+         untuk ditelusuri unit per unit saat barangnya dihitung di gudang. --}}
+    <h2>Daftar Aset (rinci per unit)</h2>
     <table>
         <thead>
             <tr>

@@ -79,6 +79,15 @@
                             <option value="{{ $value }}" @selected($groupBy === $value)>Kelompokkan per {{ $label }}</option>
                         @endforeach
                     </select>
+
+                    {{-- Ringkas enak dibaca, rinci yang dibawa saat stock opname. Keduanya
+                         tetap ada dan pilihannya ikut ke URL, jadi tautan laporan yang
+                         dibagikan membuka tampilan yang sama dengan yang dilihat pengirimnya. --}}
+                    <select name="view" class="rounded-md border border-gray-300 px-3 py-2 text-sm shadow-xs outline-none focus:border-primary focus:ring-2 focus:ring-primary/20">
+                        @foreach ($viewOptions as $value => $label)
+                            <option value="{{ $value }}" @selected($view === $value)>Tampilan: {{ $label }}</option>
+                        @endforeach
+                    </select>
                 </div>
 
                 <div class="flex items-center justify-between gap-2">
@@ -136,13 +145,23 @@
         <section class="overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm">
             <div class="flex flex-wrap items-center justify-between gap-2 border-b border-gray-200 px-5 py-3">
                 <h2 class="text-sm font-semibold text-gray-950">Daftar Aset</h2>
-                <p class="text-xs text-gray-500">Menampilkan {{ $assets->count() }} dari {{ number_format($assets->total()) }} aset. Unduhan Excel & PDF memuat seluruhnya.</p>
+                <div class="flex flex-wrap items-center gap-3">
+                    @if ($view === 'grouped')
+                        {{-- Yang dipaginasi nama, bukan unit — jadi yang dihitung di sini juga
+                             nama, dan jumlah unitnya disebut terpisah supaya tidak ada yang
+                             membaca "25 dari 40" sebagai jumlah barang. --}}
+                        <p class="text-xs text-gray-500">Menampilkan {{ number_format($nameGroups->count()) }} dari {{ number_format($nameGroups->total()) }} nama &middot; {{ number_format($summary['total']) }} unit. Unduhan Excel &amp; PDF memuat seluruhnya.</p>
+                        <button type="button" data-expand-all aria-pressed="false" class="rounded-md border border-gray-200 px-3 py-1.5 text-xs font-semibold text-gray-700 transition hover:bg-gray-50">Buka semua</button>
+                    @else
+                        <p class="text-xs text-gray-500">Menampilkan {{ $assets->count() }} dari {{ number_format($assets->total()) }} unit. Unduhan Excel &amp; PDF memuat seluruhnya.</p>
+                    @endif
+                </div>
             </div>
             <div class="overflow-x-auto">
                 <table class="data-table">
                     <thead>
                         <tr>
-                            <th>Kode & Nama</th>
+                            <th>{{ $view === 'grouped' ? 'Nama Aset' : 'Kode & Nama' }}</th>
                             <th>Kategori</th>
                             <th>Lokasi</th>
                             <th>Divisi</th>
@@ -153,48 +172,128 @@
                         </tr>
                     </thead>
                     <tbody>
-                        @forelse ($assets as $asset)
-                            <tr>
-                                <td>
-                                    <a href="{{ route('assets.show', $asset) }}" class="font-medium text-gray-950 hover:text-primary hover:underline">{{ $asset->asset_code }}</a>
-                                    <p class="mt-0.5 text-xs text-gray-500">{{ $asset->name }}</p>
-                                </td>
-                                <td class="text-sm text-gray-600">{{ $asset->category?->name ?? '—' }}</td>
-                                <td class="text-sm text-gray-600">
-                                    {{ $asset->currentBranch?->name ?? '—' }}
-                                    @if ($asset->owning_branch_id !== $asset->current_branch_id)
-                                        <span class="block text-xs text-gray-400">milik {{ $asset->owningBranch?->name ?? '—' }}</span>
-                                    @endif
-                                </td>
-                                <td class="text-sm text-gray-600">{{ $asset->department?->name ?? '—' }}</td>
-                                <td><x-status-badge :tone="$asset->status_tone">{{ $asset->status_label }}</x-status-badge></td>
-                                <td><x-status-badge :tone="$asset->condition_tone">{{ $asset->condition_label }}</x-status-badge></td>
-                                <td class="text-sm text-gray-600">
-                                    @if ($asset->currentAssignment?->employee)
-                                        {{ $asset->currentAssignment->employee->full_name }}
-                                        <span class="block text-xs text-gray-400">sejak {{ $asset->currentAssignment->assigned_at?->translatedFormat('d M Y') ?? '—' }}</span>
-                                    @elseif ($asset->status?->isSharedUse())
-                                        {{-- Bukan "—" seperti aset menganggur: kosongnya di sini disengaja,
-                                             dan pembaca perlu tahu bedanya sebelum menyimpulkan barangnya
-                                             luput dicatat serah terimanya. --}}
-                                        <span class="text-violet-700">Pakai bersama</span>
-                                    @else
-                                        <span class="text-gray-400">—</span>
-                                    @endif
-                                </td>
-                                <td class="text-right text-sm text-gray-700">{{ $asset->acquisition_cost === null ? '—' : 'Rp '.number_format((float) $asset->acquisition_cost, 0, ',', '.') }}</td>
-                            </tr>
-                        @empty
-                            <tr><td colspan="8" class="cell-empty">Tidak ada aset yang cocok dengan penyaring ini.</td></tr>
-                        @endforelse
+                        @if ($view === 'grouped')
+                            @php
+                                // Satu nilai kalau seragam, jumlahnya kalau beragam. Menulis
+                                // "3 lokasi" lebih jujur daripada memilih salah satunya dan
+                                // membuat pembaca mengira unit lainnya ada di tempat yang sama.
+                                $ringkas = function ($values, string $noun): string {
+                                    $unique = collect($values)->filter()->unique()->values();
+
+                                    return match (true) {
+                                        $unique->isEmpty() => '—',
+                                        $unique->count() === 1 => (string) $unique->first(),
+                                        default => $unique->count().' '.$noun,
+                                    };
+                                };
+                            @endphp
+
+                            @forelse ($nameGroups as $group)
+                                @php
+                                    $id = 'grup-'.md5($group['key']);
+                                    $units = $group['assets'];
+                                    $dipegang = $units->filter(fn ($asset) => $asset->currentAssignment?->employee !== null)->count();
+                                @endphp
+
+                                <tr class="border-t-2 border-gray-200">
+                                    <td>
+                                        <button type="button" data-group-toggle="{{ $id }}" aria-expanded="false" class="flex items-center gap-2 text-left">
+                                            <x-icon name="chevron-down" class="size-4 shrink-0 -rotate-90 text-gray-400 transition-transform" data-group-chevron/>
+                                            <span>
+                                                <span class="font-semibold text-gray-950">{{ $group['name'] }}</span>
+                                                <span class="ml-1.5 inline-flex items-center rounded-md bg-primary-soft px-2 py-0.5 text-xs font-semibold text-gray-700">{{ number_format($group['units']) }} unit</span>
+                                            </span>
+                                        </button>
+                                        @if ($group['spellings'] > 1)
+                                            {{-- Penggabungan ini menyamarkan penulisan yang tidak seragam.
+                                                 Kalau tidak diberitahukan di sini, tidak akan pernah ada
+                                                 yang merapikannya di master aset. --}}
+                                            <p class="mt-1 pl-6 text-xs text-amber-600">Ditulis dalam {{ $group['spellings'] }} ejaan berbeda — rapikan di master aset.</p>
+                                        @endif
+                                    </td>
+                                    <td class="text-sm text-gray-600">{{ $ringkas($units->map(fn ($asset) => $asset->category?->name), 'kategori') }}</td>
+                                    <td class="text-sm text-gray-600">{{ $ringkas($units->map(fn ($asset) => $asset->currentBranch?->name), 'lokasi') }}</td>
+                                    <td class="text-sm text-gray-600">{{ $ringkas($units->map(fn ($asset) => $asset->department?->name), 'divisi') }}</td>
+                                    <td>
+                                        <div class="flex flex-wrap gap-1">
+                                            @foreach ($units->groupBy(fn ($asset) => $asset->status_label) as $label => $rows)
+                                                <x-status-badge :tone="$rows->first()->status_tone">{{ $label }} {{ $rows->count() }}</x-status-badge>
+                                            @endforeach
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <div class="flex flex-wrap gap-1">
+                                            @foreach ($units->groupBy(fn ($asset) => $asset->condition_label) as $label => $rows)
+                                                <x-status-badge :tone="$rows->first()->condition_tone">{{ $label }} {{ $rows->count() }}</x-status-badge>
+                                            @endforeach
+                                        </div>
+                                    </td>
+                                    <td class="text-sm text-gray-600">{{ $dipegang > 0 ? $dipegang.' dipegang' : '—' }}</td>
+                                    <td class="text-right text-sm font-semibold text-gray-900">Rp {{ number_format($group['value'], 0, ',', '.') }}</td>
+                                </tr>
+
+                                @foreach ($units as $asset)
+                                    @include('reports._asset-row', ['asset' => $asset, 'nested' => true, 'groupId' => $id])
+                                @endforeach
+                            @empty
+                                <tr><td colspan="8" class="cell-empty">Tidak ada aset yang cocok dengan penyaring ini.</td></tr>
+                            @endforelse
+                        @else
+                            @forelse ($assets as $asset)
+                                @include('reports._asset-row', ['asset' => $asset, 'nested' => false, 'groupId' => null])
+                            @empty
+                                <tr><td colspan="8" class="cell-empty">Tidak ada aset yang cocok dengan penyaring ini.</td></tr>
+                            @endforelse
+                        @endif
                     </tbody>
                 </table>
             </div>
-            @if ($assets->hasPages())
-                <div class="border-t border-gray-200 px-5 py-4">{{ $assets->links() }}</div>
+            @php($daftar = $view === 'grouped' ? $nameGroups : $assets)
+            @if ($daftar->hasPages())
+                <div class="border-t border-gray-200 px-5 py-4">{{ $daftar->links() }}</div>
             @endif
         </section>
 
-        <p class="text-xs text-gray-400">Nilai perolehan adalah harga beli yang tercatat saat aset didaftarkan, bukan nilai buku — penyusutan belum dihitung sistem. Kolom Pemegang hanya terisi untuk aset yang sedang diserahkan ke seorang karyawan. Status &ldquo;Dipegang&rdquo; berarti ada satu nama yang bisa dimintai pertanggungjawaban; &ldquo;Dipakai&rdquo; berarti barangnya terpakai bersama dan memang tidak punya pemegang — keduanya dihitung dan diwarnai terpisah, jangan dijumlahkan sebagai satu angka.</p>
+        <p class="text-xs text-gray-400">Nilai perolehan adalah harga beli yang tercatat saat aset didaftarkan, bukan nilai buku — penyusutan belum dihitung sistem. Kolom Pemegang hanya terisi untuk aset yang sedang diserahkan ke seorang karyawan. Status &ldquo;Dipegang&rdquo; berarti ada satu nama yang bisa dimintai pertanggungjawaban; &ldquo;Dipakai&rdquo; berarti barangnya terpakai bersama dan memang tidak punya pemegang — keduanya dihitung dan diwarnai terpisah, jangan dijumlahkan sebagai satu angka.
+            @if ($view === 'grouped')
+                Tampilan ringkas menggabungkan aset yang <span class="font-medium">namanya sama</span> setelah besar-kecil huruf dan spasi tepinya diabaikan; penulisan yang benar-benar berbeda seperti &ldquo;iPhone XR&rdquo; dan &ldquo;iPhone XR 64GB&rdquo; tetap terpisah, dan itu memang harus dirapikan di master aset, bukan di laporan.
+            @endif
+        </p>
     </div>
+
+    @if ($view === 'grouped')
+        @push('scripts')
+        <script>
+            (function () {
+                const bodies = (key) => document.querySelectorAll('[data-group-body="' + key + '"]');
+
+                const setGroup = (button, open) => {
+                    button.setAttribute('aria-expanded', String(open));
+                    button.querySelector('[data-group-chevron]')?.classList.toggle('-rotate-90', !open);
+                    bodies(button.dataset.groupToggle).forEach((row) => row.classList.toggle('hidden', !open));
+                };
+
+                const toggles = Array.from(document.querySelectorAll('[data-group-toggle]'));
+
+                toggles.forEach((button) => {
+                    button.addEventListener('click', () => {
+                        setGroup(button, button.getAttribute('aria-expanded') !== 'true');
+                    });
+                });
+
+                // Satu tombol dua arah: setelah membuka semua, hal berikutnya yang
+                // dibutuhkan orang hampir selalu menutupnya kembali.
+                const all = document.querySelector('[data-expand-all]');
+
+                all?.addEventListener('click', () => {
+                    const open = all.getAttribute('aria-pressed') !== 'true';
+
+                    all.setAttribute('aria-pressed', String(open));
+                    all.textContent = open ? 'Tutup semua' : 'Buka semua';
+                    toggles.forEach((button) => setGroup(button, open));
+                });
+            })();
+        </script>
+        @endpush
+    @endif
 </x-layouts.app>
