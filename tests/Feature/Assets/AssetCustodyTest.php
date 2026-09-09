@@ -501,3 +501,165 @@ test('aset pakai bersama tidak bisa diserahkan ke satu karyawan', function () {
     expect($asset->status)->toBe(AssetStatus::InUse)
         ->and($asset->currentAssignment)->toBeNull();
 });
+
+/**
+ * Dua serah-terima yang sengaja berbeda di setiap sumbu penyaring: aset, karyawan,
+ * kategori, lokasi, divisi, dan tanggal penyerahan.
+ *
+ * @return array<string, mixed>
+ */
+function custodyFilterFixture(): array
+{
+    $f = custodyFixture();
+
+    $kategoriLain = AssetCategory::query()->create([
+        'code' => 'HP', 'name' => 'Handphone', 'asset_prefix' => 'HP', 'is_active' => true,
+    ]);
+    $divisiLain = Department::query()->create(['code' => 'FIN', 'name' => 'Finance', 'is_active' => true]);
+
+    $siti = Employee::query()->create([
+        'full_name' => 'Siti Rahayu', 'employment_status' => 'active',
+        'branch_id' => $f['other']->id, 'department_id' => $divisiLain->id,
+    ]);
+
+    $handphone = Asset::query()->create([
+        'category_id' => $kategoriLain->id,
+        'name' => 'Handphone Samsung',
+        'serial_number' => 'SN-HP-9',
+        'owning_branch_id' => $f['other']->id,
+        'current_branch_id' => $f['other']->id,
+        'department_id' => $divisiLain->id,
+        'status' => AssetStatus::Available->value,
+        'condition' => 'good',
+    ])->refresh();
+
+    $officer = custodyOfficer();
+
+    $lamaBudi = AssetAssignment::query()->create([
+        'asset_id' => $f['asset']->id,
+        'employee_id' => $f['employee']->id,
+        'assigned_by' => $officer->id,
+        'assigned_at' => now()->subMonths(6),
+        'condition_out' => 'good',
+    ]);
+
+    $baruSiti = AssetAssignment::query()->create([
+        'asset_id' => $handphone->id,
+        'employee_id' => $siti->id,
+        'assigned_by' => $officer->id,
+        'assigned_at' => now()->subDay(),
+        'condition_out' => 'good',
+    ]);
+
+    return [...$f, 'officer' => $officer, 'siti' => $siti, 'handphone' => $handphone,
+        'kategoriLain' => $kategoriLain, 'divisiLain' => $divisiLain,
+        'lamaBudi' => $lamaBudi, 'baruSiti' => $baruSiti];
+}
+
+test('daftar serah terima bisa dicari lewat aset maupun nama karyawan', function () {
+    $f = custodyFilterFixture();
+
+    // Sisi barang.
+    $this->actingAs($f['officer'])->get(route('assets.assignments.index', ['search' => 'SN-HP-9']))
+        ->assertOk()
+        ->assertSee('Handphone Samsung')
+        ->assertDontSee('Laptop Dell');
+
+    // Sisi orang — pertanyaan yang sama seringnya diajukan di halaman ini.
+    $this->actingAs($f['officer'])->get(route('assets.assignments.index', ['search' => 'Siti']))
+        ->assertOk()
+        ->assertSee('Handphone Samsung')
+        ->assertDontSee('Laptop Dell');
+});
+
+test('penyaring kategori, lokasi, dan divisi membaca data asetnya', function () {
+    $f = custodyFilterFixture();
+
+    foreach ([
+        ['category' => $f['kategoriLain']->id],
+        ['branch' => $f['other']->id],
+        ['department' => $f['divisiLain']->id],
+    ] as $filter) {
+        $this->actingAs($f['officer'])->get(route('assets.assignments.index', $filter))
+            ->assertOk()
+            ->assertSee('Handphone Samsung')
+            ->assertDontSee('Laptop Dell');
+    }
+});
+
+test('penyaring pemegang dan rentang tanggal penyerahan mempersempit daftarnya', function () {
+    $f = custodyFilterFixture();
+
+    $this->actingAs($f['officer'])->get(route('assets.assignments.index', ['employee' => $f['employee']->id]))
+        ->assertOk()
+        ->assertSee('Laptop Dell')
+        ->assertDontSee('Handphone Samsung');
+
+    // Rentangnya menyaring tanggal penyerahan: yang enam bulan lalu jatuh di luar.
+    $this->actingAs($f['officer'])->get(route('assets.assignments.index', [
+        'from' => today()->subWeek()->toDateString(),
+    ]))
+        ->assertOk()
+        ->assertSee('Handphone Samsung')
+        ->assertDontSee('Laptop Dell');
+
+    $this->actingAs($f['officer'])->get(route('assets.assignments.index', [
+        'to' => today()->subMonth()->toDateString(),
+    ]))
+        ->assertOk()
+        ->assertSee('Laptop Dell')
+        ->assertDontSee('Handphone Samsung');
+});
+
+test('penyaring tetap terbawa saat berpindah tab keadaan', function () {
+    $f = custodyFilterFixture();
+
+    $html = $this->actingAs($f['officer'])
+        ->get(route('assets.assignments.index', ['branch' => $f['other']->id]))
+        ->assertOk()
+        ->getContent();
+
+    // Tautan tiap tab harus membawa lokasi yang barusan dipilih. Tanpa itu orang
+    // kehilangan penyaringnya setiap kali berpindah tab dan mengira halaman ini rusak.
+    foreach (array_keys(AssetAssignment::STATES) as $state) {
+        // e(): di dalam atribut href, Blade menulis pemisah parameter sebagai &amp;.
+        expect($html)->toContain(e(route('assets.assignments.index', [
+            'branch' => $f['other']->id,
+            'state' => $state,
+        ])));
+    }
+});
+
+test('penyaring tetap menghormati cakupan pengguna', function () {
+    $f = custodyFilterFixture();
+
+    $terbatas = custodyOfficer(['assets.view', 'asset-assignments.view']);
+    $terbatas->accessBranches()->sync([$f['branch']->id]);
+
+    // Aset Surabaya berada di luar cakupannya, dan penyaring tidak boleh jadi jalan
+    // pintas untuk memunculkannya.
+    $this->actingAs($terbatas)->get(route('assets.assignments.index', ['branch' => $f['other']->id]))
+        ->assertOk()
+        ->assertDontSee('Handphone Samsung');
+
+    $this->actingAs($terbatas)->get(route('assets.assignments.index', ['search' => 'Siti']))
+        ->assertOk()
+        ->assertDontSee('Handphone Samsung');
+});
+
+test('penyaring yang tidak masuk akal diabaikan, bukan menjatuhkan halaman', function () {
+    $f = custodyFilterFixture();
+
+    // URL halaman ini gampang disalin-tempel dan disunting tangan.
+    $this->actingAs($f['officer'])->get(route('assets.assignments.index', [
+        'from' => 'bukan-tanggal',
+        'to' => '9999-99-99',
+        'category' => ['array'],
+        'employee' => 'abc',
+        'state' => 'sembarang',
+        'per_page' => '99999',
+    ]))->assertOk()->assertViewHas('filters', fn (array $filters) => $filters['from'] === null
+        && $filters['to'] === null
+        && $filters['category'] === null
+        && $filters['employee'] === null);
+});
