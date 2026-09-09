@@ -1,46 +1,70 @@
 {{--
     Satu baris unit aset di Register Aset.
 
-    Dipakai oleh ketiga bentuk baris supaya tidak mungkin lama-lama menampilkan kolom
+    Dipakai oleh semua bentuk baris supaya tidak mungkin lama-lama menampilkan kolom
     yang berbeda untuk aset yang sama:
 
       flat   — daftar rinci per unit. Kode aset di depan, namanya di bawahnya.
-      child  — unit di dalam grup yang dibuka. Namanya sudah tertulis di kepala grup,
-               jadi tidak diulang; barisnya ditakik dan tersembunyi sampai dibuka.
+      child  — unit di dalam grup nama yang dibuka. Namanya sudah tertulis di kepala
+               grup, jadi tidak diulang; ia dipimpin merek dan modelnya.
       single — nama yang cuma punya satu unit. Tidak ada yang perlu dibuka, jadi ia
                langsung tampil sebagai barisnya sendiri, dengan nama di depan supaya
                sejajar dibaca dengan kepala grup di atas dan di bawahnya.
+      unit   — baris di tampilan per merek. Merek dan model sudah tertulis di kepala
+               di atasnya, jadi yang dipimpin adalah nama asetnya. $title mengisi
+               tempat kepala model ketika modelnya cuma punya satu unit — kepala yang
+               membuka satu baris saja hanya menambah klik tanpa menambah keterangan.
 
     Barisnya tetap <tr> polos di tabel yang sama, bukan tabel bersarang di dalam satu
     sel: hanya dengan begitu kolom unit benar-benar lurus di bawah kolom grupnya.
 
     @param \App\Models\Asset $asset
-    @param string $variant  flat|child|single
-    @param string|null $groupId  id grup yang menyembunyikan/menampilkan baris ini
+    @param string $variant  flat|child|single|unit
+    @param bool $hidden  baris ini tersembunyi sampai kepalanya dibuka
+    @param array<string, string> $rowAttributes  penanda data-* yang dipakai skrip
+                                                 pembuka-tutup untuk menemukan baris ini
+    @param string|null $title  (unit) judul tebal di atas nama aset — nama modelnya
+    @param string|null $indent  (unit) kelas padding kiri yang menyatakan tingkatannya
 --}}
-@php($variant = $variant ?? 'flat')
-@php($groupId = $groupId ?? null)
+@php
+    $variant = $variant ?? 'flat';
+    $hidden = $hidden ?? false;
+    $rowAttributes = $rowAttributes ?? [];
+    $title = $title ?? null;
+    $indent = $indent ?? null;
 
-{{-- Merek dan model sering kosong, dan salah satunya bisa terisi sendirian. Dirangkai
-     dari yang benar-benar ada supaya tidak pernah muncul spasi menggantung atau tanda
-     hubung yang menunggu pasangan yang tidak datang.
-
-     Ditulis sebagai @php(...) sebaris, bukan blok @php ... @endphp: Blade mencari
-     pembuka blok dari kemunculan "@php" yang PERTAMA di berkas, sehingga dua baris
-     di atas ikut tertelan ke dalam blok yang sama dan hasil kompilasinya rusak. --}}
-@php($merekModel = collect([$asset->brand, $asset->model])->filter()->implode(' '))
+    // Merek dan model sering kosong, dan salah satunya bisa terisi sendirian. Dirangkai
+    // dari yang benar-benar ada supaya tidak pernah muncul spasi menggantung atau tanda
+    // hubung yang menunggu pasangan yang tidak datang.
+    $merekModel = collect([$asset->brand, $asset->model])->filter()->implode(' ');
+@endphp
 
 {{-- Baris 'single' berdiri sejajar dengan kepala grup, jadi ia memakai garis
      pemisah tebal yang sama supaya tingkatannya terbaca sama. --}}
 <tr @class([
-    'bg-gray-50/60' => $variant === 'child',
+    'bg-gray-50/60' => $variant === 'child' || ($variant === 'unit' && ! filled($title)),
     'border-t-2 border-gray-200' => $variant === 'single',
-    'hidden' => $groupId !== null,
-]) @if ($groupId) data-group-body="{{ $groupId }}" @endif>
+    'hidden' => $hidden,
+])@foreach ($rowAttributes as $key => $value) {{ $key }}="{{ $value }}"@endforeach>
     {{-- pl-10 menakik unit ke dalam grupnya; pl-6 hanya menggantikan lebar chevron,
-         supaya nama yang berdiri sendiri tetap lurus dengan nama grup di atasnya. --}}
-    <td @class(['pl-10' => $variant === 'child', 'pl-6' => $variant === 'single'])>
-        @if ($variant === 'flat')
+         supaya nama yang berdiri sendiri tetap lurus dengan nama grup di atasnya.
+         Tampilan per merek punya tiga tingkat, jadi takikannya dikirim dari sana. --}}
+    <td @class(['pl-10' => $variant === 'child', 'pl-6' => $variant === 'single', $indent => $variant === 'unit' && $indent !== null])>
+        @if ($variant === 'unit')
+            @if (filled($title))
+                <p class="text-sm font-medium text-gray-800">{{ $title }}</p>
+                <p class="mt-0.5 text-xs text-gray-500">{{ $asset->name }}</p>
+            @else
+                <span class="text-sm font-medium text-gray-800">{{ $asset->name }}</span>
+            @endif
+
+            <p class="mt-0.5">
+                <a href="{{ route('assets.show', $asset) }}" class="font-mono text-xs text-gray-500 hover:text-primary hover:underline">{{ $asset->asset_code }}</a>
+                @if ($asset->serial_number)
+                    <span class="text-xs text-gray-400">&middot; SN {{ $asset->serial_number }}</span>
+                @endif
+            </p>
+        @elseif ($variant === 'flat')
             <a href="{{ route('assets.show', $asset) }}" class="font-mono text-xs font-medium text-gray-950 hover:text-primary hover:underline">{{ $asset->asset_code }}</a>
             <p class="mt-0.5 text-xs text-gray-500">{{ $asset->name }}</p>
         @else

@@ -251,9 +251,8 @@ test('tampilan ringkas menggabungkan aset yang bernama sama menjadi satu baris',
     $f = assetReportFixture();
     assetNamedUnits($f, 'iPhone XR', 2);
 
-    $response = $this->actingAs(assetReportUser())->get(route('reports.assets'))->assertOk();
+    $response = $this->actingAs(assetReportUser())->get(route('reports.assets', ['view' => 'grouped']))->assertOk();
 
-    // Bawaannya memang ringkas.
     expect($response->viewData('view'))->toBe('grouped');
 
     $groups = $response->viewData('nameGroups');
@@ -270,7 +269,7 @@ test('ejaan yang tidak seragam tetap tergabung dan ditandai untuk dirapikan', fu
     $f = assetReportFixture();
     assetNamedUnits($f, 'iPhone XR', 3, ['iPhone XR', 'IPHONE XR', '  iPhone XR  ']);
 
-    $response = $this->actingAs(assetReportUser())->get(route('reports.assets'))->assertOk();
+    $response = $this->actingAs(assetReportUser())->get(route('reports.assets', ['view' => 'grouped']))->assertOk();
 
     // Dicari lewat kunci grupnya, bukan nama tampilnya: ketika ejaannya beragam,
     // ejaan mana yang terpilih untuk ditampilkan bergantung pada collation basis
@@ -294,7 +293,7 @@ test('satu nama tidak pernah terbelah oleh paginasi', function () {
     // akan muncul sebagai beberapa grup berisi satu unit — angka yang salah di
     // laporan yang dipakai menghitung barang.
     $response = $this->actingAs(assetReportUser())
-        ->get(route('reports.assets', ['per_page' => 10]))
+        ->get(route('reports.assets', ['view' => 'grouped', 'per_page' => 10]))
         ->assertOk();
 
     $groups = $response->viewData('nameGroups');
@@ -325,7 +324,7 @@ test('nilai tampilan yang tidak dikenal jatuh ke bawaannya, bukan galat', functi
 
     $this->actingAs(assetReportUser())->get(route('reports.assets', ['view' => 'sembarang']))
         ->assertOk()
-        ->assertViewHas('view', 'grouped');
+        ->assertViewHas('view', 'brand');
 });
 
 test('unduhan excel membawa lembar datar dan lembar tercollapse sekaligus', function () {
@@ -340,7 +339,7 @@ test('unduhan excel membawa lembar datar dan lembar tercollapse sekaligus', func
         $titles = array_map(fn ($sheet) => $sheet->title(), $export->sheets());
 
         // Keduanya harus ada: yang ringkas untuk dibaca, yang datar untuk diolah.
-        return in_array('Ringkas per Nama', $titles, true)
+        return in_array('Ringkas per Merek', $titles, true)
             && in_array('Register Aset', $titles, true);
     });
 });
@@ -349,7 +348,7 @@ test('nama yang hanya punya satu unit tampil langsung, tanpa tombol buka', funct
     $f = assetReportFixture();
     assetNamedUnits($f, 'iPhone XR', 2);
 
-    $html = $this->actingAs(assetReportUser())->get(route('reports.assets'))->assertOk()->getContent();
+    $html = $this->actingAs(assetReportUser())->get(route('reports.assets', ['view' => 'grouped']))->assertOk()->getContent();
 
     // Fixture-nya berisi tiga nama yang masing-masing satu unit; hanya iPhone XR
     // yang berjumlah dua. Jadi tepat satu tombol buka yang boleh ada.
@@ -379,7 +378,7 @@ test('baris rekap menautkan ke halaman yang tersaring ke baris itu', function ()
     // Kategori Handphone hanya berisi satu aset, dan seluruh halaman ikut menyusut.
     expect($tersaring->viewData('summary')['total'])->toBe(1)
         ->and($tersaring->viewData('groups'))->toHaveCount(1)
-        ->and($tersaring->viewData('nameGroups')->total())->toBe(1);
+        ->and($tersaring->viewData('brandGroups')->total())->toBe(1);
 
     $tersaring->assertSee('Handphone hostlive')->assertDontSee('Laptop Dell');
 });
@@ -505,7 +504,7 @@ test('unit di dalam grup menampilkan merek dan model, kode asetnya jadi keterang
     $modelSaja = $unit(null, 'MRY72', null);
     $kosong = $unit(null, null, null);
 
-    $html = $this->actingAs(assetReportUser())->get(route('reports.assets'))->assertOk()->getContent();
+    $html = $this->actingAs(assetReportUser())->get(route('reports.assets', ['view' => 'grouped']))->assertOk()->getContent();
 
     expect($html)->toContain('Apple MRY62')
         // Yang cuma punya salah satunya tidak boleh menyisakan spasi menggantung.
@@ -519,4 +518,164 @@ test('unit di dalam grup menampilkan merek dan model, kode asetnya jadi keterang
     }
 
     expect($html)->toContain('SN SN-A1');
+});
+
+/** Satu unit dengan merek dan model yang ditentukan. */
+function assetBranded(array $f, string $name, ?string $brand, ?string $model): Asset
+{
+    return Asset::query()->create([
+        'category_id' => $f['laptop']->id,
+        'name' => $name,
+        'brand' => $brand,
+        'model' => $model,
+        'owning_branch_id' => $f['ho']->id,
+        'current_branch_id' => $f['ho']->id,
+        'department_id' => $f['it']->id,
+        'status' => AssetStatus::Available->value,
+        'condition' => 'good',
+    ]);
+}
+
+test('bawaannya mengelompokkan per merek, lalu per model di dalamnya', function () {
+    $f = assetReportFixture();
+    assetBranded($f, 'iPhone XR', 'Apple', 'MRY62');
+    assetBranded($f, 'iPhone XR', 'Apple', 'MRY62');
+    assetBranded($f, 'iPhone XR', 'Apple', 'MRY72');
+
+    $response = $this->actingAs(assetReportUser())->get(route('reports.assets'))->assertOk();
+
+    expect($response->viewData('view'))->toBe('brand');
+
+    $apple = collect($response->viewData('brandGroups')->items())->firstWhere('key', 'apple');
+
+    expect($apple['units'])->toBe(3)
+        ->and($apple['models'])->toHaveCount(2)
+        // Model terbanyak lebih dulu.
+        ->and($apple['models'][0]['name'])->toBe('MRY62')
+        ->and($apple['models'][0]['units'])->toBe(2)
+        ->and($apple['models'][1]['name'])->toBe('MRY72')
+        ->and($apple['models'][1]['units'])->toBe(1);
+});
+
+test('merek dan model yang kosong jadi kelompok tersendiri di urutan paling bawah', function () {
+    $f = assetReportFixture();
+    assetBranded($f, 'iPhone XR', 'Apple', 'MRY62');
+    assetBranded($f, 'iPhone 11', 'Apple', null);
+
+    $response = $this->actingAs(assetReportUser())->get(route('reports.assets'))->assertOk();
+
+    $brands = collect($response->viewData('brandGroups')->items());
+
+    // Fixture-nya berisi tiga aset tanpa merek — lebih banyak daripada Apple yang
+    // hanya dua — tapi ia tetap harus di bawah: "belum diisi" bukan sebuah merek.
+    expect($brands->last()['key'])->toBe('')
+        ->and($brands->last()['units'])->toBe(3)
+        ->and($brands->firstWhere('key', 'apple')['units'])->toBe(2);
+
+    $apple = $brands->firstWhere('key', 'apple');
+
+    expect($apple['models']->last()['key'])->toBe('');
+
+    $response->assertSee('Tanpa Merek')
+        ->assertSee('Tanpa Model')
+        ->assertSee('Kolom Merek belum diisi di master aset.');
+});
+
+test('merek dan model yang cuma punya satu unit tidak diberi tombol buka', function () {
+    $f = assetReportFixture();
+    assetBranded($f, 'iPhone XR', 'Apple', 'MRY62');
+    assetBranded($f, 'iPhone XR', 'Apple', 'MRY62');
+    assetBranded($f, 'iPhone 11', 'Apple', 'MRY72');
+    assetBranded($f, 'Latitude', 'Dell', 'E5420');
+
+    $html = $this->actingAs(assetReportUser())->get(route('reports.assets'))->assertOk()->getContent();
+
+    // Merek yang bisa dibuka: Apple (4 unit) dan Tanpa Merek (3 unit). Dell hanya satu
+    // unit, jadi ia baris biasa tanpa tombol.
+    expect(substr_count($html, 'data-brand-toggle='))->toBe(2)
+        // Model yang bisa dibuka hanya MRY62 yang berisi dua unit; MRY72 satu unit,
+        // dan Tanpa Model di bawah Tanpa Merek berisi tiga sehingga ikut punya tombol.
+        ->and(substr_count($html, 'data-model-toggle='))->toBe(2)
+        ->and($html)->toContain('Latitude');
+});
+
+test('satu merek tidak pernah terbelah oleh paginasi', function () {
+    $f = assetReportFixture();
+
+    foreach (range(1, 4) as $i) {
+        assetBranded($f, 'iPhone XR', 'Apple', 'MRY'.$i);
+    }
+
+    $response = $this->actingAs(assetReportUser())
+        ->get(route('reports.assets', ['per_page' => 10]))
+        ->assertOk();
+
+    $brands = $response->viewData('brandGroups');
+    $apple = collect($brands->items())->firstWhere('key', 'apple');
+
+    // Yang dihitung paginator adalah merek: Apple dan Tanpa Merek.
+    expect($brands->total())->toBe(2)
+        ->and($apple['units'])->toBe(4)
+        ->and($apple['assets'])->toHaveCount(4)
+        ->and($apple['models'])->toHaveCount(4);
+});
+
+test('ejaan merek yang tidak seragam tetap tergabung dan ditandai', function () {
+    $f = assetReportFixture();
+    assetBranded($f, 'iPhone XR', 'Apple', 'MRY62');
+    assetBranded($f, 'iPhone XR', 'APPLE', 'MRY62');
+
+    $response = $this->actingAs(assetReportUser())->get(route('reports.assets'))->assertOk();
+
+    $apple = collect($response->viewData('brandGroups')->items())->firstWhere('key', 'apple');
+
+    expect($apple['units'])->toBe(2)
+        ->and($apple['spellings'])->toBe(2);
+
+    $response->assertSee('Ditulis dalam 2 ejaan berbeda — rapikan di master aset.');
+});
+
+test('tampilan per nama tetap tersedia sebagai pilihan', function () {
+    $f = assetReportFixture();
+    assetBranded($f, 'iPhone XR', 'Apple', 'MRY62');
+    assetBranded($f, 'iPhone XR', 'Dell', 'E5420');
+
+    $response = $this->actingAs(assetReportUser())
+        ->get(route('reports.assets', ['view' => 'grouped']))
+        ->assertOk();
+
+    // Dua merek berbeda, tapi satu nama — mode lama masih menggabungkannya.
+    $iphone = collect($response->viewData('nameGroups')->items())->firstWhere('key', 'iphone xr');
+
+    expect($response->viewData('brandGroups'))->toBeNull()
+        ->and($iphone['units'])->toBe(2);
+
+    $response->assertSee('Ringkas per merek')->assertSee('Ringkas per nama');
+});
+
+test('lembar excel ringkas berisi baris merek dan model, bukan nama', function () {
+    $f = assetReportFixture();
+    assetBranded($f, 'iPhone XR', 'Apple', 'MRY62');
+    assetBranded($f, 'iPhone XR', 'Apple', 'MRY62');
+
+    $report = app(AssetRegisterReport::class);
+    $rows = $report->brandModelSummary(DataScope::forAssets(assetReportUser()), []);
+
+    $apple = $rows->firstWhere('brand', 'Apple');
+
+    expect($apple['model'])->toBe('MRY62')
+        ->and($apple['units'])->toBe(2)
+        // Baris tanpa merek tetap ada, dan tetap di urutan terakhir.
+        ->and($rows->last()['brand'])->toBe('');
+
+    Excel::fake();
+
+    $this->actingAs(assetReportUser())->get(route('reports.assets.export'))->assertOk();
+
+    Excel::assertDownloaded('register-aset-'.now()->format('Y-m-d').'.xlsx', function (AssetRegisterExport $export) {
+        $titles = array_map(fn ($sheet) => $sheet->title(), $export->sheets());
+
+        return in_array('Ringkas per Merek', $titles, true)
+            && in_array('Register Aset', $titles, true);
+    });
 });

@@ -10,21 +10,26 @@ use Maatwebsite\Excel\Concerns\WithTitle;
 use Maatwebsite\Excel\Events\AfterSheet;
 
 /**
- * Versi tercollapse dari register: satu baris per nama aset, bukan per unit.
+ * Versi tercollapse dari register: satu baris per pasangan merek dan model, bukan
+ * per unit.
  *
  * Pasangannya adalah lembar "Register Aset" yang tetap datar satu baris per unit.
  * Keduanya sengaja ada dan tidak saling menggantikan — lembar ini untuk membaca
- * cepat ("iPhone XR ada berapa?"), lembar datar untuk menelusuri unit tertentu dan
+ * cepat ("Apple MRY62 ada berapa?"), lembar datar untuk menelusuri unit tertentu dan
  * untuk diolah sendiri dengan filter atau pivot.
  *
- * Kolom "Variasi Ejaan" bukan hiasan: ia menunjuk nama yang ditulis lebih dari satu
+ * Barisnya sengaja rata, bukan bersarang seperti di layar: bentuk bersarang enak
+ * dibaca tapi buntu untuk dipivot, sedangkan merek yang ditulis ulang di tiap baris
+ * bisa langsung dijadikan sumbu tabel pivot.
+ *
+ * Kolom "Variasi Ejaan" bukan hiasan: ia menunjuk model yang ditulis lebih dari satu
  * cara di formulir. Angka di atas 1 berarti ada pekerjaan merapikan data, dan tanpa
  * kolom ini penggabungan justru menyembunyikannya.
  */
-class AssetRegisterNameSheet implements FromArray, ShouldAutoSize, WithEvents, WithTitle
+class AssetRegisterBrandSheet implements FromArray, ShouldAutoSize, WithEvents, WithTitle
 {
     /**
-     * @param  Collection<int, array<string, mixed>>  $names
+     * @param  Collection<int, array<string, mixed>>  $names  baris merek + model
      * @param  array<string, mixed>  $summary
      */
     public function __construct(
@@ -34,27 +39,31 @@ class AssetRegisterNameSheet implements FromArray, ShouldAutoSize, WithEvents, W
 
     public function title(): string
     {
-        return 'Ringkas per Nama';
+        return 'Ringkas per Merek';
     }
 
     /** @return array<int, array<int, string|int|float>> */
     public function array(): array
     {
         $rows = [
-            ['Nama Aset', 'Jumlah Unit', 'Variasi Ejaan'],
+            ['Merek', 'Model / Tipe', 'Jumlah Unit', 'Variasi Ejaan'],
         ];
 
-        foreach ($this->names as $name) {
+        foreach ($this->names as $row) {
             $rows[] = [
-                $name['name'],
-                $name['units'],
+                // Yang kosong diberi nama, bukan dibiarkan sel kosong: sel kosong di
+                // Excel terbaca sebagai "lanjutan baris di atasnya", padahal ini justru
+                // kelompoknya sendiri.
+                $row['brand'] ?: 'Tanpa Merek',
+                $row['model'] ?: 'Tanpa Model',
+                $row['units'],
                 // 1 ditulis sebagai teks kosong supaya mata langsung jatuh ke baris
                 // yang bermasalah, bukan ke kolom penuh angka 1 yang tidak berarti apa-apa.
-                $name['spellings'] > 1 ? $name['spellings'].' ejaan berbeda' : '',
+                $row['model'] !== '' && $row['spellings'] > 1 ? $row['spellings'].' ejaan berbeda' : '',
             ];
         }
 
-        $rows[] = ['TOTAL', (int) $this->summary['total'], ''];
+        $rows[] = ['TOTAL', '', (int) $this->summary['total'], ''];
 
         return $rows;
     }
@@ -67,8 +76,8 @@ class AssetRegisterNameSheet implements FromArray, ShouldAutoSize, WithEvents, W
                 $sheet = $event->sheet->getDelegate();
                 $last = $this->names->count() + 2;
 
-                $sheet->getStyle('A1:C1')->getFont()->setBold(true);
-                $sheet->getStyle("A{$last}:C{$last}")->getFont()->setBold(true);
+                $sheet->getStyle('A1:D1')->getFont()->setBold(true);
+                $sheet->getStyle("A{$last}:D{$last}")->getFont()->setBold(true);
                 $sheet->freezePane('A2');
             },
         ];

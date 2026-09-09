@@ -67,30 +67,35 @@
     {{-- Padanan tampilan tercollapse di layar. Di kertas tidak ada yang bisa diklik,
          jadi bentuknya tabel tersendiri: barang apa yang menumpuk dan berapa
          banyak, sebelum masuk ke daftar per unit di bawahnya. --}}
-    <h2>Ringkas per Nama Aset</h2>
+    <h2>Ringkas per Merek &amp; Model</h2>
     <table>
         <thead>
             <tr>
-                <th class="l">Nama Aset</th>
+                <th class="l">Merek</th>
+                <th class="l">Model / Tipe</th>
                 <th>Jumlah Unit</th>
                 <th class="l">Catatan</th>
             </tr>
         </thead>
         <tbody>
-            @forelse ($names as $name)
+            @forelse ($names as $row)
                 <tr>
-                    <td class="l">{{ $name['name'] }}</td>
-                    <td class="r">{{ number_format($name['units']) }}</td>
-                    <td class="l">{{ $name['spellings'] > 1 ? $name['spellings'].' ejaan berbeda' : '' }}</td>
+                    {{-- Mereknya ditulis ulang di tiap baris, tidak dikosongkan pada baris
+                         lanjutan: sebuah baris yang terpisah ke halaman berikutnya harus
+                         tetap bisa dibaca sendiri tanpa menengok ke halaman sebelumnya. --}}
+                    <td class="l">{{ $row['brand'] ?: 'Tanpa Merek' }}</td>
+                    <td class="l">{{ $row['model'] ?: 'Tanpa Model' }}</td>
+                    <td class="r">{{ number_format($row['units']) }}</td>
+                    <td class="l">{{ $row['model'] !== '' && $row['spellings'] > 1 ? $row['spellings'].' ejaan berbeda' : '' }}</td>
                 </tr>
             @empty
-                <tr><td colspan="3" style="text-align:center; padding:12px; color:#9ca3af;">Tidak ada aset yang cocok dengan penyaring ini.</td></tr>
+                <tr><td colspan="4" style="text-align:center; padding:12px; color:#9ca3af;">Tidak ada aset yang cocok dengan penyaring ini.</td></tr>
             @endforelse
         </tbody>
         @if ($names->isNotEmpty())
             <tfoot>
                 <tr>
-                    <td class="l">Total {{ number_format($names->count()) }} nama</td>
+                    <td class="l" colspan="2">Total {{ number_format($names->pluck('brand')->unique()->count()) }} merek &middot; {{ number_format($names->count()) }} pasangan merek &amp; model</td>
                     <td class="r">{{ number_format($summary['total']) }}</td>
                     <td class="l"></td>
                 </tr>

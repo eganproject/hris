@@ -53,11 +53,12 @@ class AssetRegisterReport
      * Sama seperti GROUPS, kuncinya ikut ke URL dan ke nama sheet ekspor.
      */
     public const VIEWS = [
+        'brand' => 'Ringkas per merek',
         'grouped' => 'Ringkas per nama',
         'detail' => 'Rinci per unit',
     ];
 
-    public const DEFAULT_VIEW = 'grouped';
+    public const DEFAULT_VIEW = 'brand';
 
     /**
      * Kunci penggabungan nama: huruf dikecilkan dan spasi tepinya dibuang.
@@ -73,6 +74,21 @@ class AssetRegisterReport
      * ketidakkonsistenannya kelihatan, bukan tertutup diam-diam.
      */
     private const NAME_KEY = 'lower(trim(name))';
+
+    /**
+     * Kunci merek dan model, dinormalkan seperti NAME_KEY tapi tahan kosong.
+     *
+     * Berbeda dari nama, kedua kolom ini boleh tidak diisi — dan menurut pemilik data
+     * memang sering kosong. coalesce() membuat NULL dan string kosong jatuh ke kunci
+     * yang sama, jadi "belum diisi" menjadi satu kelompok yang jelas ("Tanpa Merek",
+     * "Tanpa Model") alih-alih berserakan atau hilang dari GROUP BY.
+     *
+     * Kelompok kosong itu sengaja tidak disembunyikan: besarnya adalah ukuran berapa
+     * banyak data yang masih perlu dilengkapi.
+     */
+    private const BRAND_KEY = "lower(trim(coalesce(brand, '')))";
+
+    private const MODEL_KEY = "lower(trim(coalesce(model, '')))";
 
     /**
      * Penyaring yang dipasang ketika sebuah baris rekap diklik.
@@ -194,6 +210,185 @@ class AssetRegisterReport
             'spellings' => (int) $row->spellings,
             'units' => (int) $row->units,
         ]);
+    }
+
+    /**
+     * Aset dikumpulkan per merek, dan di dalam tiap merek dikumpulkan lagi per model.
+     *
+     * Sama seperti nameGroups(), yang dipaginasi adalah tingkat teratas — mereknya.
+     * Satu merek selalu membawa seluruh unitnya dalam satu halaman, jadi jumlah yang
+     * tertulis di kepala merek tidak pernah bisa berbeda dari isinya.
+     *
+     * @param  array<string, mixed>  $filters
+     * @return LengthAwarePaginator<int, array<string, mixed>>
+     */
+    public function brandGroups(DataScope $scope, array $filters, int $perPage): LengthAwarePaginator
+    {
+        $paginator = $this->brandGroupQuery($scope, $filters)->paginate($perPage);
+
+        $paginator->setCollection($this->attachBrandMembers($scope, $filters, collect($paginator->items())));
+
+        return $paginator;
+    }
+
+    /**
+     * Rekap merek + model tanpa unitnya, satu baris per pasangan — untuk lembar Excel
+     * dan tabel PDF, yang memuat semuanya sekaligus dan tidak perlu barisan detailnya.
+     *
+     * Sengaja rata, bukan bersarang: di Excel baris yang rata bisa disaring dan
+     * dipivot sendiri, sedangkan bentuk bersarang hanya enak dibaca dan buntu untuk
+     * diolah lebih lanjut.
+     *
+     * @param  array<string, mixed>  $filters
+     * @return Collection<int, array{brand: string, model: string, units: int, spellings: int}>
+     */
+    public function brandModelSummary(DataScope $scope, array $filters): Collection
+    {
+        return $this->base($scope, $filters)
+            ->toBase()
+            ->groupByRaw(self::BRAND_KEY.', '.self::MODEL_KEY)
+            ->selectRaw(
+                self::BRAND_KEY.' as brand_key, '.self::MODEL_KEY.' as model_key, '
+                .'min(trim(brand)) as brand_name, min(trim(model)) as model_name, '
+                .'count(distinct hex(model)) as spellings, count(*) as units'
+            )
+            ->get()
+            ->map(fn ($row) => [
+                'brand_key' => (string) $row->brand_key,
+                'brand' => (string) ($row->brand_name ?? ''),
+                'model_key' => (string) $row->model_key,
+                'model' => (string) ($row->model_name ?? ''),
+                'spellings' => (int) $row->spellings,
+                'units' => (int) $row->units,
+            ])
+            ->pipe(function (Collection $rows): Collection {
+                // Diurutkan di PHP, bukan di SQL. Baris satu merek harus berkumpul dan
+                // mereknya berurut menurut TOTAL unitnya — angka yang tidak ada di
+                // baris mana pun karena tiap baris hanya menghitung satu pasangan
+                // merek+model. Mengambilnya di SQL berarti window function, yang
+                // dukungannya berbeda-beda; jumlah pasangan merek×model selalu kecil,
+                // jadi mengurutkannya di sini jauh lebih murah daripada risikonya.
+                $totalPerBrand = $rows->groupBy('brand_key')->map->sum('units');
+
+                return $rows
+                    ->sortBy([
+                        fn (array $a, array $b) => ($a['brand_key'] === '' ? 1 : 0) <=> ($b['brand_key'] === '' ? 1 : 0),
+                        fn (array $a, array $b) => $totalPerBrand[$b['brand_key']] <=> $totalPerBrand[$a['brand_key']],
+                        fn (array $a, array $b) => strcasecmp($a['brand'], $b['brand']),
+                        fn (array $a, array $b) => ($a['model_key'] === '' ? 1 : 0) <=> ($b['model_key'] === '' ? 1 : 0),
+                        fn (array $a, array $b) => $b['units'] <=> $a['units'],
+                        fn (array $a, array $b) => strcasecmp($a['model'], $b['model']),
+                    ])
+                    ->values();
+            });
+    }
+
+    /**
+     * Satu baris per merek. Merek yang kosong selalu jatuh ke urutan paling akhir,
+     * berapa pun banyaknya: ia bukan sebuah merek, melainkan pekerjaan yang tertunda,
+     * dan menaruhnya di puncak daftar hanya karena isinya banyak akan mengubur merek
+     * yang sebenarnya.
+     *
+     * @param  array<string, mixed>  $filters
+     */
+    private function brandGroupQuery(DataScope $scope, array $filters): QueryBuilder
+    {
+        return $this->base($scope, $filters)
+            ->toBase()
+            ->groupByRaw(self::BRAND_KEY)
+            ->selectRaw(
+                self::BRAND_KEY.' as group_key, min(trim(brand)) as display_name, '
+                .'count(distinct hex(brand)) as spellings, count(*) as units'
+            )
+            ->orderByRaw($this->emptyLastOrder('group_key'))
+            ->orderByDesc('units')
+            ->orderBy('display_name');
+    }
+
+    /**
+     * Urutkan kelompok berkunci kosong ke belakang.
+     *
+     * Yang dirujuk adalah ALIAS kolomnya, bukan ekspresi kuncinya diulang. MySQL
+     * dengan only_full_group_by menolak ekspresi berisi kolom mentah di ORDER BY
+     * sekalipun ekspresi itu persis yang dipakai GROUP BY — ia tidak menelusuri
+     * kesamaannya ke dalam CASE WHEN. Aliasnya diterima, dan SQLite juga menerimanya.
+     *
+     * CASE WHEN, bukan perbandingan boolean seperti (alias = ''), supaya artinya sama
+     * di kedua basis data tanpa bergantung pada bagaimana masing-masing
+     * memperlakukan hasil perbandingan sebagai angka.
+     */
+    private function emptyLastOrder(string $alias): string
+    {
+        return "case when {$alias} = '' then 1 else 0 end asc";
+    }
+
+    /**
+     * Isi tiap merek: seluruh unitnya, lalu dikumpulkan lagi per model.
+     *
+     * Tingkat model dibentuk di PHP dari unit yang memang sudah dimuat, bukan lewat
+     * kueri agregat kedua — datanya sudah ada di tangan, dan menghitungnya lagi di
+     * basis data hanya membuka peluang dua angka yang berbeda untuk hal yang sama.
+     *
+     * @param  array<string, mixed>  $filters
+     * @param  Collection<int, object>  $rows
+     * @return Collection<int, array<string, mixed>>
+     */
+    private function attachBrandMembers(DataScope $scope, array $filters, Collection $rows): Collection
+    {
+        $keys = $rows->pluck('group_key')->all();
+
+        $members = $keys === []
+            ? collect()
+            : $this->register($scope, $filters)
+                ->select([
+                    'assets.*',
+                    DB::raw(self::BRAND_KEY.' as group_key'),
+                    DB::raw(self::MODEL_KEY.' as model_key'),
+                ])
+                ->whereIn(DB::raw(self::BRAND_KEY), $keys)
+                ->get()
+                ->groupBy('group_key');
+
+        return $rows->map(function ($row) use ($members) {
+            $units = $members->get((string) $row->group_key, collect());
+
+            return [
+                'key' => (string) $row->group_key,
+                'name' => (string) ($row->display_name ?? ''),
+                'spellings' => (int) $row->spellings,
+                'units' => (int) $row->units,
+                'assets' => $units,
+                'models' => $this->modelGroups($units),
+            ];
+        });
+    }
+
+    /**
+     * Kelompok model di dalam satu merek, dengan aturan urutan yang sama seperti
+     * mereknya: yang kosong paling belakang, sisanya terbanyak lebih dulu.
+     *
+     * @param  Collection<int, Asset>  $units
+     * @return Collection<int, array<string, mixed>>
+     */
+    private function modelGroups(Collection $units): Collection
+    {
+        return $units
+            ->groupBy(fn (Asset $asset) => (string) $asset->model_key)
+            ->map(fn (Collection $rows, string $key) => [
+                'key' => $key,
+                'name' => (string) ($rows->map(fn (Asset $asset) => trim((string) $asset->model))->filter()->first() ?? ''),
+                // Dibandingkan mentah — persis seperti hitungan ejaan di SQL, yang
+                // membandingkan byte supaya beda huruf besar-kecil tidak lolos.
+                'spellings' => $rows->map(fn (Asset $asset) => (string) $asset->model)->unique()->count(),
+                'units' => $rows->count(),
+                'assets' => $rows->values(),
+            ])
+            ->sortBy([
+                fn (array $a, array $b) => ($a['key'] === '' ? 1 : 0) <=> ($b['key'] === '' ? 1 : 0),
+                fn (array $a, array $b) => $b['units'] <=> $a['units'],
+                fn (array $a, array $b) => strcasecmp($a['name'], $b['name']),
+            ])
+            ->values();
     }
 
     /**

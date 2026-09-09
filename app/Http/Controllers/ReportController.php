@@ -400,9 +400,9 @@ class ReportController extends Controller
         // ikut termuat, jadi jatah per halamannya lebih kecil daripada daftar rinci —
         // 25 nama yang masing-masing berisi beberapa unit sudah setara satu halaman
         // penuh baris.
-        $perPage = $view === 'grouped'
-            ? min(max((int) $request->input('per_page', 25), 10), 100)
-            : min(max((int) $request->input('per_page', 50), 25), 200);
+        $perPage = $view === 'detail'
+            ? min(max((int) $request->input('per_page', 50), 25), 200)
+            : min(max((int) $request->input('per_page', 25), 10), 100);
 
         return view('reports.assets', [
             'assets' => $view === 'detail'
@@ -410,6 +410,9 @@ class ReportController extends Controller
                 : null,
             'nameGroups' => $view === 'grouped'
                 ? $this->assetRegister->nameGroups($scope, $filters, $perPage)->withQueryString()
+                : null,
+            'brandGroups' => $view === 'brand'
+                ? $this->assetRegister->brandGroups($scope, $filters, $perPage)->withQueryString()
                 : null,
             'summary' => $this->assetRegister->summary($scope, $filters),
             'groups' => $this->assetRegister->groups($scope, $filters, $groupBy),
@@ -438,7 +441,7 @@ class ReportController extends Controller
             new AssetRegisterExport(
                 assets: $this->assetRegister->register($scope, $filters)->get(),
                 groups: $this->assetRegister->groups($scope, $filters, $groupBy),
-                names: $this->assetRegister->nameSummary($scope, $filters),
+                names: $this->assetRegister->brandModelSummary($scope, $filters),
                 summary: $this->assetRegister->summary($scope, $filters),
                 filterLabels: $this->assetRegister->filterLabels($filters, $groupBy),
                 groupLabel: AssetRegisterReport::GROUPS[$groupBy],
@@ -455,7 +458,7 @@ class ReportController extends Controller
         $pdf = Pdf::loadView('reports.pdf.assets', [
             'assets' => $this->assetRegister->register($scope, $filters)->get(),
             'groups' => $this->assetRegister->groups($scope, $filters, $groupBy),
-            'names' => $this->assetRegister->nameSummary($scope, $filters),
+            'names' => $this->assetRegister->brandModelSummary($scope, $filters),
             'summary' => $this->assetRegister->summary($scope, $filters),
             'groupLabel' => AssetRegisterReport::GROUPS[$groupBy],
             'filterLabels' => $this->assetRegister->filterLabels($filters, $groupBy),
