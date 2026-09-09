@@ -91,10 +91,14 @@
             </form>
         </section>
 
-        <section class="grid grid-cols-2 gap-4 lg:grid-cols-4">
+        {{-- Dipegang dan Dipakai dihitung sebagai dua angka, bukan satu "sedang
+             terpakai": hanya yang Dipegang punya nama karyawan yang bisa dimintai
+             pertanggungjawaban, dan laporan inilah yang dipakai untuk menagih. --}}
+        <section class="grid grid-cols-2 gap-4 lg:grid-cols-5">
             <x-stat-card label="Jumlah aset" :value="number_format($summary['total'])" tone="primary"><x-icon name="box"/></x-stat-card>
-            <x-stat-card label="Nilai perolehan" :value="'Rp '.number_format($summary['value'], 0, ',', '.')" tone="violet"><x-icon name="banknote"/></x-stat-card>
-            <x-stat-card label="Dipegang karyawan" :value="number_format($summary['assigned'])" tone="sky"><x-icon name="user-check"/></x-stat-card>
+            <x-stat-card label="Nilai perolehan" :value="'Rp '.number_format($summary['value'], 0, ',', '.')" tone="gray"><x-icon name="banknote"/></x-stat-card>
+            <x-stat-card label="Dipegang karyawan" :value="number_format($summary['assigned'])" tone="sky" hint="Ada pemegangnya"><x-icon name="user-check"/></x-stat-card>
+            <x-stat-card label="Dipakai bersama" :value="number_format($summary['in_use'])" tone="violet" hint="Tanpa pemegang"><x-icon name="users"/></x-stat-card>
             <x-stat-card label="Garansi ≤30 hari" :value="number_format($summary['warranty_expiring'])" tone="amber"><x-icon name="refresh"/></x-stat-card>
         </section>
 
@@ -169,6 +173,11 @@
                                     @if ($asset->currentAssignment?->employee)
                                         {{ $asset->currentAssignment->employee->full_name }}
                                         <span class="block text-xs text-gray-400">sejak {{ $asset->currentAssignment->assigned_at?->translatedFormat('d M Y') ?? '—' }}</span>
+                                    @elseif ($asset->status?->isSharedUse())
+                                        {{-- Bukan "—" seperti aset menganggur: kosongnya di sini disengaja,
+                                             dan pembaca perlu tahu bedanya sebelum menyimpulkan barangnya
+                                             luput dicatat serah terimanya. --}}
+                                        <span class="text-violet-700">Pakai bersama</span>
                                     @else
                                         <span class="text-gray-400">—</span>
                                     @endif
@@ -186,6 +195,6 @@
             @endif
         </section>
 
-        <p class="text-xs text-gray-400">Nilai perolehan adalah harga beli yang tercatat saat aset didaftarkan, bukan nilai buku — penyusutan belum dihitung sistem. Kolom Pemegang hanya terisi untuk aset yang sedang diserahkan ke seorang karyawan; barang berstatus &ldquo;Dipakai&rdquo; sengaja tanpa pemegang karena terpakai bersama.</p>
+        <p class="text-xs text-gray-400">Nilai perolehan adalah harga beli yang tercatat saat aset didaftarkan, bukan nilai buku — penyusutan belum dihitung sistem. Kolom Pemegang hanya terisi untuk aset yang sedang diserahkan ke seorang karyawan. Status &ldquo;Dipegang&rdquo; berarti ada satu nama yang bisa dimintai pertanggungjawaban; &ldquo;Dipakai&rdquo; berarti barangnya terpakai bersama dan memang tidak punya pemegang — keduanya dihitung dan diwarnai terpisah, jangan dijumlahkan sebagai satu angka.</p>
     </div>
 </x-layouts.app>

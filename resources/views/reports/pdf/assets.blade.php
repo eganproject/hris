@@ -28,6 +28,10 @@
         <br>Dicetak: {{ now()->translatedFormat('d M Y H:i') }}
         &middot; Jumlah aset: {{ number_format($summary['total']) }}
         &middot; Nilai perolehan: Rp {{ number_format($summary['value'], 0, ',', '.') }}
+        {{-- Dua angka, bukan satu "sedang terpakai": hanya Dipegang yang punya nama
+             penanggung jawab, dan cetakan inilah yang dibawa saat stock opname. --}}
+        &middot; Dipegang karyawan: {{ number_format($summary['assigned']) }}
+        &middot; Dipakai bersama: {{ number_format($summary['in_use']) }}
     </p>
 
     <h2>Rekap per {{ $groupLabel }}</h2>
@@ -87,7 +91,7 @@
                     <td class="l">{{ $asset->department?->name ?? '—' }}</td>
                     <td class="c">{{ $asset->status_label }}</td>
                     <td class="c">{{ $asset->condition_label }}</td>
-                    <td class="l">{{ $asset->currentAssignment?->employee?->full_name ?? '—' }}</td>
+                    <td class="l">{{ $asset->currentAssignment?->employee?->full_name ?? ($asset->status?->isSharedUse() ? 'Pakai bersama' : '—') }}</td>
                     <td class="r">{{ $asset->acquisition_cost === null ? '—' : number_format((float) $asset->acquisition_cost, 0, ',', '.') }}</td>
                 </tr>
             @empty

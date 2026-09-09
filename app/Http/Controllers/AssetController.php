@@ -87,6 +87,11 @@ class AssetController extends Controller
             'total' => $base()->count(),
             'available' => $base()->where('status', AssetStatus::Available->value)->count(),
             'assigned' => $base()->where('status', AssetStatus::Assigned->value)->count(),
+            // Dihitung terpisah, bukan digabung ke 'assigned': barang pakai bersama
+            // tidak punya penanggung jawab, jadi menjumlahkannya dengan aset yang
+            // sudah diserahterimakan membuat kartu ini terbaca sebagai "sekian aset
+            // ada yang memegang" — padahal sebagiannya tidak.
+            'in_use' => $base()->where('status', AssetStatus::InUse->value)->count(),
             'maintenance' => $base()->where('status', AssetStatus::Maintenance->value)->count(),
             'warranty_expiring' => $base()
                 ->whereNotNull('warranty_expires_at')

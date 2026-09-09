@@ -374,3 +374,25 @@ test('daftar aset bisa disaring ke status dipakai', function () {
         ->assertSee('Handphone hostlive')
         ->assertDontSee('Laptop cadangan');
 });
+
+test('kartu ringkas memisahkan aset dipegang dari aset dipakai bersama', function () {
+    $fixture = assetFixture();
+    $admin = assetAdmin();
+
+    $this->actingAs($admin)->post(route('assets.store'), assetPayload($fixture, [
+        'name' => 'Handphone hostlive', 'serial_number' => 'SN-SHARED2', 'status' => AssetStatus::InUse->value,
+    ]));
+
+    $response = $this->actingAs($admin)->get(route('assets.index'))->assertOk();
+
+    // Dua kartu berdiri sendiri: yang Dipegang punya nama penanggung jawab di serah
+    // terima, yang Dipakai tidak — menggabungkannya menyesatkan saat stock opname.
+    $response->assertSee('Diserahkan ke satu karyawan')
+        ->assertSee('Pakai bersama, tanpa pemegang');
+
+    expect($response->viewData('summary'))
+        ->toHaveKey('assigned')
+        ->toHaveKey('in_use')
+        ->and($response->viewData('summary')['in_use'])->toBe(1)
+        ->and($response->viewData('summary')['assigned'])->toBe(0);
+});

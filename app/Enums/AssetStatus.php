@@ -57,7 +57,11 @@ enum AssetStatus: string
     {
         return match ($this) {
             self::Available => 'success',
-            self::Assigned, self::InUse => 'info',
+            self::Assigned => 'info',
+            // Warna sendiri, bukan menumpang warna Assigned: "Dipegang" bisa ditagih
+            // ke satu orang, "Dipakai" tidak. Dua badge sewarna membuat pembaca daftar
+            // menyangka keduanya sama-sama punya penanggung jawab.
+            self::InUse => 'accent',
             self::Maintenance, self::Draft => 'warning',
             self::Lost => 'danger',
             self::Retired, self::Disposed => 'neutral',

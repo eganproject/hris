@@ -31,12 +31,17 @@
             </div>
         @endif
 
-        <section class="grid grid-cols-2 gap-4 lg:grid-cols-5">
+        {{-- "Dipegang" dan "Dipakai" berdiri sendiri-sendiri: yang pertama ada nama
+             penanggung jawabnya di serah terima, yang kedua tidak. Menggabungkannya
+             jadi satu kartu membuat stock opname mengira semua barang terpakai bisa
+             ditagih ke seseorang. --}}
+        <section class="grid grid-cols-2 gap-4 sm:grid-cols-3 xl:grid-cols-6">
             <x-stat-card label="Total aset" :value="number_format($summary['total'])" tone="primary"><x-icon name="box"/></x-stat-card>
             <x-stat-card label="Tersedia" :value="number_format($summary['available'])" tone="emerald"><x-icon name="box"/></x-stat-card>
-            <x-stat-card label="Dipegang" :value="number_format($summary['assigned'])" tone="sky"><x-icon name="user-check"/></x-stat-card>
+            <x-stat-card label="Dipegang" :value="number_format($summary['assigned'])" tone="sky" hint="Diserahkan ke satu karyawan"><x-icon name="user-check"/></x-stat-card>
+            <x-stat-card label="Dipakai" :value="number_format($summary['in_use'])" tone="violet" hint="Pakai bersama, tanpa pemegang"><x-icon name="users"/></x-stat-card>
             <x-stat-card label="Perawatan" :value="number_format($summary['maintenance'])" tone="amber"><x-icon name="refresh"/></x-stat-card>
-            <x-stat-card label="Nilai perolehan" :value="'Rp '.number_format((float) $summary['value'], 0, ',', '.')" tone="violet" :hint="$summary['warranty_expiring'].' aset garansi ≤30 hari'"><x-icon name="banknote"/></x-stat-card>
+            <x-stat-card label="Nilai perolehan" :value="'Rp '.number_format((float) $summary['value'], 0, ',', '.')" tone="gray" :hint="$summary['warranty_expiring'].' aset garansi ≤30 hari'"><x-icon name="banknote"/></x-stat-card>
         </section>
 
         <section class="rounded-lg border border-gray-200 bg-white p-5 shadow-sm">

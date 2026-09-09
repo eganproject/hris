@@ -90,7 +90,7 @@ class AssetRegisterReport
 
     /**
      * @param  array<string, mixed>  $filters
-     * @return array{total: int, value: float, warranty_expiring: int, assigned: int}
+     * @return array{total: int, value: float, warranty_expiring: int, assigned: int, in_use: int}
      */
     public function summary(DataScope $scope, array $filters): array
     {
@@ -104,6 +104,11 @@ class AssetRegisterReport
                 ->whereBetween('warranty_expires_at', [today(), today()->addDays(30)])
                 ->count(),
             'assigned' => $base()->where('status', AssetStatus::Assigned->value)->count(),
+            // Terpisah dari 'assigned'. Keduanya sama-sama "sedang terpakai", tapi
+            // hanya yang Assigned punya nama yang bisa dimintai pertanggungjawaban;
+            // satu angka gabungan menghilangkan beda itu justru di laporan yang
+            // dipakai untuk menagih.
+            'in_use' => $base()->where('status', AssetStatus::InUse->value)->count(),
         ];
     }
 

@@ -7,6 +7,8 @@ use App\Models\Branch;
 use App\Models\Department;
 use App\Models\Employee;
 use App\Models\User;
+use App\Support\AssetRegisterReport;
+use App\Support\DataScope;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Spatie\Permission\Models\Permission;
 use Spatie\Permission\PermissionRegistrar;
@@ -182,4 +184,35 @@ test('pemegang aset ikut tercatat di laporan', function () {
     $this->actingAs(assetReportUser())->get(route('reports.assets'))
         ->assertOk()
         ->assertSee('Budi Pemegang');
+});
+
+test('dipegang dan dipakai dihitung sebagai dua angka terpisah, bukan satu', function () {
+    $f = assetReportFixture();
+
+    $employee = Employee::query()->create([
+        'full_name' => 'Budi Pemegang', 'employment_status' => 'active',
+        'branch_id' => $f['ho']->id, 'department_id' => $f['it']->id,
+    ]);
+
+    $f['laptopA']->assignments()->create([
+        'employee_id' => $employee->id,
+        'assigned_at' => today(),
+        'condition_out' => 'good',
+        'assigned_by' => assetReportUser()->id,
+    ]);
+    $f['laptopA']->forceFill(['status' => AssetStatus::Assigned->value])->save();
+
+    // Fixture-nya: 1 Dipegang (laptopA), 1 Dipakai (phone), 1 Tersedia (laptopB).
+    $summary = app(AssetRegisterReport::class)->summary(DataScope::forAssets(assetReportUser()), []);
+
+    expect($summary['assigned'])->toBe(1)
+        ->and($summary['in_use'])->toBe(1);
+
+    $this->actingAs(assetReportUser())->get(route('reports.assets'))
+        ->assertOk()
+        ->assertSee('Dipegang karyawan')
+        ->assertSee('Dipakai bersama')
+        // Kolom Pemegang barang pakai bersama tidak boleh tampil sama dengan aset
+        // menganggur: kosongnya disengaja, bukan luput dicatat.
+        ->assertSee('Pakai bersama');
 });

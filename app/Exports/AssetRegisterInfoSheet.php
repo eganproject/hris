@@ -45,13 +45,18 @@ class AssetRegisterInfoSheet implements FromArray, ShouldAutoSize, WithEvents, W
         $rows[] = ['', ''];
         $rows[] = ['Jumlah aset', (string) $this->summary['total']];
         $rows[] = ['Nilai perolehan', 'Rp '.number_format((float) $this->summary['value'], 0, ',', '.')];
+        // Dua baris, bukan satu "sedang terpakai": angka yang digabung menghapus beda
+        // antara barang yang bisa ditagih ke seseorang dan barang yang tidak.
+        $rows[] = ['Dipegang karyawan', (string) $this->summary['assigned']];
+        $rows[] = ['Dipakai bersama', (string) $this->summary['in_use']];
         $rows[] = ['Dibuat oleh', $this->generatedBy ?? '-'];
         $rows[] = ['Waktu dibuat', now()->translatedFormat('l, d F Y H:i')];
         $rows[] = ['', ''];
         $rows[] = ['CARA MEMBACA', ''];
         $rows[] = ['Cakupan', 'Berkas ini hanya memuat aset yang boleh dilihat oleh akun pembuatnya. Dua orang dengan cakupan berbeda akan menghasilkan angka berbeda dari filter yang sama.'];
         $rows[] = ['Nilai Perolehan', 'Harga beli yang tercatat saat aset didaftarkan, bukan nilai buku. Penyusutan belum dihitung sistem.'];
-        $rows[] = ['Pemegang', 'Karyawan yang masa pegangnya masih berjalan. Kosong berarti aset tidak sedang diserahkan ke siapa pun — termasuk barang berstatus Dipakai yang terpakai bersama.'];
+        $rows[] = ['Pemegang', 'Karyawan yang masa pegangnya masih berjalan. Kosong berarti aset tidak sedang diserahkan ke siapa pun.'];
+        $rows[] = ['Dipegang vs Dipakai', 'Dua status yang berbeda dan tidak boleh dijumlahkan. "Dipegang" lahir dari serah terima, jadi ada satu karyawan yang bisa dimintai pertanggungjawaban dan kolom Pemegang terisi. "Dipakai" adalah barang pakai bersama yang menetap di satu ruangan — memang terpakai, tapi kolom Pemegangnya sengaja kosong karena tidak ada yang menandatangani.'];
         $rows[] = ['Lokasi Pemilik vs Sekarang', 'Lokasi Pemilik tidak berubah saat barang dipindah; Lokasi Sekarang mengikuti perpindahan.'];
         $rows[] = ['Filter lokasi', 'Menyaring lokasi pemilik ATAU lokasi sekarang, supaya aset yang dititipkan ke cabang lain tetap muncul di kedua sisi.'];
 
