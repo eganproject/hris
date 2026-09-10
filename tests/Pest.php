@@ -1,6 +1,9 @@
 <?php
 
+use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Spatie\Permission\Models\Permission;
+use Spatie\Permission\PermissionRegistrar;
 use Tests\TestCase;
 
 /*
@@ -47,6 +50,37 @@ expect()->extend('toBeOne', function () {
 function something()
 {
     // ..
+}
+
+/**
+ * Pengguna dengan izin apa adanya — tanpa role, tanpa cakupan lokasi/divisi.
+ * Cakupannya diatur pemanggilnya lewat accessBranches()/bypass_team_scope, sesuai
+ * yang sedang diuji.
+ *
+ * @param  list<string>  $permissions
+ */
+function scopedUser(array $permissions): User
+{
+    app(PermissionRegistrar::class)->forgetCachedPermissions();
+
+    foreach ($permissions as $permission) {
+        Permission::findOrCreate($permission, 'web');
+    }
+
+    $user = User::factory()->create();
+    $user->givePermissionTo($permissions);
+
+    return $user;
+}
+
+/**
+ * Judul notifikasi di kotak masuk seorang pengguna, terurut dari yang terlama.
+ *
+ * @return list<string>
+ */
+function inboxTitles(User $user): array
+{
+    return $user->notifications()->oldest()->get()->map(fn ($n) => $n->data['title'])->all();
 }
 
 /**

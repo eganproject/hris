@@ -1,6 +1,7 @@
 <?php
 
 use Illuminate\Foundation\Inspiring;
+use Illuminate\Notifications\DatabaseNotification;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Schedule;
 
@@ -25,6 +26,10 @@ Schedule::command('contracts:notify-expiring')->dailyAt('06:00');
 // Ingatkan konfirmasi serah-terima aset dan pengembalian yang mendekat atau telat.
 Schedule::command('assets:notify-custody')->dailyAt('06:15');
 
+// Tagih pengajuan cuti & lembur yang didiamkan atasannya (H+3, lalu H+7 dengan
+// tembusan ke atasan di atasnya).
+Schedule::command('approvals:notify-stale')->dailyAt('06:30');
+
 // Deteksi mesin absensi yang offline dan beri tahu HR (sekali per gangguan).
 Schedule::command('devices:notify-offline')->everyFifteenMinutes();
 
@@ -42,7 +47,7 @@ Schedule::command('attendance:prune-selfies')->monthlyOn(1, '00:25');
 
 // Pangkas notifikasi yang sudah dibaca lebih dari 30 hari agar tabel tetap ramping.
 Schedule::call(function () {
-    Illuminate\Notifications\DatabaseNotification::query()
+    DatabaseNotification::query()
         ->whereNotNull('read_at')
         ->where('read_at', '<', now()->subDays(30))
         ->delete();

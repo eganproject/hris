@@ -3,6 +3,7 @@
 namespace App\Support;
 
 use App\Enums\LeaveRequestStatus;
+use App\Models\Asset;
 use App\Models\AssetAssignment;
 use App\Models\AttendanceCorrection;
 use App\Models\Device;
@@ -13,6 +14,7 @@ use App\Models\OvertimeApproval;
 use App\Models\ShiftSwapRequest;
 use App\Models\User;
 use App\Notifications\ApprovalNotification;
+use Carbon\CarbonInterface;
 use Illuminate\Support\Facades\Auth;
 use Spatie\Permission\Exceptions\PermissionDoesNotExist;
 
@@ -39,6 +41,19 @@ class ApprovalNotifier
 
     /** Yang mengurus serah-terima aset: merekalah yang bisa menindaklanjutinya. */
     public const ASSET_OFFICER = 'asset-assignments.assign';
+
+    /**
+     * Izin untuk MEMBUKA halaman, bukan untuk memutuskan. Dipakai menyaring tembusan
+     * ke atasan: seorang atasan tidak otomatis memegang menu HR, dan tembusan yang
+     * berujung 403 lebih membingungkan daripada tidak dikirim sama sekali.
+     */
+    public const LEAVE_VIEWER = 'leave.view';
+
+    public const OVERTIME_VIEWER = 'overtime.view';
+
+    public const CORRECTION_VIEWER = 'corrections.view';
+
+    public const EMPLOYEE_VIEWER = 'employees.view';
 
     /**
      * Aset baru diserahkan — karyawannya perlu tahu, dan perlu mengonfirmasinya.
@@ -110,7 +125,7 @@ class ApprovalNotifier
                     .abs($daysLeft).' hari dari tenggat '.$due.'.',
                 url: route('assets.assignments.index', ['state' => 'overdue']),
                 category: 'asset',
-            ), $assignment->employee);
+            ), $asset);
         }
     }
 
@@ -190,7 +205,7 @@ class ApprovalNotifier
     }
 
     /** "Sen, 10 Feb 2026" — selalu dengan tahun, agar tidak ambigu lintas tahun. */
-    private function longDate(\Carbon\CarbonInterface $date): string
+    private function longDate(CarbonInterface $date): string
     {
         return $date->translatedFormat('D, d M Y');
     }
@@ -221,8 +236,18 @@ class ApprovalNotifier
         $leave->loadMissing('employee', 'supervisor', 'leaveType');
 
         $who = $leave->employee?->full_name;
-        $message = $who.' mengajukan '.$this->leaveType($leave).' — '.$this->leavePeriod($leave).'.'
-            .($leave->reason ? ' Alasan: '.$leave->reason : '');
+        $type = $this->leaveType($leave);
+        $tail = $this->leavePeriod($leave).'.'.($leave->reason ? ' Alasan: '.$leave->reason : '');
+
+        // Dibuatkan orang lain lewat menu Cuti & Izin, bukan diajukan karyawannya
+        // sendiri — dan atasan tetap yang harus memutuskannya. Bedanya perlu terbaca:
+        // pengajuan yang tidak pernah diketik orangnya sendiri kadang perlu
+        // dikonfirmasi dulu sebelum disetujui.
+        $filedBy = $this->actorFilingFor($leave->employee);
+
+        $message = $filedBy !== null
+            ? $filedBy.' membuat pengajuan '.$type.' atas nama '.$who.' — '.$tail
+            : $who.' mengajukan '.$type.' — '.$tail;
 
         // With a supervisor the request waits for them; otherwise it goes straight to HR.
         if ($leave->supervisor) {
@@ -242,6 +267,67 @@ class ApprovalNotifier
             url: route('attendance.leave.index'),
             category: 'leave',
         ), $leave->employee);
+    }
+
+    /**
+     * Pengajuan cuti yang belum juga diputuskan. Atasannya diingatkan; setelah
+     * mengendap lebih lama, atasan di atasnya ikut diberi tahu — halaman Cuti & Izin
+     * memakai garis atasan berjenjang, jadi ia memang bisa melihat dan membereskannya.
+     */
+    public function leavePendingReminder(LeaveRequest $leave, int $daysWaiting, bool $escalate): void
+    {
+        $leave->loadMissing('employee', 'supervisor', 'leaveType');
+
+        $type = $this->leaveType($leave);
+        $who = $leave->employee?->full_name ?? 'Karyawan';
+        $period = $this->leavePeriod($leave);
+
+        $this->toEmployee($leave->supervisor, new ApprovalNotification(
+            title: 'Pengajuan '.$type.' menunggu keputusan Anda',
+            message: 'Pengajuan '.$type.' dari '.$who.' — '.$period.' — sudah menunggu '.$daysWaiting.' hari.',
+            url: route('my-leave.index'),
+            category: 'leave',
+        ));
+
+        if ($escalate) {
+            $this->toSupervisor($leave->supervisor, new ApprovalNotification(
+                title: 'Pengajuan '.$type.' di tim Anda mengendap',
+                message: 'Pengajuan '.$type.' dari '.$who.' — '.$period.' — sudah '.$daysWaiting.' hari menunggu keputusan '
+                    .($leave->supervisor?->full_name ?? 'atasannya').'.',
+                url: route('attendance.leave.index'),
+                category: 'leave',
+            ), self::LEAVE_VIEWER);
+        }
+    }
+
+    /**
+     * Pengajuan lembur yang belum juga diputuskan. Naiknya berhenti di pemantauan
+     * lembur: layar itu hanya bisa dibaca, jadi atasan di atasnya bisa menagih tapi
+     * keputusannya tetap milik atasan langsung.
+     */
+    public function overtimePendingReminder(OvertimeApproval $overtime, int $daysWaiting, bool $escalate): void
+    {
+        $overtime->loadMissing('employee', 'supervisor');
+
+        $who = $overtime->employee?->full_name ?? 'Karyawan';
+        $period = $this->overtimePeriod($overtime);
+
+        $this->toEmployee($overtime->supervisor, new ApprovalNotification(
+            title: 'Pengajuan lembur menunggu keputusan Anda',
+            message: 'Pengajuan lembur dari '.$who.' — '.$period.' — sudah menunggu '.$daysWaiting.' hari.',
+            url: route('my-overtime.index'),
+            category: 'overtime',
+        ));
+
+        if ($escalate) {
+            $this->toSupervisor($overtime->supervisor, new ApprovalNotification(
+                title: 'Pengajuan lembur di tim Anda mengendap',
+                message: 'Pengajuan lembur dari '.$who.' — '.$period.' — sudah '.$daysWaiting.' hari menunggu keputusan '
+                    .($overtime->supervisor?->full_name ?? 'atasannya').'.',
+                url: route('attendance.overtime.index'),
+                category: 'overtime',
+            ), self::OVERTIME_VIEWER);
+        }
     }
 
     /**
@@ -282,6 +368,17 @@ class ApprovalNotifier
             url: route('attendance.corrections.index'),
             category: 'correction',
         ), $correction->employee);
+
+        // Keputusannya tetap milik HR — halaman Koreksi memang tidak dipersempit ke
+        // bawahan. Tapi jam kerja yang diubah adalah jam kerja timnya, jadi atasannya
+        // perlu tahu, bukan menemukannya belakangan di rekap.
+        $this->toSupervisor($correction->employee, new ApprovalNotification(
+            title: 'Koreksi absensi bawahan',
+            message: $correction->employee?->full_name.' mengajukan koreksi absensi — '.$this->correctionPeriod($correction).'.'
+                .($correction->reason ? ' Alasan: '.$correction->reason : '').' Keputusannya ada di HR.',
+            url: route('attendance.corrections.index'),
+            category: 'correction',
+        ), self::CORRECTION_VIEWER, self::CORRECTION_APPROVER);
     }
 
     /** Dibatalkan karyawannya sendiri: HR tidak perlu lagi memutuskannya. */
@@ -517,6 +614,14 @@ class ApprovalNotifier
             url: route('employees.show', $employee),
             category: 'contract',
         ), $employee);
+
+        $this->toSupervisor($employee, new ApprovalNotification(
+            title: 'Kontrak bawahan akan berakhir',
+            message: 'Kontrak '.$employee->full_name.' berakhir dalam '.$daysLeft.' hari ('
+                .$contract->end_date->translatedFormat('d M Y').'). Perpanjangannya diurus HR.',
+            url: route('employees.show', $employee),
+            category: 'contract',
+        ), self::EMPLOYEE_VIEWER, self::CONTRACT_MANAGER);
     }
 
     public function contractAutoDeactivated(Employee $employee, EmployeeContract $contract): void
@@ -527,6 +632,15 @@ class ApprovalNotifier
             url: route('employees.show', $employee),
             category: 'contract',
         ), $employee);
+
+        // Kehilangan anggota tim tanpa kabar apa pun adalah cara terburuk mengetahuinya.
+        $this->toSupervisor($employee, new ApprovalNotification(
+            title: 'Bawahan Anda dinonaktifkan',
+            message: $employee->full_name.' dinonaktifkan otomatis karena kontraknya berakhir ('
+                .$contract->end_date->translatedFormat('d M Y').').',
+            url: route('employees.show', $employee),
+            category: 'contract',
+        ), self::EMPLOYEE_VIEWER, self::CONTRACT_MANAGER);
     }
 
     public function deviceOffline(Device $device, int $minutesOffline): void
@@ -536,7 +650,7 @@ class ApprovalNotifier
             message: 'Mesin "'.$device->name.'" ('.$device->serial_number.') tidak mengirim data sejak '.($device->last_seen_at?->translatedFormat('d M H:i') ?? 'lama').' — sekitar '.$minutesOffline.' menit. Periksa koneksi perangkat.',
             url: route('attendance.devices.monitor'),
             category: 'device',
-        ));
+        ), $device);
     }
 
     private function toEmployee(?Employee $employee, ApprovalNotification $notification): void
@@ -549,12 +663,54 @@ class ApprovalNotifier
     }
 
     /**
-     * Notify every user that holds a given permission (excluding the actor). When the
-     * notification is about a specific employee, only those whose data scope covers
-     * that employee are notified — an HR cabang must not be told about, and linked to,
-     * a request they are not allowed to open.
+     * Tembusan ke atasan langsung karyawan ini.
+     *
+     * @param  string  $canOpen  Izin halaman yang ditautkan. Seorang atasan tidak
+     *                           otomatis memegang menu HR, dan tembusan yang berujung
+     *                           403 lebih membingungkan daripada tidak dikirim.
+     * @param  string|null  $decidedWith  Izin pengambil keputusannya. Atasan yang
+     *                                    kebetulan memegangnya sudah menerima
+     *                                    notifikasi aslinya lewat toPermission(), jadi
+     *                                    tembusannya dilewati agar tidak berganda.
      */
-    private function toPermission(string $permission, ApprovalNotification $notification, ?Employee $about = null): void
+    private function toSupervisor(?Employee $employee, ApprovalNotification $notification, string $canOpen, ?string $decidedWith = null): void
+    {
+        $employee?->loadMissing('manager.user');
+
+        $user = $employee?->manager?->user;
+
+        if (! $user || $user->id === Auth::id() || ! $user->can($canOpen)) {
+            return;
+        }
+
+        if ($decidedWith !== null && $user->can($decidedWith)) {
+            return;
+        }
+
+        if ($this->reaches($user, $canOpen, $employee)) {
+            $user->notify($notification);
+        }
+    }
+
+    /**
+     * Nama orang yang membuat pengajuan ini bila BUKAN karyawannya sendiri, dan null
+     * bila ia mengajukannya sendiri — juga null pada perintah terjadwal, yang berjalan
+     * tanpa pengguna yang masuk.
+     */
+    private function actorFilingFor(?Employee $employee): ?string
+    {
+        $actor = Auth::user();
+
+        return $actor && $actor->id !== $employee?->user_id ? $actor->name : null;
+    }
+
+    /**
+     * Notify every user that holds a given permission (excluding the actor). When the
+     * notification is about a specific subject, only those whose data scope covers it
+     * are notified — an HR cabang must not be told about, and linked to, a request they
+     * are not allowed to open.
+     */
+    private function toPermission(string $permission, ApprovalNotification $notification, Employee|Asset|Device|null $about = null): void
     {
         try {
             $recipients = User::query()
@@ -568,20 +724,71 @@ class ApprovalNotifier
         }
 
         if ($about) {
-            // Sumbu cakupannya harus mengikuti MODUL notifikasinya. Sebelum ada baris
-            // untuk aset, pemberitahuan soal aset ikut diukur dengan cakupan absensi —
-            // sehingga seorang asset officer baru bisa ditagih soal aset kalau ia
-            // kebetulan juga dikecualikan di absensi, yang tidak ada hubungannya.
-            $bypass = match (true) {
-                str_starts_with($permission, 'employees.') => User::SCOPE_BYPASS_EMPLOYEES,
-                str_starts_with($permission, 'asset') => User::SCOPE_BYPASS_ASSETS,
-                default => User::SCOPE_BYPASS_ATTENDANCE,
-            };
-
-            $recipients = $recipients->filter(fn (User $user) => $about->isVisibleTo($user, $bypass));
+            $recipients = $recipients->filter(fn (User $user) => $this->reaches($user, $permission, $about));
         }
 
         $recipients->each->notify($notification);
+    }
+
+    /**
+     * Apakah subjek notifikasi ini berada di dalam cakupan penerimanya.
+     *
+     * Diukur dengan cakupan yang dipakai HALAMAN tujuan notifikasinya, lewat DataScope
+     * yang sama — bukan aturan tersendiri di kelas ini. Kalau keduanya berbeda,
+     * seseorang bisa dikabari lalu menemukan daftar kosong (atau 403) di tautan yang
+     * baru saja ia buka, dan pemberitahuan seperti itu bukan kabar melainkan jalan
+     * buntu.
+     */
+    private function reaches(User $user, string $permission, Employee|Asset|Device $about): bool
+    {
+        // Aset disaring lewat lokasi/divisi asetnya sendiri, bukan lewat karyawan yang
+        // memegangnya: itulah yang menyaring halaman Serah Terima Aset. Aset gudang
+        // cabang A yang dipegang orang cabang B tetap urusan petugas cabang A.
+        if ($about instanceof Asset) {
+            return DataScope::forAssets($user)->allowsAsset($about);
+        }
+
+        if ($about instanceof Device) {
+            return $this->reachesDevice($user, $about);
+        }
+
+        return $this->employeeScope($permission, $user)->allows($about);
+    }
+
+    /**
+     * Cakupan untuk subjek berupa karyawan, dipilih menurut halaman yang dituju
+     * notifikasinya — bukan menurut modul asal kejadiannya.
+     */
+    private function employeeScope(string $permission, User $user): DataScope
+    {
+        return match (true) {
+            // Cuti & Izin dipersempit ke garis atasan; lihat LeaveController::index().
+            str_starts_with($permission, 'leave.') => DataScope::forTeam($user),
+            // Halaman data karyawan. Serah-terima aset ikut di sini karena satu-satunya
+            // notifikasinya yang bersubjek karyawan menautkan ke sana.
+            str_starts_with($permission, 'employees.'),
+            $permission === self::ASSET_OFFICER => DataScope::forEmployees($user),
+            // Koreksi, tukar jadwal, pemantauan lembur: tetap lokasi/divisi.
+            default => DataScope::forAttendance($user),
+        };
+    }
+
+    /**
+     * Mesin absensi terikat pada satu lokasi kerja, jadi yang dikabari adalah orang
+     * yang mengurus lokasi itu. Pengguna yang cakupannya tidak dinyatakan lewat lokasi
+     * (hanya divisi, atau belum diatur sama sekali) tetap dikabari: tidak ada sumbu
+     * yang bisa dipakai untuk mempersempitnya, dan mendiamkan mereka lebih berisiko
+     * daripada mengabari satu orang berlebih.
+     */
+    private function reachesDevice(User $user, Device $device): bool
+    {
+        if ($user->seesAllData(User::SCOPE_BYPASS_ATTENDANCE) || ! $device->branch_id) {
+            return true;
+        }
+
+        $branchIds = $user->accessBranchIds();
+
+        return $branchIds === [] || in_array($device->branch_id, $branchIds, true);
     }
 
     private function hm(int $minutes): string
