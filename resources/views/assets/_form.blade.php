@@ -26,13 +26,16 @@
             @error('name')<p class="mt-2 text-sm text-red-600">{{ $message }}</p>@enderror
         </div>
         <div>
-            <label for="brand" class="block text-sm font-medium text-gray-700">Merek</label>
-            <input id="brand" name="brand" value="{{ old('brand', $asset->brand) }}" class="mt-2 block w-full rounded-md border border-gray-300 px-3 py-2.5 text-sm shadow-xs outline-none focus:border-primary focus:ring-2 focus:ring-primary/20">
+            <label for="brand" class="block text-sm font-medium text-gray-700">Jenis / Merek</label>
+            <input id="brand" name="brand" value="{{ old('brand', $asset->brand) }}" class="mt-2 block w-full rounded-md border border-gray-300 px-3 py-2.5 text-sm shadow-xs outline-none focus:border-primary focus:ring-2 focus:ring-primary/20" placeholder="All In One PC">
             @error('brand')<p class="mt-2 text-sm text-red-600">{{ $message }}</p>@enderror
         </div>
         <div>
-            <label for="model" class="block text-sm font-medium text-gray-700">Model / Tipe</label>
-            <input id="model" name="model" value="{{ old('model', $asset->model) }}" class="mt-2 block w-full rounded-md border border-gray-300 px-3 py-2.5 text-sm shadow-xs outline-none focus:border-primary focus:ring-2 focus:ring-primary/20">
+            <label for="model" class="block text-sm font-medium text-gray-700">Tipe / Varian</label>
+            <input id="model" name="model" value="{{ old('model', $asset->model) }}" class="mt-2 block w-full rounded-md border border-gray-300 px-3 py-2.5 text-sm shadow-xs outline-none focus:border-primary focus:ring-2 focus:ring-primary/20" placeholder="11 Pro">
+            {{-- Spesifikasi yang berbeda tiap unit memecah pengelompokan di Register
+                 Aset menjadi satu kelompok per unit, dan ringkasannya kehilangan guna. --}}
+            <p class="mt-1 text-xs text-gray-500">Varian produknya, bukan spesifikasi. Ukuran, prosesor, atau kapasitas ditulis di kolom Spesifikasi.</p>
             @error('model')<p class="mt-2 text-sm text-red-600">{{ $message }}</p>@enderror
         </div>
         <div>

@@ -100,7 +100,10 @@ class AssetsImport implements SkipsEmptyRows, ToCollection, WithHeadingRow, With
      * Keterangan kolom, dipakai bersama template dan lembar petunjuknya supaya baris
      * judul, panduan, dan importer ini tidak pernah berbeda isi.
      *
-     * @return list<array{key: string, header: string, required: bool, example: string, desc: string}>
+     * Kolom yang judulnya pernah berganti membawa "alias": judul lamanya, agar berkas
+     * template yang sudah beredar tidak tiba-tiba ditolak. Lihat normalize().
+     *
+     * @return list<array{key: string, alias?: list<string>, header: string, required: bool, example: string, desc: string}>
      */
     public static function columns(): array
     {
@@ -108,8 +111,8 @@ class AssetsImport implements SkipsEmptyRows, ToCollection, WithHeadingRow, With
             ['key' => 'kode_aset', 'header' => 'Kode Aset', 'required' => false, 'example' => 'AST-LPT-HO-0012', 'desc' => 'Dibuat otomatis oleh sistem saat aset disimpan. Kolom ini hanya untuk data hasil ekspor — isinya diabaikan saat impor.'],
             ['key' => 'nama_aset', 'header' => 'Nama Aset', 'required' => true, 'example' => 'Laptop Dell Latitude 5420', 'desc' => 'Nama barangnya.'],
             ['key' => 'kategori', 'header' => 'Kategori', 'required' => true, 'example' => 'Laptop', 'desc' => 'Nama kategori yang SUDAH terdaftar di menu Kategori Aset. Tidak dibuat otomatis, karena kategori membawa prefix yang ikut membentuk kode aset.'],
-            ['key' => 'merek', 'header' => 'Merek', 'required' => false, 'example' => 'Dell', 'desc' => 'Opsional.'],
-            ['key' => 'model', 'header' => 'Model', 'required' => false, 'example' => 'Latitude 5420', 'desc' => 'Opsional.'],
+            ['key' => 'jenis_merek', 'alias' => ['merek'], 'header' => 'Jenis / Merek', 'required' => false, 'example' => 'All In One PC', 'desc' => 'Opsional. Boleh merek sebenarnya ("Dell") atau jenis barangnya ("All In One PC") — yang dipakai mengelompokkan Register Aset.'],
+            ['key' => 'tipe_varian', 'alias' => ['model'], 'header' => 'Tipe / Varian', 'required' => false, 'example' => '11 Pro', 'desc' => 'Opsional. Varian produknya, bukan spesifikasi — ukuran, prosesor, dan kapasitas ditulis di kolom Spesifikasi.'],
             ['key' => 'nomor_seri', 'header' => 'Nomor Seri', 'required' => false, 'example' => 'SN-0001', 'desc' => 'Wajib bila kategorinya menandai nomor seri sebagai wajib. Harus unik di seluruh daftar aset.'],
             ['key' => 'spesifikasi', 'header' => 'Spesifikasi', 'required' => false, 'example' => 'Core i5, RAM 16 GB', 'desc' => 'Opsional.'],
             ['key' => 'lokasi_pemilik', 'header' => 'Lokasi Pemilik', 'required' => true, 'example' => 'Head Office', 'desc' => 'Lokasi kerja yang MEMILIKI aset. Ikut membentuk kode aset dan tidak berubah saat barangnya dipindah. Harus sudah terdaftar.'],
@@ -221,8 +224,8 @@ class AssetsImport implements SkipsEmptyRows, ToCollection, WithHeadingRow, With
         return [
             'category_id' => $categoryId,
             'name' => $name,
-            'brand' => trim((string) $row->get('merek')) ?: null,
-            'model' => trim((string) $row->get('model')) ?: null,
+            'brand' => trim((string) $row->get('jenis_merek')) ?: null,
+            'model' => trim((string) $row->get('tipe_varian')) ?: null,
             'serial_number' => $serial,
             'specification' => trim((string) $row->get('spesifikasi')) ?: null,
             'owning_branch_id' => $owningId,
@@ -470,9 +473,32 @@ class AssetsImport implements SkipsEmptyRows, ToCollection, WithHeadingRow, With
         }
     }
 
-    /** Baris apa pun bentuknya diseragamkan jadi Collection berkunci nama kolom. */
+    /**
+     * Baris apa pun bentuknya diseragamkan jadi Collection berkunci nama kolom.
+     *
+     * Kolom yang judulnya pernah berganti juga diisi dari judul lamanya bila judul
+     * barunya tidak ada di berkasnya. Tanpa ini, setiap penggantian judul diam-diam
+     * membuang isi kolom itu pada berkas template yang sudah beredar — bukan menolak
+     * berkasnya, yang justru lebih mudah disadari, melainkan mengimpornya kosong.
+     */
     private function normalize(mixed $row): Collection
     {
-        return $row instanceof Collection ? $row : collect((array) $row);
+        $row = $row instanceof Collection ? $row : collect((array) $row);
+
+        foreach (self::columns() as $column) {
+            if ($row->has($column['key'])) {
+                continue;
+            }
+
+            foreach ($column['alias'] ?? [] as $alias) {
+                if ($row->has($alias)) {
+                    $row->put($column['key'], $row->get($alias));
+
+                    break;
+                }
+            }
+        }
+
+        return $row;
     }
 }

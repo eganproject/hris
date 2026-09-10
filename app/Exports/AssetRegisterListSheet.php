@@ -46,7 +46,7 @@ class AssetRegisterListSheet implements FromCollection, ShouldAutoSize, WithHead
             // Spesifikasi berdiri bersama Merek/Model/Nomor Seri — semuanya menjawab
             // "barang ini apa", jadi mata tidak perlu melompati kolom lokasi dan
             // status untuk merangkainya.
-            'Kode Aset', 'Nama Aset', 'Kategori', 'Merek', 'Model', 'Nomor Seri', 'Spesifikasi',
+            'Kode Aset', 'Nama Aset', 'Kategori', 'Jenis / Merek', 'Tipe / Varian', 'Nomor Seri', 'Spesifikasi',
             'Lokasi Pemilik', 'Lokasi Sekarang', 'Divisi Pemilik',
             'Status', 'Kondisi', 'Pemegang', 'No. Karyawan', 'Sejak',
             'Tanggal Perolehan', 'Garansi Berakhir',

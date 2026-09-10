@@ -339,7 +339,7 @@ test('unduhan excel membawa lembar datar dan lembar tercollapse sekaligus', func
         $titles = array_map(fn ($sheet) => $sheet->title(), $export->sheets());
 
         // Keduanya harus ada: yang ringkas untuk dibaca, yang datar untuk diolah.
-        return in_array('Ringkas per Merek', $titles, true)
+        return in_array('Ringkas per Jenis', $titles, true)
             && in_array('Register Aset', $titles, true);
     });
 });
@@ -576,9 +576,9 @@ test('merek dan model yang kosong jadi kelompok tersendiri di urutan paling bawa
 
     expect($apple['models']->last()['key'])->toBe('');
 
-    $response->assertSee('Tanpa Merek')
-        ->assertSee('Tanpa Model')
-        ->assertSee('Kolom Merek belum diisi di master aset.');
+    $response->assertSee('Tanpa Jenis / Merek')
+        ->assertSee('Tanpa Tipe / Varian')
+        ->assertSee('Kolom Jenis / Merek belum diisi di master aset.');
 });
 
 test('merek dan model yang cuma punya satu unit tidak diberi tombol buka', function () {
@@ -590,11 +590,11 @@ test('merek dan model yang cuma punya satu unit tidak diberi tombol buka', funct
 
     $html = $this->actingAs(assetReportUser())->get(route('reports.assets'))->assertOk()->getContent();
 
-    // Merek yang bisa dibuka: Apple (4 unit) dan Tanpa Merek (3 unit). Dell hanya satu
+    // Jenis yang bisa dibuka: Apple (4 unit) dan Tanpa Jenis / Merek (3 unit). Dell hanya satu
     // unit, jadi ia baris biasa tanpa tombol.
     expect(substr_count($html, 'data-brand-toggle='))->toBe(2)
         // Model yang bisa dibuka hanya MRY62 yang berisi dua unit; MRY72 satu unit,
-        // dan Tanpa Model di bawah Tanpa Merek berisi tiga sehingga ikut punya tombol.
+        // dan Tanpa Tipe di bawah Tanpa Jenis berisi tiga sehingga ikut punya tombol.
         ->and(substr_count($html, 'data-model-toggle='))->toBe(2)
         ->and($html)->toContain('Latitude');
 });
@@ -613,7 +613,7 @@ test('satu merek tidak pernah terbelah oleh paginasi', function () {
     $brands = $response->viewData('brandGroups');
     $apple = collect($brands->items())->firstWhere('key', 'apple');
 
-    // Yang dihitung paginator adalah merek: Apple dan Tanpa Merek.
+    // Yang dihitung paginator adalah jenis/mereknya: Apple dan Tanpa Jenis / Merek.
     expect($brands->total())->toBe(2)
         ->and($apple['units'])->toBe(4)
         ->and($apple['assets'])->toHaveCount(4)
@@ -650,7 +650,7 @@ test('tampilan per nama tetap tersedia sebagai pilihan', function () {
     expect($response->viewData('brandGroups'))->toBeNull()
         ->and($iphone['units'])->toBe(2);
 
-    $response->assertSee('Ringkas per merek')->assertSee('Ringkas per nama');
+    $response->assertSee('Ringkas per jenis / merek')->assertSee('Ringkas per nama');
 });
 
 test('lembar excel ringkas berisi baris merek dan model, bukan nama', function () {
@@ -675,7 +675,7 @@ test('lembar excel ringkas berisi baris merek dan model, bukan nama', function (
     Excel::assertDownloaded('register-aset-'.now()->format('Y-m-d').'.xlsx', function (AssetRegisterExport $export) {
         $titles = array_map(fn ($sheet) => $sheet->title(), $export->sheets());
 
-        return in_array('Ringkas per Merek', $titles, true)
+        return in_array('Ringkas per Jenis', $titles, true)
             && in_array('Register Aset', $titles, true);
     });
 });

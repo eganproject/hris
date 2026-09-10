@@ -67,12 +67,12 @@
     {{-- Padanan tampilan tercollapse di layar. Di kertas tidak ada yang bisa diklik,
          jadi bentuknya tabel tersendiri: barang apa yang menumpuk dan berapa
          banyak, sebelum masuk ke daftar per unit di bawahnya. --}}
-    <h2>Ringkas per Merek &amp; Model</h2>
+    <h2>Ringkas per Jenis / Merek</h2>
     <table>
         <thead>
             <tr>
-                <th class="l">Merek</th>
-                <th class="l">Model / Tipe</th>
+                <th class="l">Jenis / Merek</th>
+                <th class="l">Tipe / Varian</th>
                 <th>Jumlah Unit</th>
                 <th class="l">Catatan</th>
             </tr>
@@ -83,8 +83,8 @@
                     {{-- Mereknya ditulis ulang di tiap baris, tidak dikosongkan pada baris
                          lanjutan: sebuah baris yang terpisah ke halaman berikutnya harus
                          tetap bisa dibaca sendiri tanpa menengok ke halaman sebelumnya. --}}
-                    <td class="l">{{ $row['brand'] ?: 'Tanpa Merek' }}</td>
-                    <td class="l">{{ $row['model'] ?: 'Tanpa Model' }}</td>
+                    <td class="l">{{ $row['brand'] ?: 'Tanpa Jenis / Merek' }}</td>
+                    <td class="l">{{ $row['model'] ?: 'Tanpa Tipe / Varian' }}</td>
                     <td class="r">{{ number_format($row['units']) }}</td>
                     <td class="l">{{ $row['model'] !== '' && $row['spellings'] > 1 ? $row['spellings'].' ejaan berbeda' : '' }}</td>
                 </tr>

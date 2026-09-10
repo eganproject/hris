@@ -53,7 +53,7 @@ class AssetRegisterReport
      * Sama seperti GROUPS, kuncinya ikut ke URL dan ke nama sheet ekspor.
      */
     public const VIEWS = [
-        'brand' => 'Ringkas per merek',
+        'brand' => 'Ringkas per jenis / merek',
         'grouped' => 'Ringkas per nama',
         'detail' => 'Rinci per unit',
     ];
@@ -80,8 +80,8 @@ class AssetRegisterReport
      *
      * Berbeda dari nama, kedua kolom ini boleh tidak diisi — dan menurut pemilik data
      * memang sering kosong. coalesce() membuat NULL dan string kosong jatuh ke kunci
-     * yang sama, jadi "belum diisi" menjadi satu kelompok yang jelas ("Tanpa Merek",
-     * "Tanpa Model") alih-alih berserakan atau hilang dari GROUP BY.
+     * yang sama, jadi "belum diisi" menjadi satu kelompok yang jelas ("Tanpa Jenis /
+     * Merek", "Tanpa Tipe / Varian") alih-alih berserakan atau hilang dari GROUP BY.
      *
      * Kelompok kosong itu sengaja tidak disembunyikan: besarnya adalah ukuran berapa
      * banyak data yang masih perlu dilengkapi.

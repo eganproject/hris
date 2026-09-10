@@ -56,14 +56,16 @@ function importFixture(): array
  * yang akan dialami pengguna kalau ia mengganti sendiri format templatenya.
  *
  * @param  list<array<string, string>>  $rows
+ * @param  list<string>|null  $headings  Baris judul selain template terkini, untuk
+ *                                       menguji berkas lama yang masih beredar.
  */
-function assetWorkbook(array $rows): UploadedFile
+function assetWorkbook(array $rows, ?array $headings = null): UploadedFile
 {
     $columns = AssetsImport::columns();
 
-    $sheet = new class($columns, $rows) implements FromArray, WithHeadings
+    $sheet = new class($columns, $rows, $headings) implements FromArray, WithHeadings
     {
-        public function __construct(private array $columns, private array $rows) {}
+        public function __construct(private array $columns, private array $rows, private ?array $headings) {}
 
         public function array(): array
         {
@@ -75,7 +77,7 @@ function assetWorkbook(array $rows): UploadedFile
 
         public function headings(): array
         {
-            return array_map(fn ($column) => $column['header'], $this->columns);
+            return $this->headings ?? array_map(fn ($column) => $column['header'], $this->columns);
         }
     };
 
@@ -114,6 +116,52 @@ test('baris yang sah tersimpan beserta kode aset otomatis', function () {
         ->and($asset->current_branch_id)->toBe($f['branch']->id)
         ->and($asset->departments()->count())->toBe(2)
         ->and((float) $asset->acquisition_cost)->toBe(15000000.0);
+});
+
+test('jenis / merek dan tipe / varian tersimpan dari judul kolom yang baru', function () {
+    importFixture();
+
+    $this->actingAs(assetImporter())
+        ->post(route('assets.import'), ['file' => assetWorkbook([[
+            'nama_aset' => 'PC Kantor', 'kategori' => 'Laptop', 'nomor_seri' => 'SN-9',
+            'lokasi_pemilik' => 'Head Office', 'divisi_pemilik' => 'IT',
+            'jenis_merek' => 'All In One PC', 'tipe_varian' => '24 inch',
+        ]])])
+        ->assertRedirect(route('assets.index'));
+
+    $asset = Asset::query()->firstOrFail();
+
+    expect($asset->brand)->toBe('All In One PC')
+        ->and($asset->model)->toBe('24 inch');
+});
+
+test('template lama yang masih berjudul Merek dan Model tetap terbaca', function () {
+    importFixture();
+
+    // Berkas yang sudah beredar sebelum kolomnya berganti nama. Ditolak mentah-mentah
+    // masih bisa dimengerti orang; yang tidak boleh terjadi adalah terbaca tapi dua
+    // kolomnya diam-diam masuk kosong.
+    $headings = array_map(
+        fn (array $column) => match ($column['key']) {
+            'jenis_merek' => 'Merek',
+            'tipe_varian' => 'Model',
+            default => $column['header'],
+        },
+        AssetsImport::columns(),
+    );
+
+    $this->actingAs(assetImporter())
+        ->post(route('assets.import'), ['file' => assetWorkbook([[
+            'nama_aset' => 'Laptop Dell', 'kategori' => 'Laptop', 'nomor_seri' => 'SN-8',
+            'lokasi_pemilik' => 'Head Office', 'divisi_pemilik' => 'IT',
+            'jenis_merek' => 'Dell', 'tipe_varian' => 'Latitude 5420',
+        ]], $headings)])
+        ->assertRedirect(route('assets.index'));
+
+    $asset = Asset::query()->firstOrFail();
+
+    expect($asset->brand)->toBe('Dell')
+        ->and($asset->model)->toBe('Latitude 5420');
 });
 
 test('satu baris salah membatalkan seluruh impor', function () {

@@ -39,14 +39,14 @@ class AssetRegisterBrandSheet implements FromArray, ShouldAutoSize, WithEvents, 
 
     public function title(): string
     {
-        return 'Ringkas per Merek';
+        return 'Ringkas per Jenis';
     }
 
     /** @return array<int, array<int, string|int|float>> */
     public function array(): array
     {
         $rows = [
-            ['Merek', 'Model / Tipe', 'Jumlah Unit', 'Variasi Ejaan'],
+            ['Jenis / Merek', 'Tipe / Varian', 'Jumlah Unit', 'Variasi Ejaan'],
         ];
 
         foreach ($this->names as $row) {
@@ -54,8 +54,8 @@ class AssetRegisterBrandSheet implements FromArray, ShouldAutoSize, WithEvents, 
                 // Yang kosong diberi nama, bukan dibiarkan sel kosong: sel kosong di
                 // Excel terbaca sebagai "lanjutan baris di atasnya", padahal ini justru
                 // kelompoknya sendiri.
-                $row['brand'] ?: 'Tanpa Merek',
-                $row['model'] ?: 'Tanpa Model',
+                $row['brand'] ?: 'Tanpa Jenis / Merek',
+                $row['model'] ?: 'Tanpa Tipe / Varian',
                 $row['units'],
                 // 1 ditulis sebagai teks kosong supaya mata langsung jatuh ke baris
                 // yang bermasalah, bukan ke kolom penuh angka 1 yang tidak berarti apa-apa.

@@ -196,10 +196,10 @@
                     @if ($view !== 'detail')
                         @php
                             $tingkat = $view === 'brand'
-                                ? ['paginator' => $brandGroups, 'satuan' => 'merek']
+                                ? ['paginator' => $brandGroups, 'satuan' => 'jenis / merek']
                                 : ['paginator' => $nameGroups, 'satuan' => 'nama'];
                         @endphp
-                        {{-- Yang dipaginasi merek atau nama, bukan unit — jadi yang dihitung di
+                        {{-- Yang dipaginasi jenis/merek atau nama, bukan unit — jadi yang dihitung di
                              sini juga itu, dan jumlah unitnya disebut terpisah supaya tidak ada
                              yang membaca "25 dari 40" sebagai jumlah barang. --}}
                         <p class="text-xs text-gray-500">Menampilkan {{ number_format($tingkat['paginator']->count()) }} dari {{ number_format($tingkat['paginator']->total()) }} {{ $tingkat['satuan'] }} &middot; {{ number_format($summary['total']) }} unit. Unduhan Excel &amp; PDF memuat seluruhnya.</p>
@@ -213,7 +213,7 @@
                 <table class="data-table">
                     <thead>
                         <tr>
-                            <th>{{ ['brand' => 'Merek & Model', 'grouped' => 'Nama Aset'][$view] ?? 'Kode & Nama' }}</th>
+                            <th>{{ ['brand' => 'Jenis / Merek & Tipe', 'grouped' => 'Nama Aset'][$view] ?? 'Kode & Nama' }}</th>
                             <th>Kategori</th>
                             <th>Lokasi</th>
                             <th>Divisi</th>
@@ -228,7 +228,7 @@
                             @forelse ($brandGroups as $brand)
                                 @php
                                     $brandId = 'merek-'.md5($brand['key']);
-                                    $brandLabel = $brand['name'] !== '' ? $brand['name'] : 'Tanpa Merek';
+                                    $brandLabel = $brand['name'] !== '' ? $brand['name'] : 'Tanpa Jenis / Merek';
                                 @endphp
 
                                 @if ($brand['units'] === 1 && $brand['assets']->count() === 1)
@@ -253,7 +253,7 @@
                                             {{-- Bukan sebuah merek, melainkan pekerjaan yang tertunda. Disebut
                                                  apa adanya supaya besarnya kelompok ini terbaca sebagai data
                                                  yang belum lengkap, bukan sebagai temuan. --}}
-                                            <p class="mt-1 pl-6 text-xs text-amber-600">Kolom Merek belum diisi di master aset.</p>
+                                            <p class="mt-1 pl-6 text-xs text-amber-600">Kolom Jenis / Merek belum diisi di master aset.</p>
                                         @elseif ($brand['spellings'] > 1)
                                             <p class="mt-1 pl-6 text-xs text-amber-600">Ditulis dalam {{ $brand['spellings'] }} ejaan berbeda — rapikan di master aset.</p>
                                         @endif
@@ -264,7 +264,7 @@
                                 @foreach ($brand['models'] as $model)
                                     @php
                                         $modelId = $brandId.'-'.md5($model['key']);
-                                        $modelLabel = $model['name'] !== '' ? $model['name'] : 'Tanpa Model';
+                                        $modelLabel = $model['name'] !== '' ? $model['name'] : 'Tanpa Tipe / Varian';
                                     @endphp
 
                                     @if ($model['units'] === 1)
@@ -380,7 +380,7 @@
 
         <p class="text-xs text-gray-400">Spesifikasi dipotong bila terlalu panjang — arahkan kursor ke atasnya untuk membaca utuh, atau buka detail asetnya. Laporan ini tidak lagi menampilkan nilai perolehan; angkanya tetap tersimpan di master aset dan bisa dilihat di halaman detail tiap aset. Kolom Pemegang hanya terisi untuk aset yang sedang diserahkan ke seorang karyawan. Status &ldquo;Dipegang&rdquo; berarti ada satu nama yang bisa dimintai pertanggungjawaban; &ldquo;Dipakai&rdquo; berarti barangnya terpakai bersama dan memang tidak punya pemegang — keduanya dihitung dan diwarnai terpisah, jangan dijumlahkan sebagai satu angka.
             @if ($view === 'brand')
-                Tampilan ini mengumpulkan aset per <span class="font-medium">merek</span>, lalu per <span class="font-medium">model</span> di dalamnya; besar-kecil huruf dan spasi tepi diabaikan saat menggabungkan. Merek dan model boleh kosong di master aset, dan yang kosong dikumpulkan sebagai &ldquo;Tanpa Merek&rdquo; atau &ldquo;Tanpa Model&rdquo; di urutan paling bawah — besarnya kelompok itu adalah ukuran berapa banyak data yang masih perlu dilengkapi, bukan temuan tentang asetnya.
+                Tampilan ini mengumpulkan aset per <span class="font-medium">jenis / merek</span>, lalu per <span class="font-medium">tipe / varian</span> di dalamnya; besar-kecil huruf dan spasi tepi diabaikan saat menggabungkan. Keduanya boleh kosong di master aset, dan yang kosong dikumpulkan sebagai &ldquo;Tanpa Jenis / Merek&rdquo; atau &ldquo;Tanpa Tipe / Varian&rdquo; di urutan paling bawah — besarnya kelompok itu adalah ukuran berapa banyak data yang masih perlu dilengkapi, bukan temuan tentang asetnya.
             @elseif ($view === 'grouped')
                 Tampilan ringkas menggabungkan aset yang <span class="font-medium">namanya sama</span> setelah besar-kecil huruf dan spasi tepinya diabaikan; penulisan yang benar-benar berbeda seperti &ldquo;iPhone XR&rdquo; dan &ldquo;iPhone XR 64GB&rdquo; tetap terpisah, dan itu memang harus dirapikan di master aset, bukan di laporan.
             @endif

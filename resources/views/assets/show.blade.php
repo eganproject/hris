@@ -304,7 +304,7 @@
 
             <dl class="grid grid-cols-1 gap-x-8 gap-y-5 px-5 py-5 sm:grid-cols-2 lg:grid-cols-3">
                 <div>
-                    <dt class="text-xs font-medium uppercase tracking-wide text-gray-500">Merek / Model</dt>
+                    <dt class="text-xs font-medium uppercase tracking-wide text-gray-500">Jenis / Merek &amp; Tipe</dt>
                     <dd class="mt-1 text-sm text-gray-900">{{ collect([$asset->brand, $asset->model])->filter()->implode(' ') ?: '—' }}</dd>
                 </div>
                 <div>
