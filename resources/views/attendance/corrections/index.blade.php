@@ -74,7 +74,7 @@
             @endif
             <div class="overflow-x-auto">
                 <table class="data-table">
-                    <thead><tr>@if ($canDecide)<th class="w-10"><input type="checkbox" data-approve-all aria-label="Pilih semua" class="size-4 rounded border-gray-300 text-primary focus:ring-primary/30"></th>@endif<th>Karyawan</th><th>Tanggal</th><th>Usulan Jam</th><th>Alasan</th><th>Status</th><th class="text-right">Aksi</th></tr></thead>
+                    <thead><tr>@if ($canDecide)<th class="w-10"><input type="checkbox" data-approve-all aria-label="Pilih semua" class="size-4 rounded border-gray-300 text-primary focus:ring-primary/30"></th>@endif<th>Karyawan</th><th>Tanggal</th><th>Usulan Jam</th><th>Alasan</th><th>Bukti</th><th>Status</th><th class="text-right">Aksi</th></tr></thead>
                     <tbody>
                         @forelse ($corrections as $c)
                             <tr>
@@ -89,6 +89,7 @@
                                 <td class="text-sm text-gray-700">{{ $c->work_date->translatedFormat('d M Y') }}</td>
                                 <td class="text-sm text-gray-700">{{ $c->requested_clock_in ?? '—' }} / {{ $c->requested_clock_out ?? '—' }}</td>
                                 <td class="max-w-xs truncate text-sm text-gray-600" title="{{ $c->reason }}">{{ $c->reason }}</td>
+                                <td><x-correction-attachment :correction="$c" /></td>
                                 <td>
                                     <x-status-badge :tone="$c->status_tone">{{ $c->status_label }}</x-status-badge>
                                     @if ($c->reviewer)<p class="mt-1 text-xs text-gray-400">oleh {{ $c->reviewer->name }}</p>@endif
@@ -107,7 +108,7 @@
                                 </td>
                             </tr>
                         @empty
-                            <tr><td colspan="{{ $canDecide ? 7 : 6 }}" class="cell-empty">Tidak ada pengajuan koreksi.</td></tr>
+                            <tr><td colspan="{{ $canDecide ? 8 : 7 }}" class="cell-empty">Tidak ada pengajuan koreksi.</td></tr>
                         @endforelse
                     </tbody>
                 </table>

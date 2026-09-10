@@ -2,11 +2,12 @@
 
 use App\Http\Controllers\AccessControlController;
 use App\Http\Controllers\ActivityLogController;
-use App\Http\Controllers\AssetCategoryController;
 use App\Http\Controllers\AssetAssignmentController;
+use App\Http\Controllers\AssetCategoryController;
 use App\Http\Controllers\AssetController;
 use App\Http\Controllers\AssetDocumentController;
 use App\Http\Controllers\AttendanceController;
+use App\Http\Controllers\AttendanceCorrectionAttachmentController;
 use App\Http\Controllers\AttendanceCorrectionController;
 use App\Http\Controllers\AttendanceMapController;
 use App\Http\Controllers\AttendanceSelfieController;
@@ -418,6 +419,10 @@ Route::middleware('auth')->group(function () {
     // dimintai persetujuan belum tentu punya swaps.view, jadi siapa yang boleh
     // melihat diperiksa di dalam controller.
     Route::get('swap-attachments/{swap}', ShiftSwapAttachmentController::class)->name('swaps.attachment');
+
+    // Bukti gambar pengajuan koreksi absensi. Sama alasannya: pengajunya belum tentu
+    // punya corrections.view, jadi siapa yang boleh melihat diperiksa di controller.
+    Route::get('correction-attachments/{correction}', AttendanceCorrectionAttachmentController::class)->name('corrections.attachment');
 
     // Foto selfie absensi. Sama seperti lampiran cuti: berkasnya privat, dan siapa yang
     // boleh melihat diperiksa di dalam controller (karyawannya sendiri atau petugas

@@ -140,13 +140,14 @@
             <div class="border-b border-gray-200 px-5 py-3"><h2 class="text-sm font-semibold text-gray-950">Pengajuan Koreksi Saya</h2></div>
             <div class="overflow-x-auto">
                 <table class="data-table">
-                    <thead><tr><th>Tanggal</th><th>Usulan Jam</th><th>Alasan</th><th>Status</th><th class="text-right">Aksi</th></tr></thead>
+                    <thead><tr><th>Tanggal</th><th>Usulan Jam</th><th>Alasan</th><th>Bukti</th><th>Status</th><th class="text-right">Aksi</th></tr></thead>
                     <tbody>
                         @forelse ($corrections as $c)
                             <tr>
                                 <td class="text-sm text-gray-700">{{ $c->work_date->translatedFormat('d M Y') }}</td>
                                 <td class="text-sm text-gray-700">{{ $c->requested_clock_in ?? '—' }} / {{ $c->requested_clock_out ?? '—' }}</td>
                                 <td class="max-w-xs truncate text-sm text-gray-600" title="{{ $c->reason }}">{{ $c->reason }}</td>
+                                <td><x-correction-attachment :correction="$c" /></td>
                                 <td>
                                     <x-status-badge :tone="$c->status_tone">{{ $c->status_label }}</x-status-badge>
                                     @if ($c->status === 'rejected' && $c->decision_notes)<p class="mt-1 text-xs text-gray-400">{{ $c->decision_notes }}</p>@endif
@@ -161,7 +162,7 @@
                                 </td>
                             </tr>
                         @empty
-                            <tr><td colspan="5" class="cell-empty">Belum ada pengajuan koreksi.</td></tr>
+                            <tr><td colspan="6" class="cell-empty">Belum ada pengajuan koreksi.</td></tr>
                         @endforelse
                     </tbody>
                 </table>
@@ -204,11 +205,24 @@
     @endif
 
     <dialog id="correction-dialog" class="w-full max-w-md rounded-lg p-0 backdrop:bg-black/40">
-        <form method="POST" action="{{ route('my-attendance.corrections.store') }}" data-no-confirm="true" class="space-y-4 p-6">
+        <form method="POST" action="{{ route('my-attendance.corrections.store') }}" enctype="multipart/form-data" data-no-confirm="true" class="space-y-4 p-6">
             @csrf
             <div>
                 <h3 class="text-base font-semibold text-gray-950">Ajukan Koreksi Absensi</h3>
-                <p class="mt-1 text-sm text-gray-500">Isi jam yang seharusnya. HR akan meninjau pengajuan Anda.</p>
+                <p class="mt-1 text-sm text-gray-500">Isi jam yang seharusnya. Atasan dan HR akan meninjau pengajuan Anda.</p>
+            </div>
+
+            {{-- Yang memutuskan koreksi tidak menyaksikan orangnya hadir, jadi buktinya
+                 harus menunjukkan keberadaan pada JAM yang diajukan — bukan sekadar
+                 bahwa hari itu ada pekerjaan. Dua keadaan kerja punya bukti yang
+                 berbeda, dan menyebut satu saja membuat yang WFH menebak-nebak. --}}
+            <div class="rounded-md border border-sky-200 bg-sky-50 px-3 py-2.5 text-xs text-sky-900">
+                <p class="font-semibold">Bukti wajib dilampirkan</p>
+                <ul class="mt-1.5 list-disc space-y-1 pl-4">
+                    <li><span class="font-medium">Kerja di kantor:</span> foto diri Anda dari rekaman CCTV pada jam yang diajukan — mintakan ke security.</li>
+                    <li><span class="font-medium">WFH atau dinas luar:</span> tangkapan layar bukti aktivitas kerja pada jam tersebut — misalnya percakapan dengan atasan, undangan atau rekaman rapat daring, atau layar pekerjaan yang menampilkan jamnya.</li>
+                </ul>
+                <p class="mt-1.5">Pastikan jam pada bukti terbaca jelas. Pengajuan tanpa bukti yang bisa diperiksa akan ditolak.</p>
             </div>
             <div>
                 <label for="cor-date" class="block text-sm font-medium text-gray-700">Tanggal <span class="field-requirement is-required">*</span></label>
@@ -231,6 +245,17 @@
                 <textarea name="reason" id="cor-reason" rows="3" required class="mt-2 block w-full rounded-md border border-gray-300 px-3 py-2.5 text-sm shadow-xs outline-none focus:border-primary focus:ring-2 focus:ring-primary/20" placeholder="mis. Lupa tap saat pulang.">{{ old('reason') }}</textarea>
                 @error('reason')<p class="mt-1 text-sm text-red-600">{{ $message }}</p>@enderror
             </div>
+
+            <x-attachment-field
+                name="attachment"
+                label="Bukti"
+                :max-mb="\App\Models\AttendanceCorrection::ATTACHMENT_MAX_MB"
+                accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp"
+                hint="Wajib. Gambar (JPG, PNG, WEBP), maksimal {{ \App\Models\AttendanceCorrection::ATTACHMENT_MAX_MB }} MB."
+                :required="true"
+                wrapper-class=""
+            />
+
             <div class="flex justify-end gap-2 pt-2">
                 <button type="button" data-close-dialog class="rounded-md border border-gray-200 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">Batal</button>
                 <button type="submit" class="rounded-md bg-primary px-4 py-2 text-sm font-semibold text-white hover:bg-primary-hover">Kirim</button>

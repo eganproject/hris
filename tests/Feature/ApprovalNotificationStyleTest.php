@@ -138,6 +138,7 @@ test('correction notifications carry the requested times and who decided', funct
         'requested_clock_in' => '08:00',
         'requested_clock_out' => '17:00',
         'reason' => 'Lupa absen pulang.',
+        'attachment' => UploadedFile::fake()->image('cctv.jpg'),
     ])->assertRedirect('/my-attendance');
 
     $correction = AttendanceCorrection::query()->firstOrFail();
@@ -165,6 +166,7 @@ test('cancelling a correction tells HR it no longer needs a decision', function 
         'work_date' => now()->subDay()->toDateString(),
         'requested_clock_in' => '08:00',
         'reason' => 'Salah input.',
+        'attachment' => UploadedFile::fake()->image('cctv.jpg'),
     ])->assertRedirect('/my-attendance');
 
     $correction = AttendanceCorrection::query()->firstOrFail();

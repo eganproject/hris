@@ -9,7 +9,9 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 class AttendanceCorrection extends Model
 {
     public const STATUS_PENDING = 'pending';
+
     public const STATUS_APPROVED = 'approved';
+
     public const STATUS_REJECTED = 'rejected';
 
     /** @var list<string> */
@@ -19,6 +21,10 @@ class AttendanceCorrection extends Model
         'requested_clock_in',
         'requested_clock_out',
         'reason',
+        'attachment_path',
+        'attachment_name',
+        'attachment_mime',
+        'attachment_size',
         'status',
         'reviewed_by',
         'decided_at',
@@ -30,7 +36,34 @@ class AttendanceCorrection extends Model
         return [
             'work_date' => 'date',
             'decided_at' => 'datetime',
+            'attachment_size' => 'integer',
         ];
+    }
+
+    /** Disk privat: buktinya hanya boleh keluar lewat rute berotorisasi. */
+    public const ATTACHMENT_DISK = 'local';
+
+    /**
+     * Batas ukuran bukti. Disimpan di sini supaya aturan validasi, teks bantuan pada
+     * formulir, dan penjaga di browser selalu menyebut angka yang sama.
+     *
+     * Lebih kecil daripada lampiran cuti (5 MB) karena yang diminta cuma satu
+     * tangkapan layar atau foto layar CCTV, bukan hasil pindai dokumen.
+     */
+    public const ATTACHMENT_MAX_MB = 2;
+
+    public function hasAttachment(): bool
+    {
+        return $this->attachment_path !== null;
+    }
+
+    public function attachmentSizeLabel(): string
+    {
+        $bytes = (int) $this->attachment_size;
+
+        return $bytes >= 1048576
+            ? round($bytes / 1048576, 1).' MB'
+            : max(1, (int) round($bytes / 1024)).' KB';
     }
 
     public function employee(): BelongsTo

@@ -241,14 +241,39 @@ class MyAttendanceController extends Controller
 
     public function store(StoreAttendanceCorrectionRequest $request): RedirectResponse
     {
-        $correction = $this->employee()->attendanceCorrections()->create([
-            ...$request->validated(),
+        $employee = $this->employee();
+
+        $correction = $employee->attendanceCorrections()->create([
+            ...$request->safe()->except('attachment'),
+            ...$this->attachmentColumns($employee, $request->file('attachment')),
             'status' => AttendanceCorrection::STATUS_PENDING,
         ]);
 
         app(ApprovalNotifier::class)->correctionSubmitted($correction);
 
         return redirect()->route('my-attendance.index')->with('status', 'Pengajuan koreksi absensi terkirim.');
+    }
+
+    /**
+     * Simpan bukti ke disk privat dan kembalikan kolom-kolomnya, sama seperti lampiran
+     * cuti & tukar jadwal: berkas ditaruh per karyawan agar mudah ditelusuri, dengan
+     * nama acak dari Laravel — nama asli dari pengguna tidak pernah dipakai sebagai
+     * nama berkas di disk.
+     *
+     * @return array<string, mixed>
+     */
+    private function attachmentColumns(Employee $employee, ?UploadedFile $attachment): array
+    {
+        if (! $attachment) {
+            return [];
+        }
+
+        return [
+            'attachment_path' => $attachment->store("correction-attachments/{$employee->id}", AttendanceCorrection::ATTACHMENT_DISK),
+            'attachment_name' => $attachment->getClientOriginalName(),
+            'attachment_mime' => $attachment->getClientMimeType(),
+            'attachment_size' => $attachment->getSize(),
+        ];
     }
 
     public function cancel(AttendanceCorrection $correction): RedirectResponse
