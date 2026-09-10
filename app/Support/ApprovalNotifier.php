@@ -762,13 +762,15 @@ class ApprovalNotifier
     private function employeeScope(string $permission, User $user): DataScope
     {
         return match (true) {
-            // Cuti & Izin dipersempit ke garis atasan; lihat LeaveController::index().
-            str_starts_with($permission, 'leave.') => DataScope::forTeam($user),
+            // Cuti & Izin dan Koreksi Absensi dipersempit ke garis atasan; lihat
+            // LeaveController::index() dan AttendanceCorrectionController::index().
+            str_starts_with($permission, 'leave.'),
+            str_starts_with($permission, 'corrections.') => DataScope::forTeam($user),
             // Halaman data karyawan. Serah-terima aset ikut di sini karena satu-satunya
             // notifikasinya yang bersubjek karyawan menautkan ke sana.
             str_starts_with($permission, 'employees.'),
             $permission === self::ASSET_OFFICER => DataScope::forEmployees($user),
-            // Koreksi, tukar jadwal, pemantauan lembur: tetap lokasi/divisi.
+            // Tukar jadwal & pemantauan lembur: tetap lokasi/divisi.
             default => DataScope::forAttendance($user),
         };
     }

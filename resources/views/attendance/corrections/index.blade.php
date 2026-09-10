@@ -2,12 +2,14 @@
     <div class="mx-auto max-w-6xl space-y-6">
         <section class="flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
             <div>
-                <p class="text-sm font-medium text-gray-500">Peninjauan HR</p>
+                <p class="text-sm font-medium text-gray-500">Peninjauan atasan &amp; HR</p>
                 <h1 class="mt-1 text-2xl font-semibold text-gray-950">Koreksi Absensi</h1>
                 <p class="mt-1 text-sm text-gray-500">Pengajuan koreksi jam dari karyawan. Menyetujui akan memperbarui absensi harian.</p>
             </div>
             @if ($pendingCount > 0)<x-status-badge tone="warning">{{ $pendingCount }} menunggu</x-status-badge>@endif
         </section>
+
+        <x-scope-notice :has-no-scope="$hasNoScope" :has-no-team="$hasNoTeam"/>
 
         @if (session('status'))
             <div class="rounded-md border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">{{ session('status') }}</div>

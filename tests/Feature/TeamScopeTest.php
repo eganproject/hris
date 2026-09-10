@@ -2,6 +2,7 @@
 
 use App\Enums\LeaveRequestStatus;
 use App\Models\Attendance;
+use App\Models\AttendanceCorrection;
 use App\Models\Branch;
 use App\Models\Department;
 use App\Models\Employee;
@@ -20,15 +21,16 @@ use Spatie\Permission\PermissionRegistrar;
 uses(RefreshDatabase::class);
 
 /**
- * Absensi Harian, Jadwal Kerja & Cuti dipersempit ke bawahan pengguna.
+ * Absensi Harian, Jadwal Kerja, Cuti, Koreksi Absensi & Laporan dipersempit ke
+ * bawahan pengguna.
  *
  * Pengecualiannya adalah saklar per pengguna di Kontrol Akses, bukan daftar nama role
  * di dalam kode — susunan role tiap perusahaan berbeda, dan menambah role baru tidak
  * boleh menuntut perubahan kode.
  *
  * Yang paling penting dijaga di sini: pembatasan ini TIDAK boleh merembet ke modul
- * lain. Lembur, koreksi, laporan, dan data karyawan tetap memakai cakupan
- * lokasi/divisi seperti sebelumnya.
+ * lain. Pemantauan lembur dan data karyawan tetap memakai cakupan lokasi/divisi
+ * seperti sebelumnya.
  */
 function teamUser(bool $bypass = false): User
 {
@@ -338,6 +340,91 @@ test('the leave list shows only the subordinates', function () {
         ->assertDontSee('Citra Bukan Bawahan');
 });
 
+/** Satu koreksi absensi yang masih menunggu, untuk karyawan yang diberikan. */
+function teamCorrectionFor(Employee $employee): AttendanceCorrection
+{
+    return AttendanceCorrection::query()->create([
+        'employee_id' => $employee->id,
+        'work_date' => now()->subDay()->toDateString(),
+        'requested_clock_in' => '08:00:00',
+        'reason' => 'Lupa absen.',
+        'status' => AttendanceCorrection::STATUS_PENDING,
+    ]);
+}
+
+test('the correction list shows only the subordinates', function () {
+    $user = teamUser();
+    [, $subordinate, $stranger] = teamTree($user);
+
+    teamCorrectionFor($subordinate);
+    teamCorrectionFor($stranger);
+
+    $this->actingAs($user)->get('/attendance/corrections')
+        ->assertOk()
+        ->assertSee('Andi Bawahan')
+        ->assertDontSee('Citra Bukan Bawahan');
+});
+
+test('the switch in Kontrol Akses lifts the restriction on corrections too', function () {
+    $user = teamUser(bypass: true);
+    [, $subordinate, $stranger] = teamTree($user);
+
+    teamCorrectionFor($subordinate);
+    teamCorrectionFor($stranger);
+
+    $this->actingAs($user)->get('/attendance/corrections')
+        ->assertOk()
+        ->assertSee('Andi Bawahan')
+        ->assertSee('Citra Bukan Bawahan');
+});
+
+test('deciding the correction of someone outside the team is refused', function () {
+    $user = teamUser();
+    [, , $stranger] = teamTree($user);
+
+    $correction = teamCorrectionFor($stranger);
+
+    $this->actingAs($user)->patch("/attendance/corrections/{$correction->id}/approve")->assertForbidden();
+    $this->actingAs($user)->patch("/attendance/corrections/{$correction->id}/reject")->assertForbidden();
+
+    expect($correction->fresh()->status)->toBe(AttendanceCorrection::STATUS_PENDING);
+});
+
+test('bulk-approving skips corrections outside the team', function () {
+    $user = teamUser();
+    [, $subordinate, $stranger] = teamTree($user);
+
+    $mine = teamCorrectionFor($subordinate);
+    $theirs = teamCorrectionFor($stranger);
+
+    $this->actingAs($user)
+        ->post('/attendance/corrections/bulk-approve', ['ids' => [$mine->id, $theirs->id]])
+        ->assertRedirect();
+
+    expect($mine->fresh()->status)->toBe(AttendanceCorrection::STATUS_APPROVED)
+        ->and($theirs->fresh()->status)->toBe(AttendanceCorrection::STATUS_PENDING);
+});
+
+test('the dashboard correction counter matches what the correction page shows', function () {
+    $user = teamUser();
+    [, $subordinate, $stranger] = teamTree($user);
+
+    foreach (['corrections.update', 'dashboard.view'] as $permission) {
+        Permission::findOrCreate($permission, 'web');
+    }
+    $user->givePermissionTo(['corrections.update', 'dashboard.view']);
+    app(PermissionRegistrar::class)->forgetCachedPermissions();
+
+    teamCorrectionFor($subordinate);
+    teamCorrectionFor($stranger);
+
+    // Dua koreksi menunggu, tapi hanya satu yang jadi pekerjaan pengguna ini.
+    $card = collect($this->actingAs($user)->get('/dashboard')->assertOk()->viewData('todo'))
+        ->firstWhere('label', 'Koreksi absensi menunggu keputusan');
+
+    expect($card['count'])->toBe(1);
+});
+
 test('the switch in Kontrol Akses lifts the restriction on leave too', function () {
     $user = teamUser(bypass: true);
     [, $subordinate, $stranger] = teamTree($user);
@@ -635,7 +722,7 @@ test('Kontrol Akses states the real effect of each scope choice', function () {
     // "lihat semua" — kalimat itulah yang dulu menyesatkan.
     $this->actingAs($admin)->get(route('access-control.index'))
         ->assertOk()
-        ->assertSee('Cakupan di Absensi Harian, Jadwal Kerja, Cuti &amp; Laporan', false)
+        ->assertSee('Cakupan di Absensi Harian, Jadwal Kerja, Cuti, Koreksi &amp; Laporan', false)
         ->assertSee('Bawahan saja')
         ->assertSee('Sesuai lokasi &amp; divisi di kartu ini', false);
 });

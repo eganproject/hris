@@ -136,17 +136,22 @@ test('mesin tanpa lokasi tetap mengabari semua pemegang izinnya', function () {
     expect(inboxTitles($hrSby))->toBe(['Mesin absensi offline']);
 });
 
-test('koreksi absensi tidak ikut berubah: tetap memakai cakupan lokasi, bukan garis atasan', function () {
+test('koreksi absensi mengikuti halamannya: garis atasan, kecuali yang dikecualikan', function () {
     $ho = Branch::query()->create(['code' => 'HO', 'name' => 'Head Office', 'is_active' => true]);
     $sby = Branch::query()->create(['code' => 'SBY', 'name' => 'Surabaya', 'is_active' => true]);
 
-    // HR cabang tanpa bawahan seorang pun — tetap harus dikabari soal koreksi absensi
-    // di lokasinya, karena halaman Koreksi memang tidak dipersempit ke bawahan.
+    // Halaman Koreksi kini memakai DataScope::forTeam(), jadi HR cabang yang tidak
+    // dikecualikan tidak lagi dikabari — daftarnya pun tidak akan memuat orang ini.
     $hrHo = scopedUser(['corrections.view', 'corrections.update']);
     $hrHo->accessBranches()->sync([$ho->id]);
+    $hrHo->forceFill(['bypass_team_scope' => true])->save();
 
     $hrSby = scopedUser(['corrections.view', 'corrections.update']);
     $hrSby->accessBranches()->sync([$sby->id]);
+    $hrSby->forceFill(['bypass_team_scope' => true])->save();
+
+    $hrTanpaTim = scopedUser(['corrections.view', 'corrections.update']);
+    $hrTanpaTim->accessBranches()->sync([$ho->id]);
 
     $employee = Employee::query()->create([
         'full_name' => 'Budi', 'employment_status' => 'active', 'branch_id' => $ho->id,
@@ -163,5 +168,6 @@ test('koreksi absensi tidak ikut berubah: tetap memakai cakupan lokasi, bukan ga
     app(ApprovalNotifier::class)->correctionSubmitted($correction);
 
     expect(inboxTitles($hrHo))->toBe(['Koreksi absensi baru'])
-        ->and(inboxTitles($hrSby))->toBe([]);
+        ->and(inboxTitles($hrSby))->toBe([])
+        ->and(inboxTitles($hrTanpaTim))->toBe([]);
 });

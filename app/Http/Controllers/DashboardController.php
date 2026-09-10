@@ -146,19 +146,20 @@ class DashboardController extends Controller
 
         $scope = DataScope::forAttendance($user);
 
-        // Kartu ini menaut ke halaman Cuti & Izin, yang dipersempit ke bawahan —
-        // hitungannya harus memakai cakupan yang sama, kalau tidak angkanya
-        // menjanjikan pekerjaan yang tidak ada begitu halamannya dibuka.
-        $leaveScope = DataScope::forTeam($user);
+        // Setiap kartu dihitung dengan cakupan halaman yang DITAUTKANNYA. Cuti & Izin,
+        // Koreksi Absensi, dan Absensi Harian dipersempit ke bawahan, jadi angkanya
+        // harus memakai cakupan yang sama — kalau tidak, kartunya menjanjikan pekerjaan
+        // yang tidak ada begitu halamannya dibuka. Tukar jadwal tetap lokasi/divisi.
+        $teamScope = DataScope::forTeam($user);
 
         $pendingLeave = fn (): int => LeaveRequest::query()
             ->where('status', LeaveRequestStatus::PendingHr->value)
-            ->tap(fn ($query) => $leaveScope->constrain($query))
+            ->tap(fn ($query) => $teamScope->constrain($query))
             ->count();
 
         $pendingCorrections = fn (): int => AttendanceCorrection::query()
             ->where('status', AttendanceCorrection::STATUS_PENDING)
-            ->tap(fn ($query) => $scope->constrain($query))
+            ->tap(fn ($query) => $teamScope->constrain($query))
             ->count();
 
         $pendingSwaps = fn (): int => ShiftSwapRequest::query()
@@ -169,7 +170,7 @@ class DashboardController extends Controller
 
         // Karyawan aktif yang hari ini belum punya baris absensi sama sekali —
         // biasanya berarti hari itu belum diproses.
-        $unprocessedToday = fn (): int => $scope->employees()
+        $unprocessedToday = fn (): int => $teamScope->employees()
             ->active()
             ->whereDoesntHave('attendances', fn ($query) => $query->whereDate('work_date', now()->toDateString()))
             ->count();

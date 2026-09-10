@@ -25,7 +25,7 @@ class AttendanceCorrectionController extends Controller
         $dateFrom = $request->string('date_from')->toString() ?: null;
         $dateTo = $request->string('date_to')->toString() ?: null;
 
-        $scope = DataScope::forAttendance($request->user());
+        $scope = DataScope::forTeam($request->user());
 
         $corrections = AttendanceCorrection::query()
             ->with(['employee', 'reviewer'])
@@ -49,6 +49,8 @@ class AttendanceCorrectionController extends Controller
             'filters' => compact('search', 'branchId', 'departmentId', 'dateFrom', 'dateTo'),
             'branches' => $scope->branches(),
             'departments' => $scope->departments(),
+            'hasNoScope' => $scope->isEmpty(),
+            'hasNoTeam' => $scope->hasNoTeam(),
             'pendingCount' => AttendanceCorrection::query()
                 ->pending()
                 ->tap(fn ($query) => $scope->constrain($query))
@@ -61,7 +63,7 @@ class AttendanceCorrectionController extends Controller
      */
     public function approve(Request $request, AttendanceCorrection $correction): RedirectResponse
     {
-        DataScope::forAttendance($request->user())->authorize($correction->employee);
+        DataScope::forTeam($request->user())->authorize($correction->employee);
         $this->denySelfDecision($request, $correction);
         abort_unless($correction->isPending(), 403);
 
@@ -79,7 +81,7 @@ class AttendanceCorrectionController extends Controller
 
     public function reject(Request $request, AttendanceCorrection $correction): RedirectResponse
     {
-        DataScope::forAttendance($request->user())->authorize($correction->employee);
+        DataScope::forTeam($request->user())->authorize($correction->employee);
         $this->denySelfDecision($request, $correction);
         abort_unless($correction->isPending(), 403);
 
@@ -108,7 +110,7 @@ class AttendanceCorrectionController extends Controller
             return back()->with('error', 'Pilih minimal satu koreksi untuk disetujui.');
         }
 
-        $scope = DataScope::forAttendance($request->user());
+        $scope = DataScope::forTeam($request->user());
         $userId = $request->user()->id;
 
         $corrections = AttendanceCorrection::query()->whereIn('id', $ids)->with('employee')->get();
