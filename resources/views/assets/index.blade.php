@@ -169,6 +169,13 @@
                                                     @method('DELETE')
                                                     <button type="submit" class="action-menu-item action-menu-item-danger"><x-icon name="trash"/> Hapus</button>
                                                 </form>
+                                            {{-- Aset yang sudah punya riwayat: hanya akun pada User::ASSET_PURGE_EMAIL yang melihat jalan keluar ini, dan yang terhapus tidak bisa dikembalikan. --}}
+                                            @elseif (auth()->user()->canPurgeAssets())
+                                                <form method="POST" action="{{ route('assets.destroy', $asset) }}" onsubmit="return confirm('Hapus permanen aset {{ $asset->asset_code }} beserta SELURUH berkas, serah terima, dan riwayatnya? Tindakan ini tidak bisa dibatalkan.')">
+                                                    @csrf
+                                                    @method('DELETE')
+                                                    <button type="submit" class="action-menu-item action-menu-item-danger"><x-icon name="trash"/> Hapus permanen</button>
+                                                </form>
                                             @endif
                                         @endcan
                                     </x-action-menu>

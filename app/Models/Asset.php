@@ -12,6 +12,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Support\Facades\DB;
 use LogicException;
 
 class Asset extends Model
@@ -229,6 +230,41 @@ class Asset extends Model
     {
         return ! $this->hasHistory()
             && in_array($this->status, [AssetStatus::Draft, AssetStatus::Available], true);
+    }
+
+    /**
+     * Hapus aset berikut seluruh riwayatnya, permanen. Jalan keluar darurat untuk
+     * satu akun saja — lihat User::ASSET_PURGE_EMAIL dan canPurgeAssets().
+     *
+     * Menandai deleted_at saja tidak cukup di sini: baris serah terimanya akan tetap
+     * muncul di "Aset Saya" milik pemegangnya dengan induk yang sudah tidak terbaca.
+     * Jadi anak-anaknya dibuang lebih dulu — termasuk berkas di disk, yang tidak ikut
+     * terbawa cascade basis data — baru asetnya sendiri.
+     *
+     * @return array<string, int> jumlah baris yang ikut terbuang, untuk jejak audit
+     */
+    public function purge(): array
+    {
+        $counts = [
+            'berkas' => $this->documents()->count(),
+            'serah_terima' => $this->assignments()->count(),
+            'riwayat' => $this->transactions()->count(),
+        ];
+
+        DB::transaction(function (): void {
+            $this->documents()->get()->each(fn (AssetDocument $document) => $document->deleteFile());
+            $this->documents()->delete();
+
+            // Keduanya memakai restrictOnDelete pada asset_id: selama masih ada,
+            // basis data akan menolak penghapusan asetnya.
+            $this->transactions()->delete();
+            $this->assignments()->delete();
+            $this->departments()->detach();
+
+            $this->forceDelete();
+        });
+
+        return $counts;
     }
 
     /**

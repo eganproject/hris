@@ -1,9 +1,11 @@
 <?php
 
 use App\Enums\AssetStatus;
+use App\Models\ActivityLog;
 use App\Models\Asset;
 use App\Models\AssetAssignment;
 use App\Models\AssetCategory;
+use App\Models\AssetTransaction;
 use App\Models\Branch;
 use App\Models\Department;
 use App\Models\Employee;
@@ -662,4 +664,60 @@ test('penyaring yang tidak masuk akal diabaikan, bukan menjatuhkan halaman', fun
         && $filters['to'] === null
         && $filters['category'] === null
         && $filters['employee'] === null);
+});
+
+/**
+ * Petugas yang boleh menghapus aset. Surelnya yang menentukan apakah ia juga boleh
+ * menembus penjaga riwayat — lihat User::ASSET_PURGE_EMAIL.
+ */
+function custodyDeleter(string $email): User
+{
+    app(PermissionRegistrar::class)->forgetCachedPermissions();
+
+    $permissions = ['assets.view', 'assets.view.all', 'assets.delete'];
+
+    foreach ($permissions as $permission) {
+        Permission::findOrCreate($permission, 'web');
+    }
+
+    $user = User::factory()->create(['email' => $email]);
+    $user->givePermissionTo($permissions);
+
+    return $user;
+}
+
+test('akun penghapus khusus membuang aset berikut seluruh riwayatnya', function () {
+    $f = custodyFixture();
+
+    $this->actingAs(custodyOfficer())->post(route('assets.assign', $f['asset']), [
+        'employee_id' => $f['employee']->id, 'condition_out' => 'good',
+    ]);
+
+    $this->actingAs(custodyDeleter(User::ASSET_PURGE_EMAIL))
+        ->delete(route('assets.destroy', $f['asset']))
+        ->assertRedirect(route('assets.index'))
+        ->assertSessionHas('status');
+
+    // Termasuk barisnya sendiri: ini penghapusan permanen, bukan deleted_at.
+    expect(Asset::withTrashed()->whereKey($f['asset']->id)->exists())->toBeFalse()
+        ->and(AssetAssignment::query()->where('asset_id', $f['asset']->id)->exists())->toBeFalse()
+        ->and(AssetTransaction::query()->where('asset_id', $f['asset']->id)->exists())->toBeFalse()
+        // Satu-satunya bukti yang tersisa bahwa aset itu pernah ada.
+        ->and(ActivityLog::query()->where('module', 'assets')->where('event', 'deleted')->exists())->toBeTrue();
+});
+
+test('akun lain tetap tidak bisa menghapus aset yang sudah punya riwayat', function () {
+    $f = custodyFixture();
+
+    $this->actingAs(custodyOfficer())->post(route('assets.assign', $f['asset']), [
+        'employee_id' => $f['employee']->id, 'condition_out' => 'good',
+    ]);
+
+    $this->actingAs(custodyDeleter('admin.lain@cok.id'))
+        ->delete(route('assets.destroy', $f['asset']))
+        ->assertRedirect(route('assets.index'))
+        ->assertSessionHas('error');
+
+    expect(Asset::query()->whereKey($f['asset']->id)->exists())->toBeTrue()
+        ->and(AssetAssignment::query()->where('asset_id', $f['asset']->id)->exists())->toBeTrue();
 });

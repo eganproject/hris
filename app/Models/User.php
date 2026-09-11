@@ -35,6 +35,16 @@ class User extends Authenticatable
      */
     public const SUPER_ADMIN_ROLES = ['superadmin', 'super-admin'];
 
+    /**
+     * Satu-satunya akun yang boleh menghapus aset berikut seluruh riwayatnya.
+     *
+     * Sengaja dikunci ke satu alamat surel, bukan ke peran superadmin: penghapusan
+     * ini membuang berkas, serah terima, dan garis waktu aset secara permanen dan
+     * tidak bisa dibatalkan — hak sebesar itu tidak boleh ikut terbawa setiap kali
+     * seseorang diberi peran superadmin.
+     */
+    public const ASSET_PURGE_EMAIL = 'superadmin@cok.id';
+
     /** @var list<string> */
     protected $fillable = ['name', 'email', 'password', 'is_active', 'limit_to_subordinates', 'bypass_team_scope'];
 
@@ -49,6 +59,16 @@ class User extends Authenticatable
     public function isSuperAdmin(): bool
     {
         return $this->hasRole(self::SUPER_ADMIN_ROLES);
+    }
+
+    /**
+     * Boleh menghapus paksa aset yang sudah punya riwayat — lihat
+     * ASSET_PURGE_EMAIL. Dibaca dari surel, jadi hak ini ikut berpindah bila
+     * akunnya diganti namanya, dan tidak ikut menyebar ke akun superadmin lain.
+     */
+    public function canPurgeAssets(): bool
+    {
+        return strcasecmp((string) $this->email, self::ASSET_PURGE_EMAIL) === 0;
     }
 
     /** When set, the user's data scope is their reporting subtree, not lokasi/divisi. */

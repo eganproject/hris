@@ -12,6 +12,7 @@ use App\Imports\AssetsImport;
 use App\Models\Asset;
 use App\Models\AssetCategory;
 use App\Models\Employee;
+use App\Support\ActivityLogger;
 use App\Support\DataScope;
 use App\Support\ImportErrorStore;
 use App\Support\UploadMessages;
@@ -216,12 +217,20 @@ class AssetController extends Controller
      * Menghapus aset hanya boleh selagi ia belum menjadi apa-apa. Yang sudah punya
      * berkas atau sudah berjalan diakhiri lewat status "Tidak Dipakai" — riwayat dan
      * nilai perolehannya tetap ada di pembukuan.
+     *
+     * Satu-satunya pengecualian ada di purge(): akun pada User::ASSET_PURGE_EMAIL
+     * boleh membuang aset berikut riwayatnya untuk membereskan data yang terlanjur
+     * salah — misalnya barang yang sebenarnya tidak pernah ada.
      */
     public function destroy(Request $request, Asset $asset): RedirectResponse
     {
         DataScope::forAssets($request->user())->authorizeAsset($asset);
 
         if (! $asset->canBeDeleted()) {
+            if ($request->user()->canPurgeAssets()) {
+                return $this->purge($asset);
+            }
+
             return redirect()->route('assets.index')->with(
                 'error',
                 "Aset {$asset->asset_code} sudah memiliki berkas atau riwayat, jadi tidak bisa dihapus. Ubah statusnya menjadi \"Tidak Dipakai\" agar catatannya tetap tersimpan.",
@@ -231,6 +240,34 @@ class AssetController extends Controller
         $asset->delete();
 
         return redirect()->route('assets.index')->with('status', "Aset {$asset->asset_code} berhasil dihapus.");
+    }
+
+    /**
+     * Penghapusan permanen beserta seluruh riwayatnya, untuk satu akun saja.
+     *
+     * Jejaknya ditulis lengkap dengan apa saja yang ikut terbuang: sesudah ini baris
+     * di Jejak Aktivitas adalah satu-satunya bukti bahwa aset itu pernah ada.
+     */
+    private function purge(Asset $asset): RedirectResponse
+    {
+        $code = $asset->asset_code;
+        $holder = $asset->currentAssignment?->employee?->full_name;
+
+        $counts = $asset->purge();
+
+        ActivityLogger::log(
+            module: 'assets',
+            event: 'deleted',
+            description: "Menghapus permanen aset {$code} ({$asset->name}) beserta {$counts['berkas']} berkas, {$counts['serah_terima']} serah terima, dan {$counts['riwayat']} baris riwayat.",
+            subject: $asset,
+            properties: array_filter(['pemegang_saat_dihapus' => $holder]) + $counts,
+            subjectLabel: $code,
+        );
+
+        return redirect()->route('assets.index')->with(
+            'status',
+            "Aset {$code} beserta seluruh riwayatnya dihapus permanen.",
+        );
     }
 
     /**
