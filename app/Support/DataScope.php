@@ -46,13 +46,13 @@ class DataScope
      * hanya berurusan dengan bawahannya sendiri, kecuali ia dikecualikan lewat saklar
      * "Lihat semua karyawan" di Kontrol Akses (superadmin selalu dikecualikan).
      *
-     * Dipakai oleh halaman Absensi Harian, Jadwal Kerja, Cuti & Izin, Koreksi
-     * Absensi, dan SELURUH halaman Laporan (Rekap Kehadiran, Log Absensi, Rekap
-     * Lembur, Rekap Cuti) beserta tindakan, ekspor, dan halaman rinciannya. Laporan
-     * ikut di sini karena isinya orang yang sama dengan halaman operasionalnya —
-     * hanya diringkas per periode.
+     * Dipakai oleh halaman Absensi Harian, Jadwal Kerja, Cuti & Izin, Pemantauan
+     * Lembur, Koreksi Absensi, dan SELURUH halaman Laporan (Rekap Kehadiran, Log
+     * Absensi, Rekap Lembur, Rekap Cuti) beserta tindakan, ekspor, dan halaman
+     * rinciannya. Laporan ikut di sini karena isinya orang yang sama dengan halaman
+     * operasionalnya — hanya diringkas per periode.
      *
-     * Yang TIDAK ikut: pemantauan lembur dan data karyawan — keduanya tetap memakai
+     * Yang TIDAK ikut: tukar jadwal dan data karyawan — keduanya tetap memakai
      * forAttendance()/forEmployees() dan tidak berubah.
      *
      * Yang perlu disadari: pengguna tanpa bawahan dan tanpa saklar itu tidak akan

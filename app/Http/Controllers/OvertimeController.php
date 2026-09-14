@@ -14,6 +14,9 @@ class OvertimeController extends Controller
      * HR monitoring board: every overtime request in the month with its status.
      * Approvals are made by each employee's supervisor (see MyOvertimeController),
      * so this screen is read-only — HR watches and, via the recap, pays out.
+     *
+     * Dipersempit ke garis atasan seperti Jadwal Kerja: tiap akun hanya melihat
+     * lembur bawahannya, kecuali dikecualikan lewat Kontrol Akses.
      */
     public function index(Request $request): View
     {
@@ -23,7 +26,7 @@ class OvertimeController extends Controller
         $departmentId = $request->integer('department_id') ?: null;
         $status = $request->string('status')->toString() ?: null;
         $search = $request->string('search')->toString() ?: null;
-        $scope = DataScope::forAttendance($request->user());
+        $scope = DataScope::forTeam($request->user());
 
         // Basis (bulan + lokasi + divisi + pencarian) tanpa filter status, agar angka
         // ringkasan di atas tetap mencerminkan seluruh lembur bulan itu.
@@ -61,15 +64,16 @@ class OvertimeController extends Controller
             'statuses' => OvertimeApproval::statusLabels(),
             'pendingCount' => $base()->where('status', OvertimeApproval::STATUS_PENDING)->count(),
             'approvedMinutes' => (int) $base()->where('status', OvertimeApproval::STATUS_APPROVED)->sum('approved_minutes'),
+            'hasNoScope' => $scope->isEmpty(),
+            'hasNoTeam' => $scope->hasNoTeam(),
         ]);
     }
 
     /**
      * Monthly overtime recap: approved overtime totals per employee.
      *
-     * Halaman laporan, jadi dipersempit ke garis atasan seperti rekap lainnya.
-     * Daftar pemantauan lembur (index) tidak ikut — itu halaman operasional yang
-     * masih memakai cakupan lokasi/divisi.
+     * Halaman laporan, jadi dipersempit ke garis atasan seperti rekap lainnya —
+     * cakupannya sama dengan daftar pemantauan lembur (index).
      */
     public function recap(Request $request): View
     {

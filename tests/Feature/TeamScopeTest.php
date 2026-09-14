@@ -21,16 +21,16 @@ use Spatie\Permission\PermissionRegistrar;
 uses(RefreshDatabase::class);
 
 /**
- * Absensi Harian, Jadwal Kerja, Cuti, Koreksi Absensi & Laporan dipersempit ke
- * bawahan pengguna.
+ * Absensi Harian, Jadwal Kerja, Cuti, Pemantauan Lembur, Koreksi Absensi & Laporan
+ * dipersempit ke bawahan pengguna.
  *
  * Pengecualiannya adalah saklar per pengguna di Kontrol Akses, bukan daftar nama role
  * di dalam kode — susunan role tiap perusahaan berbeda, dan menambah role baru tidak
  * boleh menuntut perubahan kode.
  *
  * Yang paling penting dijaga di sini: pembatasan ini TIDAK boleh merembet ke modul
- * lain. Pemantauan lembur dan data karyawan tetap memakai cakupan lokasi/divisi
- * seperti sebelumnya.
+ * lain. Tukar jadwal dan data karyawan tetap memakai cakupan lokasi/divisi seperti
+ * sebelumnya.
  */
 function teamUser(bool $bypass = false): User
 {
@@ -249,15 +249,28 @@ test('the per-employee report detail of someone outside the team is forbidden', 
     $this->actingAs($user)->get("/reports/leave/{$stranger->id}")->assertForbidden();
 });
 
-test('the overtime monitoring list keeps its location and division scope', function () {
+test('the overtime monitoring list shows only the subordinates, like the roster', function () {
     $user = teamUser();
-    [, , $stranger] = teamTree($user);
-    overtimeFor([$stranger]);
+    [, $subordinate, $stranger] = teamTree($user);
+    overtimeFor([$subordinate, $stranger]);
 
-    // Yang pindah ke garis atasan adalah halaman LAPORAN. Pemantauan lembur,
-    // koreksi absensi, dan data karyawan tetap memakai cakupan lokasi/divisi.
+    $response = $this->actingAs($user)->get('/attendance/overtime')
+        ->assertOk()
+        ->assertSee('Andi Bawahan')
+        ->assertDontSee('Citra Bukan Bawahan');
+
+    // Angka ringkasan ikut dipersempit: satu lembur 2 jam, bukan dua.
+    expect($response->viewData('approvedMinutes'))->toBe(120);
+});
+
+test('the switch in Kontrol Akses lifts the restriction on overtime monitoring too', function () {
+    $user = teamUser(bypass: true);
+    [, $subordinate, $stranger] = teamTree($user);
+    overtimeFor([$subordinate, $stranger]);
+
     $this->actingAs($user)->get('/attendance/overtime')
         ->assertOk()
+        ->assertSee('Andi Bawahan')
         ->assertSee('Citra Bukan Bawahan');
 });
 test('the switch in Kontrol Akses lifts the restriction', function () {
@@ -302,7 +315,7 @@ test('a restricted user without any subordinate is told why the page is empty', 
     Employee::query()->create(['user_id' => $user->id, 'full_name' => 'Rina Tanpa Bawahan', 'employment_status' => 'active']);
 
     // Halaman kosong tanpa penjelasan terbaca sebagai aplikasi yang rusak.
-    foreach (['/attendance/daily', '/attendance/schedules', '/attendance/leave', '/attendance/schedules/unscheduled'] as $url) {
+    foreach (['/attendance/daily', '/attendance/schedules', '/attendance/leave', '/attendance/overtime', '/attendance/schedules/unscheduled'] as $url) {
         $this->actingAs($user)->get($url)
             ->assertOk()
             ->assertSee('belum ada seorang pun yang tercatat di bawah Anda', false)
@@ -722,7 +735,7 @@ test('Kontrol Akses states the real effect of each scope choice', function () {
     // "lihat semua" — kalimat itulah yang dulu menyesatkan.
     $this->actingAs($admin)->get(route('access-control.index'))
         ->assertOk()
-        ->assertSee('Cakupan di Absensi Harian, Jadwal Kerja, Cuti, Koreksi &amp; Laporan', false)
+        ->assertSee('Cakupan di Absensi Harian, Jadwal Kerja, Cuti, Lembur, Koreksi &amp; Laporan', false)
         ->assertSee('Bawahan saja')
         ->assertSee('Sesuai lokasi &amp; divisi di kartu ini', false);
 });

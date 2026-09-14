@@ -16,6 +16,8 @@
             <div class="rounded-md border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">{{ session('status') }}</div>
         @endif
 
+        <x-scope-notice :has-no-scope="$hasNoScope" :has-no-team="$hasNoTeam"/>
+
         <section class="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
             <form method="GET" action="{{ route('attendance.overtime.index') }}" class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5 lg:items-end">
                 <div class="flex items-center gap-2">
