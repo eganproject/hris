@@ -30,7 +30,7 @@ function navUser(string ...$permissions): User
 }
 
 test('an employee gets the self-service shortcuts, with Absensi Saya as the raised centre button', function () {
-    $user = navUser('dashboard.view', 'my-attendance.view', 'my-leave.view');
+    $user = navUser('dashboard.view', 'my-attendance.view', 'my-leave.view', 'my-roster.view');
 
     $this->actingAs($user)->get(route('dashboard'))
         ->assertOk()
@@ -44,7 +44,7 @@ test('an employee gets the self-service shortcuts, with Absensi Saya as the rais
 });
 
 test('the centre button sits between two shortcuts on each side', function () {
-    $user = navUser('dashboard.view', 'my-attendance.view', 'my-leave.view');
+    $user = navUser('dashboard.view', 'my-attendance.view', 'my-leave.view', 'my-roster.view');
 
     $content = $this->actingAs($user)->get(route('dashboard'))->assertOk()->getContent();
 
@@ -83,7 +83,7 @@ test('the centre button is highlighted while on its own page', function () {
 });
 
 test('without access to Absensi Saya the bar stays flat instead of forcing a centre button', function () {
-    $user = navUser('dashboard.view', 'attendance-daily.view', 'employees.view');
+    $user = navUser('dashboard.view', 'attendance-daily.view', 'employees.view', 'my-roster.view');
 
     $content = $this->actingAs($user)->get(route('dashboard'))->assertOk()->getContent();
 
@@ -145,13 +145,13 @@ test('the topbar hamburger is gone, replaced by the "Lainnya" button', function 
  */
 test('the bar hides self-service shortcuts an unlinked account cannot open', function () {
     app(PermissionRegistrar::class)->forgetCachedPermissions();
-    foreach (['dashboard.view', 'my-attendance.view', 'my-leave.view'] as $p) {
+    foreach (['dashboard.view', 'my-attendance.view', 'my-leave.view', 'my-roster.view'] as $p) {
         Permission::findOrCreate($p, 'web');
     }
 
     // Akun tanpa data karyawan — mis. petugas admin murni.
     $user = User::factory()->create();
-    $user->givePermissionTo(['dashboard.view', 'my-attendance.view', 'my-leave.view']);
+    $user->givePermissionTo(['dashboard.view', 'my-attendance.view', 'my-leave.view', 'my-roster.view']);
 
     $response = $this->actingAs($user)->get(route('dashboard'))->assertOk();
 
@@ -162,12 +162,12 @@ test('the bar hides self-service shortcuts an unlinked account cannot open', fun
 
 test('the same account with an employee record does get them', function () {
     app(PermissionRegistrar::class)->forgetCachedPermissions();
-    foreach (['dashboard.view', 'my-attendance.view', 'my-leave.view'] as $p) {
+    foreach (['dashboard.view', 'my-attendance.view', 'my-leave.view', 'my-roster.view'] as $p) {
         Permission::findOrCreate($p, 'web');
     }
 
     $user = User::factory()->create();
-    $user->givePermissionTo(['dashboard.view', 'my-attendance.view', 'my-leave.view']);
+    $user->givePermissionTo(['dashboard.view', 'my-attendance.view', 'my-leave.view', 'my-roster.view']);
     Employee::query()->create(['user_id' => $user->id, 'full_name' => 'Rina', 'employment_status' => 'active']);
 
     $this->actingAs($user)->get(route('dashboard'))->assertOk()

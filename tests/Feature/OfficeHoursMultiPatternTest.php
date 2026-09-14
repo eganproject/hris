@@ -186,6 +186,7 @@ test('an office-hours employee sees their month on Jadwal Saya instead of "belum
 
     $employee = officeHoursEmployee('Cabang', officePatternFor('CAB', $eveningShift));
     $user = User::factory()->create();
+    $user->givePermissionTo(Permission::findOrCreate('my-roster.view', 'web'));
     $employee->update(['user_id' => $user->id]);
 
     $this->actingAs($user)
@@ -467,6 +468,7 @@ test('an employee who follows no office pattern still opens Jadwal Saya without 
         'full_name' => 'Shift', 'employment_status' => 'active', 'follows_office_hours' => false,
     ]);
     $user = User::factory()->create();
+    $user->givePermissionTo(Permission::findOrCreate('my-roster.view', 'web'));
     $employee->update(['user_id' => $user->id]);
 
     $this->actingAs($user)

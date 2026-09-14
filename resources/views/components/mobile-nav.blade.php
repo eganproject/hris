@@ -49,7 +49,7 @@
             'label' => 'Jadwal',
             'route' => 'my-roster.index',
             'active' => ['my-roster.*'],
-            'permission' => null, // tanpa hak akses khusus, tapi tetap butuh data karyawan
+            'permission' => 'my-roster.view',
             'needsEmployee' => true,
             'icon' => '<rect x="3" y="4" width="18" height="16" rx="2"></rect><path d="M3 9h18M8 4v3M16 4v3"></path>',
         ],

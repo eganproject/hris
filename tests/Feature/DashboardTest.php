@@ -151,7 +151,7 @@ test('a queue the user may not decide is not shown at all', function () {
 test('an employee without HR permissions sees only their own summary', function () {
     dashboardFixture();
 
-    $user = dashboardUser(['dashboard.view', 'my-leave.view']);
+    $user = dashboardUser(['dashboard.view', 'my-leave.view', 'my-roster.view']);
     Employee::query()->create([
         'user_id' => $user->id, 'full_name' => 'Staf Biasa', 'employment_status' => 'active',
         'join_date' => now()->subYear()->toDateString(),

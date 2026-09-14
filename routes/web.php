@@ -80,8 +80,9 @@ Route::middleware('auth')->group(function () {
     Route::post('profile/photo', [ProfileController::class, 'updatePhoto'])->name('profile.photo.update');
     Route::delete('profile/photo', [ProfileController::class, 'destroyPhoto'])->name('profile.photo.destroy');
 
-    // Self-service: check own work schedule (read-only, no special permission).
-    Route::get('jadwal-saya', [MyRosterController::class, 'index'])->name('my-roster.index');
+    // Self-service: check own work schedule (read-only). Punya izinnya sendiri supaya
+    // bisa ditampilkan atau disembunyikan per role lewat Kontrol Akses.
+    Route::get('jadwal-saya', [MyRosterController::class, 'index'])->middleware('permission:my-roster.view')->name('my-roster.index');
 
     // Aset Saya: aset yang sedang dipegang pengguna sendiri, beserta konfirmasi
     // penerimaannya. Cakupan datanya adalah dirinya sendiri, bukan lokasi/divisi.

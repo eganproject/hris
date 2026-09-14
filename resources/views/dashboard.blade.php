@@ -154,9 +154,11 @@
                     icon="calendar-clock"
                     tone="violet"
                     flush>
-                    <x-slot:action>
-                        <a href="{{ route('my-roster.index') }}" class="text-xs font-medium text-primary hover:underline">Lihat jadwal</a>
-                    </x-slot:action>
+                    @can('my-roster.view')
+                        <x-slot:action>
+                            <a href="{{ route('my-roster.index') }}" class="text-xs font-medium text-primary hover:underline">Lihat jadwal</a>
+                        </x-slot:action>
+                    @endcan
 
                     <div class="overflow-x-auto">
                         <table class="data-table">

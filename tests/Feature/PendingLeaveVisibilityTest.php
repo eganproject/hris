@@ -25,9 +25,10 @@ function pendingLeaveEmployee(string $date): array
 {
     app(PermissionRegistrar::class)->forgetCachedPermissions();
     Permission::findOrCreate('my-schedule.view', 'web');
+    Permission::findOrCreate('my-roster.view', 'web');
 
     $user = User::factory()->create();
-    $user->givePermissionTo('my-schedule.view');
+    $user->givePermissionTo(['my-schedule.view', 'my-roster.view']);
 
     $employee = Employee::query()->create([
         'user_id' => $user->id, 'full_name' => 'Rina', 'employment_status' => 'active',

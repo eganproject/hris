@@ -97,6 +97,7 @@ return [
         ],
 
         'Self-service' => [
+            'my-roster' => ['label' => 'Jadwal Saya', 'actions' => ['view']],
             'my-leave' => ['label' => 'Cuti Saya', 'actions' => ['view']],
             'my-attendance' => ['label' => 'Absensi Saya (koreksi)', 'actions' => ['view']],
             'my-schedule' => ['label' => 'Tukar Jadwal Saya', 'actions' => ['view']],
@@ -165,7 +166,7 @@ return [
             'departments.view', 'departments.create', 'departments.update', 'departments.delete',
             'job-positions.view', 'job-positions.create', 'job-positions.update', 'job-positions.delete',
             'settings.view', 'settings.update',
-            'my-leave.view', 'my-attendance.view', 'my-schedule.view', 'my-overtime.view', 'my-assets.view',
+            'my-roster.view', 'my-leave.view', 'my-attendance.view', 'my-schedule.view', 'my-overtime.view', 'my-assets.view',
             'employees.view.all', 'attendance.view.all',
         ],
 
@@ -176,6 +177,7 @@ return [
 
         'employee' => [
             'dashboard.view',
+            'my-roster.view',
             'my-leave.view',
             'my-attendance.view',
             'my-schedule.view',

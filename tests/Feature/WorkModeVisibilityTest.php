@@ -33,7 +33,9 @@ function workModeShift(): Shift
 function workModeEmployee(string $date, bool $isWfh = false): array
 {
     app(PermissionRegistrar::class)->forgetCachedPermissions();
+    Permission::findOrCreate('my-roster.view', 'web');
     $user = User::factory()->create();
+    $user->givePermissionTo('my-roster.view');
     $employee = Employee::query()->create([
         'user_id' => $user->id, 'full_name' => 'Rina Reguler', 'employment_status' => 'active',
     ]);
