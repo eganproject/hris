@@ -123,6 +123,32 @@ test('an admin can grant a menu action to a role from the matrix', function () {
     $this->actingAs($member)->get('/attendance/shifts')->assertForbidden();
 });
 
+test('the overtime page is a row under Cuti & Lembur that an admin can grant', function () {
+    expect(config('rbac.menus.Cuti & Lembur.overtime'))->toBe(['label' => 'Lembur', 'actions' => ['view']]);
+
+    $admin = userWithPermissions(['dashboard.view', 'access-control.view', 'access-control.update']);
+    // Matriks dirender per role, jadi role-nya harus ada sebelum halamannya dibuka.
+    $role = Role::findOrCreate('admin-lembur', 'web');
+
+    $this->actingAs($admin)->get(route('access-control.index'))
+        ->assertOk()
+        ->assertSeeInOrder(['Cuti &amp; Lembur', 'Lembur', 'value="overtime.view"'], escape: false);
+
+    $member = User::factory()->create();
+    $member->assignRole($role);
+    $member->forceFill(['bypass_team_scope' => true])->save();
+
+    $this->actingAs($member)->get('/attendance/overtime')->assertForbidden();
+
+    $this->actingAs($admin)
+        ->put(route('access-control.roles.update', $role), ['permissions' => ['overtime.view']])
+        ->assertRedirect(route('access-control.index'));
+
+    app(PermissionRegistrar::class)->forgetCachedPermissions();
+
+    $this->actingAs($member->fresh())->get('/attendance/overtime')->assertOk();
+});
+
 test('the superadmin role cannot have its access stripped', function () {
     $admin = userWithPermissions(['dashboard.view', 'access-control.view', 'access-control.update']);
     $superadmin = Role::findOrCreate('superadmin', 'web');

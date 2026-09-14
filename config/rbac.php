@@ -44,14 +44,12 @@ return [
             'attendance-map' => ['label' => 'Peta Absen Mandiri', 'actions' => ['view']],
             'punches' => ['label' => 'Log Punch', 'actions' => ['view', 'update']],
             'corrections' => ['label' => 'Koreksi Absensi', 'actions' => ['view', 'update']],
-            'overtime' => ['label' => 'Lembur (rekap HR)', 'actions' => ['view']],
-            'swaps' => ['label' => 'Tukar Jadwal (HR)', 'actions' => ['view', 'update']],
             'devices' => ['label' => 'Perangkat Absensi', 'actions' => ['view', 'create', 'update', 'delete']],
-            'shifts' => ['label' => 'Shift Kerja', 'actions' => ['view', 'create', 'update', 'delete']],
-            'holidays' => ['label' => 'Hari Libur', 'actions' => ['view', 'create', 'update', 'delete']],
         ],
 
         'Jadwal' => [
+            'shifts' => ['label' => 'Shift Kerja', 'actions' => ['view', 'create', 'update', 'delete']],
+            'holidays' => ['label' => 'Hari Libur', 'actions' => ['view', 'create', 'update', 'delete']],
             'schedule-patterns' => ['label' => 'Pola Jadwal', 'actions' => ['view', 'create', 'update', 'delete']],
             // "import" berdiri sendiri: mengunggah roster sebulan penuh dari Excel
             // berbeda bobotnya dengan mengubah satu sel, dan sebelumnya menumpang pada
@@ -60,10 +58,15 @@ return [
             'schedules' => ['label' => 'Jadwal Kerja', 'actions' => ['view', 'create', 'update', 'delete', 'import']],
         ],
 
-        'Cuti' => [
+        // Grup dan label mengikuti sidebar: baris yang ditaruh di grup lain atau
+        // bernama lain (dulu "Lembur (rekap HR)" di grup Absensi) tidak ketemu saat
+        // dicari dari nama menunya. Memindahkan baris tidak mengubah nama permission.
+        'Cuti & Lembur' => [
             'leave' => ['label' => 'Cuti & Izin', 'actions' => ['view', 'create', 'update', 'delete']],
             'leave-types' => ['label' => 'Jenis Cuti', 'actions' => ['view', 'create', 'update', 'delete']],
             'leave-balances' => ['label' => 'Kuota Cuti', 'actions' => ['view', 'update']],
+            'overtime' => ['label' => 'Lembur', 'actions' => ['view']],
+            'swaps' => ['label' => 'Tukar Jadwal', 'actions' => ['view', 'update']],
         ],
 
         'Aset' => [
