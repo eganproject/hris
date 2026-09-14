@@ -20,7 +20,9 @@ use App\Models\User;
 use App\Services\OfficeHoursTransition;
 use App\Services\PunchIngestionService;
 use App\Support\ActivityLogger;
+use App\Support\DataScope;
 use App\Support\ImportErrorStore;
+use App\Support\LeaveReport;
 use App\Support\UploadMessages;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
@@ -304,9 +306,16 @@ class EmployeeManagementController extends Controller
         return ImportErrorStore::download($token);
     }
 
-    public function show(Employee $employee): View
+    public function show(Request $request, Employee $employee, LeaveReport $leaveReport): View
     {
         $this->authorizeScope($employee);
+
+        // Sisa cuti tahun berjalan, dihitung sama dengan Rekap Cuti. Tautan ke riwayat
+        // hanya ditawarkan kepada yang memang boleh membuka Detail Cuti — halaman itu
+        // punya izin dan cakupan (garis atasan) sendiri, dan tautan yang berujung 403
+        // lebih buruk daripada tidak ada tautan.
+        $leaveYear = (int) now()->year;
+        $user = $request->user();
 
         $employee->load([
             'branch',
@@ -323,6 +332,9 @@ class EmployeeManagementController extends Controller
         return view('employees.show', [
             'employee' => $employee,
             'contractTypes' => ['PKWT', 'PKWTT', 'Probation', 'Internship'],
+            'leaveYear' => $leaveYear,
+            'leaveSummary' => $leaveReport->employeeHistory($employee, $leaveYear)['balances'],
+            'canOpenLeaveDetail' => $user->can('reports.leave.view') && DataScope::forTeam($user)->allows($employee),
         ]);
     }
 

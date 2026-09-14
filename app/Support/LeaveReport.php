@@ -83,4 +83,80 @@ class LeaveReport
 
         return ['types' => $types, 'rows' => $rows];
     }
+
+    /**
+     * Riwayat cuti satu karyawan dalam setahun, beserta saldo per jenis cuti.
+     *
+     * "Sisa" memakai aturan yang sama dengan build(): kuota dikurangi cuti yang
+     * DISETUJUI. Pengajuan yang masih menunggu ditampilkan terpisah, supaya Detail
+     * Cuti dan Rekap Cuti tidak pernah menyebut sisa yang berbeda untuk orang yang
+     * sama.
+     *
+     * @return array{
+     *     requests: Collection<int, LeaveRequest>,
+     *     balances: Collection<int, array{type: LeaveType, quota: ?int, used: int, pending: int, remaining: ?int}>,
+     *     remainingAfter: array<int, int>,
+     * }
+     */
+    public function employeeHistory(Employee $employee, int $year): array
+    {
+        $requests = LeaveRequest::query()
+            ->where('employee_id', $employee->id)
+            ->whereYear('start_date', $year)
+            ->with('leaveType')
+            ->orderByDesc('start_date')
+            ->orderByDesc('id')
+            ->get();
+
+        $overrides = LeaveBalance::query()
+            ->where('employee_id', $employee->id)
+            ->where('year', $year)
+            ->pluck('quota_days', 'leave_type_id');
+
+        // Jenis berkuota selalu tampil — sisa yang masih utuh pun informasi. Jenis
+        // lain hanya bila memang pernah diajukan pada tahun itu.
+        $types = LeaveType::query()
+            ->where(fn ($q) => $q
+                ->where(fn ($q) => $q->where('is_active', true)->where('counts_against_balance', true))
+                ->orWhereIn('id', $requests->pluck('leave_type_id')->unique()))
+            ->orderBy('name')
+            ->get();
+
+        $days = fn (Collection $rows): int => (int) $rows->sum(fn (LeaveRequest $r) => $r->days);
+
+        $balances = $types->map(function (LeaveType $type) use ($requests, $overrides, $days) {
+            $ofType = $requests->where('leave_type_id', $type->id);
+            $used = $days($ofType->filter(fn (LeaveRequest $r) => $r->status === LeaveRequestStatus::Approved));
+            $quota = $type->counts_against_balance
+                ? (int) ($overrides[$type->id] ?? $type->default_quota_days ?? 0)
+                : null;
+
+            return [
+                'type' => $type,
+                'quota' => $quota,
+                'used' => $used,
+                'pending' => $days($ofType->filter(fn (LeaveRequest $r) => $r->status->isPending())),
+                'remaining' => $quota === null ? null : $quota - $used,
+            ];
+        })->values();
+
+        // Sisa setelah tiap cuti disetujui, dijalankan urut tanggal dari awal tahun —
+        // sehingga baris riwayat terbaca seperti buku saldo.
+        $running = $balances
+            ->filter(fn (array $balance) => $balance['quota'] !== null)
+            ->mapWithKeys(fn (array $balance) => [$balance['type']->id => $balance['quota']])
+            ->all();
+
+        $remainingAfter = [];
+
+        $requests
+            ->filter(fn (LeaveRequest $r) => $r->status === LeaveRequestStatus::Approved && isset($running[$r->leave_type_id]))
+            ->sortBy(fn (LeaveRequest $r) => $r->start_date->format('Y-m-d').sprintf('-%010d', $r->id))
+            ->each(function (LeaveRequest $r) use (&$running, &$remainingAfter) {
+                $running[$r->leave_type_id] -= $r->days;
+                $remainingAfter[$r->id] = $running[$r->leave_type_id];
+            });
+
+        return ['requests' => $requests, 'balances' => $balances, 'remainingAfter' => $remainingAfter];
+    }
 }

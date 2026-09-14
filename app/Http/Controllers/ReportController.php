@@ -354,7 +354,8 @@ class ReportController extends Controller
     }
 
     /**
-     * Per-employee leave history for the selected year.
+     * Per-employee leave history for the selected year, with the remaining quota
+     * per leave type.
      *
      * Sama seperti rincian kehadiran: penjaganya mengikuti rekapnya.
      */
@@ -363,19 +364,17 @@ class ReportController extends Controller
         DataScope::forTeam($request->user())->authorize($employee);
 
         $year = $this->resolveYear($request->input('year'));
-
-        $requests = LeaveRequest::query()
-            ->where('employee_id', $employee->id)
-            ->whereYear('start_date', $year)
-            ->with('leaveType')
-            ->orderByDesc('start_date')
-            ->get();
+        $history = $this->leaveReport->employeeHistory($employee, $year);
 
         return view('reports.leave-detail', [
             'employee' => $employee->load(['branch', 'department', 'jobPosition']),
-            'requests' => $requests,
+            'requests' => $history['requests'],
+            'balances' => $history['balances'],
+            'remainingAfter' => $history['remainingAfter'],
             'year' => $year,
-            'approvedDays' => (int) $requests->where('status', LeaveRequestStatus::Approved)->sum(fn (LeaveRequest $r) => $r->days),
+            'approvedDays' => (int) $history['requests']
+                ->filter(fn (LeaveRequest $r) => $r->status === LeaveRequestStatus::Approved)
+                ->sum(fn (LeaveRequest $r) => $r->days),
         ]);
     }
 

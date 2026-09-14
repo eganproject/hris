@@ -245,6 +245,43 @@
                     </dl>
                 </section>
 
+                {{-- Sisa kuota tahun berjalan. Angkanya dari LeaveReport::employeeHistory(),
+                     sama dengan Rekap Cuti & Detail Cuti: kuota dikurangi cuti disetujui. --}}
+                <section class="rounded-lg border border-gray-200 bg-white p-6 shadow-sm" data-leave-summary>
+                    <div class="flex items-center justify-between gap-3">
+                        <h2 class="text-base font-semibold text-gray-950">Sisa Cuti {{ $leaveYear }}</h2>
+                        @if ($canOpenLeaveDetail)
+                            <a href="{{ route('reports.leave.detail', ['employee' => $employee->id, 'year' => $leaveYear]) }}" class="text-xs font-medium text-primary hover:underline">Lihat riwayat</a>
+                        @endif
+                    </div>
+                    @if ($leaveSummary->isNotEmpty())
+                        <ul class="mt-4 space-y-3">
+                            @foreach ($leaveSummary as $balance)
+                                <li class="flex items-start justify-between gap-3 text-sm">
+                                    <span class="min-w-0">
+                                        <span class="block truncate font-medium text-gray-800">{{ $balance['type']->name }}</span>
+                                        <span class="block text-xs text-gray-500">
+                                            {{ $balance['quota'] !== null ? 'Terpakai '.$balance['used'].' hari' : 'Tanpa kuota' }}
+                                            @if ($balance['pending'] > 0)
+                                                · <span class="text-amber-700">menunggu {{ $balance['pending'] }} hari</span>
+                                            @endif
+                                        </span>
+                                    </span>
+                                    @if ($balance['quota'] !== null)
+                                        <span class="shrink-0 text-right font-semibold {{ $balance['remaining'] <= 0 ? 'text-red-600' : 'text-gray-950' }}">
+                                            {{ $balance['remaining'] }}<span class="font-normal text-gray-400"> / {{ $balance['quota'] }} hari</span>
+                                        </span>
+                                    @else
+                                        <span class="shrink-0 text-right font-semibold text-gray-950">{{ $balance['used'] }}<span class="font-normal text-gray-400"> hari</span></span>
+                                    @endif
+                                </li>
+                            @endforeach
+                        </ul>
+                    @else
+                        <p class="mt-4 text-sm text-gray-500">Belum ada jenis cuti yang memakai kuota.</p>
+                    @endif
+                </section>
+
                 <section class="rounded-lg border border-gray-200 bg-white p-6 shadow-sm">
                     <div class="flex items-center justify-between gap-3">
                         <h2 class="text-base font-semibold text-gray-950">Absensi &amp; Perangkat</h2>
