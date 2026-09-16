@@ -28,6 +28,9 @@ class AttendanceResolver
      */
     public const REMOTE_STATUSES = [AttendanceStatus::Wfh, AttendanceStatus::BusinessTrip];
 
+    /** Lebar kolom `attendances.note`. Lihat fitNote(). */
+    private const NOTE_MAX = 255;
+
     public function __construct(private readonly DefaultOfficeSchedule $officeSchedule) {}
 
     /**
@@ -163,7 +166,7 @@ class AttendanceResolver
     {
         $computed = $this->compute($employee, $date, $clockIn, $clockOut);
         $computed['status'] = $computed['status']->value;
-        $computed['note'] = $note;
+        $computed['note'] = $this->fitNote($note);
 
         return Attendance::query()->updateOrCreate(
             ['employee_id' => $employee->id, 'work_date' => Carbon::parse($date)->toDateString()],
@@ -186,6 +189,25 @@ class AttendanceResolver
             $existing?->clock_out?->format('H:i'),
             $existing?->note,
         );
+    }
+
+    /**
+     * Pangkas catatan agar muat di kolomnya.
+     *
+     * `attendances.note` adalah varchar(255), sedangkan yang dikirim ke sini bisa
+     * lebih panjang: persetujuan koreksi absensi menyalin alasan karyawan (sampai
+     * 1000 karakter) ke dalamnya. Di MySQL mode ketat kelebihan itu tidak dipotong
+     * diam-diam melainkan menggagalkan seluruh penyimpanan absensinya, jadi
+     * dipangkas di satu pintu ini supaya semua pemanggil resolve() aman sekaligus.
+     * Teks aslinya tetap utuh pada baris pengajuannya.
+     */
+    private function fitNote(?string $note): ?string
+    {
+        if ($note === null || mb_strlen($note) <= self::NOTE_MAX) {
+            return $note;
+        }
+
+        return mb_substr($note, 0, self::NOTE_MAX - 1).'…';
     }
 
     private function punch(CarbonInterface $date, ?string $time): ?Carbon

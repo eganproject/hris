@@ -55,7 +55,13 @@ return [
         'stack' => [
             'driver' => 'stack',
             'channels' => explode(',', (string) env('LOG_STACK', 'single')),
-            'ignore_exceptions' => false,
+
+            // File log yang tidak bisa ditulis (hak akses storage/logs salah di
+            // server) jangan sampai ikut menggagalkan permintaannya. Dengan false,
+            // kegagalan menulis log dilempar sebagai UnexpectedValueException dan
+            // MENGGANTIKAN error aslinya di layar — halamannya jadi menuduh Monolog,
+            // padahal penyebabnya sama sekali lain dan tidak pernah terlihat.
+            'ignore_exceptions' => true,
         ],
 
         'single' => [

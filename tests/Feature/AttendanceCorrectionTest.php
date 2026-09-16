@@ -184,6 +184,31 @@ test('HR approves a correction and the attendance is updated', function () {
         ->and($attendance->clock_out->format('H:i'))->toBe('17:00');
 });
 
+test('alasan panjang tidak menggagalkan persetujuan: catatan absensi dipangkas agar muat di kolomnya', function () {
+    [, $employee] = correctionEmployee();
+    $hr = correctionHr();
+
+    // Alasan boleh sampai 1000 karakter (StoreAttendanceCorrectionRequest), sedangkan
+    // `attendances.note` cuma varchar(255). Tanpa pemangkasan, MySQL mode ketat
+    // menolak seluruh penyimpanannya dan persetujuannya berakhir 500.
+    $correction = AttendanceCorrection::query()->create([
+        'employee_id' => $employee->id,
+        'work_date' => '2026-02-10',
+        'requested_clock_in' => '08:00',
+        'requested_clock_out' => '17:00',
+        'reason' => str_repeat('Mesin absensi di lobi mati sejak pagi. ', 25),
+        'status' => 'pending',
+    ]);
+
+    $this->actingAs($hr)->patch(route('attendance.corrections.approve', $correction))->assertRedirect();
+
+    $attendance = Attendance::query()->where('employee_id', $employee->id)->where('work_date', '2026-02-10')->firstOrFail();
+
+    expect($correction->fresh()->status)->toBe('approved')
+        ->and(mb_strlen($attendance->note))->toBeLessThanOrEqual(255)
+        ->and($attendance->note)->toStartWith('Koreksi disetujui: Mesin absensi di lobi mati sejak pagi.');
+});
+
 test('HR rejects a correction', function () {
     [, $employee] = correctionEmployee();
     $hr = correctionHr();
