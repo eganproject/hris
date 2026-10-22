@@ -11,6 +11,7 @@ use App\Models\Department;
 use App\Models\JobPosition;
 use App\Models\User;
 use App\Support\MenuPermissions;
+use App\Support\RoleGuard;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -144,6 +145,27 @@ class AccessControlController extends Controller
      */
     public function updateUserScope(UserScopeRequest $request, User $user): RedirectResponse
     {
+        $requestedRoles = collect($request->validated('roles', []))->map(fn ($name) => (string) $name);
+        $currentRoles = $user->roles()->pluck('name');
+        $changedRoles = $requestedRoles->diff($currentRoles)->merge($currentRoles->diff($requestedRoles));
+
+        // Role superadmin hanya boleh diberikan atau dicabut oleh superadmin.
+        abort_if(
+            ! $request->user()->isSuperAdmin() && $changedRoles->contains(fn ($name) => RoleGuard::isProtected($name)),
+            403,
+            'Hanya superadmin yang bisa memberikan atau mencabut role superadmin.',
+        );
+
+        // Jangan sampai tidak ada lagi superadmin aktif: tidak ada yang bisa
+        // memulihkan hak akses setelah itu.
+        $losesSuperAdmin = $currentRoles->contains(fn ($name) => RoleGuard::isProtected($name))
+            && ! $requestedRoles->contains(fn ($name) => RoleGuard::isProtected($name));
+
+        if ($losesSuperAdmin && ! $this->otherActiveSuperAdminExists($user)) {
+            return redirect()->route('access-control.index')
+                ->with('error', "{$user->name} adalah superadmin aktif terakhir. Jadikan akun lain superadmin lebih dulu.");
+        }
+
         $user->accessBranches()->sync($request->validated('branches', []));
         $user->accessDepartments()->sync($request->validated('departments', []));
         $user->forceFill([
@@ -178,5 +200,14 @@ class AccessControlController extends Controller
         return redirect()
             ->route('access-control.index')
             ->with('status', "Divisi untuk lokasi {$branch->name} berhasil diperbarui.");
+    }
+
+    private function otherActiveSuperAdminExists(User $user): bool
+    {
+        return User::query()
+            ->whereKeyNot($user->id)
+            ->where('is_active', true)
+            ->whereHas('roles', fn ($query) => $query->whereIn('name', User::SUPER_ADMIN_ROLES))
+            ->exists();
     }
 }

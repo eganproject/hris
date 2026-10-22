@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\LeaveRequest;
 use App\Models\User;
 use App\Support\DataScope;
+use App\Support\PrivateFile;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Symfony\Component\HttpFoundation\StreamedResponse;
@@ -29,11 +30,7 @@ class LeaveAttachmentController extends Controller
         // dipangkas manual) — jangan sampai berujung error 500.
         abort_unless($disk->exists($leaveRequest->attachment_path), 404, 'Berkas lampiran tidak ditemukan.');
 
-        $headers = ['Content-Type' => $leaveRequest->attachment_mime ?: 'application/octet-stream'];
-
-        return $request->boolean('download')
-            ? $disk->download($leaveRequest->attachment_path, $leaveRequest->attachment_name, $headers)
-            : $disk->response($leaveRequest->attachment_path, $leaveRequest->attachment_name, $headers);
+        return PrivateFile::response($disk, $leaveRequest->attachment_path, $leaveRequest->attachment_name, $leaveRequest->attachment_mime, $request->boolean('download'));
     }
 
     /**

@@ -14,6 +14,7 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 
 class Employee extends Model
 {
@@ -635,7 +636,8 @@ class Employee extends Model
         }
 
         if ($this->user) {
-            $this->user->forceFill(['is_active' => false])->save();
+            // Token "Ingat saya" ikut diganti agar cookie lama tidak bisa dipakai lagi.
+            $this->user->forceFill(['is_active' => false, 'remember_token' => Str::random(60)])->save();
             DB::table('sessions')->where('user_id', $this->user->id)->delete();
         }
     }

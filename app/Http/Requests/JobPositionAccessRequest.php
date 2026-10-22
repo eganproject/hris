@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests;
 
+use App\Support\RoleGuard;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
@@ -18,7 +19,7 @@ class JobPositionAccessRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'default_role_id' => ['nullable', 'integer', Rule::exists('roles', 'id')->where('guard_name', 'web')],
+            'default_role_id' => ['nullable', 'integer', Rule::exists('roles', 'id')->where('guard_name', 'web'), RoleGuard::assignableRule($this->user(), $this->route('jobPosition')?->default_role_id)],
         ];
     }
 }

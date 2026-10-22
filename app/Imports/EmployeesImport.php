@@ -10,7 +10,9 @@ use App\Models\EmployeeContract;
 use App\Models\JobPosition;
 use App\Models\User;
 use App\Services\PunchIngestionService;
+use App\Support\RoleGuard;
 use Carbon\CarbonImmutable;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -19,6 +21,7 @@ use Maatwebsite\Excel\Concerns\ToCollection;
 use Maatwebsite\Excel\Concerns\WithHeadingRow;
 use Maatwebsite\Excel\Concerns\WithMultipleSheets;
 use PhpOffice\PhpSpreadsheet\Shared\Date as ExcelDate;
+use Spatie\Permission\Models\Role;
 
 /**
  * Imports employees (with their placement, first contract and — optionally — an
@@ -71,6 +74,9 @@ class EmployeesImport implements SkipsEmptyRows, ToCollection, WithHeadingRow, W
     public function __construct(
         private readonly ?array $allowedBranches = null,
         private readonly ?array $allowedDepartments = null,
+        // Pengguna yang menjalankan import. Role login yang boleh dipasang dibatasi
+        // pada role yang boleh ia berikan (RoleGuard); null = tanpa batasan (konsol).
+        private readonly ?User $actor = null,
     ) {}
 
     /**
@@ -279,6 +285,10 @@ class EmployeesImport implements SkipsEmptyRows, ToCollection, WithHeadingRow, W
             $add("Peran Login \"{$loginRole}\" tidak ditemukan.", 'Peran Login');
         }
 
+        if ($roleId !== null && $this->actor && ! RoleGuard::canAssign($this->actor, Role::query()->find($roleId))) {
+            $add("Anda tidak berwenang memberikan Peran Login \"{$loginRole}\".", 'Peran Login');
+        }
+
         if ($loginRole !== '' && $loginPassword === '') {
             $add('Peran Login hanya berlaku jika Password Login diisi.', 'Peran Login');
         }
@@ -454,7 +464,7 @@ class EmployeesImport implements SkipsEmptyRows, ToCollection, WithHeadingRow, W
     /**
      * Case-insensitive "name => id" map of every existing record of a master model.
      *
-     * @param  class-string<\Illuminate\Database\Eloquent\Model>  $model
+     * @param  class-string<Model>  $model
      * @return array<string, int>
      */
     private function nameIdCache(string $model): array
@@ -470,7 +480,7 @@ class EmployeesImport implements SkipsEmptyRows, ToCollection, WithHeadingRow, W
      * code, because the employee code is built from it.
      *
      * @param  array<string, int>  $cache
-     * @param  class-string<\Illuminate\Database\Eloquent\Model>  $model
+     * @param  class-string<Model>  $model
      */
     private function resolveOrCreate(array &$cache, string $model, string $name): int
     {
@@ -562,7 +572,9 @@ class EmployeesImport implements SkipsEmptyRows, ToCollection, WithHeadingRow, W
             ? $roleModel::query()->find($login['role_id'])
             : $employee->loadMissing('jobPosition.defaultRole')->jobPosition?->defaultRole;
 
-        if ($role) {
+        // Role default jabatan juga melewati RoleGuard: yang tidak boleh diberikan
+        // pengimpor dilewati saja, akunnya tetap dibuat tanpa role.
+        if ($role && (! $this->actor || RoleGuard::canAssign($this->actor, $role))) {
             $user->syncRoles([$role->name]);
         }
     }
@@ -711,7 +723,7 @@ class EmployeesImport implements SkipsEmptyRows, ToCollection, WithHeadingRow, W
             'roles' => $roles,
             'employee_numbers' => Employee::query()->pluck('employee_number')->map(fn ($v) => strtolower((string) $v))->all(),
             'names' => Employee::query()->pluck('full_name')->map(fn ($v) => strtolower(trim((string) $v)))->all(),
-            'contract_numbers' =>EmployeeContract::query()->pluck('contract_number')->map(fn ($v) => strtolower((string) $v))->all(),
+            'contract_numbers' => EmployeeContract::query()->pluck('contract_number')->map(fn ($v) => strtolower((string) $v))->all(),
             'emails' => Employee::query()->whereNotNull('email')->pluck('email')->map(fn ($v) => strtolower((string) $v))
                 ->merge(DB::table('users')->whereNotNull('email')->pluck('email')->map(fn ($v) => strtolower((string) $v)))
                 ->unique()->values()->all(),
