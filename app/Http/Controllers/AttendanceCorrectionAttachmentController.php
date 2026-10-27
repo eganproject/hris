@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\AttendanceCorrection;
 use App\Models\User;
 use App\Support\DataScope;
+use App\Support\PrivateFile;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Symfony\Component\HttpFoundation\StreamedResponse;
@@ -30,11 +31,7 @@ class AttendanceCorrectionAttachmentController extends Controller
         // dipangkas manual) — jangan sampai berujung error 500.
         abort_unless($disk->exists($correction->attachment_path), 404, 'Berkas bukti tidak ditemukan.');
 
-        $headers = ['Content-Type' => $correction->attachment_mime ?: 'application/octet-stream'];
-
-        return $request->boolean('download')
-            ? $disk->download($correction->attachment_path, $correction->attachment_name, $headers)
-            : $disk->response($correction->attachment_path, $correction->attachment_name, $headers);
+        return PrivateFile::response($disk, $correction->attachment_path, $correction->attachment_name, $correction->attachment_mime, $request->boolean('download'));
     }
 
     /**

@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Support\PrivateFile;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -120,7 +121,7 @@ class EmployeeContract extends Model
         return [
             'document_path' => $file->store("contract-documents/{$employeeId}", self::DOCUMENT_DISK),
             'document_name' => $file->getClientOriginalName(),
-            'document_mime' => $file->getClientMimeType(),
+            'document_mime' => PrivateFile::detectedMime($file),
             'document_size' => $file->getSize(),
         ];
     }

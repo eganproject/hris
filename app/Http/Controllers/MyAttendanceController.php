@@ -11,6 +11,7 @@ use App\Models\Employee;
 use App\Services\AttendanceResolver;
 use App\Services\AttendanceRollup;
 use App\Support\ApprovalNotifier;
+use App\Support\PrivateFile;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
@@ -271,7 +272,7 @@ class MyAttendanceController extends Controller
         return [
             'attachment_path' => $attachment->store("correction-attachments/{$employee->id}", AttendanceCorrection::ATTACHMENT_DISK),
             'attachment_name' => $attachment->getClientOriginalName(),
-            'attachment_mime' => $attachment->getClientMimeType(),
+            'attachment_mime' => PrivateFile::detectedMime($attachment),
             'attachment_size' => $attachment->getSize(),
         ];
     }

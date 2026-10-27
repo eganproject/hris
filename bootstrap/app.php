@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Middleware\EnsureUserIsActive;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
@@ -24,6 +25,10 @@ return Application::configure(basePath: dirname(__DIR__))
         // The fingerprint machine speaks the ZKTeco iclock protocol and cannot send
         // a CSRF token; these device endpoints are gated by a serial-number allowlist.
         $middleware->validateCsrfTokens(except: ['iclock/*']);
+
+        // Akun yang dinonaktifkan (mis. karyawan keluar) langsung dikeluarkan,
+        // termasuk yang masih masuk lewat cookie "Ingat saya".
+        $middleware->appendToGroup('web', EnsureUserIsActive::class);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         $exceptions->shouldRenderJsonWhen(

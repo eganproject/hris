@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\ShiftSwapRequest;
 use App\Models\User;
 use App\Support\DataScope;
+use App\Support\PrivateFile;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Symfony\Component\HttpFoundation\StreamedResponse;
@@ -30,11 +31,7 @@ class ShiftSwapAttachmentController extends Controller
         // dipangkas manual) — jangan sampai berujung error 500.
         abort_unless($disk->exists($swap->attachment_path), 404, 'Berkas bukti tidak ditemukan.');
 
-        $headers = ['Content-Type' => $swap->attachment_mime ?: 'application/octet-stream'];
-
-        return $request->boolean('download')
-            ? $disk->download($swap->attachment_path, $swap->attachment_name, $headers)
-            : $disk->response($swap->attachment_path, $swap->attachment_name, $headers);
+        return PrivateFile::response($disk, $swap->attachment_path, $swap->attachment_name, $swap->attachment_mime, $request->boolean('download'));
     }
 
     /**

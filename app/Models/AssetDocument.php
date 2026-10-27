@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Support\PrivateFile;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Http\UploadedFile;
@@ -82,7 +83,7 @@ class AssetDocument extends Model
             'disk' => self::DISK,
             'path' => $file->store("asset-documents/{$assetId}", self::DISK),
             'original_name' => $file->getClientOriginalName(),
-            'mime_type' => $file->getClientMimeType(),
+            'mime_type' => PrivateFile::detectedMime($file),
             'size' => $file->getSize(),
         ];
     }

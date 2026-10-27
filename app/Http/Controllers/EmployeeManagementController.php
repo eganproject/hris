@@ -23,6 +23,7 @@ use App\Support\ActivityLogger;
 use App\Support\DataScope;
 use App\Support\ImportErrorStore;
 use App\Support\LeaveReport;
+use App\Support\RoleGuard;
 use App\Support\UploadMessages;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
@@ -273,7 +274,7 @@ class EmployeeManagementController extends Controller
             ? null
             : $this->scopedDepartments($user)->map(fn (Department $department) => strtolower(trim($department->name)))->values()->all();
 
-        $import = new EmployeesImport($allowedBranches, $allowedDepartments);
+        $import = new EmployeesImport($allowedBranches, $allowedDepartments, $user);
 
         try {
             Excel::import($import, $request->file('file'));
@@ -1031,7 +1032,13 @@ class EmployeeManagementController extends Controller
                     $department->id => $department->activeJobPositions->pluck('id')->values(),
                 ]),
             ],
-            'roles' => Role::query()->where('guard_name', 'web')->orderBy('name')->get(),
+            // Hanya role yang boleh diberikan pengguna ini (RoleGuard), ditambah role yang
+            // sudah terpasang supaya pilihannya tetap tampil apa adanya.
+            'roles' => RoleGuard::assignableRoles($user)
+                ->merge($employee?->user?->roles ?? [])
+                ->unique('id')
+                ->sortBy('name')
+                ->values(),
             'leaveTypes' => LeaveType::query()->where('is_active', true)->where('counts_against_balance', true)->orderBy('name')->get(),
             // Atasan langsung: yang ditawarkan adalah karyawan aktif — ditambah atasan
             // yang memang sudah tercatat untuk orang ini sekalipun ia sudah keluar.
@@ -1242,14 +1249,22 @@ class EmployeeManagementController extends Controller
             return;
         }
 
-        $employee->loadMissing('jobPosition.defaultRole', 'user');
+        $employee->loadMissing('jobPosition.defaultRole', 'user.roles');
 
-        $role = Role::query()->find($request->validated('login_role_id')) ?: $employee->jobPosition?->defaultRole;
+        $chosenRole = Role::query()->find($request->validated('login_role_id'));
         $user = $employee->user;
 
         if (! $user && ! $request->filled('login_password')) {
             return;
         }
+
+        // Akun baru memakai role pilihan, atau role default jabatan. Akun yang sudah
+        // ada hanya diganti role-nya bila memang dipilih role lain di form — kalau
+        // tidak, menyimpan form (yang hanya menampilkan role pertama) menghapus
+        // role tambahan yang diatur di Kontrol Akses.
+        $role = $user
+            ? ($chosenRole && ! $user->roles->contains('id', $chosenRole->id) ? $chosenRole : null)
+            : ($chosenRole ?: $employee->jobPosition?->defaultRole);
 
         $user ??= new User;
 
@@ -1270,6 +1285,7 @@ class EmployeeManagementController extends Controller
             $user->syncRoles([$role->name]);
         }
     }
+
     /**
      * Kalimat penolakan bila karyawan masih memegang aset perusahaan — atau null bila
      * ia memang sudah tidak memegang apa-apa.
@@ -1285,6 +1301,4 @@ class EmployeeManagementController extends Controller
         return "{$employee->full_name} masih tercatat memegang {$count} aset perusahaan. "
             .'Catat dulu pengembaliannya di menu Aset sebelum memproses keluar, agar barangnya tidak kehilangan penanggung jawab.';
     }
-
-
 }

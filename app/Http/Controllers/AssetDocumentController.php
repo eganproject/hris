@@ -7,6 +7,7 @@ use App\Models\Asset;
 use App\Models\AssetDocument;
 use App\Support\ActivityLogger;
 use App\Support\DataScope;
+use App\Support\PrivateFile;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
@@ -64,11 +65,7 @@ class AssetDocumentController extends Controller
         // jangan sampai berujung error 500.
         abort_unless($disk->exists($document->path), 404, 'Berkas aset tidak ditemukan.');
 
-        $headers = ['Content-Type' => $document->mime_type ?: 'application/octet-stream'];
-
-        return $request->boolean('download')
-            ? $disk->download($document->path, $document->original_name, $headers)
-            : $disk->response($document->path, $document->original_name, $headers);
+        return PrivateFile::response($disk, $document->path, $document->original_name, $document->mime_type, $request->boolean('download'));
     }
 
     public function destroy(Request $request, Asset $asset, AssetDocument $document): RedirectResponse

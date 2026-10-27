@@ -6,9 +6,10 @@ use App\Enums\LeaveRequestStatus;
 use App\Models\Employee;
 use App\Models\LeaveRequest;
 use App\Models\User;
-use Illuminate\Http\UploadedFile;
 use App\Support\ApprovalNotifier;
+use App\Support\PrivateFile;
 use Carbon\CarbonPeriod;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 
@@ -69,7 +70,7 @@ class LeaveWorkflow
         return [
             'attachment_path' => $attachment->store("leave-attachments/{$employee->id}", LeaveRequest::ATTACHMENT_DISK),
             'attachment_name' => $attachment->getClientOriginalName(),
-            'attachment_mime' => $attachment->getClientMimeType(),
+            'attachment_mime' => PrivateFile::detectedMime($attachment),
             'attachment_size' => $attachment->getSize(),
         ];
     }

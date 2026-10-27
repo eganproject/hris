@@ -6,6 +6,7 @@ use App\Models\Employee;
 use App\Models\EmployeeSchedule;
 use App\Models\ShiftSwapRequest;
 use App\Support\ApprovalNotifier;
+use App\Support\PrivateFile;
 use Carbon\CarbonInterface;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Carbon;
@@ -141,7 +142,7 @@ class ShiftSwapService
         return [
             'attachment_path' => $attachment->store("swap-attachments/{$requester->id}", ShiftSwapRequest::ATTACHMENT_DISK),
             'attachment_name' => $attachment->getClientOriginalName(),
-            'attachment_mime' => $attachment->getClientMimeType(),
+            'attachment_mime' => PrivateFile::detectedMime($attachment),
             'attachment_size' => $attachment->getSize(),
         ];
     }

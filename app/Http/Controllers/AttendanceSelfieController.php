@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Attendance;
 use App\Models\User;
 use App\Support\DataScope;
+use App\Support\PrivateFile;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Symfony\Component\HttpFoundation\StreamedResponse;
@@ -36,9 +37,7 @@ class AttendanceSelfieController extends Controller
 
         $name = $attendance->work_date->format('Y-m-d').'-'.($side === 'in' ? 'masuk' : 'pulang').'.jpg';
 
-        return $request->boolean('download')
-            ? $disk->download($path, $name)
-            : $disk->response($path, $name, ['Content-Type' => 'image/jpeg']);
+        return PrivateFile::response($disk, $path, $name, 'image/jpeg', $request->boolean('download'));
     }
 
     /**

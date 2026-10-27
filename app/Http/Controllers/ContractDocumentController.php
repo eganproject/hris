@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\EmployeeContract;
 use App\Models\User;
 use App\Support\DataScope;
+use App\Support\PrivateFile;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Symfony\Component\HttpFoundation\StreamedResponse;
@@ -29,11 +30,7 @@ class ContractDocumentController extends Controller
         // dipangkas manual) — jangan sampai berujung error 500.
         abort_unless($disk->exists($contract->document_path), 404, 'Berkas dokumen kontrak tidak ditemukan.');
 
-        $headers = ['Content-Type' => $contract->document_mime ?: 'application/octet-stream'];
-
-        return $request->boolean('download')
-            ? $disk->download($contract->document_path, $contract->document_name, $headers)
-            : $disk->response($contract->document_path, $contract->document_name, $headers);
+        return PrivateFile::response($disk, $contract->document_path, $contract->document_name, $contract->document_mime, $request->boolean('download'));
     }
 
     /**

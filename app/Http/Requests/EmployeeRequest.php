@@ -4,14 +4,17 @@ namespace App\Http\Requests;
 
 use App\Models\Employee;
 use App\Models\EmployeeContract;
+use App\Models\JobPosition;
 use App\Models\SchedulePattern;
 use App\Models\User;
+use App\Support\RoleGuard;
 use App\Support\UploadMessages;
 use Closure;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Validator;
+use Spatie\Permission\Models\Role;
 
 class EmployeeRequest extends FormRequest
 {
@@ -89,7 +92,7 @@ class EmployeeRequest extends FormRequest
             'machine_pins.*.device_id' => ['nullable', 'integer', 'exists:devices,id'],
             'machine_pins.*.machine_user_id' => ['nullable', 'string', 'max:50'],
             // employee_number is not accepted here: the system generates it (COK…).
-            'photo' =>['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:2048', 'dimensions:min_width=300,min_height=300,max_width=3000,max_height=3000'],
+            'photo' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:2048', 'dimensions:min_width=300,min_height=300,max_width=3000,max_height=3000'],
             'full_name' => ['required', 'string', 'max:255'],
             'email' => [
                 'nullable',
@@ -216,6 +219,7 @@ class EmployeeRequest extends FormRequest
     public function after(): array
     {
         return [
+            fn (Validator $validator) => $this->validateLoginAccount($validator),
             function (Validator $validator): void {
                 if ($validator->errors()->isNotEmpty()) {
                     return;
@@ -323,5 +327,55 @@ class EmployeeRequest extends FormRequest
                 }
             },
         ];
+    }
+
+    /**
+     * Akun login hanya boleh diberi role yang memang boleh diberikan pengubahnya
+     * (lihat RoleGuard), dan akun superadmin tidak boleh diubah email, password, atau
+     * role-nya oleh yang bukan superadmin. Tanpa ini form karyawan menjadi jalan
+     * pintas untuk membuat atau mengambil alih akun superadmin.
+     */
+    private function validateLoginAccount(Validator $validator): void
+    {
+        $actor = $this->user();
+        $target = $this->route('employee')?->user;
+
+        if ($target && ! RoleGuard::canManageAccount($actor, $target)) {
+            $emailChanged = $this->filled('email') && strcasecmp((string) $this->input('email'), (string) $target->email) !== 0;
+            $roleChanged = $this->filled('login_role_id') && ! $target->roles->contains('id', $this->integer('login_role_id'));
+
+            if ($emailChanged || $this->filled('login_password') || $roleChanged) {
+                $validator->errors()->add('login_password', 'Akun login ini milik superadmin. Email, password, dan role-nya hanya bisa diubah oleh superadmin.');
+            }
+
+            return;
+        }
+
+        $role = $this->filled('login_role_id') ? Role::query()->find($this->integer('login_role_id')) : null;
+
+        // Role yang sudah dipegang akun ini tidak dinilai ulang: form selalu mengirim
+        // ulang role yang sedang terpasang, dan menyimpan nomor telepon tidak boleh
+        // ditolak hanya karena role itu dulu diberikan oleh admin lain.
+        if ($role && $target?->roles->contains('id', $role->id)) {
+            return;
+        }
+
+        if ($role && ! RoleGuard::canAssign($actor, $role)) {
+            $validator->errors()->add('login_role_id', "Anda tidak berwenang memberikan role \"{$role->name}\". Hubungi admin Kontrol Akses.");
+
+            return;
+        }
+
+        // Akun baru tanpa role pilihan memakai role default jabatan — aturan yang sama
+        // berlaku untuk role itu.
+        $creatingAccount = ! $target && $this->filled('email') && $this->filled('login_password');
+
+        if (! $role && $creatingAccount) {
+            $default = JobPosition::query()->with('defaultRole.permissions')->find($this->integer('job_position_id'))?->defaultRole;
+
+            if ($default && ! RoleGuard::canAssign($actor, $default)) {
+                $validator->errors()->add('login_role_id', "Role default jabatan ini (\"{$default->name}\") tidak bisa Anda berikan. Pilih role lain.");
+            }
+        }
     }
 }
