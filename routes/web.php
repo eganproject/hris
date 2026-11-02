@@ -348,6 +348,7 @@ Route::middleware('auth')->group(function () {
         // Overtime is submitted by employees and approved by their supervisor (see the
         // my-overtime routes below). HR only monitors and recaps the approved totals.
         Route::get('overtime', [OvertimeController::class, 'index'])->middleware('permission:overtime.view')->name('overtime.index');
+        Route::get('overtime/export', [OvertimeController::class, 'export'])->middleware('permission:overtime.view')->name('overtime.export');
         Route::get('overtime/recap', [OvertimeController::class, 'recap'])->middleware('permission:overtime.view')->name('overtime.recap');
 
         Route::get('swaps', [ShiftSwapController::class, 'index'])->middleware('permission:swaps.view')->name('swaps.index');
