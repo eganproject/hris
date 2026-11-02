@@ -8,6 +8,10 @@
             </div>
             <div class="flex items-center gap-2">
                 @if ($pendingCount > 0)<x-status-badge tone="warning">{{ $pendingCount }} menunggu atasan</x-status-badge>@endif
+                <a href="{{ route('attendance.overtime.export', request()->except(['page', 'per_page'])) }}" class="inline-flex items-center gap-2 rounded-md bg-emerald-600 px-4 py-2.5 text-sm font-medium text-white shadow-xs hover:bg-emerald-700" title="Unduh Excel sesuai bulan & filter yang sedang tampil">
+                    <svg class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path d="M10.75 2.75a.75.75 0 0 0-1.5 0v8.69L6.53 8.72a.75.75 0 0 0-1.06 1.06l4 4a.75.75 0 0 0 1.06 0l4-4a.75.75 0 1 0-1.06-1.06l-2.72 2.72V2.75Z"/><path d="M3.5 12.75a.75.75 0 0 0-1.5 0v2.5A2.75 2.75 0 0 0 4.75 18h10.5A2.75 2.75 0 0 0 18 15.25v-2.5a.75.75 0 0 0-1.5 0v2.5c0 .69-.56 1.25-1.25 1.25H4.75c-.69 0-1.25-.56-1.25-1.25v-2.5Z"/></svg>
+                    Export Excel
+                </a>
                 <a href="{{ route('attendance.overtime.recap', ['month' => $month->format('Y-m'), 'branch_id' => $branchId]) }}" class="rounded-md border border-gray-200 px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50">Rekap Lembur</a>
             </div>
         </section>

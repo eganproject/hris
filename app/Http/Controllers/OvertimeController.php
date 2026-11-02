@@ -2,11 +2,18 @@
 
 namespace App\Http\Controllers;
 
+use App\Exports\OvertimeExport;
+use App\Models\Branch;
+use App\Models\Department;
 use App\Models\OvertimeApproval;
 use App\Support\DataScope;
 use App\Support\MonthInput;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
 use Illuminate\View\View;
+use Maatwebsite\Excel\Facades\Excel;
+use Symfony\Component\HttpFoundation\BinaryFileResponse;
 
 class OvertimeController extends Controller
 {
@@ -20,27 +27,9 @@ class OvertimeController extends Controller
      */
     public function index(Request $request): View
     {
-        $month = MonthInput::resolve($request->input('month'));
-        [$from, $to] = [$month->copy()->startOfMonth(), $month->copy()->endOfMonth()];
-        $branchId = $request->integer('branch_id') ?: null;
-        $departmentId = $request->integer('department_id') ?: null;
-        $status = $request->string('status')->toString() ?: null;
-        $search = $request->string('search')->toString() ?: null;
-        $scope = DataScope::forTeam($request->user());
+        [$month, $branchId, $departmentId, $status, $search, $scope, $base] = $this->filters($request);
 
-        // Basis (bulan + lokasi + divisi + pencarian) tanpa filter status, agar angka
-        // ringkasan di atas tetap mencerminkan seluruh lembur bulan itu.
         $perPage = min(max((int) $request->input('per_page', 50), 25), 200);
-
-        $base = fn () => OvertimeApproval::query()
-            ->whereBetween('work_date', [$from->toDateString(), $to->toDateString()])
-            ->whereHas('employee', fn ($q) => $q
-                ->byBranch($branchId)
-                ->byDepartment($departmentId)
-                ->when($search, fn ($q, $s) => $q->where(fn ($q) => $q
-                    ->where('full_name', 'like', "%{$s}%")
-                    ->orWhere('employee_number', 'like', "%{$s}%"))))
-            ->tap(fn ($query) => $scope->constrain($query));
 
         $requests = $base()
             ->when($status, fn ($q, $s) => $q->where('status', $s))
@@ -67,6 +56,69 @@ class OvertimeController extends Controller
             'hasNoScope' => $scope->isEmpty(),
             'hasNoTeam' => $scope->hasNoTeam(),
         ]);
+    }
+
+    /**
+     * Unduh Excel isi halaman pemantauan: filter & cakupan tim sama persis dengan
+     * layarnya, hanya tanpa paginasi. Berkas yang memuat lebih banyak orang daripada
+     * tabelnya adalah kebocoran, bukan kemudahan.
+     */
+    public function export(Request $request): BinaryFileResponse
+    {
+        [$month, $branchId, $departmentId, $status, $search, , $base] = $this->filters($request);
+
+        $rows = $base()
+            ->when($status, fn ($q, $s) => $q->where('status', $s))
+            ->with(['employee.departments', 'employee.department', 'employee.branch', 'employee.jobPosition', 'supervisor'])
+            ->orderBy('work_date')
+            ->orderBy('start_time')
+            ->get()
+            ->sortBy([
+                fn ($a, $b) => $a->work_date <=> $b->work_date,
+                fn ($a, $b) => strnatcasecmp((string) $a->employee?->full_name, (string) $b->employee?->full_name),
+            ])
+            ->values();
+
+        $export = new OvertimeExport($rows, [
+            'periode' => $month->translatedFormat('F Y'),
+            'status' => $status ? (OvertimeApproval::statusLabels()[$status] ?? $status) : null,
+            'lokasi' => $branchId ? Branch::find($branchId)?->name : null,
+            'divisi' => $departmentId ? Department::find($departmentId)?->name : null,
+            'pencarian' => $search,
+            'dibuat_oleh' => $request->user()?->name,
+        ]);
+
+        return Excel::download($export, 'lembur-'.$month->format('Y-m').'.xlsx');
+    }
+
+    /**
+     * Filter bersama layar & ekspor. $base = bulan + lokasi + divisi + pencarian +
+     * cakupan tim, tanpa filter status, agar angka ringkasan di atas tetap
+     * mencerminkan seluruh lembur bulan itu.
+     *
+     * @return array{0: Carbon, 1: ?int, 2: ?int, 3: ?string, 4: ?string, 5: DataScope, 6: callable(): Builder}
+     */
+    private function filters(Request $request): array
+    {
+        $month = MonthInput::resolve($request->input('month'));
+        [$from, $to] = [$month->copy()->startOfMonth(), $month->copy()->endOfMonth()];
+        $branchId = $request->integer('branch_id') ?: null;
+        $departmentId = $request->integer('department_id') ?: null;
+        $status = $request->string('status')->toString() ?: null;
+        $search = $request->string('search')->toString() ?: null;
+        $scope = DataScope::forTeam($request->user());
+
+        $base = fn () => OvertimeApproval::query()
+            ->whereBetween('work_date', [$from->toDateString(), $to->toDateString()])
+            ->whereHas('employee', fn ($q) => $q
+                ->byBranch($branchId)
+                ->byDepartment($departmentId)
+                ->when($search, fn ($q, $s) => $q->where(fn ($q) => $q
+                    ->where('full_name', 'like', "%{$s}%")
+                    ->orWhere('employee_number', 'like', "%{$s}%"))))
+            ->tap(fn ($query) => $scope->constrain($query));
+
+        return [$month, $branchId, $departmentId, $status, $search, $scope, $base];
     }
 
     /**
