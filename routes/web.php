@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\AccessControlController;
+use App\Http\Controllers\AnnouncementController;
 use App\Http\Controllers\ActivityLogController;
 use App\Http\Controllers\AssetAssignmentController;
 use App\Http\Controllers\AssetCategoryController;
@@ -22,6 +23,7 @@ use App\Http\Controllers\EmployeeManagementController;
 use App\Http\Controllers\HolidayController;
 use App\Http\Controllers\IclockController;
 use App\Http\Controllers\JobPositionController;
+use App\Http\Controllers\KabarModerationController;
 use App\Http\Controllers\LeaveAttachmentController;
 use App\Http\Controllers\LeaveBalanceController;
 use App\Http\Controllers\LeaveController;
@@ -103,6 +105,27 @@ Route::middleware('auth')->group(function () {
 
     Route::get('settings', [SettingsController::class, 'index'])->middleware('permission:settings.view')->name('settings.index');
     Route::put('settings', [SettingsController::class, 'update'])->middleware('permission:settings.update')->name('settings.update');
+
+    // Kabar (tab di aplikasi HP): pengumuman HR dan moderasi postingan karyawan.
+    // Rute ber-wildcard dideklarasikan setelah "create".
+    Route::prefix('kabar')->name('kabar.')->group(function () {
+        Route::get('pengumuman', [AnnouncementController::class, 'index'])->middleware('permission:announcements.view')->name('announcements.index');
+        Route::get('pengumuman/create', [AnnouncementController::class, 'create'])->middleware('permission:announcements.create')->name('announcements.create');
+        Route::post('pengumuman', [AnnouncementController::class, 'store'])->middleware('permission:announcements.create')->name('announcements.store');
+        Route::get('pengumuman/{announcement}', [AnnouncementController::class, 'show'])->middleware('permission:announcements.view')->name('announcements.show');
+        Route::get('pengumuman/{announcement}/lampiran', [AnnouncementController::class, 'attachment'])->middleware('permission:announcements.view')->name('announcements.attachment');
+        Route::get('pengumuman/{announcement}/edit', [AnnouncementController::class, 'edit'])->middleware('permission:announcements.update')->name('announcements.edit');
+        Route::put('pengumuman/{announcement}', [AnnouncementController::class, 'update'])->middleware('permission:announcements.update')->name('announcements.update');
+        Route::delete('pengumuman/{announcement}', [AnnouncementController::class, 'destroy'])->middleware('permission:announcements.delete')->name('announcements.destroy');
+
+        Route::get('moderasi', [KabarModerationController::class, 'index'])->middleware('permission:kabar-moderation.view')->name('moderation.index');
+        Route::get('moderasi/{post}', [KabarModerationController::class, 'show'])->withTrashed()->middleware('permission:kabar-moderation.view')->name('moderation.show');
+        Route::get('moderasi/{post}/foto', [KabarModerationController::class, 'image'])->withTrashed()->middleware('permission:kabar-moderation.view')->name('moderation.image');
+        Route::patch('moderasi/{post}/sembunyikan', [KabarModerationController::class, 'hidePost'])->middleware('permission:kabar-moderation.update')->name('moderation.hide');
+        Route::patch('moderasi/{post}/tampilkan', [KabarModerationController::class, 'unhidePost'])->middleware('permission:kabar-moderation.update')->name('moderation.unhide');
+        Route::patch('moderasi/{post}/tutup-laporan', [KabarModerationController::class, 'dismissReports'])->middleware('permission:kabar-moderation.update')->name('moderation.dismiss');
+        Route::patch('moderasi/komentar/{comment}', [KabarModerationController::class, 'toggleComment'])->middleware('permission:kabar-moderation.update')->name('moderation.comment');
+    });
 
     // In-app notifications (available to every authenticated user).
     Route::prefix('notifications')->name('notifications.')->group(function () {

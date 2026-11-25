@@ -653,6 +653,98 @@ class ApprovalNotifier
         ), $device);
     }
 
+    // --- Aplikasi HP: jadwal tim, pengingat absen, dan tab Kabar ---
+
+    /** Atasan menerbitkan jadwal mingguan: anggota tim diminta mengecek & mengonfirmasi. */
+    public function schedulePublished(Employee $employee, CarbonInterface $weekStart, ?string $leaderName): void
+    {
+        $weekEnd = $weekStart->copy()->addDays(6);
+
+        $this->toEmployee($employee, new ApprovalNotification(
+            title: 'Jadwal minggu depan terbit',
+            message: ($leaderName ?? 'Atasan').' sudah mengatur jadwal '.$weekStart->translatedFormat('j M')
+                .' – '.$weekEnd->translatedFormat('j M Y').'. Cek dan konfirmasi ya.',
+            url: route('my-roster.index'),
+            category: 'schedule',
+            meta: ['week_start' => $weekStart->toDateString()],
+        ));
+    }
+
+    /** Tombol "Ingatkan" di layar Tim hari ini. */
+    public function attendanceReminder(Employee $employee, ?string $leaderName): void
+    {
+        $this->toEmployee($employee, new ApprovalNotification(
+            title: 'Jangan lupa absen',
+            message: ($leaderName ?? 'Atasan').' mengingatkan: Anda belum tercatat absen Masuk hari ini.',
+            url: route('dashboard'),
+            category: 'attendance',
+        ));
+    }
+
+    /** Pengumuman HR baru: dikirim ke setiap karyawan sasarannya yang punya akun. */
+    public function announcementPublished(\App\Models\Announcement $announcement): void
+    {
+        $announcement->audienceQuery()->whereNotNull('user_id')->with('user')->chunkById(200, function ($employees) use ($announcement): void {
+            foreach ($employees as $employee) {
+                $this->toEmployee($employee, new ApprovalNotification(
+                    title: 'Pengumuman HR',
+                    message: $announcement->title,
+                    url: route('notifications.index'),
+                    category: 'announcement',
+                    meta: ['announcement_id' => $announcement->id],
+                ));
+            }
+        });
+    }
+
+    /** Ada komentar baru di postingan: penulis postingan (dan penulis komentar induk) diberi tahu. */
+    public function postCommented(\App\Models\PostComment $comment): void
+    {
+        $comment->loadMissing('post.author.user', 'author', 'parent.author.user');
+
+        $who = $comment->author?->full_name ?? 'Seseorang';
+        $snippet = \Illuminate\Support\Str::limit($comment->body, 80);
+        $meta = ['post_id' => $comment->post_id, 'comment_id' => $comment->id];
+        $notified = [];
+
+        $parentAuthor = $comment->parent?->author;
+        if ($parentAuthor && $parentAuthor->id !== $comment->employee_id) {
+            $this->toEmployee($parentAuthor, new ApprovalNotification(
+                title: 'Balasan komentar',
+                message: "{$who} membalas komentar Anda: \"{$snippet}\"",
+                url: route('notifications.index'),
+                category: 'kabar',
+                meta: $meta,
+            ));
+            $notified[] = $parentAuthor->id;
+        }
+
+        $postAuthor = $comment->post?->author;
+        if ($postAuthor && $postAuthor->id !== $comment->employee_id && ! in_array($postAuthor->id, $notified, true)) {
+            $this->toEmployee($postAuthor, new ApprovalNotification(
+                title: 'Komentar baru',
+                message: "{$who} mengomentari postingan Anda: \"{$snippet}\"",
+                url: route('notifications.index'),
+                category: 'kabar',
+                meta: $meta,
+            ));
+        }
+    }
+
+    /** HR menyembunyikan postingan: penulisnya berhak tahu alasannya. */
+    public function postHidden(\App\Models\Post $post): void
+    {
+        $post->loadMissing('author.user');
+
+        $this->toEmployee($post->author, new ApprovalNotification(
+            title: 'Postingan disembunyikan HR',
+            message: 'Postingan Anda disembunyikan dari Kabar.'.($post->hidden_reason ? ' Alasan: '.$post->hidden_reason : ''),
+            url: route('notifications.index'),
+            category: 'kabar',
+            meta: ['post_id' => $post->id],
+        ));
+    }
+
     private function toEmployee(?Employee $employee, ApprovalNotification $notification): void
     {
         $user = $employee?->user;

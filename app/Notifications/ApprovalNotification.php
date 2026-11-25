@@ -16,6 +16,13 @@ class ApprovalNotification extends Notification
         public string $message,
         public string $url,
         public string $category = 'general',
+        /**
+         * Penunjuk tambahan untuk aplikasi HP (mis. ['post_id' => 5]) agar notifikasi
+         * bisa membuka layar yang tepat; web cukup memakai url.
+         *
+         * @var array<string, scalar|null>
+         */
+        public array $meta = [],
     ) {}
 
     /** @return list<string> */
@@ -25,7 +32,7 @@ class ApprovalNotification extends Notification
     }
 
     /**
-     * @return array{title: string, message: string, url: string, category: string}
+     * @return array<string, mixed>
      */
     public function toArray(object $notifiable): array
     {
@@ -34,6 +41,7 @@ class ApprovalNotification extends Notification
             'message' => $this->message,
             'url' => $this->url,
             'category' => $this->category,
+            ...($this->meta !== [] ? ['meta' => $this->meta] : []),
         ];
     }
 }

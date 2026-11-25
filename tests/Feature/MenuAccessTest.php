@@ -124,7 +124,7 @@ test('an admin can grant a menu action to a role from the matrix', function () {
 });
 
 test('the overtime page is a row under Cuti & Lembur that an admin can grant', function () {
-    expect(config('rbac.menus.Cuti & Lembur.overtime'))->toBe(['label' => 'Lembur', 'actions' => ['view']]);
+    expect(config('rbac.menus.Cuti & Lembur.overtime'))->toBe(['label' => 'Lembur', 'actions' => ['view', 'update']]);
 
     $admin = userWithPermissions(['dashboard.view', 'access-control.view', 'access-control.update']);
     // Matriks dirender per role, jadi role-nya harus ada sebelum halamannya dibuka.
