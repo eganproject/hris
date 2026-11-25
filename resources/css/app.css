@@ -1237,3 +1237,48 @@
 .org-tree ul[hidden] {
     display: none;
 }
+
+/* Bawahan tanpa bawahan lagi disusun menurun dalam satu kolom, dihubungkan garis tegak. */
+.org-stack {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.org-stack > [data-org-node] > .org-card::before {
+    content: '';
+    position: absolute;
+    bottom: 100%;
+    left: 50%;
+    height: 0.75rem;
+    border-left: 1px solid var(--org-line);
+}
+
+.org-stack > [data-org-node]:first-child > .org-card::before {
+    display: none;
+}
+
+/* Area bagan: tinggi tetap, bisa digeser (drag) dan di-zoom. */
+.org-viewport {
+    height: min(75vh, 52rem);
+    overflow: auto;
+    cursor: grab;
+    overscroll-behavior: contain;
+}
+
+.org-viewport.is-panning {
+    cursor: grabbing;
+    user-select: none;
+}
+
+.org-frame:fullscreen {
+    display: flex;
+    flex-direction: column;
+    border-radius: 0;
+}
+
+.org-frame:fullscreen .org-viewport {
+    flex: 1 1 auto;
+    height: auto;
+}

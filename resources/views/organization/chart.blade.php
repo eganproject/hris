@@ -52,13 +52,28 @@
             </form>
         </section>
 
-        <section class="overflow-x-auto rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
+        <section data-org-frame class="org-frame overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm">
             @if (count($tree) > 0)
-                <ul class="org-tree">
-                    @foreach ($tree as $node)
-                        <li>@include('organization.partials.node', ['node' => $node, 'depth' => 0])</li>
-                    @endforeach
-                </ul>
+                <div class="flex flex-wrap items-center justify-between gap-2 border-b border-gray-100 px-4 py-2.5">
+                    <p class="text-xs text-gray-500">Geser bagan dengan menahan klik lalu tarik. Ctrl + scroll untuk zoom.</p>
+                    <div class="flex items-center gap-1.5">
+                        <button type="button" data-org-zoom-out class="rounded-md border border-gray-200 bg-white px-2.5 py-1.5 text-sm font-medium text-gray-700 transition hover:bg-gray-50" aria-label="Perkecil" title="Perkecil">&minus;</button>
+                        <span data-org-zoom-label class="w-12 text-center text-xs font-medium tabular-nums text-gray-600">100%</span>
+                        <button type="button" data-org-zoom-in class="rounded-md border border-gray-200 bg-white px-2.5 py-1.5 text-sm font-medium text-gray-700 transition hover:bg-gray-50" aria-label="Perbesar" title="Perbesar">+</button>
+                        <button type="button" data-org-zoom-fit class="rounded-md border border-gray-200 bg-white px-2.5 py-1.5 text-sm font-medium text-gray-700 transition hover:bg-gray-50">Pas layar</button>
+                        <button type="button" data-org-zoom-reset class="rounded-md border border-gray-200 bg-white px-2.5 py-1.5 text-sm font-medium text-gray-700 transition hover:bg-gray-50">100%</button>
+                        <button type="button" data-org-fullscreen class="rounded-md border border-gray-200 bg-white px-2.5 py-1.5 text-sm font-medium text-gray-700 transition hover:bg-gray-50">Layar penuh</button>
+                    </div>
+                </div>
+                <div data-org-viewport class="org-viewport p-4">
+                    <div data-org-canvas class="org-canvas">
+                        <ul class="org-tree">
+                            @foreach ($tree as $node)
+                                <li>@include('organization.partials.node', ['node' => $node, 'depth' => 0])</li>
+                            @endforeach
+                        </ul>
+                    </div>
+                </div>
             @else
                 <p class="px-2 py-8 text-center text-sm text-gray-400">Belum ada karyawan aktif untuk ditampilkan pada bagan.</p>
             @endif
@@ -91,6 +106,98 @@
             document.querySelector('[data-org-collapse-all]')?.addEventListener('click', () => {
                 document.querySelectorAll('[data-org-toggle]').forEach((button) => setNode(button, false));
             });
+
+            // Zoom, geser (drag) dan layar penuh.
+            const frame = document.querySelector('[data-org-frame]');
+            const viewport = document.querySelector('[data-org-viewport]');
+            const canvas = document.querySelector('[data-org-canvas]');
+            if (!viewport || !canvas) return;
+
+            const MIN = 0.3, MAX = 1.5, STEP = 0.1;
+            const label = document.querySelector('[data-org-zoom-label]');
+            let scale = 1;
+
+            const setZoom = (value, anchor) => {
+                const next = Math.min(MAX, Math.max(MIN, Math.round(value * 100) / 100));
+                // Pertahankan titik yang sedang dilihat (atau tengah layar) saat zoom berubah.
+                const ax = anchor?.x ?? viewport.clientWidth / 2;
+                const ay = anchor?.y ?? viewport.clientHeight / 2;
+                const ratio = next / scale;
+                const left = (viewport.scrollLeft + ax) * ratio - ax;
+                const top = (viewport.scrollTop + ay) * ratio - ay;
+                scale = next;
+                canvas.style.zoom = String(next);
+                viewport.scrollLeft = left;
+                viewport.scrollTop = top;
+                if (label) label.textContent = Math.round(next * 100) + '%';
+            };
+
+            // Lebar & tinggi asli bagan (pada zoom 100%).
+            const naturalSize = () => {
+                const current = canvas.style.zoom;
+                canvas.style.zoom = '1';
+                const tree = canvas.firstElementChild;
+                const size = { width: tree.scrollWidth, height: tree.scrollHeight };
+                canvas.style.zoom = current;
+                return size;
+            };
+
+            const fitScale = () => {
+                const style = getComputedStyle(viewport);
+                const padX = parseFloat(style.paddingLeft) + parseFloat(style.paddingRight);
+                const { width } = naturalSize();
+                return width > 0 ? (viewport.clientWidth - padX) / width : 1;
+            };
+
+            const centerHorizontally = () => {
+                viewport.scrollLeft = (viewport.scrollWidth - viewport.clientWidth) / 2;
+                viewport.scrollTop = 0;
+            };
+
+            document.querySelector('[data-org-zoom-in]')?.addEventListener('click', () => setZoom(scale + STEP));
+            document.querySelector('[data-org-zoom-out]')?.addEventListener('click', () => setZoom(scale - STEP));
+            document.querySelector('[data-org-zoom-reset]')?.addEventListener('click', () => { setZoom(1); centerHorizontally(); });
+            document.querySelector('[data-org-zoom-fit]')?.addEventListener('click', () => { setZoom(Math.min(1, fitScale())); centerHorizontally(); });
+
+            viewport.addEventListener('wheel', (event) => {
+                if (!event.ctrlKey && !event.metaKey) return;
+                event.preventDefault();
+                const rect = viewport.getBoundingClientRect();
+                setZoom(scale * (event.deltaY < 0 ? 1.1 : 1 / 1.1), { x: event.clientX - rect.left, y: event.clientY - rect.top });
+            }, { passive: false });
+
+            // Geser dengan mouse: tahan klik di area kosong lalu tarik. Sentuh/trackpad tetap scroll biasa.
+            let drag = null;
+            viewport.addEventListener('pointerdown', (event) => {
+                if (event.pointerType !== 'mouse' || event.button !== 0 || event.target.closest('a, button')) return;
+                drag = { x: event.clientX, y: event.clientY, left: viewport.scrollLeft, top: viewport.scrollTop };
+                viewport.setPointerCapture(event.pointerId);
+                viewport.classList.add('is-panning');
+            });
+            viewport.addEventListener('pointermove', (event) => {
+                if (!drag) return;
+                viewport.scrollLeft = drag.left - (event.clientX - drag.x);
+                viewport.scrollTop = drag.top - (event.clientY - drag.y);
+            });
+            const endDrag = () => { drag = null; viewport.classList.remove('is-panning'); };
+            viewport.addEventListener('pointerup', endDrag);
+            viewport.addEventListener('pointercancel', endDrag);
+
+            const fullscreenButton = document.querySelector('[data-org-fullscreen]');
+            if (fullscreenButton && frame?.requestFullscreen) {
+                fullscreenButton.addEventListener('click', () => {
+                    document.fullscreenElement ? document.exitFullscreen() : frame.requestFullscreen();
+                });
+                document.addEventListener('fullscreenchange', () => {
+                    fullscreenButton.textContent = document.fullscreenElement ? 'Keluar layar penuh' : 'Layar penuh';
+                });
+            } else {
+                fullscreenButton?.remove();
+            }
+
+            // Saat dibuka: kecilkan otomatis bila bagan lebih lebar dari layar (tidak di bawah 60% agar tetap terbaca).
+            setZoom(Math.min(1, Math.max(0.6, fitScale())));
+            centerHorizontally();
         })();
     </script>
     @endpush

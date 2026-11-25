@@ -3,6 +3,11 @@
     $employee = $node['employee'];
     $children = $node['children'];
     $hasChildren = count($children) > 0;
+    // Bawahan yang tidak punya bawahan lagi disusun menurun (satu kolom) supaya
+    // bagan tidak melebar ke samping. Yang masih punya bawahan tetap berjajar.
+    $branchChildren = array_values(array_filter($children, fn ($child) => count($child['children']) > 0));
+    $leafChildren = array_values(array_filter($children, fn ($child) => count($child['children']) === 0));
+    $stackLeaves = count($leafChildren) > 1;
     $divisions = $employee->departments->pluck('name')->filter()->join(', ');
 @endphp
 
@@ -27,9 +32,18 @@
 
     @if ($hasChildren)
         <ul data-org-children>
-            @foreach ($children as $child)
+            @foreach ($stackLeaves ? $branchChildren : $children as $child)
                 <li>@include('organization.partials.node', ['node' => $child, 'depth' => $depth + 1])</li>
             @endforeach
+            @if ($stackLeaves)
+                <li>
+                    <div class="org-stack">
+                        @foreach ($leafChildren as $child)
+                            @include('organization.partials.node', ['node' => $child, 'depth' => $depth + 1])
+                        @endforeach
+                    </div>
+                </li>
+            @endif
         </ul>
     @endif
 </div>
