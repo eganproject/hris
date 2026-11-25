@@ -45,6 +45,9 @@ return [
             'punches' => ['label' => 'Log Punch', 'actions' => ['view', 'update']],
             'corrections' => ['label' => 'Koreksi Absensi', 'actions' => ['view', 'update']],
             'devices' => ['label' => 'Perangkat Absensi', 'actions' => ['view', 'create', 'update', 'delete']],
+            // Absen lewat aplikasi HP: "Lihat" = daftar absen aplikasi + HP terdaftar,
+            // "Ubah" = meninjau absen yang ditandai dan menyetujui/mencabut HP.
+            'mobile-attendance' => ['label' => 'Absen Aplikasi HP', 'actions' => ['view', 'update']],
         ],
 
         'Jadwal' => [
@@ -148,6 +151,7 @@ return [
             'employees.view', 'employees.create', 'employees.update', 'employees.delete', 'employees.export', 'employees.import',
             'attendance-daily.view', 'attendance-daily.update',
             'attendance-map.view',
+            'mobile-attendance.view', 'mobile-attendance.update',
             'punches.view', 'punches.update',
             'corrections.view', 'corrections.update',
             'overtime.view',
