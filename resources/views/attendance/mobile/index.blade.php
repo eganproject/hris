@@ -4,7 +4,7 @@
             <div>
                 <p class="text-sm font-medium text-gray-500">Absensi</p>
                 <h1 class="mt-1 text-2xl font-semibold text-gray-950">Absen Aplikasi HP</h1>
-                <p class="mt-1 text-sm text-gray-500">Absen selfie dari aplikasi HP. Absen yang ditandai (di luar radius, kedip tidak terverifikasi, terkirim terlambat) tetap tercatat di Absensi Harian dan menunggu tinjauan di sini.</p>
+                <p class="mt-1 text-sm text-gray-500">Absen selfie dari aplikasi HP. Absen yang ditandai (di luar radius, lokasi tidak terbaca, terkirim terlambat) tetap tercatat di Absensi Harian dan menunggu tinjauan di sini.</p>
             </div>
             @if ($reviewCount > 0)<x-status-badge tone="warning">{{ $reviewCount }} perlu ditinjau</x-status-badge>@endif
         </section>

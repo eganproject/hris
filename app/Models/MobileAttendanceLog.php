@@ -33,6 +33,7 @@ class MobileAttendanceLog extends Model
         'outside_radius' => 'Di luar radius kantor',
         'no_location' => 'Lokasi tidak terbaca',
         'low_accuracy' => 'Akurasi GPS rendah',
+        // Tidak lagi dipasang; label disimpan untuk log lama.
         'blink_unverified' => 'Kedip tidak terverifikasi',
         'offline_delay' => 'Terkirim terlambat (offline)',
         'clock_skew' => 'Jam HP tidak sesuai',

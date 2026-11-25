@@ -96,7 +96,7 @@ class AttendanceController extends Controller
             'latitude' => ['nullable', 'numeric', 'between:-90,90'],
             'longitude' => ['nullable', 'numeric', 'between:-180,180'],
             'accuracy' => ['nullable', 'numeric', 'min:0', 'max:100000'],
-            'blink_verified' => ['required', 'boolean'],
+            'blink_verified' => ['sometimes', 'boolean'],
             'is_mock_location' => ['required', 'boolean'],
             'is_rooted' => ['required', 'boolean'],
             'wifi_ssid' => ['nullable', 'string', 'max:255'],

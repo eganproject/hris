@@ -309,17 +309,35 @@ test('hari WFH: selfie + lokasi dicatat tanpa radius', function () {
     expect(Attendance::query()->where('employee_id', $employee->id)->first()->status->value)->toBe('wfh');
 });
 
-test('kedip gagal tetap diterima dan masuk antrean tinjauan HR', function () {
+test('selfie biasa tanpa cek kedip diterima tanpa tanda', function () {
     ['user' => $user] = mobileFixture();
     $token = mobileLogin($user);
 
-    mobileClock($token, 'in', ['blink_verified' => false])
+    $payload = clockPayload('in');
+    unset($payload['blink_verified']);
+
+    test()->withToken($token)->post('/api/mobile/v1/attendance/clock', $payload, ['Accept' => 'application/json'])
+        ->assertOk()
         ->assertJsonPath('data.result', 'accepted')
-        ->assertJsonPath('data.flags', ['blink_unverified']);
+        ->assertJsonPath('data.flags', []);
+
+    // APK lama yang masih mengirim blink_verified=false juga tidak ditandai lagi.
+    mobileClock($token, 'out', ['blink_verified' => false])
+        ->assertJsonPath('data.result', 'accepted')
+        ->assertJsonPath('data.flags', []);
+});
+
+test('absen bertanda masuk antrean tinjauan HR', function () {
+    ['user' => $user] = mobileFixture();
+    $token = mobileLogin($user);
+
+    mobileClock($token, 'in', ['latitude' => MOBILE_OFFICE_LAT + 0.01])
+        ->assertJsonPath('data.result', 'accepted')
+        ->assertJsonPath('data.flags', ['outside_radius']);
 
     $hr = mobileHr();
     $log = MobileAttendanceLog::query()->firstOrFail();
-    $this->actingAs($hr)->get(route('attendance.mobile.index'))->assertOk()->assertSee('Kedip tidak terverifikasi');
+    $this->actingAs($hr)->get(route('attendance.mobile.index'))->assertOk()->assertSee('Di luar radius kantor');
     $this->actingAs($hr)->patch(route('attendance.mobile.review', $log), ['decision' => 'approved'])->assertRedirect();
 
     expect($log->fresh()->review_status)->toBe('approved')

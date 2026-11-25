@@ -266,9 +266,8 @@ class MobileAttendanceService
             }
         }
 
-        if (! $log->blink_verified) {
-            $flags[] = 'blink_unverified';
-        }
+        // Cek kedip dihapus (keputusan Ega 2026-11-25): selfie biasa sudah cukup,
+        // jadi blink_verified hanya dicatat dan tidak lagi menandai absen.
 
         // --- Tulis ke absensi ----------------------------------------------------
         $path = $this->storePhoto($photo, $workDate);
