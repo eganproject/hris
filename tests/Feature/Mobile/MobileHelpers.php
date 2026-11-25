@@ -17,11 +17,11 @@ use Tests\TestCase;
 
 function mobileTahap2Routes(): void
 {
-    if (Route::has('mobile.profile.show')) {
+    if (Route::has('api.mobile.profile.show')) {
         return;
     }
 
-    Route::prefix('api/mobile/v1')->middleware(['api', 'auth'])->group(base_path('routes/api_mobile_tahap2.php'));
+    Route::prefix('api/mobile/v1')->name('api.mobile.')->middleware(['api', 'auth'])->group(base_path('routes/api_mobile_tahap2.php'));
     app('router')->getRoutes()->refreshNameLookups();
     app('router')->getRoutes()->refreshActionLookups();
 }
@@ -38,7 +38,7 @@ function mobileAs(User $user): TestCase
     $test = test()->actingAs($user);
 
     // Middleware pengikat HP milik tahap 1 diuji di tes tahap 1, bukan di sini.
-    foreach (['App\\Http\\Middleware\\EnsureMobileDevice', 'App\\Http\\Middleware\\MobileDevice'] as $class) {
+    foreach (['App\\Http\\Middleware\\EnsureMobileDevice'] as $class) {
         if (class_exists($class)) {
             $test->withoutMiddleware($class);
         }

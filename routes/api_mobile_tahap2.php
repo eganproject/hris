@@ -8,8 +8,8 @@
 |
 | File ini di-require oleh routes/api.php (Tahap 1) DI DALAM grup prefix
 | /api/mobile/v1 + middleware auth:sanctum & mobile.device, jadi semua rute di
-| sini sudah terautentikasi dan terikat ke HP terdaftar. Nama rute diawali
-| "mobile.".
+| sini sudah terautentikasi dan terikat ke HP terdaftar. Grup tahap 1 memberi
+| awalan nama "api.mobile.", jadi rute di sini dinamai tanpa awalan.
 |
 */
 
@@ -26,7 +26,7 @@ use App\Http\Controllers\Api\Mobile\Hr\TeamController;
 use App\Http\Controllers\Api\Mobile\Hr\TeamScheduleController;
 use Illuminate\Support\Facades\Route;
 
-Route::name('mobile.')->group(function () {
+Route::group([], function () {
     // Pengajuan (cuti/izin/sakit, lembur, tukar jadwal; koreksi milik Tahap 1)
     Route::get('pengajuan', [PengajuanController::class, 'index'])->name('pengajuan.index');
     Route::get('pengajuan/ringkasan', [PengajuanController::class, 'summary'])->name('pengajuan.summary');
