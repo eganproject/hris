@@ -29,6 +29,7 @@ use App\Http\Controllers\LeaveBalanceController;
 use App\Http\Controllers\LeaveController;
 use App\Http\Controllers\LeaveTypeController;
 use App\Http\Controllers\MyAssetController;
+use App\Http\Controllers\MobileAttendanceController;
 use App\Http\Controllers\MyAttendanceController;
 use App\Http\Controllers\MyLeaveController;
 use App\Http\Controllers\MyOvertimeController;
@@ -362,6 +363,13 @@ Route::middleware('auth')->group(function () {
         Route::get('daily/{employee}/history', [AttendanceController::class, 'history'])->middleware('permission:attendance-daily.view')->name('daily.history');
         Route::post('daily/process', [AttendanceController::class, 'process'])->middleware('permission:attendance-daily.update')->name('daily.process');
         Route::post('daily/punch', [AttendanceController::class, 'storePunch'])->middleware('permission:attendance-daily.update')->name('daily.punch');
+
+        // Absen lewat aplikasi HP: tinjauan absen bertanda + persetujuan ganti HP.
+        Route::get('mobile', [MobileAttendanceController::class, 'index'])->middleware('permission:mobile-attendance.view')->name('mobile.index');
+        Route::get('mobile/logs/{log}/photo', [MobileAttendanceController::class, 'photo'])->middleware('permission:mobile-attendance.view')->name('mobile.photo');
+        Route::patch('mobile/logs/{log}/review', [MobileAttendanceController::class, 'review'])->middleware('permission:mobile-attendance.update')->name('mobile.review');
+        Route::get('mobile/devices', [MobileAttendanceController::class, 'devices'])->middleware('permission:mobile-attendance.view')->name('mobile.devices');
+        Route::patch('mobile/devices/{device}', [MobileAttendanceController::class, 'decideDevice'])->middleware('permission:mobile-attendance.update')->name('mobile.devices.decide');
 
         Route::get('corrections', [AttendanceCorrectionController::class, 'index'])->middleware('permission:corrections.view')->name('corrections.index');
         Route::post('corrections/bulk-approve', [AttendanceCorrectionController::class, 'bulkApprove'])->middleware('permission:corrections.update')->name('corrections.bulk-approve');

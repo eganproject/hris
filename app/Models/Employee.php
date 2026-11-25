@@ -205,6 +205,16 @@ class Employee extends Model
         return $this->hasMany(EmployeeDevice::class);
     }
 
+    public function mobileDevices(): HasMany
+    {
+        return $this->hasMany(MobileDevice::class);
+    }
+
+    public function mobileAttendanceLogs(): HasMany
+    {
+        return $this->hasMany(MobileAttendanceLog::class);
+    }
+
     public function punches(): HasMany
     {
         return $this->hasMany(AttendancePunch::class);

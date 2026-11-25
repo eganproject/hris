@@ -3,6 +3,7 @@
 namespace App\Console\Commands;
 
 use App\Models\Attendance;
+use App\Models\MobileAttendanceLog;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Storage;
 
@@ -42,6 +43,22 @@ class PruneAttendanceSelfies extends Command
                         'clock_in_photo_path' => null,
                         'clock_out_photo_path' => null,
                     ])->save();
+                }
+            });
+
+        // Jejak absen aplikasi HP: foto yang diterima berbagi berkas dengan baris
+        // absensi di atas; foto percobaan yang ditolak punya berkas sendiri.
+        MobileAttendanceLog::query()
+            ->where('captured_at', '<', $cutoff)
+            ->whereNotNull('photo_path')
+            ->chunkById(200, function ($rows) use ($disk, &$deleted) {
+                foreach ($rows as $log) {
+                    if ($disk->exists($log->photo_path)) {
+                        $disk->delete($log->photo_path);
+                        $deleted++;
+                    }
+
+                    $log->forceFill(['photo_path' => null])->save();
                 }
             });
 

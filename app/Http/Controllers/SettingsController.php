@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\SchedulePattern;
 use App\Models\Setting;
 use App\Services\DefaultOfficeSchedule;
+use App\Services\Mobile\MobileAttendanceService;
 use App\Support\ActivityLogger;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -28,6 +29,7 @@ class SettingsController extends Controller
             'officePatterns' => $patterns,
             'officePatternIds' => $patterns->where('is_office_pattern', true)->pluck('id')->all(),
             'officePatternId' => (int) Setting::get(DefaultOfficeSchedule::SETTING_KEY) ?: null,
+            'mobileSessionMaxMinutes' => MobileAttendanceService::sessionMaxMinutes(),
         ]);
     }
 
@@ -40,11 +42,16 @@ class SettingsController extends Controller
             // daftar kandidat akan membuat dropdown di data karyawan tidak pernah
             // menampilkan pola yang justru dipakai mayoritas.
             'default_office_pattern_id' => ['nullable', 'integer', Rule::in($request->input('office_pattern_ids', []))],
+            // Batas sesi absen aplikasi HP (keputusan awal: 23 jam 50 menit).
+            'mobile_session_hours' => ['nullable', 'integer', 'min:1', 'max:47'],
+            'mobile_session_minutes' => ['nullable', 'integer', 'min:0', 'max:59'],
         ], [
             'default_office_pattern_id.in' => 'Pola default harus salah satu pola yang dicentang sebagai pola jam kantor.',
         ], [
             'office_pattern_ids' => 'pola jam kantor',
             'default_office_pattern_id' => 'pola default',
+            'mobile_session_hours' => 'batas sesi (jam)',
+            'mobile_session_minutes' => 'batas sesi (menit)',
         ]);
 
         // Keadaan sebelum disimpan, supaya catatan aktivitasnya bisa menyebut
@@ -61,6 +68,14 @@ class SettingsController extends Controller
 
         Setting::set(DefaultOfficeSchedule::SETTING_KEY, (string) ($request->integer('default_office_pattern_id') ?: ''));
 
+        $sessionBefore = MobileAttendanceService::sessionMaxMinutes();
+        if ($request->filled('mobile_session_hours')) {
+            Setting::set(
+                MobileAttendanceService::SESSION_SETTING_KEY,
+                (string) ($request->integer('mobile_session_hours') * 60 + $request->integer('mobile_session_minutes')),
+            );
+        }
+
         // Setting ditulis lewat Setting::set() dan pola dicentang lewat mass update;
         // keduanya tidak memicu event Eloquent, jadi dicatat di sini secara eksplisit.
         ActivityLogger::log(
@@ -72,6 +87,7 @@ class SettingsController extends Controller
                 'roster_autogenerate' => ['dari' => $before['autogenerate'], 'jadi' => $request->boolean('roster_autogenerate')],
                 'pola_jam_kantor' => ['dari' => implode(', ', $before['patterns']) ?: '(kosong)', 'jadi' => implode(', ', array_map('intval', $validated['office_pattern_ids'] ?? [])) ?: '(kosong)'],
                 'pola_default' => ['dari' => $before['default'] ?: '(kosong)', 'jadi' => $request->integer('default_office_pattern_id') ?: '(kosong)'],
+                'batas_sesi_absen_hp_menit' => ['dari' => $sessionBefore, 'jadi' => MobileAttendanceService::sessionMaxMinutes()],
             ]],
         );
 

@@ -116,8 +116,8 @@
                         </div>
                     @endcanany
 
-                    @canany(['attendance-daily.view', 'attendance-map.view', 'devices.view', 'corrections.view'])
-                        @php $g = request()->routeIs('attendance.daily.*', 'attendance.map', 'attendance.devices.*', 'attendance.punches.*', 'attendance.corrections.*'); @endphp
+                    @canany(['attendance-daily.view', 'attendance-map.view', 'devices.view', 'corrections.view', 'mobile-attendance.view'])
+                        @php $g = request()->routeIs('attendance.daily.*', 'attendance.map', 'attendance.devices.*', 'attendance.punches.*', 'attendance.corrections.*', 'attendance.mobile.*'); @endphp
                         <div @class(['sidebar-group', 'is-open' => $g]) data-sidebar-group="absensi">
                             <button type="button" data-sidebar-group-toggle aria-expanded="{{ $g ? 'true' : 'false' }}" class="sidebar-group-toggle flex w-full items-center gap-2.5 rounded px-2.5 py-1.5 text-left transition hover:bg-white/70">
                                 <svg class="size-4 shrink-0 text-gray-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 11l3 3L22 4"></path><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path></svg>
@@ -147,6 +147,12 @@
                                     <a href="{{ route('attendance.devices.monitor') }}" @class(['sidebar-nav-link flex items-center gap-2.5 rounded px-2.5 py-1.5 text-[13px] font-medium transition', 'bg-white text-gray-950 shadow-xs ring-1 ring-gray-200' => request()->routeIs('attendance.devices.monitor'), 'text-gray-600 hover:bg-white hover:text-gray-950' => ! request()->routeIs('attendance.devices.monitor')]) title="Monitor Mesin">
                                         <svg class="size-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12h4l3 8 4-16 3 8h4"></path></svg>
                                         <span class="sidebar-label truncate">Monitor Mesin</span>
+                                    </a>
+                                @endcan
+                                @can('mobile-attendance.view')
+                                    <a href="{{ route('attendance.mobile.index') }}" @class(['sidebar-nav-link flex items-center gap-2.5 rounded px-2.5 py-1.5 text-[13px] font-medium transition', 'bg-white text-gray-950 shadow-xs ring-1 ring-gray-200' => request()->routeIs('attendance.mobile.*'), 'text-gray-600 hover:bg-white hover:text-gray-950' => ! request()->routeIs('attendance.mobile.*')]) title="Absen Aplikasi HP">
+                                        <svg class="size-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="6" y="2" width="12" height="20" rx="2"></rect><path d="M11 18h2"></path></svg>
+                                        <span class="sidebar-label truncate">Absen Aplikasi HP</span>
                                     </a>
                                 @endcan
                                 @can('corrections.view')
