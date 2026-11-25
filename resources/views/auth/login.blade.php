@@ -2,7 +2,7 @@
     <div class="w-full max-w-md">
         <div class="mb-8 lg:hidden">
             <div class="flex items-center gap-3">
-                <img src="{{ asset('img/company-logo.svg') }}" alt="{{ config('app.name', 'HRIS') }}" class="size-10 rounded-md border border-gray-200 bg-white object-contain">
+                <img src="{{ asset('img/company-logo.png') }}" alt="{{ config('app.name', 'HRIS') }}" class="size-10 rounded-full bg-white object-contain">
 
                 <div>
                     <p class="text-sm font-semibold text-gray-950">{{ config('app.name', 'HRIS') }}</p>
@@ -13,6 +13,7 @@
 
         <div class="rounded-lg border border-gray-200 bg-white p-6 shadow-sm sm:p-8">
             <div>
+                <img src="{{ asset('img/company-logo.png') }}" alt="" class="mb-4 hidden size-12 rounded-full bg-white object-contain lg:flex">
                 <h1 class="text-2xl font-semibold text-gray-950">Login</h1>
                 <p class="mt-2 text-sm text-gray-500">Masuk ke admin panel HRIS.</p>
             </div>

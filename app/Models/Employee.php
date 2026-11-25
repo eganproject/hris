@@ -533,7 +533,7 @@ class Employee extends Model
      */
     public function getPhotoDisplayUrlAttribute(): string
     {
-        return $this->photo_url ?? asset('img/company-logo.svg');
+        return $this->photo_url ?? asset('img/company-logo.png');
     }
 
     /**

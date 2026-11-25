@@ -7,7 +7,9 @@
 
         <title>{{ $title ?? config('app.name', 'HRIS') }}</title>
 
-        <link rel="icon" type="image/svg+xml" href="{{ asset('img/company-logo.svg') }}">
+        <link rel="icon" type="image/png" sizes="192x192" href="{{ asset('img/company-logo-192.png') }}">
+        <link rel="icon" href="{{ asset('favicon.ico') }}" sizes="any">
+        <link rel="apple-touch-icon" href="{{ asset('apple-touch-icon.png') }}">
 
         @vite(['resources/css/app.css', 'resources/js/app.js'])
     </head>
@@ -15,7 +17,7 @@
         <main class="grid min-h-screen grid-cols-1 lg:grid-cols-[1fr_520px]">
             <section class="hidden bg-[#edf2f7] px-12 py-10 lg:flex lg:flex-col lg:justify-between">
                 <div class="flex items-center gap-3">
-                    <img src="{{ asset('img/company-logo.svg') }}" alt="{{ config('app.name', 'HRIS') }}" class="size-10 rounded-md border border-gray-200 bg-white object-contain">
+                    <img src="{{ asset('img/company-logo.png') }}" alt="{{ config('app.name', 'HRIS') }}" class="size-10 rounded-full bg-white object-contain">
 
                     <div>
                         <p class="text-sm font-semibold text-gray-950">{{ config('app.name', 'HRIS') }}</p>

@@ -33,7 +33,7 @@ test('an employee without a photo falls back to the company logo', function () {
     ]);
 
     expect($employee->photo_url)->toBeNull()
-        ->and($employee->photo_display_url)->toContain('company-logo.svg');
+        ->and($employee->photo_display_url)->toContain('company-logo.png');
 });
 
 test('the configured disk url is not pinned to APP_URL', function () {

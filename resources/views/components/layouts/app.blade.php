@@ -7,7 +7,9 @@
 
         <title>{{ $title ?? config('app.name', 'HRIS') }}</title>
 
-        <link rel="icon" type="image/svg+xml" href="{{ asset('img/company-logo.svg') }}">
+        <link rel="icon" type="image/png" sizes="192x192" href="{{ asset('img/company-logo-192.png') }}">
+        <link rel="icon" href="{{ asset('favicon.ico') }}" sizes="any">
+        <link rel="apple-touch-icon" href="{{ asset('apple-touch-icon.png') }}">
 
         @vite(['resources/css/app.css', 'resources/js/app.js'])
     </head>
@@ -38,7 +40,7 @@
             <div class="mobile-nav-overlay" data-mobile-nav-overlay aria-hidden="true"></div>
             <aside class="admin-sidebar flex flex-col border-r border-[#e5e7eb] bg-[#f8fafc]">
                 <div class="sidebar-brand flex h-[52px] shrink-0 items-center gap-2.5 border-b border-[#e5e7eb] px-4">
-                    <img src="{{ asset('img/company-logo.svg') }}" alt="{{ config('app.name', 'HRIS') }}" class="size-7 shrink-0 rounded border border-gray-200 bg-white object-contain">
+                    <img src="{{ asset('img/company-logo.png') }}" alt="{{ config('app.name', 'HRIS') }}" class="size-8 shrink-0 rounded-full bg-white object-contain">
 
                     <div class="sidebar-brand-text min-w-0">
                         <p class="truncate text-[13px] font-semibold text-gray-900">{{ config('app.name', 'HRIS') }}</p>
