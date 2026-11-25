@@ -13,7 +13,7 @@ use Illuminate\Support\Facades\Cache;
 
 /**
  * "Tim hari ini" untuk atasan: siapa yang sudah masuk, telat, belum absen, cuti,
- * atau WFH, dihitung dari jadwal + absensi hari ini anggota tim langsung.
+ * atau WFH, dihitung dari jadwal + absensi hari ini seluruh bawahan (semua level).
  */
 class TeamController extends HrController
 {
@@ -25,8 +25,8 @@ class TeamController extends HrController
         $today = now()->startOfDay();
 
         $members = Employee::query()->active()
-            ->where('manager_id', $leader->id)
-            ->with(['jobPosition', 'department', 'branch'])
+            ->whereIn('id', $this->teamIds($leader))
+            ->with(['jobPosition', 'department', 'branch', 'manager:id,full_name'])
             ->orderBy('full_name')
             ->get();
 
@@ -36,7 +36,7 @@ class TeamController extends HrController
             ->get()
             ->keyBy('employee_id');
 
-        $rows = $members->map(function (Employee $member) use ($attendances, $today) {
+        $rows = $members->map(function (Employee $member) use ($attendances, $today, $leader) {
             $day = $this->days->for($member, $today, $today)->first();
             /** @var Attendance|null $att */
             $att = $attendances->get($member->id);
@@ -44,6 +44,9 @@ class TeamController extends HrController
 
             return [
                 'employee' => Present::person($member),
+                // Bawahan tidak langsung ditampilkan bersama atasan langsungnya.
+                'is_direct' => $member->manager_id === $leader->id,
+                'manager_name' => $member->manager_id === $leader->id ? null : $member->manager?->full_name,
                 'state' => $state, // present | late | not_yet | leave | wfh | off
                 'clock_in' => $att?->clock_in?->format('H:i'),
                 'clock_out' => $att?->clock_out?->format('H:i'),
@@ -72,7 +75,7 @@ class TeamController extends HrController
     public function remind(Employee $employee): JsonResponse
     {
         $leader = $this->leader();
-        abort_unless($employee->manager_id === $leader->id, 403, 'Karyawan ini bukan anggota tim Anda.');
+        abort_unless(in_array($employee->id, $this->teamIds($leader), true), 403, 'Karyawan ini bukan anggota tim Anda.');
 
         $key = "mobile:remind:{$leader->id}:{$employee->id}";
         abort_if(Cache::has($key), 429, 'Pengingat sudah dikirim. Coba lagi nanti.');

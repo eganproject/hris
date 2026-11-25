@@ -34,6 +34,23 @@ abstract class HrController extends Controller
         return $employee;
     }
 
+    /**
+     * Seluruh bawahan atasan ini, semua level (bawahan langsung, bawahan dari
+     * bawahan, dst.) — sama dengan cakupan "tim" di web.
+     *
+     * @return list<int>
+     */
+    protected function teamIds(Employee $leader): array
+    {
+        $user = request()->user();
+
+        if ($user && $user->employee?->id === $leader->id) {
+            return $user->subordinateEmployeeIds();
+        }
+
+        return $leader->user?->subordinateEmployeeIds() ?? [];
+    }
+
     protected function ok(mixed $data, int $status = 200, array $extra = []): JsonResponse
     {
         return response()->json(['data' => $data, ...$extra], $status);

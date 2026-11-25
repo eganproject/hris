@@ -40,7 +40,7 @@ test('an employee gets the self-service shortcuts, with Absensi Saya as the rais
         ->assertSee('Beranda')
         ->assertSee('Absensi')
         ->assertSee('Cuti')
-        ->assertSee('Lainnya');
+        ->assertSee('Menu');
 });
 
 test('the centre button sits between two shortcuts on each side', function () {
@@ -53,7 +53,7 @@ test('the centre button sits between two shortcuts on each side', function () {
 
     $centre = strpos($nav, 'mobile-bottom-nav-center');
 
-    // Dua pintasan sebelum tombol tengah, dua sesudahnya (yang terakhir "Lainnya").
+    // Dua pintasan sebelum tombol tengah, dua sesudahnya (yang terakhir "Menu").
     expect(substr_count(substr($nav, 0, $centre), 'mobile-bottom-nav-link'))->toBe(2)
         ->and(substr_count(substr($nav, $centre), 'mobile-bottom-nav-link'))->toBe(2);
 });
@@ -89,7 +89,7 @@ test('without access to Absensi Saya the bar stays flat instead of forcing a cen
 
     expect($content)->not->toContain('mobile-bottom-nav-fab')
         ->and($content)->not->toContain('has-center')
-        // Tetap lima slot: empat pintasan datar + Lainnya.
+        // Tetap lima slot: empat pintasan datar + Menu.
         ->and(substr_count($content, 'mobile-bottom-nav-link'))->toBe(5);
 });
 
@@ -99,7 +99,7 @@ test('the bar falls back to whatever the user may actually open', function () {
 
     $response = $this->actingAs($user)->get(route('attendance.daily.index'))->assertOk();
 
-    $response->assertSee('Harian')->assertSee('Karyawan')->assertSee('Lainnya');
+    $response->assertSee('Harian')->assertSee('Karyawan')->assertSee('Menu');
 
     // Menu yang tidak boleh dibuka tidak muncul sebagai pintasan. Diperiksa hanya di
     // dalam bilahnya: kata "Cuti" juga muncul sebagai pilihan status di penyaring
@@ -113,7 +113,7 @@ test('it never offers more than five slots', function () {
 
     $content = $this->actingAs($user)->get(route('dashboard'))->assertOk()->getContent();
 
-    // Tiga pintasan datar + tombol Lainnya, ditambah satu tombol tengah = lima kolom.
+    // Tiga pintasan datar + tombol Menu, ditambah satu tombol tengah = lima kolom.
     expect(substr_count($content, 'mobile-bottom-nav-link'))->toBe(4)
         ->and(substr_count($content, 'mobile-bottom-nav-fab-link'))->toBe(1);
 });
@@ -127,7 +127,7 @@ test('the current page is marked active in the bar', function () {
         ->assertSee('aria-current="page"', escape: false);
 });
 
-test('the topbar hamburger is gone, replaced by the "Lainnya" button', function () {
+test('the topbar hamburger is gone, replaced by the "Menu" button', function () {
     $user = navUser('dashboard.view');
 
     $content = $this->actingAs($user)->get(route('dashboard'))->assertOk()->getContent();

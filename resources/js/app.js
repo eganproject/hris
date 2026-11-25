@@ -420,14 +420,35 @@ document.querySelectorAll('[data-sidebar-toggle]').forEach((button) => {
     });
 })();
 
-// Mobile navigation drawer: the hamburger opens the sidebar; tapping the overlay,
-// a menu link, Escape, or resizing to desktop closes it.
+// Mobile navigation drawer (< lg): the "Menu" button in the bottom bar opens the
+// sidebar — a bottom sheet on phones, a left drawer on tablets. The close button,
+// overlay, a menu link, Escape, swiping the sheet down, or resizing to desktop
+// closes it. A search box filters the menu items (and opens their groups).
 (() => {
-    const openNav = () => document.body.setAttribute('data-mobile-nav', 'open');
-    const closeNav = () => document.body.removeAttribute('data-mobile-nav');
+    const sidebar = document.querySelector('.admin-sidebar');
+    const toggles = document.querySelectorAll('[data-mobile-nav-toggle]');
+    const isOpen = () => document.body.getAttribute('data-mobile-nav') === 'open';
 
-    document.querySelectorAll('[data-mobile-nav-toggle]').forEach((button) => button.addEventListener('click', openNav));
-    document.querySelectorAll('[data-mobile-nav-overlay]').forEach((overlay) => overlay.addEventListener('click', closeNav));
+    const openNav = () => {
+        document.body.setAttribute('data-mobile-nav', 'open');
+        toggles.forEach((button) => button.setAttribute('aria-expanded', 'true'));
+        // Scroll the active page into view inside the drawer.
+        const active = sidebar?.querySelector('.sidebar-nav-link[aria-current="page"], .sidebar-nav-link.ring-1');
+        active?.scrollIntoView({ block: 'center' });
+    };
+
+    const closeNav = () => {
+        if (!isOpen()) {
+            return;
+        }
+
+        document.body.removeAttribute('data-mobile-nav');
+        toggles.forEach((button) => button.setAttribute('aria-expanded', 'false'));
+        document.activeElement?.blur?.();
+    };
+
+    toggles.forEach((button) => button.addEventListener('click', () => (isOpen() ? closeNav() : openNav())));
+    document.querySelectorAll('[data-mobile-nav-close], [data-mobile-nav-overlay]').forEach((el) => el.addEventListener('click', closeNav));
     document.querySelectorAll('.admin-sidebar a').forEach((link) => link.addEventListener('click', closeNav));
 
     document.addEventListener('keydown', (event) => {
@@ -441,6 +462,115 @@ document.querySelectorAll('[data-sidebar-toggle]').forEach((button) => {
             closeNav();
         }
     });
+
+    // Swipe the bottom sheet down to close it (phones only). The drag starts from
+    // the handle/header area, or anywhere while the menu list is scrolled to the top.
+    if (sidebar) {
+        const nav = sidebar.querySelector('.sidebar-nav');
+        let startY = null;
+        let delta = 0;
+
+        sidebar.addEventListener('touchstart', (event) => {
+            if (window.innerWidth >= 640 || !isOpen()) {
+                return;
+            }
+
+            const inList = nav && nav.contains(event.target);
+            if (inList && nav.scrollTop > 0) {
+                return;
+            }
+
+            if (event.target.closest('input')) {
+                return;
+            }
+
+            startY = event.touches[0].clientY;
+            delta = 0;
+        }, { passive: true });
+
+        sidebar.addEventListener('touchmove', (event) => {
+            if (startY === null) {
+                return;
+            }
+
+            delta = Math.max(0, event.touches[0].clientY - startY);
+            if (delta > 4) {
+                sidebar.classList.add('is-dragging');
+                sidebar.style.setProperty('--sheet-drag', `${delta}px`);
+            }
+        }, { passive: true });
+
+        const endDrag = () => {
+            if (startY === null) {
+                return;
+            }
+
+            sidebar.classList.remove('is-dragging');
+            sidebar.style.removeProperty('--sheet-drag');
+            if (delta > 90) {
+                closeNav();
+            }
+            startY = null;
+            delta = 0;
+        };
+
+        sidebar.addEventListener('touchend', endDrag);
+        sidebar.addEventListener('touchcancel', endDrag);
+    }
+
+    // Menu search.
+    const filter = document.querySelector('[data-sidebar-filter]');
+    const nav = document.querySelector('.sidebar-nav');
+    const empty = document.querySelector('[data-sidebar-filter-empty]');
+
+    if (filter && nav) {
+        const normalize = (text) => text.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').trim();
+        const topItems = Array.from(nav.children).filter((el) => !el.matches('[data-sidebar-filter-empty]'));
+
+        filter.addEventListener('input', () => {
+            const query = normalize(filter.value);
+            nav.classList.toggle('is-filtering', query !== '');
+            let visible = 0;
+
+            topItems.forEach((item) => {
+                if (item.matches('[data-sidebar-group]')) {
+                    const groupLabel = normalize(item.querySelector('.sidebar-section-label')?.textContent || '');
+                    const groupMatch = query !== '' && groupLabel.includes(query);
+                    let anyChild = false;
+
+                    item.querySelectorAll('.sidebar-group-items .sidebar-nav-link').forEach((link) => {
+                        const match = query === '' || groupMatch || normalize(link.textContent).includes(query);
+                        link.toggleAttribute('data-filter-hidden', !match);
+                        anyChild = anyChild || match;
+                    });
+
+                    item.toggleAttribute('data-filter-hidden', !anyChild);
+                    visible += anyChild ? 1 : 0;
+                } else {
+                    const match = query === '' || normalize(item.textContent).includes(query);
+                    item.toggleAttribute('data-filter-hidden', !match);
+                    visible += match ? 1 : 0;
+                }
+            });
+
+            if (empty) {
+                empty.hidden = visible > 0;
+            }
+        });
+
+        // Enter opens the first visible result.
+        filter.addEventListener('keydown', (event) => {
+            if (event.key !== 'Enter') {
+                return;
+            }
+
+            const first = Array.from(nav.querySelectorAll('.sidebar-nav-link')).find((link) => link.offsetParent !== null);
+            if (first) {
+                event.preventDefault();
+                first.click();
+            }
+        });
+    }
 })();
 
 // Generic dropdown menus (e.g. row action menus). The panel is positioned with

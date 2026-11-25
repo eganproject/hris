@@ -1237,3 +1237,331 @@
 .org-tree ul[hidden] {
     display: none;
 }
+
+/* ── Laci menu di layar kecil (< lg) ───────────────────────────────────────
+   HP: lembar dari bawah (bottom sheet) yang dibuka tombol "Menu" di bilah bawah,
+   dekat ibu jari. Tablet: laci dari kiri. Keduanya memakai target sentuh 44px,
+   kolom cari menu, tombol tutup, serta Profil & Keluar di bagian bawah.
+   Ditulis di luar @layer agar menimpa utilitas spasi rapat milik sidebar desktop. */
+.sidebar-close,
+.sidebar-search,
+.sidebar-mobile-actions {
+    display: none;
+}
+
+@media (max-width: 63.99rem) {
+    body[data-mobile-nav='open'] {
+        overflow: hidden;
+    }
+
+    .mobile-nav-overlay {
+        display: block !important;
+        opacity: 0;
+        visibility: hidden;
+        background: rgb(15 23 42 / 0.45);
+        backdrop-filter: blur(2px);
+        transition: opacity 220ms ease, visibility 0s linear 220ms;
+    }
+
+    body[data-mobile-nav='open'] .mobile-nav-overlay {
+        opacity: 1;
+        visibility: visible;
+        transition: opacity 220ms ease;
+    }
+
+    .admin-sidebar {
+        z-index: 55;
+        background: #fff;
+        border: 0;
+        visibility: hidden;
+        transition: transform 280ms cubic-bezier(0.32, 0.72, 0, 1), visibility 0s linear 280ms;
+        overscroll-behavior: contain;
+    }
+
+    body[data-mobile-nav='open'] .admin-sidebar {
+        visibility: visible;
+        transition: transform 280ms cubic-bezier(0.32, 0.72, 0, 1);
+    }
+
+    .admin-sidebar .sidebar-brand {
+        height: auto;
+        min-height: 60px;
+        padding: 12px 12px 8px 18px;
+        border-bottom: 0;
+        gap: 12px;
+    }
+
+    .admin-sidebar .sidebar-brand img {
+        width: 38px;
+        height: 38px;
+        box-shadow: 0 0 0 1px #e5e7eb;
+    }
+
+    .admin-sidebar .sidebar-brand-text {
+        flex: 1;
+    }
+
+    .admin-sidebar .sidebar-brand-text p:first-child {
+        font-size: 15px;
+    }
+
+    .sidebar-close {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 40px;
+        height: 40px;
+        flex-shrink: 0;
+        border-radius: 999px;
+        background: #f1f5f9;
+        color: #334155;
+        -webkit-tap-highlight-color: transparent;
+    }
+
+    .sidebar-close svg {
+        width: 20px;
+        height: 20px;
+    }
+
+    .sidebar-close:active {
+        background: #e2e8f0;
+    }
+
+    .sidebar-search {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin: 4px 16px 8px;
+        padding: 0 12px;
+        height: 44px;
+        border-radius: 12px;
+        background: #f1f5f9;
+        color: #64748b;
+        flex-shrink: 0;
+    }
+
+    .sidebar-search:focus-within {
+        background: #fff;
+        box-shadow: 0 0 0 2px var(--color-primary, #2563eb);
+    }
+
+    .sidebar-search svg {
+        width: 18px;
+        height: 18px;
+        flex-shrink: 0;
+    }
+
+    .sidebar-search input {
+        flex: 1;
+        min-width: 0;
+        border: 0;
+        background: transparent;
+        outline: none;
+        font-size: 16px; /* 16px: iOS tidak memperbesar halaman saat fokus. */
+        color: #0f172a;
+    }
+
+    .sidebar-search input::-webkit-search-cancel-button {
+        cursor: pointer;
+    }
+
+    .admin-sidebar .sidebar-nav {
+        padding: 4px 12px 16px;
+    }
+
+    .admin-sidebar .sidebar-nav > * {
+        margin-top: 0;
+        margin-bottom: 2px;
+    }
+
+    .admin-sidebar .sidebar-nav-link,
+    .admin-sidebar .sidebar-group-toggle {
+        min-height: 46px;
+        padding: 10px 12px;
+        gap: 12px;
+        border-radius: 12px;
+        font-size: 14.5px;
+        -webkit-tap-highlight-color: transparent;
+    }
+
+    .admin-sidebar .sidebar-nav-link > svg,
+    .admin-sidebar .sidebar-group-toggle > svg:first-child {
+        width: 20px;
+        height: 20px;
+    }
+
+    .admin-sidebar .sidebar-group-toggle .sidebar-section-label {
+        font-size: 14.5px;
+        font-weight: 600;
+        text-transform: none;
+        letter-spacing: 0;
+        color: #1e293b;
+    }
+
+    .admin-sidebar .sidebar-group-toggle > svg:first-child {
+        color: #475569;
+    }
+
+    .admin-sidebar .sidebar-group-chevron {
+        width: 16px;
+        height: 16px;
+    }
+
+    .admin-sidebar .sidebar-group.is-open > .sidebar-group-toggle {
+        background: #f8fafc;
+    }
+
+    .admin-sidebar .sidebar-nav-link:active,
+    .admin-sidebar .sidebar-group-toggle:active {
+        background: #f1f5f9;
+    }
+
+    /* Anak menu: digaris bantu tipis di kiri, sejajar ikon grup. */
+    .admin-sidebar .sidebar-group-items {
+        margin-left: 21px;
+        padding-left: 12px;
+        border-left: 1.5px solid #e2e8f0;
+    }
+
+    .admin-sidebar .sidebar-group.is-open > .sidebar-group-items {
+        margin-top: 2px;
+        margin-bottom: 6px;
+    }
+
+    .admin-sidebar .sidebar-group-items .sidebar-nav-link {
+        min-height: 44px;
+        padding-left: 12px;
+        font-size: 14px;
+    }
+
+    /* Halaman aktif: latar warna utama lembut, bukan kartu bergaris. */
+    .admin-sidebar .sidebar-nav-link[class*='ring-1'] {
+        background: var(--color-primary-soft, #eef2ff);
+        color: var(--color-primary, #2563eb);
+        font-weight: 600;
+        box-shadow: none;
+        --tw-ring-shadow: 0 0 #0000;
+    }
+
+    .admin-sidebar .sidebar-footer {
+        padding: 12px 16px calc(12px + env(safe-area-inset-bottom, 0px));
+        background: #fff;
+        border-top: 1px solid #f1f5f9;
+    }
+
+    .admin-sidebar .sidebar-user-card {
+        padding: 10px;
+        border-radius: 14px;
+        box-shadow: none;
+        background: #f8fafc;
+        --tw-ring-shadow: 0 0 #0000;
+    }
+
+    .sidebar-mobile-actions {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 8px;
+    }
+
+    .sidebar-mobile-action {
+        display: flex;
+        width: 100%;
+        min-height: 44px;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        border-radius: 12px;
+        border: 1px solid #e2e8f0;
+        background: #fff;
+        font-size: 14px;
+        font-weight: 600;
+        color: #334155;
+        -webkit-tap-highlight-color: transparent;
+    }
+
+    .sidebar-mobile-action svg {
+        width: 18px;
+        height: 18px;
+    }
+
+    .sidebar-mobile-action.is-danger {
+        color: #b91c1c;
+        border-color: #fecaca;
+        background: #fef2f2;
+    }
+
+    /* Saat mencari: semua grup terbuka, item yang tidak cocok disembunyikan. */
+    .sidebar-nav.is-filtering .sidebar-group-items {
+        max-height: none !important;
+        transition: none;
+    }
+
+    .sidebar-nav.is-filtering .sidebar-group-chevron {
+        visibility: hidden;
+    }
+
+    .sidebar-nav [data-filter-hidden] {
+        display: none !important;
+    }
+
+    .sidebar-filter-empty {
+        padding: 28px 8px;
+        text-align: center;
+        font-size: 14px;
+        color: #94a3b8;
+    }
+
+    /* Tombol "Menu" di bilah bawah tampak aktif selama laci terbuka. */
+    body[data-mobile-nav='open'] [data-mobile-nav-toggle] {
+        color: var(--color-primary, #2563eb);
+    }
+}
+
+/* HP: lembar dari bawah. */
+@media (max-width: 39.99rem) {
+    .admin-sidebar {
+        inset: auto 0 0 0;
+        width: 100%;
+        max-width: none;
+        height: auto;
+        max-height: calc(100dvh - 48px);
+        border-radius: 22px 22px 0 0;
+        transform: translateY(102%);
+        box-shadow: 0 -12px 40px rgb(2 6 23 / 0.18);
+    }
+
+    body[data-mobile-nav='open'] .admin-sidebar {
+        transform: translateY(var(--sheet-drag, 0px));
+        box-shadow: 0 -12px 40px rgb(2 6 23 / 0.18);
+    }
+
+    .admin-sidebar.is-dragging {
+        transition: none !important;
+    }
+
+    /* Pegangan tarik di atas lembar. */
+    .admin-sidebar::before {
+        content: '';
+        display: block;
+        flex-shrink: 0;
+        width: 40px;
+        height: 5px;
+        margin: 8px auto 0;
+        border-radius: 999px;
+        background: #cbd5e1;
+    }
+
+    .admin-sidebar .sidebar-brand {
+        min-height: 52px;
+        padding-top: 6px;
+    }
+}
+
+/* Tablet: laci dari kiri, sedikit lebih lebar. */
+@media (min-width: 40rem) and (max-width: 63.99rem) {
+    .admin-sidebar {
+        width: 340px;
+        max-width: 86vw;
+        border-radius: 0 22px 22px 0;
+    }
+}

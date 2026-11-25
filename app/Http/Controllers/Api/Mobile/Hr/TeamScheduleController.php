@@ -206,7 +206,7 @@ class TeamScheduleController extends HrController
     private function members(Employee $leader): Collection
     {
         return Employee::query()->active()
-            ->where('manager_id', $leader->id)
+            ->whereIn('id', $this->teamIds($leader))
             ->with(['jobPosition', 'department', 'branch'])
             ->orderBy('full_name')
             ->get();
@@ -216,7 +216,7 @@ class TeamScheduleController extends HrController
     {
         $member = Employee::query()->active()->find($employeeId);
 
-        abort_unless($member && $member->manager_id === $leader->id, 403, 'Karyawan ini bukan anggota tim Anda.');
+        abort_unless($member && in_array($member->id, $this->teamIds($leader), true), 403, 'Karyawan ini bukan anggota tim Anda.');
 
         return $member;
     }

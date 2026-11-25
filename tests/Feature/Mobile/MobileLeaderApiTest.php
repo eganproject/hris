@@ -157,3 +157,28 @@ test('atasan mengatur, menyalin, dan menerbitkan jadwal tim', function () {
 
     expect(ScheduleAcknowledgement::query()->first()->confirmed_at)->not->toBeNull();
 });
+
+test('tim hari ini mencakup bawahan semua level, lengkap dengan atasan langsungnya', function () {
+    [$egaUser, $ega] = mobileEmployee('Ega');
+    [, $okan] = mobileEmployee('Okan', ['manager_id' => $ega->id]);
+    [, $budi] = mobileEmployee('Budi', ['manager_id' => $okan->id]);
+    [, $cici] = mobileEmployee('Cici', ['manager_id' => $budi->id]);
+    mobileEmployee('Orang Lain');
+
+    $response = mobileAs($egaUser)->getJson('/api/mobile/v1/team/today')
+        ->assertOk()
+        ->assertJsonPath('data.team_size', 3);
+
+    $byName = collect($response->json('data.members'))->keyBy('employee.name');
+    expect($byName->keys()->sort()->values()->all())->toBe(['Budi', 'Cici', 'Okan'])
+        ->and($byName['Okan']['is_direct'])->toBeTrue()
+        ->and($byName['Budi']['manager_name'])->toBe('Okan')
+        ->and($byName['Cici']['manager_name'])->toBe('Budi');
+
+    // Okan hanya melihat timnya sendiri.
+    expect($okan->user)->not->toBeNull();
+    mobileAs($okan->user)->getJson('/api/mobile/v1/team/today')->assertJsonPath('data.team_size', 2);
+
+    // Pengingat juga boleh ke bawahan tidak langsung.
+    mobileAs($egaUser)->postJson("/api/mobile/v1/team/{$cici->id}/remind")->assertOk();
+});

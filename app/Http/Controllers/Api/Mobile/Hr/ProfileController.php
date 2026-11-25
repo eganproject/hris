@@ -34,7 +34,7 @@ class ProfileController extends HrController
             'departments' => $employee->departments->pluck('name')->values(),
             'manager' => Present::person($employee->manager),
             'is_leader' => $isLeader,
-            'leader' => $isLeader ? $this->leaderBadges($employee->id) : null,
+            'leader' => $isLeader ? $this->leaderBadges($employee) : null,
         ]);
     }
 
@@ -56,15 +56,17 @@ class ProfileController extends HrController
         return $this->message('Data pribadi berhasil diperbarui.');
     }
 
-    /** Angka badge pada menu atasan di Profil. */
-    private function leaderBadges(int $employeeId): array
+    /** Angka badge pada menu atasan (Beranda). */
+    private function leaderBadges(Employee $leader): array
     {
+        $employeeId = $leader->id;
+
         return [
             'pending_approvals' => LeaveRequest::query()->where('supervisor_id', $employeeId)
                 ->where('status', LeaveRequestStatus::PendingSupervisor->value)->count()
                 + OvertimeApproval::query()->where('supervisor_id', $employeeId)
                     ->where('status', OvertimeApproval::STATUS_PENDING)->count(),
-            'team_size' => Employee::query()->active()->where('manager_id', $employeeId)->count(),
+            'team_size' => Employee::query()->active()->whereIn('id', $this->teamIds($leader))->count(),
         ];
     }
 }

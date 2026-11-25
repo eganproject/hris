@@ -81,7 +81,7 @@
     $right = $center ? $sides->slice(2) : collect();
 @endphp
 
-@if ($sides->isNotEmpty() || $center)
+{{-- Selalu tampil di layar kecil: tombol "Menu" satu-satunya jalan ke laci menu. --}}
     <nav @class(['mobile-bottom-nav', 'lg:hidden', 'has-center' => (bool) $center]) aria-label="Navigasi utama">
         <ul class="mobile-bottom-nav-list">
             @foreach ($left as $item)
@@ -108,11 +108,10 @@
             @endforeach
 
             <li>
-                <button type="button" data-mobile-nav-toggle class="mobile-bottom-nav-link" aria-label="Buka menu lengkap">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="5" cy="12" r="1.6"></circle><circle cx="12" cy="12" r="1.6"></circle><circle cx="19" cy="12" r="1.6"></circle></svg>
-                    <span>Lainnya</span>
+                <button type="button" data-mobile-nav-toggle class="mobile-bottom-nav-link" aria-label="Buka menu lengkap" aria-expanded="false" aria-controls="app-sidebar">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="2"></rect><rect x="14" y="3" width="7" height="7" rx="2"></rect><rect x="3" y="14" width="7" height="7" rx="2"></rect><rect x="14" y="14" width="7" height="7" rx="2"></rect></svg>
+                    <span>Menu</span>
                 </button>
             </li>
         </ul>
     </nav>
-@endif

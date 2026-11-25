@@ -38,7 +38,7 @@
 
         <div class="admin-shell min-h-screen">
             <div class="mobile-nav-overlay" data-mobile-nav-overlay aria-hidden="true"></div>
-            <aside class="admin-sidebar flex flex-col border-r border-[#e5e7eb] bg-[#f8fafc]">
+            <aside id="app-sidebar" aria-label="Menu utama" class="admin-sidebar flex flex-col border-r border-[#e5e7eb] bg-[#f8fafc]">
                 <div class="sidebar-brand flex h-[52px] shrink-0 items-center gap-2.5 border-b border-[#e5e7eb] px-4">
                     <img src="{{ asset('img/company-logo.png') }}" alt="{{ config('app.name', 'HRIS') }}" class="size-8 shrink-0 rounded-full bg-white object-contain">
 
@@ -46,6 +46,16 @@
                         <p class="truncate text-[13px] font-semibold text-gray-900">{{ config('app.name', 'HRIS') }}</p>
                         <p class="text-[11px] text-gray-500">Admin Workspace</p>
                     </div>
+
+                    {{-- Tombol tutup & kolom cari hanya untuk laci menu di layar kecil. --}}
+                    <button type="button" data-mobile-nav-close class="sidebar-close lg:hidden" aria-label="Tutup menu">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"></path></svg>
+                    </button>
+                </div>
+
+                <div class="sidebar-search lg:hidden">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7"></circle><path d="m21 21-4.3-4.3"></path></svg>
+                    <input type="search" data-sidebar-filter placeholder="Cari menu…" autocomplete="off" enterkeyhint="search" aria-label="Cari menu">
                 </div>
 
                 <nav class="sidebar-nav min-h-0 flex-1 space-y-4 overflow-y-auto px-2.5 py-4">
@@ -391,6 +401,7 @@
                             </div>
                         </div>
                     @endcanany
+                    <p class="sidebar-filter-empty" data-sidebar-filter-empty hidden>Menu tidak ditemukan.</p>
                 </nav>
 
                 <div class="sidebar-footer shrink-0 space-y-2 border-t border-gray-200 bg-[#f8fafc] p-3">
@@ -410,6 +421,21 @@
                             <p class="truncate text-[12px] font-medium text-gray-900">{{ auth()->user()->name }}</p>
                             <p class="truncate text-[11px] text-gray-500">{{ auth()->user()->email }}</p>
                         </div>
+                    </div>
+
+                    {{-- Di layar kecil, Profil & Logout pindah ke laci agar bilah atas lega. --}}
+                    <div class="sidebar-mobile-actions lg:hidden">
+                        <a href="{{ route('profile.edit') }}" class="sidebar-mobile-action">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="4"></circle><path d="M4 21a8 8 0 0 1 16 0"></path></svg>
+                            <span>Profil Saya</span>
+                        </a>
+                        <form method="POST" action="{{ route('logout') }}">
+                            @csrf
+                            <button type="submit" class="sidebar-mobile-action is-danger">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><path d="m16 17 5-5-5-5"></path><path d="M21 12H9"></path></svg>
+                                <span>Keluar</span>
+                            </button>
+                        </form>
                     </div>
                 </div>
             </aside>
@@ -475,7 +501,7 @@
                                 <span class="block text-[11px] text-gray-500">Profil Saya</span>
                             </span>
                         </a>
-                        <form method="POST" action="{{ route('logout') }}">
+                        <form method="POST" action="{{ route('logout') }}" class="hidden lg:block">
                             @csrf
                             <button type="submit" class="rounded border border-gray-200 bg-white px-2.5 py-1.5 text-[12px] font-medium text-gray-700 shadow-xs transition hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-primary/20">
                                 Logout
