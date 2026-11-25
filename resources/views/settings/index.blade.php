@@ -29,6 +29,19 @@
                 </label>
 
                 <div class="mt-6 border-t border-gray-100 pt-6">
+                    <span class="block text-sm font-medium text-gray-800">Batas sesi absen aplikasi HP</span>
+                    <p class="mt-1 text-xs text-gray-500">Setelah absen masuk lewat aplikasi, absen masuk berikutnya dikunci sampai karyawan absen pulang, paling lama selama batas ini sejak jam masuk. Lewat dari batas, kuncinya hilang dan jam pulang yang terlewat diisi lewat koreksi.</p>
+                    @php $sessionMax = (int) old('mobile_session_max_minutes', $mobileSessionMaxMinutes); @endphp
+                    <div class="mt-3 flex items-center gap-2 text-sm text-gray-700">
+                        <input type="number" name="mobile_session_hours" min="1" max="47" value="{{ old('mobile_session_hours', intdiv($sessionMax, 60)) }}" aria-label="Jam" class="block w-20 rounded-md border border-gray-300 px-3 py-2 text-sm shadow-xs outline-none focus:border-primary focus:ring-2 focus:ring-primary/20">
+                        <span>jam</span>
+                        <input type="number" name="mobile_session_minutes" min="0" max="59" value="{{ old('mobile_session_minutes', $sessionMax % 60) }}" aria-label="Menit" class="block w-20 rounded-md border border-gray-300 px-3 py-2 text-sm shadow-xs outline-none focus:border-primary focus:ring-2 focus:ring-primary/20">
+                        <span>menit</span>
+                    </div>
+                    @error('mobile_session_hours')<p class="mt-2 text-sm text-red-600">{{ $message }}</p>@enderror
+                </div>
+
+                <div class="mt-6 border-t border-gray-100 pt-6">
                     <span class="block text-sm font-medium text-gray-800">Pola jam kantor</span>
                     <p class="mt-1 text-xs text-gray-500">Centang pola yang boleh dipilih untuk karyawan bertanda <span class="font-medium">"Ikuti jam kantor (tanpa penjadwalan)"</span>. Absensi mereka dihitung langsung dari pola tersebut tanpa perlu di-assign atau digenerate roster. Kosongkan semua untuk mematikan fitur.</p>
 
