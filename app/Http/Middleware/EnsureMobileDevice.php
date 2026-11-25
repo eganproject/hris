@@ -49,7 +49,8 @@ class EnsureMobileDevice
             return response()->json(['message' => 'Token dipakai dari HP lain.', 'code' => 'device_mismatch'], 401);
         }
 
-        if (! $device->last_seen_at || $device->last_seen_at->lt(now()->subMinutes(5))) {
+        // Dipakai juga untuk status "online" di Kabar (online = aktif ≤ 5 menit).
+        if (! $device->last_seen_at || $device->last_seen_at->lt(now()->subMinute())) {
             $device->forceFill(['last_seen_at' => now()])->saveQuietly();
         }
 

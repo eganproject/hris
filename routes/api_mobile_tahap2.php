@@ -19,6 +19,7 @@ use App\Http\Controllers\Api\Mobile\Hr\NotificationController;
 use App\Http\Controllers\Api\Mobile\Hr\OrgController;
 use App\Http\Controllers\Api\Mobile\Hr\OvertimeController;
 use App\Http\Controllers\Api\Mobile\Hr\PengajuanController;
+use App\Http\Controllers\Api\Mobile\Hr\PeopleController;
 use App\Http\Controllers\Api\Mobile\Hr\ProfileController;
 use App\Http\Controllers\Api\Mobile\Hr\ScheduleController;
 use App\Http\Controllers\Api\Mobile\Hr\SwapController;
@@ -59,6 +60,12 @@ Route::group([], function () {
     // Profil & struktur organisasi
     Route::get('profile', [ProfileController::class, 'show'])->name('profile.show');
     Route::patch('profile', [ProfileController::class, 'update'])->name('profile.update');
+    Route::post('profile/photo', [ProfileController::class, 'updatePhoto'])->name('profile.photo.update');
+    Route::delete('profile/photo', [ProfileController::class, 'destroyPhoto'])->name('profile.photo.destroy');
+
+    // Rekan kerja: siapa yang online + profil publik
+    Route::get('people', [PeopleController::class, 'index'])->name('people.index');
+    Route::get('people/{employee}', [PeopleController::class, 'show'])->whereNumber('employee')->name('people.show');
     Route::get('org', [OrgController::class, 'show'])->name('org.show');
 
     // Menu atasan (karyawan yang punya bawahan; HR bisa mengambil alih persetujuan)

@@ -37,6 +37,7 @@ class KabarController extends HrController
         $posts = Post::query()
             ->visibleToEmployee($me)
             ->when($division, fn ($q) => $q->where('audience', Post::AUDIENCE_DIVISION))
+            ->when($request->integer('author'), fn ($q, int $author) => $q->where('employee_id', $author))
             ->with(['author.jobPosition', 'author.department', 'department'])
             ->withCount(['likes', 'comments' => fn ($q) => $q->whereNull('hidden_at')])
             ->withExists(['likes as liked' => fn ($q) => $q->where('employee_id', $me->id)])

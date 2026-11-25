@@ -66,28 +66,40 @@ class TeamScheduleController extends HrController
 
         $data = $request->validate([
             'employee_id' => ['required', 'integer'],
-            'date' => ['required', 'date', 'after_or_equal:today'],
+            // Satu hari (date) atau beberapa hari sekaligus (dates[]), mis. Sen–Jum.
+            'date' => ['required_without:dates', 'date', 'after_or_equal:today'],
+            'dates' => ['required_without:date', 'array', 'min:1', 'max:31'],
+            'dates.*' => ['date', 'after_or_equal:today'],
             'is_day_off' => ['boolean'],
             'is_wfh' => ['boolean'],
             'shift_id' => [Rule::requiredIf(fn () => ! $request->boolean('is_day_off')), 'nullable', 'integer', Rule::exists('shifts', 'id')->where('is_active', true)],
         ], [
             'date.after_or_equal' => 'Jadwal hari yang sudah lewat hanya bisa diubah HR dari web.',
+            'dates.*.after_or_equal' => 'Jadwal hari yang sudah lewat hanya bisa diubah HR dari web.',
             'shift_id.required' => 'Pilih shift, atau tandai sebagai libur.',
         ]);
 
         $member = $this->member($leader, (int) $data['employee_id']);
         $isDayOff = (bool) ($data['is_day_off'] ?? false);
 
-        $this->generator->override(
-            $member,
-            Carbon::parse($data['date']),
-            $isDayOff ? null : (int) $data['shift_id'],
-            $isDayOff,
-            'Diatur atasan lewat aplikasi HP',
-            (bool) ($data['is_wfh'] ?? false),
-        );
+        $dates = collect($data['dates'] ?? [$data['date']])->map(fn ($d) => Carbon::parse($d)->startOfDay())->unique(fn ($d) => $d->toDateString());
 
-        return $this->ok($this->grid($leader, Carbon::parse($data['date'])->startOfWeek()));
+        DB::transaction(function () use ($dates, $member, $isDayOff, $data): void {
+            foreach ($dates as $date) {
+                $this->generator->override(
+                    $member,
+                    $date,
+                    $isDayOff ? null : (int) $data['shift_id'],
+                    $isDayOff,
+                    'Diatur atasan lewat aplikasi HP',
+                    (bool) ($data['is_wfh'] ?? false),
+                );
+            }
+        });
+
+        $message = $dates->count() > 1 ? 'Jadwal '.$member->full_name.' diatur untuk '.$dates->count().' hari.' : null;
+
+        return $this->ok($this->grid($leader, $dates->first()->copy()->startOfWeek()), 200, $message ? ['message' => $message] : []);
     }
 
     /** Salin jadwal minggu sebelumnya ke minggu ini (hanya hari yang belum lewat). */
@@ -156,18 +168,20 @@ class TeamScheduleController extends HrController
             ->get()
             ->keyBy('employee_id');
 
-        $rows = $members->map(function (Employee $member) use ($weekStart, $weekEnd, $acks) {
+        $rows = $members->map(function (Employee $member) use ($weekStart, $weekEnd, $acks, $leader) {
             $days = $this->days->for($member, $weekStart, $weekEnd);
             $ack = $acks->get($member->id);
 
             return [
                 'employee' => Present::person($member),
+                'manager_name' => $member->manager_id === $leader->id ? null : $member->manager?->full_name,
                 'confirmed' => (bool) $ack?->confirmed_at,
                 'days' => $days->map(fn (array $day) => [
                     'date' => $day['date'],
                     'code' => $this->code($day),
                     'mode' => $day['mode'],
                     'shift_id' => $day['shift']['id'] ?? null,
+                    'shift_name' => $day['shift']['name'] ?? null,
                     'label' => $day['label'],
                     'time' => $day['shift'] ? $day['shift']['start_time'].' – '.$day['shift']['end_time'] : null,
                     'editable' => Carbon::parse($day['date'])->greaterThanOrEqualTo(now()->startOfDay()) && $day['mode'] !== 'leave',
@@ -207,7 +221,7 @@ class TeamScheduleController extends HrController
     {
         return Employee::query()->active()
             ->whereIn('id', $this->teamIds($leader))
-            ->with(['jobPosition', 'department', 'branch'])
+            ->with(['jobPosition', 'department', 'branch', 'manager:id,full_name'])
             ->orderBy('full_name')
             ->get();
     }

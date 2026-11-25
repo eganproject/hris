@@ -9,6 +9,7 @@ use App\Models\OvertimeApproval;
 use App\Support\Mobile\Present;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
 
 /**
  * Profil di aplikasi HP: data diri (yang boleh diubah sendiri sama dengan web:
@@ -54,6 +55,49 @@ class ProfileController extends HrController
         $employee->update($data);
 
         return $this->message('Data pribadi berhasil diperbarui.');
+    }
+
+    /**
+     * Ganti foto profil sendiri dari HP. Standar foto sama dengan web; foto lama
+     * dihapus dari disk. Foto profil terpisah dari selfie absen.
+     */
+    public function updatePhoto(Request $request): JsonResponse
+    {
+        $request->validate([
+            'photo' => ['required', 'image', 'mimes:jpg,jpeg,png,webp', 'max:4096', 'dimensions:min_width=200,min_height=200,max_width=4000,max_height=4000'],
+        ], [
+            'photo.required' => 'Pilih fotonya dulu.',
+            'photo.max' => 'Ukuran foto maksimal 4 MB.',
+            'photo.mimes' => 'Foto harus berformat JPG, PNG, atau WebP.',
+            'photo.dimensions' => 'Resolusi foto minimal 200x200 px.',
+        ]);
+
+        $employee = $this->employee();
+        $previous = $employee->photo_path;
+        $employee->update(['photo_path' => $request->file('photo')->store('employees/photos', 'public')]);
+        $this->forgetPhoto($previous, $employee->photo_path);
+
+        return $this->message('Foto profil diperbarui.', ['photo_url' => $employee->photo_url]);
+    }
+
+    public function destroyPhoto(): JsonResponse
+    {
+        $employee = $this->employee();
+        $previous = $employee->photo_path;
+
+        if ($previous) {
+            $employee->update(['photo_path' => null]);
+            $this->forgetPhoto($previous, null);
+        }
+
+        return $this->message('Foto profil dihapus.', ['photo_url' => null]);
+    }
+
+    private function forgetPhoto(?string $previous, ?string $current): void
+    {
+        if ($previous && $previous !== $current && ! Employee::query()->where('photo_path', $previous)->exists()) {
+            Storage::disk('public')->delete($previous);
+        }
     }
 
     /** Angka badge pada menu atasan (Beranda). */
