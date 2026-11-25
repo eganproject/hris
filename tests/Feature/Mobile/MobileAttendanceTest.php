@@ -246,7 +246,8 @@ test('di luar radius tetap tercatat tapi ditandai; mode ketat menolak; Wi-Fi kan
     mobileClock($token, 'in', $far)
         ->assertJsonPath('data.result', 'accepted')
         ->assertJsonPath('data.within_radius', false)
-        ->assertJsonPath('data.needs_review', true)
+        ->assertJsonPath('data.needs_review', false)
+        ->assertJsonPath('data.flagged', true)
         ->assertJsonPath('data.flags', ['outside_radius']);
     expect(MobileAttendanceLog::query()->latest('id')->value('employee_note'))->toBe('Rapat di kantor klien');
 
@@ -327,21 +328,24 @@ test('selfie biasa tanpa cek kedip diterima tanpa tanda', function () {
         ->assertJsonPath('data.flags', []);
 });
 
-test('absen bertanda masuk antrean tinjauan HR', function () {
-    ['user' => $user] = mobileFixture();
+test('absen bertanda hanya diberi tanda, tanpa persetujuan HR', function () {
+    ['user' => $user, 'employee' => $employee] = mobileFixture();
     $token = mobileLogin($user);
 
     mobileClock($token, 'in', ['latitude' => MOBILE_OFFICE_LAT + 0.01])
         ->assertJsonPath('data.result', 'accepted')
         ->assertJsonPath('data.flags', ['outside_radius']);
 
-    $hr = mobileHr();
     $log = MobileAttendanceLog::query()->firstOrFail();
-    $this->actingAs($hr)->get(route('attendance.mobile.index'))->assertOk()->assertSee('Di luar radius kantor');
-    $this->actingAs($hr)->patch(route('attendance.mobile.review', $log), ['decision' => 'approved'])->assertRedirect();
+    expect($log->review_status)->toBeNull()
+        ->and($employee->attendances()->firstOrFail()->clock_in->format('H:i'))->toBe('07:50');
 
-    expect($log->fresh()->review_status)->toBe('approved')
-        ->and($log->fresh()->reviewed_by)->toBe($hr->id);
+    $hr = mobileHr();
+    $this->actingAs($hr)->get(route('attendance.mobile.index', ['tab' => 'flagged']))
+        ->assertOk()
+        ->assertSee('Di luar radius kantor')
+        ->assertDontSee('Tolak');
+    $this->actingAs($hr)->get(route('attendance.mobile.index', ['tab' => 'review']))->assertOk(); // tautan lama
 });
 
 test('shift malam: absen pulang esok pagi menutup sesi di tanggal absen masuk', function () {

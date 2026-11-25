@@ -16,9 +16,10 @@ use Illuminate\View\View;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 /**
- * Menu HR "Absen Aplikasi HP": tinjauan absen yang ditandai (di luar radius,
- * kedip tidak terverifikasi, terkirim terlambat, ...), percobaan yang ditolak
- * (fake GPS, root), dan persetujuan ganti HP.
+ * Menu HR "Absen Aplikasi HP": daftar absen dari aplikasi, termasuk yang bertanda
+ * (di luar radius, lokasi tidak terbaca, terkirim terlambat, ...) sebagai penanda
+ * saja tanpa persetujuan, percobaan yang ditolak sistem (fake GPS, root), dan
+ * persetujuan ganti HP.
  */
 class MobileAttendanceController extends Controller
 {
@@ -26,17 +27,20 @@ class MobileAttendanceController extends Controller
 
     public function index(Request $request): View
     {
-        $tab = $request->string('tab')->toString() ?: 'review';
-        abort_unless(in_array($tab, ['review', 'all', 'rejected'], true), 404);
+        $tab = $request->string('tab')->toString() ?: 'all';
+        if ($tab === 'review') {
+            $tab = 'flagged'; // tautan lama
+        }
+        abort_unless(in_array($tab, ['all', 'flagged', 'rejected'], true), 404);
 
         $scope = DataScope::forAttendance($request->user());
         $search = $request->string('search')->toString() ?: null;
         $date = $request->string('date')->toString() ?: null;
 
         $logs = MobileAttendanceLog::query()
-            ->with(['employee', 'branch', 'reviewer', 'device'])
+            ->with(['employee', 'branch', 'device'])
             ->tap(fn ($query) => $scope->constrain($query))
-            ->when($tab === 'review', fn ($q) => $q->where('review_status', MobileAttendanceLog::REVIEW_PENDING))
+            ->when($tab === 'flagged', fn ($q) => $q->where('result', MobileAttendanceLog::RESULT_ACCEPTED)->whereNotNull('flags'))
             ->when($tab === 'rejected', fn ($q) => $q->where('result', MobileAttendanceLog::RESULT_REJECTED))
             ->when($search, fn ($q, $s) => $q->whereHas('employee', fn ($e) => $e
                 ->where('full_name', 'like', "%{$s}%")
@@ -50,41 +54,11 @@ class MobileAttendanceController extends Controller
             'logs' => $logs,
             'tab' => $tab,
             'filters' => compact('search', 'date'),
-            'reviewCount' => MobileAttendanceLog::query()
-                ->where('review_status', MobileAttendanceLog::REVIEW_PENDING)
-                ->tap(fn ($query) => $scope->constrain($query))
-                ->count(),
             'pendingDevices' => MobileDevice::query()
                 ->where('status', MobileDevice::STATUS_PENDING)
                 ->tap(fn ($query) => $scope->constrain($query))
                 ->count(),
         ]);
-    }
-
-    public function review(Request $request, MobileAttendanceLog $log): RedirectResponse
-    {
-        DataScope::forAttendance($request->user())->authorize($log->employee);
-        abort_if($log->employee?->user_id === $request->user()->id, 403, 'Absen sendiri tidak bisa ditinjau sendiri.');
-
-        $data = $request->validate([
-            'decision' => ['required', 'in:approved,rejected'],
-            'note' => ['nullable', 'string', 'max:255'],
-        ]);
-
-        $log->forceFill([
-            'review_status' => $data['decision'],
-            'reviewed_by' => $request->user()->id,
-            'reviewed_at' => now(),
-            'review_note' => $data['note'] ?? null,
-        ])->save();
-
-        ActivityLogger::log('mobile-attendance', 'reviewed', ($data['decision'] === 'approved' ? 'Menyetujui' : 'Menolak').' absen aplikasi '.$log->employee?->full_name.' '.$log->captured_at->format('d/m/Y H:i').'.', $log);
-
-        $message = $data['decision'] === 'approved'
-            ? 'Absen ditandai sudah ditinjau dan diterima.'
-            : 'Absen ditandai ditolak. Ubah jamnya di Absensi Harian bila perlu.';
-
-        return back()->with('status', $message);
     }
 
     public function photo(Request $request, MobileAttendanceLog $log): StreamedResponse

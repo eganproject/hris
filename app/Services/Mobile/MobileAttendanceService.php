@@ -20,7 +20,7 @@ use Illuminate\Support\Facades\Storage;
  * Aturan (keputusan Ega 2026-11-25):
  * - Bukti: selfie (kamera langsung, tanpa cek kedip) + lokasi. Tanpa pencocokan wajah.
  * - Hari kantor: titik GPS dibandingkan radius Lokasi Kerja. Di luar radius =
- *   ditandai untuk HR (ditolak hanya bila lokasi memakai mode ketat). Wi-Fi
+ *   diberi tanda di sistem, tanpa perlu persetujuan HR (ditolak hanya bila lokasi memakai mode ketat). Wi-Fi
  *   kantor yang cocok dianggap bukti berada di kantor.
  * - WFH / dinas luar: lokasi dicatat, tanpa radius.
  * - Lokasi palsu / HP root: ditolak, percobaannya tetap dicatat.
@@ -296,8 +296,9 @@ class MobileAttendanceService
             'result' => MobileAttendanceLog::RESULT_ACCEPTED,
             'attendance_id' => $attendance->id,
             'photo_path' => $path,
+            // Tanda hanya penanda di sistem; HR tidak perlu menyetujui apa pun
+            // (keputusan Ega 2026-11-25).
             'flags' => $flags ?: null,
-            'review_status' => $flags ? MobileAttendanceLog::REVIEW_PENDING : null,
         ])->save();
 
         return $log;

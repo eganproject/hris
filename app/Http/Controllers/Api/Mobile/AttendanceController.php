@@ -218,7 +218,9 @@ class AttendanceController extends Controller
             'blink_verified' => $log->blink_verified,
             'flags' => $log->flags ?? [],
             'flag_labels' => $log->flagLabels(),
-            'needs_review' => $log->review_status === MobileAttendanceLog::REVIEW_PENDING,
+            // Tidak ada lagi persetujuan HR; tetap dikirim false untuk APK lama.
+            'needs_review' => false,
+            'flagged' => ! empty($log->flags),
             'attendance' => $log->attendance ? $this->attendanceJson($log->attendance) : null,
         ];
     }

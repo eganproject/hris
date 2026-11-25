@@ -4,9 +4,8 @@
             <div>
                 <p class="text-sm font-medium text-gray-500">Absensi</p>
                 <h1 class="mt-1 text-2xl font-semibold text-gray-950">Absen Aplikasi HP</h1>
-                <p class="mt-1 text-sm text-gray-500">Absen selfie dari aplikasi HP. Absen yang ditandai (di luar radius, lokasi tidak terbaca, terkirim terlambat) tetap tercatat di Absensi Harian dan menunggu tinjauan di sini.</p>
+                <p class="mt-1 text-sm text-gray-500">Absen selfie dari aplikasi HP. Semua absen langsung tercatat di Absensi Harian. Absen di luar radius, lokasi tidak terbaca, atau terkirim terlambat hanya diberi tanda di sini, tanpa perlu persetujuan HR.</p>
             </div>
-            @if ($reviewCount > 0)<x-status-badge tone="warning">{{ $reviewCount }} perlu ditinjau</x-status-badge>@endif
         </section>
 
         @if (session('status'))
@@ -36,7 +35,7 @@
         <section class="overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm">
             <div class="overflow-x-auto">
                 <table class="data-table">
-                    <thead><tr><th>Selfie</th><th>Karyawan</th><th>Waktu</th><th>Lokasi</th><th>Keterangan</th><th class="text-right">Tinjauan</th></tr></thead>
+                    <thead><tr><th>Selfie</th><th>Karyawan</th><th>Waktu</th><th>Lokasi</th><th>Keterangan</th></tr></thead>
                     <tbody>
                         @forelse ($logs as $log)
                             <tr>
@@ -78,26 +77,9 @@
                                     @endif
                                     @if ($log->employee_note)<p class="mt-1 max-w-xs text-xs text-gray-600">Alasan: “{{ $log->employee_note }}”</p>@endif
                                 </td>
-                                <td class="text-right">
-                                    @if ($log->review_status === 'pending')
-                                        @can('mobile-attendance.update')
-                                            <div class="flex justify-end gap-2">
-                                                <form method="POST" action="{{ route('attendance.mobile.review', $log) }}">@csrf @method('PATCH')<input type="hidden" name="decision" value="approved"><button type="submit" class="rounded-md bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-700">Terima</button></form>
-                                                <form method="POST" action="{{ route('attendance.mobile.review', $log) }}" onsubmit="return confirm('Tandai absen ini ditolak? Jam di Absensi Harian tidak berubah otomatis.')">@csrf @method('PATCH')<input type="hidden" name="decision" value="rejected"><button type="submit" class="rounded-md border border-red-200 px-3 py-1.5 text-xs font-semibold text-red-700 hover:bg-red-50">Tolak</button></form>
-                                            </div>
-                                        @else
-                                            <x-status-badge tone="warning">Menunggu</x-status-badge>
-                                        @endcan
-                                    @elseif ($log->review_status)
-                                        <x-status-badge :tone="$log->review_status === 'approved' ? 'success' : 'danger'">{{ $log->review_status === 'approved' ? 'Diterima' : 'Ditolak' }}</x-status-badge>
-                                        @if ($log->reviewer)<p class="mt-1 text-xs text-gray-400">oleh {{ $log->reviewer->name }}</p>@endif
-                                    @else
-                                        <span class="text-xs text-gray-400">—</span>
-                                    @endif
-                                </td>
                             </tr>
                         @empty
-                            <tr><td colspan="6" class="cell-empty">{{ $tab === 'review' ? 'Tidak ada absen yang perlu ditinjau.' : 'Belum ada absen dari aplikasi.' }}</td></tr>
+                            <tr><td colspan="5" class="cell-empty">{{ $tab === 'flagged' ? 'Tidak ada absen bertanda.' : 'Belum ada absen dari aplikasi.' }}</td></tr>
                         @endforelse
                     </tbody>
                 </table>

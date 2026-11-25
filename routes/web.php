@@ -364,10 +364,9 @@ Route::middleware('auth')->group(function () {
         Route::post('daily/process', [AttendanceController::class, 'process'])->middleware('permission:attendance-daily.update')->name('daily.process');
         Route::post('daily/punch', [AttendanceController::class, 'storePunch'])->middleware('permission:attendance-daily.update')->name('daily.punch');
 
-        // Absen lewat aplikasi HP: tinjauan absen bertanda + persetujuan ganti HP.
+        // Absen lewat aplikasi HP: daftar absen (bertanda = penanda saja) + persetujuan ganti HP.
         Route::get('mobile', [MobileAttendanceController::class, 'index'])->middleware('permission:mobile-attendance.view')->name('mobile.index');
         Route::get('mobile/logs/{log}/photo', [MobileAttendanceController::class, 'photo'])->middleware('permission:mobile-attendance.view')->name('mobile.photo');
-        Route::patch('mobile/logs/{log}/review', [MobileAttendanceController::class, 'review'])->middleware('permission:mobile-attendance.update')->name('mobile.review');
         Route::get('mobile/devices', [MobileAttendanceController::class, 'devices'])->middleware('permission:mobile-attendance.view')->name('mobile.devices');
         Route::patch('mobile/devices/{device}', [MobileAttendanceController::class, 'decideDevice'])->middleware('permission:mobile-attendance.update')->name('mobile.devices.decide');
 
