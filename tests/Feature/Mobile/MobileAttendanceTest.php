@@ -430,3 +430,58 @@ function mobileHr(): User
 
     return $hr;
 }
+
+test('masuk di mesin lalu pulang lewat HP', function () {
+    ['user' => $user, 'employee' => $employee] = mobileFixture();
+    $token = mobileLogin($user);
+
+    $employee->punches()->create([
+        'punched_at' => '2026-11-25 07:55:00', 'machine_user_id' => '17', 'status' => 'matched', 'dedup_hash' => 'mesin-masuk',
+    ]);
+    app(\App\Services\AttendanceRollup::class)->rebuild($employee, Carbon::parse('2026-11-25'));
+
+    Carbon::setTestNow(Carbon::parse('2026-11-25 17:05:00', 'Asia/Jakarta'));
+
+    test()->withToken($token)->getJson('/api/mobile/v1/attendance/status')
+        ->assertOk()
+        ->assertJsonPath('data.next_action', 'out')
+        ->assertJsonPath('data.session.open', true);
+
+    // Masuk lagi lewat HP tetap terkunci karena sesi dari mesin masih terbuka.
+    mobileClock($token, 'in')->assertJsonPath('data.result', 'rejected')->assertJsonPath('data.reject_code', 'session_open');
+
+    mobileClock($token, 'out')->assertJsonPath('data.result', 'accepted');
+
+    $attendance = $employee->attendances()->firstOrFail();
+    expect($attendance->clock_in->format('H:i'))->toBe('07:55')
+        ->and($attendance->clock_out->format('H:i'))->toBe('17:05');
+
+    // Sinkron ulang mesin tidak menghapus jam pulang dari HP.
+    app(\App\Services\AttendanceRollup::class)->rebuild($employee, Carbon::parse('2026-11-25'));
+    expect($attendance->fresh()->clock_out->format('H:i'))->toBe('17:05');
+});
+
+test('masuk lewat HP lalu pulang di mesin menutup sesi', function () {
+    ['user' => $user, 'employee' => $employee] = mobileFixture();
+    $token = mobileLogin($user);
+
+    mobileClock($token, 'in')->assertJsonPath('data.result', 'accepted');
+
+    $employee->punches()->create([
+        'punched_at' => '2026-11-25 17:02:00', 'machine_user_id' => '17', 'status' => 'matched', 'dedup_hash' => 'mesin-pulang',
+    ]);
+    app(\App\Services\AttendanceRollup::class)->rebuild($employee, Carbon::parse('2026-11-25'));
+
+    $attendance = $employee->attendances()->firstOrFail();
+    expect($attendance->clock_in->format('H:i'))->toBe('07:50')
+        ->and($attendance->clock_out->format('H:i'))->toBe('17:02');
+
+    Carbon::setTestNow(Carbon::parse('2026-11-25 17:10:00', 'Asia/Jakarta'));
+
+    test()->withToken($token)->getJson('/api/mobile/v1/attendance/status')
+        ->assertOk()
+        ->assertJsonPath('data.session.open', false);
+
+    // Pulang lewat HP sesudahnya tidak ada sesi lagi.
+    mobileClock($token, 'out')->assertJsonPath('data.result', 'rejected')->assertJsonPath('data.reject_code', 'no_session');
+});

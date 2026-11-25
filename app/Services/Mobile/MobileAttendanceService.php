@@ -18,15 +18,15 @@ use Illuminate\Support\Facades\Storage;
  * Absen masuk/pulang dari aplikasi HP.
  *
  * Aturan (keputusan Ega 2026-11-25):
- * - Bukti: selfie (kamera langsung, cek kedip; bila kedip gagal tetap diterima
- *   tapi ditandai) + lokasi. Tanpa pencocokan wajah.
+ * - Bukti: selfie (kamera langsung, tanpa cek kedip) + lokasi. Tanpa pencocokan wajah.
  * - Hari kantor: titik GPS dibandingkan radius Lokasi Kerja. Di luar radius =
  *   ditandai untuk HR (ditolak hanya bila lokasi memakai mode ketat). Wi-Fi
  *   kantor yang cocok dianggap bukti berada di kantor.
  * - WFH / dinas luar: lokasi dicatat, tanpa radius.
  * - Lokasi palsu / HP root: ditolak, percobaannya tetap dicatat.
  * - Setelah absen masuk, absen masuk berikutnya terkunci sampai absen pulang,
- *   paling lama batas sesi (default 23j50m) sejak jam masuk.
+ *   paling lama batas sesi (default 23j50m) sejak jam masuk. Sesi dibaca dari
+ *   tabel absensi, jadi masuk/pulang boleh dicampur antara mesin dan HP.
  * - Jam dan buktinya ditulis ke tabel `attendances` yang sama dengan mesin.
  */
 class MobileAttendanceService
@@ -54,35 +54,34 @@ class MobileAttendanceService
     }
 
     /**
-     * Sesi absen yang masih terbuka: absen masuk terakhir yang diterima, belum
-     * ditutup absen pulang, dan belum lewat batas sesi.
+     * Sesi absen yang masih terbuka: baris absensi yang sudah punya jam masuk,
+     * belum punya jam pulang, dan jam masuknya belum lewat batas sesi.
+     *
+     * Sumbernya tabel `attendances`, bukan hanya log aplikasi, supaya absen bisa
+     * dicampur: masuk di mesin lalu pulang lewat HP, atau sebaliknya. Absen pulang
+     * dari mesin/koreksi otomatis menutup sesi karena mengisi clock_out.
      */
-    public function openSession(Employee $employee, ?Carbon $at = null): ?MobileAttendanceLog
+    public function openSession(Employee $employee, ?Carbon $at = null): ?OpenSession
     {
         $at ??= now();
 
-        $lastIn = $employee->mobileAttendanceLogs()
-            ->where('result', MobileAttendanceLog::RESULT_ACCEPTED)
-            ->where('type', 'in')
-            ->where('captured_at', '<=', $at)
-            ->latest('captured_at')
+        $attendance = $employee->attendances()
+            ->whereNotNull('clock_in')
+            ->whereNull('clock_out')
+            ->where('clock_in', '<=', $at)
+            ->where('clock_in', '>=', $at->copy()->subMinutes(self::sessionMaxMinutes()))
+            ->latest('clock_in')
             ->first();
 
-        if (! $lastIn || $lastIn->captured_at->copy()->addMinutes(self::sessionMaxMinutes())->lessThan($at)) {
+        if (! $attendance) {
             return null;
         }
 
-        $closed = $employee->mobileAttendanceLogs()
-            ->where('result', MobileAttendanceLog::RESULT_ACCEPTED)
-            ->where('type', 'out')
-            ->where('captured_at', '>=', $lastIn->captured_at)
-            ->exists();
-
-        // Baris absensinya bisa juga ditutup lewat jalur lain (koreksi HR, mesin).
-        $attendanceClosed = $lastIn->attendance_id
-            && Attendance::query()->whereKey($lastIn->attendance_id)->whereNotNull('clock_out')->exists();
-
-        return ($closed || $attendanceClosed) ? null : $lastIn;
+        return new OpenSession(
+            $attendance,
+            Carbon::parse($attendance->clock_in),
+            Carbon::parse($attendance->work_date)->startOfDay(),
+        );
     }
 
     /**
@@ -197,7 +196,7 @@ class MobileAttendanceService
 
         if ($type === 'in') {
             if ($open) {
-                return $this->reject($log, $photo, 'session_open', 'Kamu masih tercatat bekerja sejak '.$open->captured_at->translatedFormat('d M H:i').'. Absen pulang dulu.');
+                return $this->reject($log, $photo, 'session_open', 'Kamu masih tercatat bekerja sejak '.$open->clockInAt->translatedFormat('d M H:i').'. Absen pulang dulu.');
             }
 
             $workDate = $captured->copy()->startOfDay();
@@ -211,7 +210,7 @@ class MobileAttendanceService
                 return $this->reject($log, $photo, 'no_session', 'Belum ada absen masuk yang terbuka (atau sudah lewat batas '.$this->sessionLabel().'). Ajukan koreksi absensi.');
             }
 
-            $workDate = $open->work_date->copy();
+            $workDate = $open->workDate->copy();
             $existing = $open->attendance;
         }
 

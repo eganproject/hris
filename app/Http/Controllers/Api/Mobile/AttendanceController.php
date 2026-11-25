@@ -33,7 +33,7 @@ class AttendanceController extends Controller
         $now = now();
         $open = $this->service->openSession($employee, $now);
 
-        $date = $open ? $open->work_date->copy() : $now->copy()->startOfDay();
+        $date = $open ? $open->workDate->copy() : $now->copy()->startOfDay();
         $attendance = $open?->attendance ?? $employee->attendances()->whereDate('work_date', $date->toDateString())->first();
         $remote = $this->service->remoteStatusOn($employee, $date);
         $branch = $employee->branch;
@@ -49,8 +49,8 @@ class AttendanceController extends Controller
             'work_date' => $date->toDateString(),
             'session' => $open ? [
                 'open' => true,
-                'clock_in_at' => $open->captured_at->toIso8601String(),
-                'expires_at' => $open->captured_at->copy()->addMinutes($maxMinutes)->toIso8601String(),
+                'clock_in_at' => $open->clockInAt->toIso8601String(),
+                'expires_at' => $open->clockInAt->copy()->addMinutes($maxMinutes)->toIso8601String(),
             ] : ['open' => false],
             'next_action' => $open ? 'out' : 'in',
             'attendance' => $attendance ? $this->attendanceJson($attendance) : null,
