@@ -275,6 +275,31 @@
                         </a>
                     @endcanany
 
+                    @canany(['announcements.view', 'kabar-moderation.view'])
+                        @php $g = request()->routeIs('kabar.*'); @endphp
+                        <div @class(['sidebar-group', 'is-open' => $g]) data-sidebar-group="kabar">
+                            <button type="button" data-sidebar-group-toggle aria-expanded="{{ $g ? 'true' : 'false' }}" class="sidebar-group-toggle flex w-full items-center gap-2.5 rounded px-2.5 py-1.5 text-left transition hover:bg-white/70">
+                                <svg class="size-4 shrink-0 text-gray-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 11.5a8.4 8.4 0 0 1-12.3 7.5L3 21l2-5.3A8.5 8.5 0 1 1 21 11.5z"></path></svg>
+                                <span class="sidebar-section-label flex-1 truncate text-[11px] font-semibold uppercase tracking-wide text-gray-500">Kabar</span>
+                                <svg class="sidebar-group-chevron size-3.5 shrink-0 text-gray-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 6 6 6-6 6"></path></svg>
+                            </button>
+                            <div class="sidebar-group-items space-y-0.5" data-sidebar-group-items>
+                                @can('announcements.view')
+                                    <a href="{{ route('kabar.announcements.index') }}" @class(['sidebar-nav-link flex items-center gap-2.5 rounded px-2.5 py-1.5 text-[13px] font-medium transition', 'bg-white text-gray-950 shadow-xs ring-1 ring-gray-200' => request()->routeIs('kabar.announcements.*'), 'text-gray-600 hover:bg-white hover:text-gray-950' => ! request()->routeIs('kabar.announcements.*')]) title="Pengumuman HR">
+                                        <svg class="size-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 11v2a1 1 0 0 0 1 1h2l5 4V6L6 10H4a1 1 0 0 0-1 1z"></path><path d="M15 8.5a5 5 0 0 1 0 7M18 6a8.5 8.5 0 0 1 0 12"></path></svg>
+                                        <span class="sidebar-label truncate">Pengumuman HR</span>
+                                    </a>
+                                @endcan
+                                @can('kabar-moderation.view')
+                                    <a href="{{ route('kabar.moderation.index') }}" @class(['sidebar-nav-link flex items-center gap-2.5 rounded px-2.5 py-1.5 text-[13px] font-medium transition', 'bg-white text-gray-950 shadow-xs ring-1 ring-gray-200' => request()->routeIs('kabar.moderation.*'), 'text-gray-600 hover:bg-white hover:text-gray-950' => ! request()->routeIs('kabar.moderation.*')]) title="Moderasi Kabar">
+                                        <svg class="size-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3 4 6v6c0 5 3.5 8 8 9 4.5-1 8-4 8-9V6z"></path><path d="m9 12 2 2 4-4"></path></svg>
+                                        <span class="sidebar-label truncate">Moderasi Kabar</span>
+                                    </a>
+                                @endcan
+                            </div>
+                        </div>
+                    @endcanany
+
                     {{-- Seluruh grup ini menjawab 403 tanpa data karyawan yang tertaut,
                          jadi keterkaitan itu yang menentukan grupnya muncul — bukan hak
                          akses. Hak akses tetap menyaring tiap menunya di dalam. --}}

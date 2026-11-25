@@ -65,8 +65,18 @@ return [
             'leave' => ['label' => 'Cuti & Izin', 'actions' => ['view', 'create', 'update', 'delete']],
             'leave-types' => ['label' => 'Jenis Cuti', 'actions' => ['view', 'create', 'update', 'delete']],
             'leave-balances' => ['label' => 'Kuota Cuti', 'actions' => ['view', 'update']],
-            'overtime' => ['label' => 'Lembur', 'actions' => ['view']],
+            // "Ubah" = HR boleh mengambil alih keputusan lembur (mis. atasan sedang cuti)
+            // dari aplikasi HP. Alur normalnya tetap diputuskan atasan langsung.
+            'overtime' => ['label' => 'Lembur', 'actions' => ['view', 'update']],
             'swaps' => ['label' => 'Tukar Jadwal', 'actions' => ['view', 'update']],
+        ],
+
+        // Tab "Kabar" di aplikasi HP: pengumuman resmi HR dan moderasi postingan
+        // karyawan. Dipisah karena menulis pengumuman ke seluruh perusahaan dan
+        // menyembunyikan postingan orang lain adalah dua wewenang yang berbeda.
+        'Kabar' => [
+            'announcements' => ['label' => 'Pengumuman HR', 'actions' => ['view', 'create', 'update', 'delete']],
+            'kabar-moderation' => ['label' => 'Moderasi Kabar', 'actions' => ['view', 'update']],
         ],
 
         'Aset' => [
@@ -150,7 +160,7 @@ return [
             'attendance-map.view',
             'punches.view', 'punches.update',
             'corrections.view', 'corrections.update',
-            'overtime.view',
+            'overtime.view', 'overtime.update',
             'swaps.view', 'swaps.update',
             'devices.view', 'devices.create', 'devices.update', 'devices.delete',
             'shifts.view', 'shifts.create', 'shifts.update', 'shifts.delete',
@@ -165,6 +175,8 @@ return [
             'reports.leave.view', 'reports.leave.export',
             'reports.assets.view', 'reports.assets.export',
             'organization.view',
+            'announcements.view', 'announcements.create', 'announcements.update', 'announcements.delete',
+            'kabar-moderation.view', 'kabar-moderation.update',
             'branches.view', 'branches.create', 'branches.update', 'branches.delete',
             'departments.view', 'departments.create', 'departments.update', 'departments.delete',
             'job-positions.view', 'job-positions.create', 'job-positions.update', 'job-positions.delete',

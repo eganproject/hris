@@ -2,10 +2,9 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Attendance;
 use App\Models\Employee;
 use App\Models\OvertimeApproval;
-use App\Support\ApprovalNotifier;
+use App\Services\OvertimeWorkflow;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
@@ -49,6 +48,8 @@ class MyOvertimeController extends Controller
         ]);
     }
 
+    public function __construct(private readonly OvertimeWorkflow $workflow) {}
+
     public function store(Request $request): RedirectResponse
     {
         $employee = $this->employee();
@@ -69,56 +70,9 @@ class MyOvertimeController extends Controller
             'reason' => 'uraian pekerjaan',
         ]);
 
-        $minutes = OvertimeApproval::minutesBetween($data['start_time'], $data['end_time']);
-
-        if ($minutes <= 0) {
-            return back()->withInput()->withErrors(['end_time' => 'Jam selesai harus menghasilkan durasi lembur lebih dari 0 menit.']);
-        }
-
-        if ($minutes > OvertimeApproval::MAX_REQUEST_MINUTES) {
-            $maxHours = intdiv(OvertimeApproval::MAX_REQUEST_MINUTES, 60);
-
-            return back()->withInput()->withErrors(['end_time' => "Durasi lembur tidak wajar (lebih dari {$maxHours} jam). Periksa kembali jam mulai & selesai."]);
-        }
-
-        // Satu baris per karyawan per tanggal (unique key di tabelnya), jadi tanggal
-        // yang sudah punya pengajuan tidak boleh diinsert lagi.
-        $existing = OvertimeApproval::query()
-            ->where('employee_id', $employee->id)
-            ->where('work_date', $data['work_date'])
-            ->first();
-
-        if ($existing && $existing->status !== OvertimeApproval::STATUS_REJECTED) {
-            return back()->withInput()->withErrors(['work_date' => 'Anda sudah mengajukan lembur untuk tanggal ini.']);
-        }
-
-        $computed = (int) (Attendance::query()
-            ->where('employee_id', $employee->id)
-            ->where('work_date', $data['work_date'])
-            ->value('overtime_minutes') ?? 0);
-
-        // Pengajuan yang pernah ditolak boleh diperbaiki dan diajukan ulang: barisnya
-        // dipakai ulang (insert baru menabrak unique key) dan jejak keputusan lama
-        // dibersihkan agar catatan penolakan sebelumnya tidak ikut terbawa.
-        $overtime = OvertimeApproval::query()->updateOrCreate([
-            'employee_id' => $employee->id,
-            'work_date' => $data['work_date'],
-        ], [
-            'supervisor_id' => $employee->manager_id,
-            'start_time' => $data['start_time'],
-            'end_time' => $data['end_time'],
-            'requested_minutes' => $minutes,
-            'reason' => $data['reason'],
-            'requested_at' => now(),
-            'computed_minutes' => $computed,
-            'approved_minutes' => 0,
-            'status' => OvertimeApproval::STATUS_PENDING,
-            'reviewed_by' => null,
-            'decided_at' => null,
-            'notes' => null,
-        ]);
-
-        app(ApprovalNotifier::class)->overtimeRequested($overtime);
+        // Aturan durasi & satu-pengajuan-per-tanggal ada di OvertimeWorkflow (dipakai
+        // juga oleh aplikasi HP); pelanggarannya kembali sebagai error validasi biasa.
+        $this->workflow->submit($employee, $data);
 
         return redirect()->route('my-overtime.index')->with('status', 'Pengajuan lembur berhasil dikirim ke atasan Anda.');
     }
@@ -129,10 +83,7 @@ class MyOvertimeController extends Controller
 
         abort_unless($overtime->employee_id === $employee->id && $overtime->status === OvertimeApproval::STATUS_PENDING, 403);
 
-        // Atasan sedang menunggu keputusan: beri tahu sebelum datanya hilang.
-        app(ApprovalNotifier::class)->overtimeCancelled($overtime);
-
-        $overtime->delete();
+        $this->workflow->cancel($overtime);
 
         return redirect()->route('my-overtime.index')->with('status', 'Pengajuan lembur dibatalkan.');
     }
@@ -141,18 +92,11 @@ class MyOvertimeController extends Controller
     {
         $this->authorizeSupervisor($overtime);
 
-        $approved = $request->filled('approved_minutes')
-            ? max(0, min($overtime->requested_minutes, (int) $request->input('approved_minutes')))
-            : $overtime->requested_minutes;
-
-        $overtime->update([
-            'status' => OvertimeApproval::STATUS_APPROVED,
-            'approved_minutes' => $approved,
-            'reviewed_by' => auth()->id(),
-            'decided_at' => now(),
-        ]);
-
-        app(ApprovalNotifier::class)->overtimeDecided($overtime);
+        $this->workflow->approve(
+            $overtime,
+            $request->user(),
+            $request->filled('approved_minutes') ? (int) $request->input('approved_minutes') : null,
+        );
 
         return redirect()->route('my-overtime.index')->with('status', 'Pengajuan lembur bawahan disetujui.');
     }
@@ -161,15 +105,7 @@ class MyOvertimeController extends Controller
     {
         $this->authorizeSupervisor($overtime);
 
-        $overtime->update([
-            'status' => OvertimeApproval::STATUS_REJECTED,
-            'approved_minutes' => 0,
-            'reviewed_by' => auth()->id(),
-            'decided_at' => now(),
-            'notes' => $request->string('notes')->toString() ?: null,
-        ]);
-
-        app(ApprovalNotifier::class)->overtimeDecided($overtime);
+        $this->workflow->reject($overtime, $request->user(), $request->string('notes')->toString() ?: null);
 
         return redirect()->route('my-overtime.index')->with('status', 'Pengajuan lembur bawahan ditolak.');
     }
@@ -187,14 +123,7 @@ class MyOvertimeController extends Controller
             return back()->with('error', 'Persetujuan hanya bisa dibatalkan pada hari yang sama saat disetujui. Hubungi HR untuk koreksi lembur hari sebelumnya.');
         }
 
-        $overtime->update([
-            'status' => OvertimeApproval::STATUS_PENDING,
-            'approved_minutes' => 0,
-            'reviewed_by' => null,
-            'decided_at' => null,
-        ]);
-
-        app(ApprovalNotifier::class)->overtimeApprovalRevoked($overtime);
+        $this->workflow->revoke($overtime);
 
         return redirect()->route('my-overtime.index')->with('status', 'Persetujuan dibatalkan. Pengajuan kembali menunggu keputusan Anda.');
     }
