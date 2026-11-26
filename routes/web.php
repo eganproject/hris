@@ -106,6 +106,7 @@ Route::middleware('auth')->group(function () {
 
     Route::get('settings', [SettingsController::class, 'index'])->middleware('permission:settings.view')->name('settings.index');
     Route::put('settings', [SettingsController::class, 'update'])->middleware('permission:settings.update')->name('settings.update');
+    Route::post('settings/push-test', [SettingsController::class, 'pushTest'])->middleware('permission:settings.update')->name('settings.push-test');
 
     // Kabar (tab di aplikasi HP): pengumuman HR dan moderasi postingan karyawan.
     // Rute ber-wildcard dideklarasikan setelah "create".

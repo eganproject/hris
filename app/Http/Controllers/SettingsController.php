@@ -2,12 +2,15 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Employee;
+use App\Models\MobileDevice;
 use App\Models\SchedulePattern;
 use App\Models\Setting;
 use App\Services\DefaultOfficeSchedule;
 use App\Services\Mobile\MobileAttendanceService;
 use App\Services\Push\AttendancePushNotifier;
 use App\Services\Push\FcmClient;
+use App\Services\Push\PushNotifier;
 use App\Support\ActivityLogger;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -36,6 +39,12 @@ class SettingsController extends Controller
             'pushOut' => Setting::getBool(AttendancePushNotifier::OUT_KEY, true),
             'pushMachine' => Setting::getBool(AttendancePushNotifier::MACHINE_KEY, true),
             'pushConfigured' => $fcm->configured(),
+            'pushDeviceCount' => MobileDevice::query()->where('status', MobileDevice::STATUS_ACTIVE)->whereNotNull('push_token')->count(),
+            'pushEmployees' => Employee::query()
+                ->whereNotNull('user_id')
+                ->where('employment_status', 'active')
+                ->orderBy('full_name')
+                ->get(['id', 'full_name', 'employee_number']),
             'pushTemplates' => [
                 'in' => AttendancePushNotifier::template('in'),
                 'out' => AttendancePushNotifier::template('out'),
@@ -141,6 +150,57 @@ class SettingsController extends Controller
         );
 
         return back()->with('status', 'Pengaturan berhasil disimpan.');
+    }
+
+    /**
+     * Kirim notifikasi uji ke HP seorang karyawan dan tampilkan hasilnya apa
+     * adanya, supaya HR bisa melihat di mana notifikasi macet: HP belum
+     * terdaftar, Firebase belum tersambung, atau Firebase menolak.
+     */
+    public function pushTest(Request $request, FcmClient $fcm, PushNotifier $push): RedirectResponse
+    {
+        $data = $request->validate(['employee_id' => ['required', 'integer', 'exists:employees,id']], [], ['employee_id' => 'karyawan']);
+        $employee = Employee::query()->with('user')->findOrFail($data['employee_id']);
+        $name = $employee->full_name;
+
+        if (! $fcm->configured()) {
+            return back()->with('push_test', ['ok' => false, 'lines' => ['Firebase belum tersambung di server, jadi notifikasi tidak bisa dikirim.']]);
+        }
+
+        if (! $employee->user) {
+            return back()->with('push_test', ['ok' => false, 'lines' => [$name.' belum punya akun login HRIS, jadi tidak bisa memakai aplikasi HP.']]);
+        }
+
+        if (PushNotifier::devicesFor($employee->user)->isEmpty()) {
+            $last = MobileDevice::query()->where('user_id', $employee->user->id)->latest('last_seen_at')->first();
+
+            return back()->with('push_test', ['ok' => false, 'lines' => array_values(array_filter([
+                'HP '.$name.' belum terdaftar untuk notifikasi.',
+                $last ? 'HP terakhir dipakai: '.($last->model ?: 'tanpa nama').', '.($last->last_seen_at?->diffForHumans() ?? 'belum pernah').'.' : 'Karyawan ini belum pernah login di aplikasi HP.',
+                'Pastikan APK yang terpasang adalah versi terbaru (dengan notifikasi), buka aplikasinya sekali dalam keadaan login, lalu pilih "Izinkan" saat diminta izin notifikasi.',
+            ]))]);
+        }
+
+        $results = $push->sendDetailed(
+            $employee->user,
+            'Uji notifikasi HRIS',
+            'Halo '.(strtok((string) $name, ' ') ?: $name).', ini notifikasi uji dari HR. Kalau pesan ini muncul, notifikasi absen sudah siap.',
+            ['category' => 'test'],
+        );
+
+        $lines = [];
+        foreach ($results as $r) {
+            $label = $r['device']->model ?: 'HP';
+            $lines[] = match ($r['result']) {
+                FcmClient::SENT => $label.': terkirim ke Firebase. Seharusnya muncul di HP dalam beberapa detik.',
+                FcmClient::INVALID_TOKEN => $label.': HP ini sudah tidak terdaftar di Firebase (aplikasi dihapus/dipasang ulang). Minta karyawan membuka aplikasinya lagi.',
+                default => $label.': gagal dikirim. '.($r['error'] ?? ''),
+            };
+        }
+
+        $ok = collect($results)->contains('result', FcmClient::SENT);
+
+        return back()->with('push_test', ['ok' => $ok, 'lines' => $lines]);
     }
 
     /**
