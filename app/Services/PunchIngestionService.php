@@ -6,6 +6,7 @@ use App\Models\AttendancePunch;
 use App\Models\Device;
 use App\Models\Employee;
 use App\Models\EmployeeDevice;
+use App\Services\Push\AttendancePushNotifier;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 
@@ -16,9 +17,17 @@ use Illuminate\Support\Collection;
  */
 class PunchIngestionService
 {
-    public function __construct(private readonly AttendanceRollup $rollup)
-    {
-    }
+    /**
+     * Hanya tap yang masuk selambat-lambatnya selama ini yang dikabarkan ke HP
+     * karyawan. Mesin yang baru tersambung lagi sering mengirim tumpukan tap lama
+     * sekaligus; itu tidak perlu dijadikan notifikasi.
+     */
+    private const PUSH_RECENT_MINUTES = 180;
+
+    public function __construct(
+        private readonly AttendanceRollup $rollup,
+        private readonly AttendancePushNotifier $push,
+    ) {}
 
     /**
      * Ingest a tab-separated ATTLOG body. Each line: PIN, DateTime, State, Verify, ...
@@ -27,6 +36,7 @@ class PunchIngestionService
     public function ingestAttlog(Device $device, string $body): int
     {
         $affected = collect(); // [ "employeeId|Y-m-d" => [employee, date] ]
+        $recent = []; // employeeId => true bila ada tap baru yang masih segar
         $new = 0;
 
         foreach (preg_split('/\r\n|\r|\n/', trim($body)) as $line) {
@@ -65,6 +75,10 @@ class PunchIngestionService
             $new++;
 
             if ($employee) {
+                if ($punchedAt->greaterThanOrEqualTo(now()->subMinutes(self::PUSH_RECENT_MINUTES))) {
+                    $recent[$employee->id] = true;
+                }
+
                 // A punch may belong to its own day or the previous night shift.
                 foreach ([$punchedAt->copy()->subDay(), $punchedAt->copy()] as $date) {
                     $key = $employee->id.'|'.$date->toDateString();
@@ -73,9 +87,63 @@ class PunchIngestionService
             }
         }
 
+        $notify = $affected->filter(fn (array $pair) => isset($recent[$pair[0]->id]));
+        $before = $this->clockSnapshot($notify);
+
         $this->rebuildAll($affected);
 
+        $this->notifyClockChanges($device, $notify, $before);
+
         return $new;
+    }
+
+    /**
+     * @param  Collection<string, array{0: Employee, 1: Carbon}>  $pairs
+     * @return array<string, array{in: ?string, out: ?string}>
+     */
+    private function clockSnapshot(Collection $pairs): array
+    {
+        $snapshot = [];
+
+        foreach ($pairs as $key => [$employee, $date]) {
+            $attendance = $employee->attendances()->whereDate('work_date', $date->toDateString())->first();
+            $snapshot[$key] = [
+                'in' => $attendance?->clock_in?->format('Y-m-d H:i'),
+                'out' => $attendance?->clock_out?->format('Y-m-d H:i'),
+            ];
+        }
+
+        return $snapshot;
+    }
+
+    /**
+     * Bandingkan jam masuk/pulang sebelum dan sesudah dihitung ulang: yang baru
+     * terisi (atau jam pulang yang bergeser) adalah absen yang barusan terjadi.
+     *
+     * @param  Collection<string, array{0: Employee, 1: Carbon}>  $pairs
+     * @param  array<string, array{in: ?string, out: ?string}>  $before
+     */
+    private function notifyClockChanges(Device $device, Collection $pairs, array $before): void
+    {
+        if ($pairs->isEmpty()) {
+            return;
+        }
+
+        $after = $this->clockSnapshot($pairs);
+
+        foreach ($pairs as $key => [$employee]) {
+            foreach (['in', 'out'] as $type) {
+                $now = $after[$key][$type] ?? null;
+
+                if ($now !== null && $now !== ($before[$key][$type] ?? null)) {
+                    $at = Carbon::parse($now);
+
+                    if ($at->greaterThanOrEqualTo(now()->subMinutes(self::PUSH_RECENT_MINUTES))) {
+                        $this->push->clocked($employee, $type, $at, AttendancePushNotifier::SOURCE_MACHINE, $device->name);
+                    }
+                }
+            }
+        }
     }
 
     /**

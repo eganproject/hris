@@ -108,6 +108,8 @@ class AuthController extends Controller
 
     public function logout(Request $request): JsonResponse
     {
+        // HP yang keluar tidak boleh lagi menerima notifikasi akun ini.
+        $request->attributes->get('mobile_device')?->forceFill(['push_token' => null, 'push_token_updated_at' => now()])->save();
         $request->user()->currentAccessToken()?->delete();
 
         return response()->json(['data' => ['ok' => true]]);

@@ -6,6 +6,8 @@ use App\Models\SchedulePattern;
 use App\Models\Setting;
 use App\Services\DefaultOfficeSchedule;
 use App\Services\Mobile\MobileAttendanceService;
+use App\Services\Push\AttendancePushNotifier;
+use App\Services\Push\FcmClient;
 use App\Support\ActivityLogger;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -14,7 +16,7 @@ use Illuminate\View\View;
 
 class SettingsController extends Controller
 {
-    public function index(): View
+    public function index(FcmClient $fcm): View
     {
         // Jumlah pemakai ditampilkan agar mencabut tanda dari sebuah pola tidak
         // dilakukan tanpa tahu berapa karyawan yang masih memakainya.
@@ -30,6 +32,10 @@ class SettingsController extends Controller
             'officePatternIds' => $patterns->where('is_office_pattern', true)->pluck('id')->all(),
             'officePatternId' => (int) Setting::get(DefaultOfficeSchedule::SETTING_KEY) ?: null,
             'mobileSessionMaxMinutes' => MobileAttendanceService::sessionMaxMinutes(),
+            'pushIn' => Setting::getBool(AttendancePushNotifier::IN_KEY, true),
+            'pushOut' => Setting::getBool(AttendancePushNotifier::OUT_KEY, true),
+            'pushMachine' => Setting::getBool(AttendancePushNotifier::MACHINE_KEY, true),
+            'pushConfigured' => $fcm->configured(),
         ]);
     }
 
@@ -60,6 +66,11 @@ class SettingsController extends Controller
             'autogenerate' => Setting::getBool('roster_autogenerate', true),
             'patterns' => SchedulePattern::query()->where('is_office_pattern', true)->pluck('id')->all(),
             'default' => (int) Setting::get(DefaultOfficeSchedule::SETTING_KEY) ?: null,
+            'push' => [
+                'in' => Setting::getBool(AttendancePushNotifier::IN_KEY, true),
+                'out' => Setting::getBool(AttendancePushNotifier::OUT_KEY, true),
+                'machine' => Setting::getBool(AttendancePushNotifier::MACHINE_KEY, true),
+            ],
         ];
 
         Setting::set('roster_autogenerate', $request->boolean('roster_autogenerate') ? '1' : '0');
@@ -67,6 +78,14 @@ class SettingsController extends Controller
         $this->syncOfficePatterns(array_map('intval', $validated['office_pattern_ids'] ?? []));
 
         Setting::set(DefaultOfficeSchedule::SETTING_KEY, (string) ($request->integer('default_office_pattern_id') ?: ''));
+
+        // Bagian notifikasi selalu ikut terkirim bersama formulir ini (penanda
+        // push_settings), jadi kotak yang tidak dicentang berarti dimatikan.
+        if ($request->has('push_settings')) {
+            Setting::set(AttendancePushNotifier::IN_KEY, $request->boolean('push_attendance_in') ? '1' : '0');
+            Setting::set(AttendancePushNotifier::OUT_KEY, $request->boolean('push_attendance_out') ? '1' : '0');
+            Setting::set(AttendancePushNotifier::MACHINE_KEY, $request->boolean('push_attendance_machine') ? '1' : '0');
+        }
 
         $sessionBefore = MobileAttendanceService::sessionMaxMinutes();
         if ($request->filled('mobile_session_hours')) {
@@ -88,6 +107,9 @@ class SettingsController extends Controller
                 'pola_jam_kantor' => ['dari' => implode(', ', $before['patterns']) ?: '(kosong)', 'jadi' => implode(', ', array_map('intval', $validated['office_pattern_ids'] ?? [])) ?: '(kosong)'],
                 'pola_default' => ['dari' => $before['default'] ?: '(kosong)', 'jadi' => $request->integer('default_office_pattern_id') ?: '(kosong)'],
                 'batas_sesi_absen_hp_menit' => ['dari' => $sessionBefore, 'jadi' => MobileAttendanceService::sessionMaxMinutes()],
+                'notif_absen_masuk' => ['dari' => $before['push']['in'], 'jadi' => Setting::getBool(AttendancePushNotifier::IN_KEY, true)],
+                'notif_absen_pulang' => ['dari' => $before['push']['out'], 'jadi' => Setting::getBool(AttendancePushNotifier::OUT_KEY, true)],
+                'notif_absen_mesin' => ['dari' => $before['push']['machine'], 'jadi' => Setting::getBool(AttendancePushNotifier::MACHINE_KEY, true)],
             ]],
         );
 

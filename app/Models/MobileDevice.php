@@ -47,9 +47,13 @@ class MobileDevice extends Model
         'last_seen_at',
     ];
 
+    /** @var list<string> */
+    protected $hidden = ['push_token'];
+
     protected function casts(): array
     {
         return [
+            'push_token_updated_at' => 'datetime',
             'decided_at' => 'datetime',
             'last_seen_at' => 'datetime',
             'consented_at' => 'datetime',

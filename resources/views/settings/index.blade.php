@@ -42,6 +42,50 @@
                 </div>
 
                 <div class="mt-6 border-t border-gray-100 pt-6">
+                    <input type="hidden" name="push_settings" value="1">
+                    <span class="block text-sm font-medium text-gray-800">Notifikasi absen ke HP karyawan</span>
+                    <p class="mt-1 text-xs text-gray-500">Karyawan menerima notifikasi di aplikasi HP setiap absennya tercatat, walau aplikasinya sedang ditutup. Juga tercatat di daftar notifikasi aplikasi.</p>
+                    @if ($pushConfigured)
+                        <p class="mt-2 text-xs font-medium text-emerald-700">Firebase tersambung.</p>
+                    @else
+                        <p class="mt-2 text-xs text-amber-700">Firebase belum tersambung: notifikasi hanya masuk ke daftar notifikasi aplikasi, belum muncul di layar HP. Isi <code>FIREBASE_CREDENTIALS</code> di file .env server.</p>
+                    @endif
+                    <label class="mt-4 flex items-start justify-between gap-4">
+                        <span>
+                            <span class="block text-sm font-medium text-gray-800">Absen masuk</span>
+                            <span class="mt-1 block text-xs text-gray-500">Kirim notifikasi saat absen masuk tercatat.</span>
+                        </span>
+                        <span class="relative inline-flex flex-none">
+                            <input type="checkbox" name="push_attendance_in" value="1" @checked($pushIn) class="peer sr-only">
+                            <span class="h-6 w-11 rounded-full bg-gray-300 transition peer-checked:bg-primary"></span>
+                            <span class="absolute left-0.5 top-0.5 size-5 rounded-full bg-white shadow transition peer-checked:translate-x-5"></span>
+                        </span>
+                    </label>
+                    <label class="mt-4 flex items-start justify-between gap-4">
+                        <span>
+                            <span class="block text-sm font-medium text-gray-800">Absen pulang</span>
+                            <span class="mt-1 block text-xs text-gray-500">Kirim notifikasi saat absen pulang tercatat.</span>
+                        </span>
+                        <span class="relative inline-flex flex-none">
+                            <input type="checkbox" name="push_attendance_out" value="1" @checked($pushOut) class="peer sr-only">
+                            <span class="h-6 w-11 rounded-full bg-gray-300 transition peer-checked:bg-primary"></span>
+                            <span class="absolute left-0.5 top-0.5 size-5 rounded-full bg-white shadow transition peer-checked:translate-x-5"></span>
+                        </span>
+                    </label>
+                    <label class="mt-4 flex items-start justify-between gap-4">
+                        <span>
+                            <span class="block text-sm font-medium text-gray-800">Termasuk absen dari mesin absensi</span>
+                            <span class="mt-1 block text-xs text-gray-500">Jika dimatikan, hanya absen dari tablet kantor yang dikirimi notifikasi.</span>
+                        </span>
+                        <span class="relative inline-flex flex-none">
+                            <input type="checkbox" name="push_attendance_machine" value="1" @checked($pushMachine) class="peer sr-only">
+                            <span class="h-6 w-11 rounded-full bg-gray-300 transition peer-checked:bg-primary"></span>
+                            <span class="absolute left-0.5 top-0.5 size-5 rounded-full bg-white shadow transition peer-checked:translate-x-5"></span>
+                        </span>
+                    </label>
+                </div>
+
+                <div class="mt-6 border-t border-gray-100 pt-6">
                     <span class="block text-sm font-medium text-gray-800">Pola jam kantor</span>
                     <p class="mt-1 text-xs text-gray-500">Centang pola yang boleh dipilih untuk karyawan bertanda <span class="font-medium">"Ikuti jam kantor (tanpa penjadwalan)"</span>. Absensi mereka dihitung langsung dari pola tersebut tanpa perlu di-assign atau digenerate roster. Kosongkan semua untuk mematikan fitur.</p>
 
