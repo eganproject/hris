@@ -46,7 +46,7 @@
                     <span class="block text-sm font-medium text-gray-800">Notifikasi absen ke HP karyawan</span>
                     <p class="mt-1 text-xs text-gray-500">Karyawan menerima notifikasi di aplikasi HP setiap absennya tercatat, walau aplikasinya sedang ditutup. Juga tercatat di daftar notifikasi aplikasi.</p>
                     @if ($pushConfigured)
-                        <p class="mt-2 text-xs font-medium text-emerald-700">Firebase tersambung.</p>
+                        <p class="mt-2 text-xs font-medium text-emerald-700">Firebase tersambung. HP yang terdaftar menerima notifikasi: {{ $pushDeviceCount }}.</p>
                     @else
                         <p class="mt-2 text-xs text-amber-700">Firebase belum tersambung: notifikasi hanya masuk ke daftar notifikasi aplikasi, belum muncul di layar HP. Isi <code>FIREBASE_CREDENTIALS</code> di file .env server.</p>
                     @endif
@@ -159,6 +159,35 @@
                 <div class="mt-6 flex justify-end">
                     <button type="submit" class="rounded-md bg-primary px-5 py-2.5 text-sm font-semibold text-white shadow-xs transition hover:bg-primary-hover">Simpan Pengaturan</button>
                 </div>
+            </form>
+        </section>
+
+        <section id="uji-notifikasi" class="rounded-lg border border-gray-200 bg-white p-6 shadow-sm">
+            <h2 class="text-sm font-semibold text-gray-950">Uji notifikasi ke HP</h2>
+            <p class="mt-1 text-xs text-gray-500">Kirim notifikasi percobaan ke HP seorang karyawan untuk memastikan notifikasi muncul walau aplikasinya ditutup. Hasilnya menunjukkan di mana masalahnya bila tidak muncul.</p>
+
+            @if (session('push_test'))
+                @php $pt = session('push_test'); @endphp
+                <div class="mt-4 rounded-md border px-4 py-3 text-sm {{ $pt['ok'] ? 'border-emerald-200 bg-emerald-50 text-emerald-800' : 'border-amber-200 bg-amber-50 text-amber-800' }}">
+                    @foreach ($pt['lines'] as $line)
+                        <p @class(['mt-1' => ! $loop->first])>{{ $line }}</p>
+                    @endforeach
+                </div>
+            @endif
+
+            <form method="POST" action="{{ route('settings.push-test') }}#uji-notifikasi" data-no-confirm="true" class="mt-4 flex flex-col gap-3 sm:flex-row sm:items-end">
+                @csrf
+                <div class="flex-1">
+                    <label for="push_test_employee" class="block text-xs font-medium text-gray-600">Karyawan</label>
+                    <select id="push_test_employee" name="employee_id" required class="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2.5 text-sm shadow-xs outline-none focus:border-primary focus:ring-2 focus:ring-primary/20">
+                        <option value="">Pilih karyawan…</option>
+                        @foreach ($pushEmployees as $pe)
+                            <option value="{{ $pe->id }}" @selected((int) old('employee_id') === $pe->id)>{{ $pe->full_name }}{{ $pe->employee_number ? ' ('.$pe->employee_number.')' : '' }}</option>
+                        @endforeach
+                    </select>
+                    @error('employee_id')<p class="mt-1 text-sm text-red-600">{{ $message }}</p>@enderror
+                </div>
+                <button type="submit" class="rounded-md border border-gray-300 bg-white px-5 py-2.5 text-sm font-semibold text-gray-800 shadow-xs transition hover:bg-gray-50">Kirim notifikasi uji</button>
             </form>
         </section>
     </div>

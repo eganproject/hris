@@ -27,6 +27,9 @@ class FcmClient
 
     private const SCOPE = 'https://www.googleapis.com/auth/firebase.messaging';
 
+    /** Pesan galat terakhir (untuk layar uji kirim di Pengaturan). */
+    public ?string $lastError = null;
+
     /** @var array<string, mixed>|null|false false = belum dibaca */
     private array|null|false $credentials = false;
 
@@ -46,8 +49,11 @@ class FcmClient
     public function send(string $token, string $title, string $body, array $data = []): string
     {
         $credentials = $this->credentials();
+        $this->lastError = null;
 
         if ($credentials === null) {
+            $this->lastError = 'Kunci Firebase belum terpasang di server.';
+
             return self::NOT_CONFIGURED;
         }
 
@@ -71,6 +77,7 @@ class FcmClient
                 ]);
         } catch (Throwable $e) {
             Log::warning('FCM: gagal mengirim notifikasi.', ['error' => $e->getMessage()]);
+            $this->lastError = $e->getMessage();
 
             return self::FAILED;
         }
@@ -80,8 +87,14 @@ class FcmClient
         }
 
         $code = $response->json('error.details.0.errorCode') ?? $response->json('error.status');
+        $this->lastError = trim($response->status().' '.$code.' '.$response->json('error.message'));
 
-        if ($response->status() === 404 || in_array($code, ['UNREGISTERED', 'INVALID_ARGUMENT'], true)) {
+        // Hanya token yang memang sudah mati yang dibuang. INVALID_ARGUMENT bisa
+        // juga berarti isi pesannya yang salah; membuang token karena itu akan
+        // membuat HP berhenti menerima notifikasi sampai login ulang.
+        $message = (string) $response->json('error.message');
+        if ($code === 'UNREGISTERED'
+            || ($code === 'INVALID_ARGUMENT' && stripos($message, 'registration token') !== false)) {
             return self::INVALID_TOKEN;
         }
 

@@ -250,3 +250,45 @@ test('kata-kata notifikasi bisa diubah HR lewat Pengaturan', function () {
         ->and($push['notification']['body'])->toBe('Absen masuk 07:50 di Tablet Lobi (26 Nov 2026).')
         ->and(AttendancePushNotifier::template('out')['title'])->toBe('Absen pulang tercatat');
 });
+
+function pushHr(): User
+{
+    Permission::findOrCreate('settings.view', 'web');
+    Permission::findOrCreate('settings.update', 'web');
+    $hr = User::factory()->create();
+    $hr->givePermissionTo(['settings.view', 'settings.update']);
+
+    return $hr;
+}
+
+test('uji kirim di Pengaturan melaporkan HP yang belum terdaftar', function () {
+    [, $employee] = pushEmployee();
+
+    $this->actingAs(pushHr())->from('/settings')->post('/settings/push-test', ['employee_id' => $employee->id])
+        ->assertRedirect('/settings')
+        ->assertSessionHas('push_test', fn ($r) => $r['ok'] === false && str_contains($r['lines'][0], 'belum terdaftar'));
+
+    expect(sentPushes())->toBeEmpty();
+});
+
+test('uji kirim di Pengaturan mengirim notifikasi ke HP karyawan', function () {
+    [$user, $employee] = pushEmployee();
+    pushPhone($user, $employee);
+
+    $this->actingAs(pushHr())->from('/settings')->post('/settings/push-test', ['employee_id' => $employee->id])
+        ->assertSessionHas('push_test', fn ($r) => $r['ok'] === true);
+
+    expect(sentPushes())->toHaveCount(1)
+        ->and(sentPushes()[0]['notification']['title'])->toBe('Uji notifikasi HRIS');
+});
+
+test('galat isi pesan dari Firebase tidak membuang token HP', function () {
+    $this->fcmResponse = Http::response(['error' => ['status' => 'INVALID_ARGUMENT', 'message' => 'Invalid value at message.data']], 400);
+    [$user, $employee] = pushEmployee();
+    $phone = pushPhone($user, $employee);
+
+    $this->actingAs(pushHr())->from('/settings')->post('/settings/push-test', ['employee_id' => $employee->id])
+        ->assertSessionHas('push_test', fn ($r) => $r['ok'] === false && str_contains($r['lines'][0], 'INVALID_ARGUMENT'));
+
+    expect($phone->fresh()->push_token)->toBe('fcm-token-rina');
+});
