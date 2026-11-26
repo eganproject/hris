@@ -20,6 +20,7 @@ use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\DepartmentController;
 use App\Http\Controllers\DeviceController;
 use App\Http\Controllers\EmployeeManagementController;
+use App\Http\Controllers\FaceTabletController;
 use App\Http\Controllers\HolidayController;
 use App\Http\Controllers\IclockController;
 use App\Http\Controllers\JobPositionController;
@@ -369,6 +370,20 @@ Route::middleware('auth')->group(function () {
         Route::get('mobile/logs/{log}/photo', [MobileAttendanceController::class, 'photo'])->middleware('permission:mobile-attendance.view')->name('mobile.photo');
         Route::get('mobile/devices', [MobileAttendanceController::class, 'devices'])->middleware('permission:mobile-attendance.view')->name('mobile.devices');
         Route::patch('mobile/devices/{device}', [MobileAttendanceController::class, 'decideDevice'])->middleware('permission:mobile-attendance.update')->name('mobile.devices.decide');
+
+        // Tablet absensi wajah: tablet per Lokasi Kerja, data wajah + PIN cadangan,
+        // pengaturan pengenalan wajah, dan riwayat absen tablet.
+        Route::get('tablets', [FaceTabletController::class, 'index'])->middleware('permission:face-tablets.view')->name('tablets.index');
+        Route::get('tablets/logs', [FaceTabletController::class, 'logs'])->middleware('permission:face-tablets.view')->name('tablets.logs');
+        Route::get('tablets/logs/{log}/photo', [FaceTabletController::class, 'logPhoto'])->middleware('permission:face-tablets.view')->name('tablets.logs.photo');
+        Route::get('tablets/faces/{employee}/photo', [FaceTabletController::class, 'facePhoto'])->middleware('permission:face-tablets.view')->name('tablets.faces.photo');
+        Route::post('tablets', [FaceTabletController::class, 'storeTablet'])->middleware('permission:face-tablets.update')->name('tablets.store');
+        Route::post('tablets/{tablet}/pairing-code', [FaceTabletController::class, 'pairingCode'])->middleware('permission:face-tablets.update')->name('tablets.pairing-code');
+        Route::put('tablets/{tablet}/hr-pin', [FaceTabletController::class, 'hrPin'])->middleware('permission:face-tablets.update')->name('tablets.hr-pin');
+        Route::patch('tablets/{tablet}/revoke', [FaceTabletController::class, 'revoke'])->middleware('permission:face-tablets.update')->name('tablets.revoke');
+        Route::delete('tablets/faces/{employee}', [FaceTabletController::class, 'destroyFace'])->middleware('permission:face-tablets.update')->name('tablets.faces.destroy');
+        Route::put('tablets/faces/{employee}/pin', [FaceTabletController::class, 'employeePin'])->middleware('permission:face-tablets.update')->name('tablets.faces.pin');
+        Route::put('tablets/settings', [FaceTabletController::class, 'updateSettings'])->middleware('permission:face-tablets.update')->name('tablets.settings');
 
         Route::get('corrections', [AttendanceCorrectionController::class, 'index'])->middleware('permission:corrections.view')->name('corrections.index');
         Route::post('corrections/bulk-approve', [AttendanceCorrectionController::class, 'bulkApprove'])->middleware('permission:corrections.update')->name('corrections.bulk-approve');
