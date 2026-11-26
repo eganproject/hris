@@ -83,6 +83,32 @@
                             <span class="absolute left-0.5 top-0.5 size-5 rounded-full bg-white shadow transition peer-checked:translate-x-5"></span>
                         </span>
                     </label>
+
+                    <p class="mt-5 text-xs text-gray-500">Kata-kata di bawah boleh diubah. Penanda berikut akan diganti otomatis:
+                        @foreach (\App\Services\Push\AttendancePushNotifier::PLACEHOLDERS as $tag => $meaning)
+                            <code class="rounded bg-gray-100 px-1 text-gray-700">{{ $tag }}</code> {{ $meaning }}@if (! $loop->last);@else.@endif
+                        @endforeach
+                        Kosongkan kolom untuk kembali ke kata-kata bawaan.</p>
+
+                    <div class="mt-5 rounded-md border border-gray-200 p-4">
+                        <span class="block text-sm font-medium text-gray-800">Kata-kata notifikasi absen masuk</span>
+                        <label for="push_in_title" class="mt-3 block text-xs font-medium text-gray-600">Judul</label>
+                        <input type="text" id="push_in_title" name="push_in_title" maxlength="80" value="{{ old('push_in_title', $pushTemplates['in']['title']) }}" class="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-xs outline-none focus:border-primary focus:ring-2 focus:ring-primary/20">
+                        @error('push_in_title')<p class="mt-1 text-sm text-red-600">{{ $message }}</p>@enderror
+                        <label for="push_in_body" class="mt-3 block text-xs font-medium text-gray-600">Isi</label>
+                        <textarea id="push_in_body" name="push_in_body" rows="2" maxlength="250" class="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-xs outline-none focus:border-primary focus:ring-2 focus:ring-primary/20">{{ old('push_in_body', $pushTemplates['in']['body']) }}</textarea>
+                        @error('push_in_body')<p class="mt-1 text-sm text-red-600">{{ $message }}</p>@enderror
+                    </div>
+
+                    <div class="mt-5 rounded-md border border-gray-200 p-4">
+                        <span class="block text-sm font-medium text-gray-800">Kata-kata notifikasi absen pulang</span>
+                        <label for="push_out_title" class="mt-3 block text-xs font-medium text-gray-600">Judul</label>
+                        <input type="text" id="push_out_title" name="push_out_title" maxlength="80" value="{{ old('push_out_title', $pushTemplates['out']['title']) }}" class="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-xs outline-none focus:border-primary focus:ring-2 focus:ring-primary/20">
+                        @error('push_out_title')<p class="mt-1 text-sm text-red-600">{{ $message }}</p>@enderror
+                        <label for="push_out_body" class="mt-3 block text-xs font-medium text-gray-600">Isi</label>
+                        <textarea id="push_out_body" name="push_out_body" rows="2" maxlength="250" class="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-xs outline-none focus:border-primary focus:ring-2 focus:ring-primary/20">{{ old('push_out_body', $pushTemplates['out']['body']) }}</textarea>
+                        @error('push_out_body')<p class="mt-1 text-sm text-red-600">{{ $message }}</p>@enderror
+                    </div>
                 </div>
 
                 <div class="mt-6 border-t border-gray-100 pt-6">

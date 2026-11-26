@@ -18,6 +18,7 @@ use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
+use Spatie\Permission\Models\Permission;
 
 uses(RefreshDatabase::class);
 
@@ -218,4 +219,34 @@ test('aplikasi HP mendaftarkan dan melepas token notifikasi', function () {
 
     $this->withToken($token)->postJson('/api/mobile/v1/auth/logout')->assertOk();
     expect($device->fresh()->push_token)->toBeNull();
+});
+
+test('kata-kata notifikasi bisa diubah HR lewat Pengaturan', function () {
+    Permission::findOrCreate('settings.view', 'web');
+    Permission::findOrCreate('settings.update', 'web');
+    $hr = User::factory()->create();
+    $hr->givePermissionTo(['settings.view', 'settings.update']);
+
+    $this->actingAs($hr)->get('/settings')->assertOk()->assertSee('Kata-kata notifikasi absen masuk')->assertSee('{jam}');
+
+    $this->actingAs($hr)->put('/settings', [
+        'push_settings' => '1',
+        'push_attendance_in' => '1',
+        'push_attendance_out' => '1',
+        'push_attendance_machine' => '1',
+        'push_in_title' => 'Selamat pagi, {nama}!',
+        'push_in_body' => 'Absen masuk {jam} di {lokasi} ({tanggal}).',
+        'push_out_title' => '',
+        'push_out_body' => '',
+    ])->assertRedirect();
+    app('auth')->forgetGuards();
+
+    [$user, $employee, $branch] = pushEmployee();
+    pushPhone($user, $employee);
+    pushTabletClock($branch, $employee);
+
+    $push = sentPushes()[0];
+    expect($push['notification']['title'])->toBe('Selamat pagi, Rina!')
+        ->and($push['notification']['body'])->toBe('Absen masuk 07:50 di Tablet Lobi (26 Nov 2026).')
+        ->and(AttendancePushNotifier::template('out')['title'])->toBe('Absen pulang tercatat');
 });

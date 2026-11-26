@@ -26,6 +26,26 @@ class AttendancePushNotifier
 
     public const MACHINE_KEY = 'push_attendance_machine';
 
+    /** Kata-kata notifikasi yang bisa diubah HR di menu Pengaturan. */
+    public const TEMPLATE_KEYS = [
+        'in' => ['title' => 'push_attendance_in_title', 'body' => 'push_attendance_in_body'],
+        'out' => ['title' => 'push_attendance_out_title', 'body' => 'push_attendance_out_body'],
+    ];
+
+    public const DEFAULT_TEMPLATES = [
+        'in' => ['title' => 'Absen masuk tercatat', 'body' => 'Pukul {jam} di {lokasi}. Bukan Anda? Segera hubungi HR.'],
+        'out' => ['title' => 'Absen pulang tercatat', 'body' => 'Pukul {jam} di {lokasi}. Terima kasih, hati-hati di jalan.'],
+    ];
+
+    /** Penanda yang bisa dipakai di kata-kata notifikasi. */
+    public const PLACEHOLDERS = [
+        '{nama}' => 'nama panggilan (kata pertama nama karyawan)',
+        '{nama_lengkap}' => 'nama lengkap karyawan',
+        '{jam}' => 'jam absen, mis. 08:02',
+        '{tanggal}' => 'tanggal absen, mis. 26 Nov 2026',
+        '{lokasi}' => 'nama tablet atau mesin absensi',
+    ];
+
     public const SOURCE_TABLET = 'tablet';
 
     public const SOURCE_MACHINE = 'machine';
@@ -45,6 +65,29 @@ class AttendancePushNotifier
 
     /**
      * @param  'in'|'out'  $type
+     * @return array{title: string, body: string}
+     */
+    public static function template(string $type): array
+    {
+        $keys = self::TEMPLATE_KEYS[$type];
+        $default = self::DEFAULT_TEMPLATES[$type];
+
+        return [
+            'title' => trim((string) Setting::get($keys['title'])) ?: $default['title'],
+            'body' => trim((string) Setting::get($keys['body'])) ?: $default['body'],
+        ];
+    }
+
+    /**
+     * @param  array<string, string>  $values
+     */
+    public static function fill(string $text, array $values): string
+    {
+        return trim(preg_replace('/\s+/', ' ', strtr($text, $values)));
+    }
+
+    /**
+     * @param  'in'|'out'  $type
      */
     public function clocked(Employee $employee, string $type, CarbonInterface $at, string $source, ?string $place = null): void
     {
@@ -58,10 +101,17 @@ class AttendancePushNotifier
             return;
         }
 
-        $title = $type === 'in' ? 'Absen masuk tercatat' : 'Absen pulang tercatat';
-        $where = $place ?: ($source === self::SOURCE_MACHINE ? 'mesin absensi' : 'tablet absensi');
-        $day = $at->isToday() ? '' : ' ('.$at->translatedFormat('j M').')';
-        $body = 'Pukul '.$at->format('H:i').$day.' di '.$where.'. Bukan Anda? Segera hubungi HR.';
+        $name = trim((string) $employee->full_name);
+        $values = [
+            '{nama}' => strtok($name, ' ') ?: $name,
+            '{nama_lengkap}' => $name,
+            '{jam}' => $at->format('H:i'),
+            '{tanggal}' => $at->translatedFormat('j M Y'),
+            '{lokasi}' => $place ?: ($source === self::SOURCE_MACHINE ? 'mesin absensi' : 'tablet absensi'),
+        ];
+        $template = self::template($type);
+        $title = self::fill($template['title'], $values);
+        $body = self::fill($template['body'], $values);
         $meta = [
             'type' => $type,
             'source' => $source,
