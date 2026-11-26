@@ -128,9 +128,9 @@ class MobileAttendanceController extends Controller
         ActivityLogger::log('mobile-attendance', 'device-'.$data['action'], "{$verb} HP {$device->label} milik {$device->employee?->full_name}.", $device);
 
         return back()->with('status', [
-            'approve' => 'HP disetujui. HP lama karyawan ini otomatis dicabut.',
+            'approve' => 'HP diaktifkan.',
             'reject' => 'Permintaan HP ditolak.',
-            'revoke' => 'HP dicabut. Karyawan harus masuk lagi dari HP yang disetujui.',
+            'revoke' => 'HP dicabut. Karyawan keluar dari aplikasi di HP itu dan perlu masuk lagi.',
         ][$data['action']]);
     }
 }

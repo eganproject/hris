@@ -9,11 +9,12 @@ use Illuminate\Support\Facades\DB;
 use Laravel\Sanctum\PersonalAccessToken;
 
 /**
- * Pengikatan HP ke karyawan: satu HP aktif per karyawan.
+ * Catatan HP yang dipakai karyawan untuk aplikasi.
  *
- * - HP pertama karyawan langsung aktif.
- * - HP lain saat sudah ada HP aktif = permintaan ganti HP, menunggu HR.
- * - HR menyetujui: HP lama dicabut (tokennya dihapus), HP baru aktif.
+ * Sejak 2026-11-26 tidak ada lagi kunci satu HP: aplikasi HP tidak dipakai
+ * untuk absen (absen lewat tablet kantor / mesin), jadi setiap HP yang dipakai
+ * login langsung aktif tanpa persetujuan HR. HR masih bisa mencabut HP
+ * (keluar paksa); login ulang dari HP itu mengaktifkannya lagi.
  */
 class MobileDeviceRegistry
 {
@@ -38,19 +39,11 @@ class MobileDeviceRegistry
                 'app_version' => $info['app_version'] ?? $device->app_version,
             ]);
 
-            if (! $device->exists) {
-                $hasActive = $employee->mobileDevices()->active()->exists();
-                $device->status = $hasActive ? MobileDevice::STATUS_PENDING : MobileDevice::STATUS_ACTIVE;
-                if (! $hasActive) {
-                    $device->decided_at = now();
-                    $device->decision_note = 'HP pertama, aktif otomatis.';
-                }
-            } elseif (in_array($device->status, [MobileDevice::STATUS_REVOKED], true)) {
-                // HP yang pernah dicabut dan dipakai login lagi: ajukan ulang ke HR.
-                $device->status = MobileDevice::STATUS_PENDING;
+            if ($device->status !== MobileDevice::STATUS_ACTIVE) {
+                $device->status = MobileDevice::STATUS_ACTIVE;
                 $device->decided_by = null;
-                $device->decided_at = null;
-                $device->decision_note = null;
+                $device->decided_at = now();
+                $device->decision_note = 'Aktif otomatis saat login.';
             }
 
             $device->save();
@@ -61,36 +54,12 @@ class MobileDeviceRegistry
 
     public function approve(MobileDevice $device, User $actor, ?string $note = null): void
     {
-        DB::transaction(function () use ($device, $actor, $note) {
-            $others = MobileDevice::query()
-                ->where('employee_id', $device->employee_id)
-                ->whereKeyNot($device->id)
-                ->where('status', MobileDevice::STATUS_ACTIVE)
-                ->get();
-
-            foreach ($others as $other) {
-                $this->revoke($other, $actor, 'Diganti HP baru ('.$device->label.').');
-            }
-
-            // Permintaan lain yang masih menunggu otomatis gugur.
-            MobileDevice::query()
-                ->where('employee_id', $device->employee_id)
-                ->whereKeyNot($device->id)
-                ->where('status', MobileDevice::STATUS_PENDING)
-                ->update([
-                    'status' => MobileDevice::STATUS_REJECTED,
-                    'decided_by' => $actor->id,
-                    'decided_at' => now(),
-                    'decision_note' => 'Gugur: HP lain disetujui.',
-                ]);
-
-            $device->forceFill([
-                'status' => MobileDevice::STATUS_ACTIVE,
-                'decided_by' => $actor->id,
-                'decided_at' => now(),
-                'decision_note' => $note,
-            ])->save();
-        });
+        $device->forceFill([
+            'status' => MobileDevice::STATUS_ACTIVE,
+            'decided_by' => $actor->id,
+            'decided_at' => now(),
+            'decision_note' => $note,
+        ])->save();
     }
 
     public function reject(MobileDevice $device, User $actor, ?string $note = null): void

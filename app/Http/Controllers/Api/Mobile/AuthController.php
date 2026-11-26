@@ -15,8 +15,8 @@ use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 
 /**
- * Login aplikasi HP: akun yang sama dengan HRIS web (email atau NIK), plus
- * pengikatan HP. Token hanya diberikan untuk HP yang aktif.
+ * Login aplikasi HP: akun yang sama dengan HRIS web (email atau NIK). Boleh
+ * dari HP mana saja; HP-nya dicatat dan token diikat ke HP itu.
  */
 class AuthController extends Controller
 {
@@ -62,17 +62,6 @@ class AuthController extends Controller
         }
 
         $device = $this->devices->register($user, $employee, $data);
-
-        if (! $device->isActive()) {
-            return response()->json([
-                'message' => match ($device->status) {
-                    MobileDevice::STATUS_PENDING => 'Akunmu sudah terdaftar di HP lain. Permintaan ganti HP sudah dikirim ke HR, tunggu persetujuannya lalu masuk lagi.',
-                    default => 'HP ini ditolak HR untuk akunmu. Hubungi HR.',
-                },
-                'code' => $device->status === MobileDevice::STATUS_PENDING ? 'device_pending' : 'device_rejected',
-                'device' => ['status' => $device->status],
-            ], 403);
-        }
 
         // Satu token per HP: login ulang di HP yang sama mengganti token lamanya.
         $this->devices->deleteTokens($device);

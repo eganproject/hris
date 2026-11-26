@@ -9,6 +9,9 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 
 uses(RefreshDatabase::class);
 
+// Kabar dimatikan sejak 2026-11-26; tes ini menguji kodenya bila dibuka lagi.
+beforeEach(fn () => config(['features.kabar' => true]));
+
 test('HR menerbitkan pengumuman dan semua karyawan sasaran diberi tahu', function () {
     $hr = scopedUser(['announcements.view', 'announcements.create']);
     $staff = User::factory()->create();

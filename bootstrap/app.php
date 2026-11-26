@@ -23,6 +23,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'role' => RoleMiddleware::class,
             'role_or_permission' => RoleOrPermissionMiddleware::class,
             'mobile.device' => EnsureMobileDevice::class,
+            'feature' => \App\Http\Middleware\EnsureFeatureEnabled::class,
         ]);
 
         // The fingerprint machine speaks the ZKTeco iclock protocol and cannot send

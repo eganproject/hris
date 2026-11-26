@@ -12,6 +12,9 @@ require_once __DIR__.'/MobileHelpers.php';
 
 uses(RefreshDatabase::class);
 
+// Kabar dimatikan sejak 2026-11-26; tes ini menguji kodenya bila dibuka lagi.
+beforeEach(fn () => config(['features.kabar' => true]));
+
 function seenDevice($user, $employee, $at): MobileDevice
 {
     return MobileDevice::query()->forceCreate([

@@ -26,6 +26,8 @@ const MOBILE_OFFICE_LAT = -6.2000000;
 const MOBILE_OFFICE_LNG = 106.8166667;
 
 beforeEach(function () {
+    // Absen HP dimatikan sejak 2026-11-26; tes ini menguji kodenya bila dibuka lagi.
+    config(['features.mobile_clock' => true]);
     Storage::fake('local');
     Carbon::setTestNow(Carbon::parse('2026-11-25 07:50:00', 'Asia/Jakarta'));
 });
@@ -140,30 +142,34 @@ test('kata sandi salah ditolak dan akun nonaktif tidak bisa masuk', function () 
     ])->assertStatus(422);
 });
 
-test('HP kedua menunggu HR; setelah disetujui HP lama langsung tidak bisa dipakai', function () {
-    ['user' => $user, 'employee' => $employee] = mobileFixture();
+test('akun bisa dipakai di beberapa HP tanpa persetujuan HR; HP yang dicabut keluar paksa', function () {
+    ['user' => $user] = mobileFixture();
     $oldToken = mobileLogin($user, 'device-lama-0001');
+    $newToken = mobileLogin($user, 'device-baru-0002');
 
-    $this->postJson('/api/mobile/v1/auth/login', [
-        'login' => $user->email, 'password' => 'rahasia123', 'device_id' => 'device-baru-0002', 'platform' => 'ios',
-    ])->assertStatus(403)->assertJsonPath('code', 'device_pending');
+    expect(MobileDevice::query()->where('device_uuid', 'device-lama-0001')->value('status'))->toBe('active')
+        ->and(MobileDevice::query()->where('device_uuid', 'device-baru-0002')->value('status'))->toBe('active');
+
+    app('auth')->forgetGuards();
+    $this->withToken($oldToken)->getJson('/api/mobile/v1/me')->assertOk();
+    app('auth')->forgetGuards();
+    $this->withToken($newToken)->getJson('/api/mobile/v1/me')->assertOk();
 
     $hr = mobileHr();
-    $pending = MobileDevice::query()->where('device_uuid', 'device-baru-0002')->firstOrFail();
-
-    $this->actingAs($hr)->get(route('attendance.mobile.devices'))->assertOk()->assertSee('Samsung', false);
-    $this->actingAs($hr)->patch(route('attendance.mobile.devices.decide', $pending), ['action' => 'approve'])->assertRedirect();
-
-    expect($pending->fresh()->status)->toBe('active')
-        ->and(MobileDevice::query()->where('device_uuid', 'device-lama-0001')->value('status'))->toBe('revoked');
+    $old = MobileDevice::query()->where('device_uuid', 'device-lama-0001')->firstOrFail();
+    $this->actingAs($hr)->patch(route('attendance.mobile.devices.decide', $old), ['action' => 'revoke'])->assertRedirect();
 
     app('auth')->forgetGuards();
     $this->withToken($oldToken)->getJson('/api/mobile/v1/me')->assertStatus(401);
+    app('auth')->forgetGuards();
+    $this->withToken($newToken)->getJson('/api/mobile/v1/me')->assertOk();
 
+    // Login ulang dari HP yang dicabut langsung aktif lagi.
     app('auth')->forgetGuards();
     $this->postJson('/api/mobile/v1/auth/login', [
-        'login' => $user->email, 'password' => 'rahasia123', 'device_id' => 'device-baru-0002', 'platform' => 'ios',
+        'login' => $user->email, 'password' => 'rahasia123', 'device_id' => 'device-lama-0001', 'platform' => 'android',
     ])->assertOk();
+    expect($old->fresh()->status)->toBe('active');
 });
 
 test('absen butuh persetujuan penyimpanan selfie dan lokasi', function () {
@@ -488,4 +494,37 @@ test('masuk lewat HP lalu pulang di mesin menutup sesi', function () {
 
     // Pulang lewat HP sesudahnya tidak ada sesi lagi.
     mobileClock($token, 'out')->assertJsonPath('data.result', 'rejected')->assertJsonPath('data.reject_code', 'no_session');
+});
+
+// Ega 2026-11-26: absen dari HP dan Kabar disembunyikan, data lama tetap.
+
+test('absen dari HP dan Kabar mati secara bawaan, status, riwayat dan pengumuman tetap jalan', function () {
+    config(['features.mobile_clock' => false, 'features.kabar' => false]);
+
+    ['user' => $user] = mobileFixture();
+    $token = mobileLogin($user, consent: false);
+
+    $this->withToken($token)->postJson('/api/mobile/v1/attendance/clock', [])->assertStatus(410)->assertJsonPath('code', 'feature_disabled');
+    $this->withToken($token)->postJson('/api/mobile/v1/auth/consent', ['agree' => true])->assertStatus(410);
+    $this->withToken($token)->getJson('/api/mobile/v1/kabar')->assertStatus(410);
+    $this->withToken($token)->postJson('/api/mobile/v1/posts', ['body' => 'Halo'])->assertStatus(410);
+
+    $this->withToken($token)->getJson('/api/mobile/v1/attendance/status')->assertOk();
+    $this->withToken($token)->getJson('/api/mobile/v1/attendance/history')->assertOk();
+    $this->withToken($token)->getJson('/api/mobile/v1/announcements')->assertOk();
+});
+
+test('menu web Absen Aplikasi HP dan Moderasi Kabar tersembunyi', function () {
+    config(['features.mobile_clock' => false, 'features.kabar' => false]);
+    $hr = mobileHr();
+    foreach (['kabar-moderation.view', 'announcements.view'] as $p) {
+        Permission::findOrCreate($p, 'web');
+    }
+    $hr->givePermissionTo(['kabar-moderation.view', 'announcements.view']);
+
+    $this->actingAs($hr)->get(route('attendance.mobile.index'))->assertNotFound();
+    $this->actingAs($hr)->get(route('kabar.moderation.index'))->assertNotFound();
+    $this->actingAs($hr)->get(route('kabar.announcements.index'))->assertOk()
+        ->assertDontSee('Absen Aplikasi HP')
+        ->assertDontSee('Moderasi Kabar');
 });
