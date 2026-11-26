@@ -48,6 +48,9 @@ return [
             // Absen lewat aplikasi HP: "Lihat" = daftar absen aplikasi + HP terdaftar,
             // "Ubah" = meninjau absen yang ditandai dan menyetujui/mencabut HP.
             'mobile-attendance' => ['label' => 'Absen Aplikasi HP', 'actions' => ['view', 'update']],
+            // Tablet absensi wajah: "Lihat" = tablet, data wajah, riwayat + foto absen;
+            // "Ubah" = daftarkan/cabut tablet, PIN HR & karyawan, hapus wajah, pengaturan.
+            'face-tablets' => ['label' => 'Tablet Absensi Wajah', 'actions' => ['view', 'update']],
         ],
 
         'Jadwal' => [
@@ -162,6 +165,7 @@ return [
             'attendance-daily.view', 'attendance-daily.update',
             'attendance-map.view',
             'mobile-attendance.view', 'mobile-attendance.update',
+            'face-tablets.view', 'face-tablets.update',
             'punches.view', 'punches.update',
             'corrections.view', 'corrections.update',
             'overtime.view', 'overtime.update',

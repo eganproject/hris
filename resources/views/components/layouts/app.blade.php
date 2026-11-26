@@ -128,8 +128,8 @@
                         </div>
                     @endcanany
 
-                    @canany(['attendance-daily.view', 'attendance-map.view', 'devices.view', 'corrections.view', 'mobile-attendance.view'])
-                        @php $g = request()->routeIs('attendance.daily.*', 'attendance.map', 'attendance.devices.*', 'attendance.punches.*', 'attendance.corrections.*', 'attendance.mobile.*'); @endphp
+                    @canany(['attendance-daily.view', 'attendance-map.view', 'devices.view', 'corrections.view', 'mobile-attendance.view', 'face-tablets.view'])
+                        @php $g = request()->routeIs('attendance.daily.*', 'attendance.map', 'attendance.devices.*', 'attendance.punches.*', 'attendance.corrections.*', 'attendance.mobile.*', 'attendance.tablets.*'); @endphp
                         <div @class(['sidebar-group', 'is-open' => $g]) data-sidebar-group="absensi">
                             <button type="button" data-sidebar-group-toggle aria-expanded="{{ $g ? 'true' : 'false' }}" class="sidebar-group-toggle flex w-full items-center gap-2.5 rounded px-2.5 py-1.5 text-left transition hover:bg-white/70">
                                 <svg class="size-4 shrink-0 text-gray-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 11l3 3L22 4"></path><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path></svg>
@@ -147,6 +147,12 @@
                                     <a href="{{ route('attendance.map') }}" @class(['sidebar-nav-link flex items-center gap-2.5 rounded px-2.5 py-1.5 text-[13px] font-medium transition', 'bg-white text-gray-950 shadow-xs ring-1 ring-gray-200' => request()->routeIs('attendance.map'), 'text-gray-600 hover:bg-white hover:text-gray-950' => ! request()->routeIs('attendance.map')]) title="Peta Absen Mandiri">
                                         <svg class="size-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"></path><circle cx="12" cy="10" r="3"></circle></svg>
                                         <span class="sidebar-label truncate">Peta Absen Mandiri</span>
+                                    </a>
+                                @endcan
+                                @can('face-tablets.view')
+                                    <a href="{{ route('attendance.tablets.index') }}" @class(['sidebar-nav-link flex items-center gap-2.5 rounded px-2.5 py-1.5 text-[13px] font-medium transition', 'bg-white text-gray-950 shadow-xs ring-1 ring-gray-200' => request()->routeIs('attendance.tablets.*'), 'text-gray-600 hover:bg-white hover:text-gray-950' => ! request()->routeIs('attendance.tablets.*')]) title="Tablet Absensi Wajah">
+                                        <svg class="size-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 8V6a2 2 0 0 1 2-2h2M16 4h2a2 2 0 0 1 2 2v2M20 16v2a2 2 0 0 1-2 2h-2M8 20H6a2 2 0 0 1-2-2v-2"></path><circle cx="12" cy="10" r="2.5"></circle><path d="M8 16.5a4.5 4.5 0 0 1 8 0"></path></svg>
+                                        <span class="sidebar-label truncate">Tablet Absensi Wajah</span>
                                     </a>
                                 @endcan
                                 @can('devices.view')

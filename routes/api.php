@@ -40,3 +40,21 @@ Route::prefix('mobile/v1')->name('api.mobile.')->group(function () {
         }
     });
 });
+
+/*
+| API tablet absensi wajah (aplikasi di repo hris-mobile, folder tablet/).
+| Tablet memegang token Sanctum sendiri; lihat EnsureAttendanceTablet.
+*/
+Route::prefix('tablet/v1')->name('api.tablet.')->group(function () {
+    Route::post('pair', [\App\Http\Controllers\Api\Tablet\TabletController::class, 'pair'])
+        ->middleware('throttle:10,1')
+        ->name('pair');
+
+    Route::middleware(['auth:sanctum', \App\Http\Middleware\EnsureAttendanceTablet::class, 'throttle:300,1'])->group(function () {
+        Route::get('sync', [\App\Http\Controllers\Api\Tablet\TabletController::class, 'sync'])->name('sync');
+        Route::post('attendance', [\App\Http\Controllers\Api\Tablet\AttendanceController::class, 'store'])->name('attendance.store');
+        Route::post('faces', [\App\Http\Controllers\Api\Tablet\FaceController::class, 'store'])
+            ->middleware('throttle:30,1')
+            ->name('faces.store');
+    });
+});

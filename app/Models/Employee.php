@@ -215,6 +215,17 @@ class Employee extends Model
         return $this->hasMany(MobileAttendanceLog::class);
     }
 
+    /** Data wajah + PIN cadangan untuk tablet absensi wajah. */
+    public function faceProfile(): HasOne
+    {
+        return $this->hasOne(EmployeeFaceProfile::class);
+    }
+
+    public function tabletAttendanceLogs(): HasMany
+    {
+        return $this->hasMany(TabletAttendanceLog::class);
+    }
+
     public function punches(): HasMany
     {
         return $this->hasMany(AttendancePunch::class);
