@@ -8,6 +8,7 @@ use App\Models\Employee;
 use App\Models\TabletAttendanceLog;
 use App\Services\AttendanceResolver;
 use App\Services\Mobile\MobileAttendanceService;
+use App\Services\Push\AttendancePushNotifier;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -37,6 +38,7 @@ class TabletAttendanceService
     public function __construct(
         private readonly AttendanceResolver $resolver,
         private readonly MobileAttendanceService $sessions,
+        private readonly AttendancePushNotifier $push,
     ) {}
 
     /**
@@ -188,6 +190,8 @@ class TabletAttendanceService
             'photo_path' => $path,
             'flags' => $flags ?: null,
         ])->save();
+
+        $this->push->clocked($employee, $type, $captured, AttendancePushNotifier::SOURCE_TABLET, $tablet->name);
 
         return $log;
     }

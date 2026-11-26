@@ -3,6 +3,7 @@
 use App\Http\Controllers\Api\Mobile\AttendanceController;
 use App\Http\Controllers\Api\Mobile\AuthController;
 use App\Http\Controllers\Api\Mobile\CorrectionController;
+use App\Http\Controllers\Api\Mobile\PushTokenController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -19,6 +20,10 @@ Route::prefix('mobile/v1')->name('api.mobile.')->group(function () {
         Route::post('auth/logout', [AuthController::class, 'logout'])->name('auth.logout');
         Route::post('auth/consent', [AuthController::class, 'consent'])->middleware('feature:mobile_clock')->name('auth.consent');
         Route::get('me', [AuthController::class, 'me'])->name('me');
+
+        // Token Firebase untuk notifikasi saat aplikasi ditutup.
+        Route::post('push-token', [PushTokenController::class, 'store'])->name('push-token.store');
+        Route::delete('push-token', [PushTokenController::class, 'destroy'])->name('push-token.destroy');
 
         // Tahap 1: absensi. Absen dari HP dimatikan (config/features.php);
         // status hari ini dan riwayat tetap dipakai aplikasi.

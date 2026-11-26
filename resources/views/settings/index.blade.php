@@ -42,6 +42,76 @@
                 </div>
 
                 <div class="mt-6 border-t border-gray-100 pt-6">
+                    <input type="hidden" name="push_settings" value="1">
+                    <span class="block text-sm font-medium text-gray-800">Notifikasi absen ke HP karyawan</span>
+                    <p class="mt-1 text-xs text-gray-500">Karyawan menerima notifikasi di aplikasi HP setiap absennya tercatat, walau aplikasinya sedang ditutup. Juga tercatat di daftar notifikasi aplikasi.</p>
+                    @if ($pushConfigured)
+                        <p class="mt-2 text-xs font-medium text-emerald-700">Firebase tersambung.</p>
+                    @else
+                        <p class="mt-2 text-xs text-amber-700">Firebase belum tersambung: notifikasi hanya masuk ke daftar notifikasi aplikasi, belum muncul di layar HP. Isi <code>FIREBASE_CREDENTIALS</code> di file .env server.</p>
+                    @endif
+                    <label class="mt-4 flex items-start justify-between gap-4">
+                        <span>
+                            <span class="block text-sm font-medium text-gray-800">Absen masuk</span>
+                            <span class="mt-1 block text-xs text-gray-500">Kirim notifikasi saat absen masuk tercatat.</span>
+                        </span>
+                        <span class="relative inline-flex flex-none">
+                            <input type="checkbox" name="push_attendance_in" value="1" @checked($pushIn) class="peer sr-only">
+                            <span class="h-6 w-11 rounded-full bg-gray-300 transition peer-checked:bg-primary"></span>
+                            <span class="absolute left-0.5 top-0.5 size-5 rounded-full bg-white shadow transition peer-checked:translate-x-5"></span>
+                        </span>
+                    </label>
+                    <label class="mt-4 flex items-start justify-between gap-4">
+                        <span>
+                            <span class="block text-sm font-medium text-gray-800">Absen pulang</span>
+                            <span class="mt-1 block text-xs text-gray-500">Kirim notifikasi saat absen pulang tercatat.</span>
+                        </span>
+                        <span class="relative inline-flex flex-none">
+                            <input type="checkbox" name="push_attendance_out" value="1" @checked($pushOut) class="peer sr-only">
+                            <span class="h-6 w-11 rounded-full bg-gray-300 transition peer-checked:bg-primary"></span>
+                            <span class="absolute left-0.5 top-0.5 size-5 rounded-full bg-white shadow transition peer-checked:translate-x-5"></span>
+                        </span>
+                    </label>
+                    <label class="mt-4 flex items-start justify-between gap-4">
+                        <span>
+                            <span class="block text-sm font-medium text-gray-800">Termasuk absen dari mesin absensi</span>
+                            <span class="mt-1 block text-xs text-gray-500">Jika dimatikan, hanya absen dari tablet kantor yang dikirimi notifikasi.</span>
+                        </span>
+                        <span class="relative inline-flex flex-none">
+                            <input type="checkbox" name="push_attendance_machine" value="1" @checked($pushMachine) class="peer sr-only">
+                            <span class="h-6 w-11 rounded-full bg-gray-300 transition peer-checked:bg-primary"></span>
+                            <span class="absolute left-0.5 top-0.5 size-5 rounded-full bg-white shadow transition peer-checked:translate-x-5"></span>
+                        </span>
+                    </label>
+
+                    <p class="mt-5 text-xs text-gray-500">Kata-kata di bawah boleh diubah. Penanda berikut akan diganti otomatis:
+                        @foreach (\App\Services\Push\AttendancePushNotifier::PLACEHOLDERS as $tag => $meaning)
+                            <code class="rounded bg-gray-100 px-1 text-gray-700">{{ $tag }}</code> {{ $meaning }}@if (! $loop->last);@else.@endif
+                        @endforeach
+                        Kosongkan kolom untuk kembali ke kata-kata bawaan.</p>
+
+                    <div class="mt-5 rounded-md border border-gray-200 p-4">
+                        <span class="block text-sm font-medium text-gray-800">Kata-kata notifikasi absen masuk</span>
+                        <label for="push_in_title" class="mt-3 block text-xs font-medium text-gray-600">Judul</label>
+                        <input type="text" id="push_in_title" name="push_in_title" maxlength="80" value="{{ old('push_in_title', $pushTemplates['in']['title']) }}" class="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-xs outline-none focus:border-primary focus:ring-2 focus:ring-primary/20">
+                        @error('push_in_title')<p class="mt-1 text-sm text-red-600">{{ $message }}</p>@enderror
+                        <label for="push_in_body" class="mt-3 block text-xs font-medium text-gray-600">Isi</label>
+                        <textarea id="push_in_body" name="push_in_body" rows="2" maxlength="250" class="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-xs outline-none focus:border-primary focus:ring-2 focus:ring-primary/20">{{ old('push_in_body', $pushTemplates['in']['body']) }}</textarea>
+                        @error('push_in_body')<p class="mt-1 text-sm text-red-600">{{ $message }}</p>@enderror
+                    </div>
+
+                    <div class="mt-5 rounded-md border border-gray-200 p-4">
+                        <span class="block text-sm font-medium text-gray-800">Kata-kata notifikasi absen pulang</span>
+                        <label for="push_out_title" class="mt-3 block text-xs font-medium text-gray-600">Judul</label>
+                        <input type="text" id="push_out_title" name="push_out_title" maxlength="80" value="{{ old('push_out_title', $pushTemplates['out']['title']) }}" class="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-xs outline-none focus:border-primary focus:ring-2 focus:ring-primary/20">
+                        @error('push_out_title')<p class="mt-1 text-sm text-red-600">{{ $message }}</p>@enderror
+                        <label for="push_out_body" class="mt-3 block text-xs font-medium text-gray-600">Isi</label>
+                        <textarea id="push_out_body" name="push_out_body" rows="2" maxlength="250" class="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-xs outline-none focus:border-primary focus:ring-2 focus:ring-primary/20">{{ old('push_out_body', $pushTemplates['out']['body']) }}</textarea>
+                        @error('push_out_body')<p class="mt-1 text-sm text-red-600">{{ $message }}</p>@enderror
+                    </div>
+                </div>
+
+                <div class="mt-6 border-t border-gray-100 pt-6">
                     <span class="block text-sm font-medium text-gray-800">Pola jam kantor</span>
                     <p class="mt-1 text-xs text-gray-500">Centang pola yang boleh dipilih untuk karyawan bertanda <span class="font-medium">"Ikuti jam kantor (tanpa penjadwalan)"</span>. Absensi mereka dihitung langsung dari pola tersebut tanpa perlu di-assign atau digenerate roster. Kosongkan semua untuk mematikan fitur.</p>
 
