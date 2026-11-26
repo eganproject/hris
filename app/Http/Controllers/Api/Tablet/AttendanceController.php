@@ -31,6 +31,7 @@ class AttendanceController extends Controller
             'liveness_checked' => ['nullable', 'boolean'],
             'liveness_score' => ['nullable', 'numeric', 'between:0,1'],
             'not_me' => ['nullable', 'boolean'],
+            'requested_type' => ['nullable', 'in:in,out'],
             'photo' => ['nullable', 'image', 'max:4096'],
         ]);
 

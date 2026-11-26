@@ -17,7 +17,9 @@ use Illuminate\Support\Facades\DB;
  * Absen otomatis dari tablet wajah (keputusan Ega 2026-11-26).
  *
  * - Tablet mencocokkan wajah di dalam perangkat lalu mengirim karyawan, skor, dan
- *   foto bukti. Server yang menentukan masuk atau pulang:
+ *   foto bukti. Sejak tombol Absen Masuk / Absen Pulang, tablet juga mengirim
+ *   pilihan karyawan (requested_type) dan pilihan itu yang dipakai. Tanpa pilihan
+ *   (versi lama tablet) server menebak:
  *   sesi terbuka (sudah masuk, belum pulang, dalam batas sesi 23j50m) = pulang;
  *   selain itu = masuk. Sesi dibaca dari tabel absensi, jadi boleh dicampur
  *   dengan mesin X100-C atau koreksi.
@@ -42,7 +44,7 @@ class TabletAttendanceService
     ) {}
 
     /**
-     * @param  array{client_uuid: string, employee_id: int, captured_at: string, method: string, match_score?: ?float, match_margin?: ?float, liveness_checked?: bool, liveness_score?: ?float, not_me?: bool}  $data
+     * @param  array{client_uuid: string, employee_id: int, captured_at: string, method: string, match_score?: ?float, match_margin?: ?float, liveness_checked?: bool, liveness_score?: ?float, not_me?: bool, requested_type?: ?string}  $data
      */
     public function record(AttendanceTablet $tablet, array $data, ?UploadedFile $photo): TabletAttendanceLog
     {
@@ -133,39 +135,17 @@ class TabletAttendanceService
         }
 
         // --- Masuk atau pulang -----------------------------------------------------
-        $repeat = TabletSettings::REPEAT_IGNORE_SECONDS;
-        $open = $this->sessions->openSession($employee, $captured);
+        $requested = $data['requested_type'] ?? null;
 
-        if ($open) {
-            if ($open->clockInAt->diffInSeconds($captured, true) < $repeat) {
-                return $this->ignored($log, $photo, 'in', $open->workDate, $open->attendance, 'Sudah absen masuk pukul '.$open->clockInAt->format('H:i').'.');
-            }
+        $decided = in_array($requested, ['in', 'out'], true)
+            ? $this->decideChosen($employee, $captured, $requested, $flags)
+            : $this->decideAutomatic($employee, $captured, $flags);
 
-            $type = 'out';
-            $workDate = $open->workDate->copy();
-            $attendance = $open->attendance;
-        } else {
-            $workDate = $captured->copy()->startOfDay();
-            $attendance = $employee->attendances()->whereDate('work_date', $workDate->toDateString())->first();
-
-            if ($attendance?->clock_in && $attendance->clock_out) {
-                // Sudah masuk dan pulang hari ini: pindai lagi = jam pulang diperbarui.
-                $lastOut = Carbon::parse($attendance->clock_out);
-
-                if ($captured->lessThanOrEqualTo($lastOut) || $lastOut->diffInSeconds($captured, true) < $repeat) {
-                    return $this->ignored($log, $photo, 'out', $workDate, $attendance, 'Sudah absen pulang pukul '.$lastOut->format('H:i').'.');
-                }
-
-                $type = 'out';
-                $flags[] = 'repeat_out';
-            } elseif ($attendance?->clock_in) {
-                // Masuk hari ini sudah lewat batas sesi tanpa pulang: catat sebagai pulang
-                // terlambat agar tidak hilang; HR melihatnya di riwayat.
-                $type = 'out';
-            } else {
-                $type = 'in';
-            }
+        if ($decided['ignore'] ?? false) {
+            return $this->ignored($log, $photo, $decided['type'], $decided['workDate'], $decided['attendance'], $decided['reason']);
         }
+
+        ['type' => $type, 'workDate' => $workDate, 'attendance' => $attendance] = $decided;
 
         $log->type = $type;
         $log->work_date = $workDate;
@@ -194,6 +174,108 @@ class TabletAttendanceService
         $this->push->clocked($employee, $type, $captured, AttendancePushNotifier::SOURCE_TABLET, $tablet->name);
 
         return $log;
+    }
+
+    /**
+     * Versi lama tablet (tanpa tombol): server menebak masuk atau pulang dari sesi.
+     *
+     * @param  list<string>  $flags
+     * @return array{type: string, workDate: Carbon, attendance: ?Attendance, ignore?: bool, reason?: string}
+     */
+    private function decideAutomatic(Employee $employee, Carbon $captured, array &$flags): array
+    {
+        $repeat = TabletSettings::REPEAT_IGNORE_SECONDS;
+        $open = $this->sessions->openSession($employee, $captured);
+
+        if ($open) {
+            if ($open->clockInAt->diffInSeconds($captured, true) < $repeat) {
+                return ['ignore' => true, 'type' => 'in', 'workDate' => $open->workDate, 'attendance' => $open->attendance, 'reason' => 'Sudah absen masuk pukul '.$open->clockInAt->format('H:i').'.'];
+            }
+
+            return ['type' => 'out', 'workDate' => $open->workDate->copy(), 'attendance' => $open->attendance];
+        }
+
+        return $this->outOrInToday($employee, $captured, $flags, 'in');
+    }
+
+    /**
+     * Karyawan memilih sendiri lewat tombol Absen Masuk / Absen Pulang (Ega,
+     * 2026-11-26). Pilihannya dihormati; tablet sudah bertanya lebih dulu bila
+     * pilihan itu janggal, jadi di sini hanya kiriman ganda yang diabaikan.
+     *
+     * @param  list<string>  $flags
+     * @return array{type: string, workDate: Carbon, attendance: ?Attendance, ignore?: bool, reason?: string}
+     */
+    private function decideChosen(Employee $employee, Carbon $captured, string $requested, array &$flags): array
+    {
+        $open = $this->sessions->openSession($employee, $captured);
+        $today = $captured->copy()->startOfDay();
+
+        if ($requested === 'out') {
+            if ($open) {
+                if ($open->clockInAt->diffInSeconds($captured, true) < TabletSettings::REPEAT_IGNORE_SECONDS) {
+                    return ['ignore' => true, 'type' => 'in', 'workDate' => $open->workDate, 'attendance' => $open->attendance, 'reason' => 'Baru saja absen masuk pukul '.$open->clockInAt->format('H:i').'.'];
+                }
+
+                return ['type' => 'out', 'workDate' => $open->workDate->copy(), 'attendance' => $open->attendance];
+            }
+
+            return $this->outOrInToday($employee, $captured, $flags, 'out');
+        }
+
+        // Pilih MASUK. Sesi terbuka dari hari sebelumnya (lupa absen pulang) tidak
+        // menghalangi: hari ini dibuka sebagai absensi baru.
+        if ($open && $open->workDate->isSameDay($today)) {
+            return ['ignore' => true, 'type' => 'in', 'workDate' => $open->workDate, 'attendance' => $open->attendance, 'reason' => 'Sudah absen masuk pukul '.$open->clockInAt->format('H:i').'.'];
+        }
+
+        $attendance = $employee->attendances()->whereDate('work_date', $today->toDateString())->first();
+
+        if ($attendance?->clock_in) {
+            return ['ignore' => true, 'type' => 'in', 'workDate' => $today, 'attendance' => $attendance, 'reason' => 'Sudah absen masuk pukul '.Carbon::parse($attendance->clock_in)->format('H:i').'.'];
+        }
+
+        return ['type' => 'in', 'workDate' => $today, 'attendance' => $attendance];
+    }
+
+    /**
+     * Tidak ada sesi terbuka: tentukan dari absensi hari ini.
+     *
+     * @param  list<string>  $flags
+     * @return array{type: string, workDate: Carbon, attendance: ?Attendance, ignore?: bool, reason?: string}
+     */
+    private function outOrInToday(Employee $employee, Carbon $captured, array &$flags, string $whenEmpty): array
+    {
+        $repeat = TabletSettings::REPEAT_IGNORE_SECONDS;
+        $workDate = $captured->copy()->startOfDay();
+        $attendance = $employee->attendances()->whereDate('work_date', $workDate->toDateString())->first();
+
+        if ($attendance?->clock_in && $attendance->clock_out) {
+            // Sudah masuk dan pulang hari ini: pindai lagi = jam pulang diperbarui.
+            $lastOut = Carbon::parse($attendance->clock_out);
+
+            if ($captured->lessThanOrEqualTo($lastOut) || $lastOut->diffInSeconds($captured, true) < $repeat) {
+                return ['ignore' => true, 'type' => 'out', 'workDate' => $workDate, 'attendance' => $attendance, 'reason' => 'Sudah absen pulang pukul '.$lastOut->format('H:i').'.'];
+            }
+
+            $flags[] = 'repeat_out';
+
+            return ['type' => 'out', 'workDate' => $workDate, 'attendance' => $attendance];
+        }
+
+        if ($attendance?->clock_in) {
+            // Masuk hari ini sudah lewat batas sesi tanpa pulang: catat sebagai pulang
+            // terlambat agar tidak hilang; HR melihatnya di riwayat.
+            return ['type' => 'out', 'workDate' => $workDate, 'attendance' => $attendance];
+        }
+
+        if ($whenEmpty === 'out') {
+            // Karyawan memilih pulang (dan sudah mengonfirmasi di tablet) padahal
+            // belum ada jam masuk. Dicatat apa adanya dan ditandai untuk HR.
+            $flags[] = 'no_clock_in';
+        }
+
+        return ['type' => $whenEmpty, 'workDate' => $workDate, 'attendance' => $attendance];
     }
 
     private function ignored(TabletAttendanceLog $log, ?UploadedFile $photo, string $type, Carbon $workDate, ?Attendance $attendance, string $reason): TabletAttendanceLog

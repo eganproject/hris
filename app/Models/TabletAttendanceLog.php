@@ -38,6 +38,7 @@ class TabletAttendanceLog extends Model
         'clock_skew' => 'Jam tablet tidak sesuai',
         'other_branch' => 'Beda lokasi kerja',
         'repeat_out' => 'Pulang diperbarui',
+        'no_clock_in' => 'Pulang tanpa absen masuk',
     ];
 
     /** @var list<string> */

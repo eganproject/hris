@@ -174,6 +174,46 @@ test('masuk di mesin lalu pulang di tablet', function () {
     expect(Attendance::query()->sole()->clock_in->format('H:i'))->toBe('07:40');
 });
 
+test('tombol pilihan: masuk dan pulang mengikuti pilihan karyawan', function () {
+    ['employee' => $employee, 'token' => $token] = tabletFixture();
+
+    tabletClock($token, $employee, ['requested_type' => 'in'])->assertCreated()->assertJsonPath('data.type', 'in');
+
+    // Pilih masuk lagi = tidak dicatat ulang.
+    Carbon::setTestNow(Carbon::parse('2026-11-26 09:00:00', 'Asia/Jakarta'));
+    tabletClock($token, $employee, ['requested_type' => 'in'])->assertJsonPath('data.result', 'ignored')
+        ->assertJsonPath('data.reason', 'Sudah absen masuk pukul 07:50.');
+
+    // Pulang cepat (izin) tetap tercatat pulang karena dipilih karyawan.
+    Carbon::setTestNow(Carbon::parse('2026-11-26 13:00:00', 'Asia/Jakarta'));
+    tabletClock($token, $employee, ['requested_type' => 'out'])->assertJsonPath('data.type', 'out');
+
+    expect(Attendance::query()->sole()->clock_out->format('H:i'))->toBe('13:00');
+});
+
+test('tombol pilihan: lupa pulang kemarin, pilih masuk hari ini membuka hari baru', function () {
+    ['employee' => $employee, 'token' => $token] = tabletFixture();
+
+    // Masuk kemarin 20:00, lupa pulang: sesi masih terbuka pagi ini.
+    app(\App\Services\AttendanceResolver::class)->resolve($employee, Carbon::parse('2026-11-25'), '20:00', null);
+
+    tabletClock($token, $employee, ['requested_type' => 'in'])->assertJsonPath('data.type', 'in')
+        ->assertJsonPath('data.attendance.work_date', '2026-11-26');
+
+    expect(Attendance::query()->count())->toBe(2);
+});
+
+test('tombol pilihan: pulang tanpa absen masuk dicatat dan ditandai', function () {
+    ['employee' => $employee, 'token' => $token] = tabletFixture();
+
+    Carbon::setTestNow(Carbon::parse('2026-11-26 17:02:00', 'Asia/Jakarta'));
+    tabletClock($token, $employee, ['requested_type' => 'out'])->assertJsonPath('data.type', 'out')
+        ->assertJsonPath('data.flags', ['no_clock_in']);
+
+    $attendance = Attendance::query()->sole();
+    expect($attendance->clock_in)->toBeNull()->and($attendance->clock_out->format('H:i'))->toBe('17:02');
+});
+
 test('kirim ulang dari antrean offline dengan UUID sama tidak dobel', function () {
     ['employee' => $employee, 'token' => $token] = tabletFixture();
     $uuid = (string) Str::uuid();
