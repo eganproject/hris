@@ -73,6 +73,7 @@ class ApprovalNotifier
                 .$target.' Buka menu Aset Saya untuk mengonfirmasi penerimaannya.',
             url: route('my-assets.index'),
             category: 'asset',
+            meta: ['assignment_id' => $assignment->id],
         ));
     }
 
@@ -90,6 +91,7 @@ class ApprovalNotifier
                 .'Buka menu Aset Saya untuk mengonfirmasinya, atau tulis catatan bila ada yang tidak sesuai.',
             url: route('my-assets.index'),
             category: 'asset',
+            meta: ['assignment_id' => $assignment->id],
         ));
     }
 
@@ -116,6 +118,7 @@ class ApprovalNotifier
             message: $message,
             url: route('my-assets.index'),
             category: 'asset',
+            meta: ['assignment_id' => $assignment->id],
         ));
 
         if ($daysLeft < 0) {
@@ -188,6 +191,7 @@ class ApprovalNotifier
                 .($overtime->reason ? ' Alasan: '.$overtime->reason : ''),
             url: route('my-overtime.index'),
             category: 'overtime',
+            meta: ['for' => 'approver'],
         ));
     }
 
@@ -256,6 +260,7 @@ class ApprovalNotifier
                 message: $message,
                 url: route('my-leave.index'),
                 category: 'leave',
+                meta: ['for' => 'approver'],
             ));
 
             return;
@@ -287,6 +292,7 @@ class ApprovalNotifier
             message: 'Pengajuan '.$type.' dari '.$who.' — '.$period.' — sudah menunggu '.$daysWaiting.' hari.',
             url: route('my-leave.index'),
             category: 'leave',
+            meta: ['for' => 'approver'],
         ));
 
         if ($escalate) {
@@ -296,6 +302,7 @@ class ApprovalNotifier
                     .($leave->supervisor?->full_name ?? 'atasannya').'.',
                 url: route('attendance.leave.index'),
                 category: 'leave',
+                meta: ['for' => 'approver'],
             ), self::LEAVE_VIEWER);
         }
     }
@@ -317,6 +324,7 @@ class ApprovalNotifier
             message: 'Pengajuan lembur dari '.$who.' — '.$period.' — sudah menunggu '.$daysWaiting.' hari.',
             url: route('my-overtime.index'),
             category: 'overtime',
+            meta: ['for' => 'approver'],
         ));
 
         if ($escalate) {
@@ -326,6 +334,7 @@ class ApprovalNotifier
                     .($overtime->supervisor?->full_name ?? 'atasannya').'.',
                 url: route('attendance.overtime.index'),
                 category: 'overtime',
+                meta: ['for' => 'approver'],
             ), self::OVERTIME_VIEWER);
         }
     }

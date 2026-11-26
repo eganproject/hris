@@ -31,8 +31,20 @@ final class Present
             'initials' => self::initials($employee->full_name),
             'job_title' => $employee->jobPosition?->name,
             'department' => $employee->department?->name,
-            'photo_url' => $employee->photo_url,
+            'photo_url' => self::photoUrl($employee),
         ];
+    }
+
+    /**
+     * URL foto lengkap (https://host/storage/...). Disk public sengaja memberi URL
+     * relatif untuk web; aplikasi HP tidak bisa memuat URL relatif, jadi di sini
+     * dilengkapi dengan host permintaan.
+     */
+    public static function photoUrl(?Employee $employee): ?string
+    {
+        $url = $employee?->photo_url;
+
+        return $url === null ? null : url($url);
     }
 
     public static function initials(?string $name): string
