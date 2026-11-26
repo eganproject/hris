@@ -101,8 +101,8 @@ test('atasan bisa membuka profil dan riwayat absen anggota tim, bukan orang lain
 });
 
 test('foto profil dikirim sebagai URL lengkap supaya bisa dimuat aplikasi', function () {
-    [$user] = mobileEmployee('Rina');
-    [, $okan] = mobileEmployee('Okan', ['photo_path' => 'employees/photos/okan.jpg']);
+    [$user] = mobileEmployee('Rina', ['branch_id' => mobileBranch()]);
+    [, $okan] = mobileEmployee('Okan', ['branch_id' => mobileBranch(), 'photo_path' => 'employees/photos/okan.jpg']);
 
     $url = mobileAs($user)->getJson("/api/mobile/v1/people/{$okan->id}")->assertOk()->json('data.photo_url');
 
