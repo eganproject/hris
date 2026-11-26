@@ -4,6 +4,7 @@ use App\Http\Controllers\Api\Mobile\AttendanceController;
 use App\Http\Controllers\Api\Mobile\AuthController;
 use App\Http\Controllers\Api\Mobile\CorrectionController;
 use App\Http\Controllers\Api\Mobile\PushTokenController;
+use App\Http\Controllers\Api\Mobile\RemoteAttendanceController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -30,6 +31,10 @@ Route::prefix('mobile/v1')->name('api.mobile.')->group(function () {
         Route::get('attendance/status', [AttendanceController::class, 'status'])->name('attendance.status');
         Route::post('attendance/clock', [AttendanceController::class, 'clock'])->middleware('feature:mobile_clock')->name('attendance.clock');
         Route::get('attendance/history', [AttendanceController::class, 'history'])->name('attendance.history');
+
+        // Absen selfie khusus hari WFH / dinas luar (aturan sama dengan web, tanpa geofence).
+        Route::get('attendance/remote', [RemoteAttendanceController::class, 'show'])->name('attendance.remote.show');
+        Route::post('attendance/remote', [RemoteAttendanceController::class, 'store'])->middleware('throttle:20,1')->name('attendance.remote.store');
         Route::get('attendance/{attendance}/photo/{side}', [AttendanceController::class, 'photo'])
             ->middleware('feature:mobile_clock')
             ->whereIn('side', ['in', 'out'])
