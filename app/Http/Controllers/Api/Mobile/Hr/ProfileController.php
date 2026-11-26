@@ -77,7 +77,7 @@ class ProfileController extends HrController
         $employee->update(['photo_path' => $request->file('photo')->store('employees/photos', 'public')]);
         $this->forgetPhoto($previous, $employee->photo_path);
 
-        return $this->message('Foto profil diperbarui.', ['photo_url' => $employee->photo_url]);
+        return $this->message('Foto profil diperbarui.', ['photo_url' => Present::photoUrl($employee)]);
     }
 
     public function destroyPhoto(): JsonResponse

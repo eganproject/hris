@@ -7,6 +7,7 @@ use App\Models\Employee;
 use App\Models\MobileDevice;
 use App\Models\User;
 use App\Services\Mobile\MobileDeviceRegistry;
+use App\Support\Mobile\Present;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
@@ -139,7 +140,7 @@ class AuthController extends Controller
                 'id' => $employee->id,
                 'number' => $employee->employee_number,
                 'full_name' => $employee->full_name,
-                'photo_url' => $employee->photo_url,
+                'photo_url' => Present::photoUrl($employee),
                 'phone' => $employee->phone,
                 'branch' => $employee->branch ? ['id' => $employee->branch->id, 'name' => $employee->branch->name] : null,
                 'department' => $employee->department?->name,

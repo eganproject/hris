@@ -14,6 +14,7 @@
 */
 
 use App\Http\Controllers\Api\Mobile\Hr\ApprovalController;
+use App\Http\Controllers\Api\Mobile\Hr\AssetController;
 use App\Http\Controllers\Api\Mobile\Hr\KabarController;
 use App\Http\Controllers\Api\Mobile\Hr\NotificationController;
 use App\Http\Controllers\Api\Mobile\Hr\OrgController;
@@ -24,6 +25,7 @@ use App\Http\Controllers\Api\Mobile\Hr\ProfileController;
 use App\Http\Controllers\Api\Mobile\Hr\ScheduleController;
 use App\Http\Controllers\Api\Mobile\Hr\SwapController;
 use App\Http\Controllers\Api\Mobile\Hr\TeamController;
+use App\Http\Controllers\Api\Mobile\Hr\TeamMemberController;
 use App\Http\Controllers\Api\Mobile\Hr\TeamScheduleController;
 use Illuminate\Support\Facades\Route;
 
@@ -64,6 +66,11 @@ Route::group([], function () {
     Route::delete('profile/photo', [ProfileController::class, 'destroyPhoto'])->name('profile.photo.destroy');
 
     // Rekan kerja: siapa yang online + profil publik
+    // Aset yang saya pegang + konfirmasi penerimaan (sama dengan web Aset Saya).
+    Route::get('assets', [AssetController::class, 'index'])->name('assets.index');
+    Route::get('assets/{assignment}', [AssetController::class, 'show'])->whereNumber('assignment')->name('assets.show');
+    Route::post('assets/{assignment}/acknowledge', [AssetController::class, 'acknowledge'])->whereNumber('assignment')->name('assets.acknowledge');
+
     Route::get('people', [PeopleController::class, 'index'])->name('people.index');
     Route::get('people/{employee}', [PeopleController::class, 'show'])->whereNumber('employee')->name('people.show');
     Route::get('org', [OrgController::class, 'show'])->name('org.show');
@@ -74,6 +81,7 @@ Route::group([], function () {
     Route::post('approvals/{kind}/{id}/reject', [ApprovalController::class, 'reject'])->whereIn('kind', ['leave', 'overtime'])->whereNumber('id')->name('approvals.reject');
     Route::get('team/today', [TeamController::class, 'today'])->name('team.today');
     Route::post('team/{employee}/remind', [TeamController::class, 'remind'])->name('team.remind');
+    Route::get('team/members/{employee}', [TeamMemberController::class, 'show'])->whereNumber('employee')->name('team.members.show');
     Route::get('team/schedule', [TeamScheduleController::class, 'show'])->name('team.schedule');
     Route::put('team/schedule', [TeamScheduleController::class, 'update'])->name('team.schedule.update');
     Route::post('team/schedule/copy-last-week', [TeamScheduleController::class, 'copyLastWeek'])->name('team.schedule.copy');
