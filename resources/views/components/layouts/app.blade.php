@@ -161,12 +161,14 @@
                                         <span class="sidebar-label truncate">Monitor Mesin</span>
                                     </a>
                                 @endcan
+                                @if (config('features.mobile_clock'))
                                 @can('mobile-attendance.view')
                                     <a href="{{ route('attendance.mobile.index') }}" @class(['sidebar-nav-link flex items-center gap-2.5 rounded px-2.5 py-1.5 text-[13px] font-medium transition', 'bg-white text-gray-950 shadow-xs ring-1 ring-gray-200' => request()->routeIs('attendance.mobile.*'), 'text-gray-600 hover:bg-white hover:text-gray-950' => ! request()->routeIs('attendance.mobile.*')]) title="Absen Aplikasi HP">
                                         <svg class="size-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="6" y="2" width="12" height="20" rx="2"></rect><path d="M11 18h2"></path></svg>
                                         <span class="sidebar-label truncate">Absen Aplikasi HP</span>
                                     </a>
                                 @endcan
+                                @endif
                                 @can('corrections.view')
                                     <a href="{{ route('attendance.corrections.index') }}" @class(['sidebar-nav-link flex items-center gap-2.5 rounded px-2.5 py-1.5 text-[13px] font-medium transition', 'bg-white text-gray-950 shadow-xs ring-1 ring-gray-200' => request()->routeIs('attendance.corrections.*'), 'text-gray-600 hover:bg-white hover:text-gray-950' => ! request()->routeIs('attendance.corrections.*')]) title="Koreksi Absensi">
                                         <svg class="size-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20h9"></path><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"></path></svg>
@@ -298,7 +300,7 @@
                         <div @class(['sidebar-group', 'is-open' => $g]) data-sidebar-group="kabar">
                             <button type="button" data-sidebar-group-toggle aria-expanded="{{ $g ? 'true' : 'false' }}" class="sidebar-group-toggle flex w-full items-center gap-2.5 rounded px-2.5 py-1.5 text-left transition hover:bg-white/70">
                                 <svg class="size-4 shrink-0 text-gray-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 11.5a8.4 8.4 0 0 1-12.3 7.5L3 21l2-5.3A8.5 8.5 0 1 1 21 11.5z"></path></svg>
-                                <span class="sidebar-section-label flex-1 truncate text-[11px] font-semibold uppercase tracking-wide text-gray-500">Kabar</span>
+                                <span class="sidebar-section-label flex-1 truncate text-[11px] font-semibold uppercase tracking-wide text-gray-500">Pengumuman</span>
                                 <svg class="sidebar-group-chevron size-3.5 shrink-0 text-gray-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 6 6 6-6 6"></path></svg>
                             </button>
                             <div class="sidebar-group-items space-y-0.5" data-sidebar-group-items>
@@ -308,12 +310,14 @@
                                         <span class="sidebar-label truncate">Pengumuman HR</span>
                                     </a>
                                 @endcan
+                                @if (config('features.kabar'))
                                 @can('kabar-moderation.view')
                                     <a href="{{ route('kabar.moderation.index') }}" @class(['sidebar-nav-link flex items-center gap-2.5 rounded px-2.5 py-1.5 text-[13px] font-medium transition', 'bg-white text-gray-950 shadow-xs ring-1 ring-gray-200' => request()->routeIs('kabar.moderation.*'), 'text-gray-600 hover:bg-white hover:text-gray-950' => ! request()->routeIs('kabar.moderation.*')]) title="Moderasi Kabar">
                                         <svg class="size-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3 4 6v6c0 5 3.5 8 8 9 4.5-1 8-4 8-9V6z"></path><path d="m9 12 2 2 4-4"></path></svg>
                                         <span class="sidebar-label truncate">Moderasi Kabar</span>
                                     </a>
                                 @endcan
+                                @endif
                             </div>
                         </div>
                     @endcanany

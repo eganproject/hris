@@ -17,14 +17,16 @@ Route::prefix('mobile/v1')->name('api.mobile.')->group(function () {
 
     Route::middleware(['auth:sanctum', 'mobile.device', 'throttle:120,1'])->group(function () {
         Route::post('auth/logout', [AuthController::class, 'logout'])->name('auth.logout');
-        Route::post('auth/consent', [AuthController::class, 'consent'])->name('auth.consent');
+        Route::post('auth/consent', [AuthController::class, 'consent'])->middleware('feature:mobile_clock')->name('auth.consent');
         Route::get('me', [AuthController::class, 'me'])->name('me');
 
-        // Tahap 1: absensi.
+        // Tahap 1: absensi. Absen dari HP dimatikan (config/features.php);
+        // status hari ini dan riwayat tetap dipakai aplikasi.
         Route::get('attendance/status', [AttendanceController::class, 'status'])->name('attendance.status');
-        Route::post('attendance/clock', [AttendanceController::class, 'clock'])->name('attendance.clock');
+        Route::post('attendance/clock', [AttendanceController::class, 'clock'])->middleware('feature:mobile_clock')->name('attendance.clock');
         Route::get('attendance/history', [AttendanceController::class, 'history'])->name('attendance.history');
         Route::get('attendance/{attendance}/photo/{side}', [AttendanceController::class, 'photo'])
+            ->middleware('feature:mobile_clock')
             ->whereIn('side', ['in', 'out'])
             ->name('attendance.photo');
 

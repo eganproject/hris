@@ -8,6 +8,9 @@ use Spatie\Permission\PermissionRegistrar;
 
 uses(RefreshDatabase::class);
 
+// Kabar dimatikan sejak 2026-11-26; tes ini menguji kodenya bila dibuka lagi.
+beforeEach(fn () => config(['features.kabar' => true]));
+
 test('superadmin and HR attendance holders get the Kabar menus', function () {
     app(PermissionRegistrar::class)->forgetCachedPermissions();
     Permission::findOrCreate('attendance-daily.update', 'web');

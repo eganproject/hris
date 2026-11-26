@@ -80,20 +80,20 @@ Route::group([], function () {
     Route::post('team/schedule/publish', [TeamScheduleController::class, 'publish'])->name('team.schedule.publish');
     Route::get('shifts', [TeamScheduleController::class, 'shifts'])->name('shifts');
 
-    // Kabar
-    Route::get('kabar', [KabarController::class, 'feed'])->name('kabar.feed');
+    // Pengumuman HR (aktif) dan Kabar (dimatikan, config/features.php).
+    Route::get('kabar', [KabarController::class, 'feed'])->middleware('feature:kabar')->name('kabar.feed');
     Route::get('announcements', [KabarController::class, 'announcements'])->name('announcements.index');
     Route::get('announcements/{announcement}', [KabarController::class, 'announcement'])->name('announcements.show');
     Route::post('announcements/{announcement}/read', [KabarController::class, 'markRead'])->name('announcements.read');
     Route::get('announcements/{announcement}/attachment', [KabarController::class, 'announcementAttachment'])->name('announcements.attachment');
-    Route::post('posts', [KabarController::class, 'storePost'])->name('posts.store');
-    Route::get('posts/{post}', [KabarController::class, 'showPost'])->name('posts.show');
-    Route::delete('posts/{post}', [KabarController::class, 'destroyPost'])->name('posts.destroy');
-    Route::get('posts/{post}/image', [KabarController::class, 'postImage'])->name('posts.image');
-    Route::post('posts/{post}/like', [KabarController::class, 'likePost'])->name('posts.like');
-    Route::post('posts/{post}/report', [KabarController::class, 'reportPost'])->name('posts.report');
-    Route::post('posts/{post}/comments', [KabarController::class, 'storeComment'])->name('posts.comments.store');
-    Route::delete('comments/{comment}', [KabarController::class, 'destroyComment'])->name('comments.destroy');
-    Route::post('comments/{comment}/like', [KabarController::class, 'likeComment'])->name('comments.like');
-    Route::post('comments/{comment}/report', [KabarController::class, 'reportComment'])->name('comments.report');
+    Route::post('posts', [KabarController::class, 'storePost'])->middleware('feature:kabar')->name('posts.store');
+    Route::get('posts/{post}', [KabarController::class, 'showPost'])->middleware('feature:kabar')->name('posts.show');
+    Route::delete('posts/{post}', [KabarController::class, 'destroyPost'])->middleware('feature:kabar')->name('posts.destroy');
+    Route::get('posts/{post}/image', [KabarController::class, 'postImage'])->middleware('feature:kabar')->name('posts.image');
+    Route::post('posts/{post}/like', [KabarController::class, 'likePost'])->middleware('feature:kabar')->name('posts.like');
+    Route::post('posts/{post}/report', [KabarController::class, 'reportPost'])->middleware('feature:kabar')->name('posts.report');
+    Route::post('posts/{post}/comments', [KabarController::class, 'storeComment'])->middleware('feature:kabar')->name('posts.comments.store');
+    Route::delete('comments/{comment}', [KabarController::class, 'destroyComment'])->middleware('feature:kabar')->name('comments.destroy');
+    Route::post('comments/{comment}/like', [KabarController::class, 'likeComment'])->middleware('feature:kabar')->name('comments.like');
+    Route::post('comments/{comment}/report', [KabarController::class, 'reportComment'])->middleware('feature:kabar')->name('comments.report');
 });

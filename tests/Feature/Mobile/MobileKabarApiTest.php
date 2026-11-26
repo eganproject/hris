@@ -13,6 +13,9 @@ require_once __DIR__.'/MobileHelpers.php';
 
 uses(RefreshDatabase::class);
 
+// Kabar dimatikan sejak 2026-11-26; tes ini menguji kodenya bila dibuka lagi.
+beforeEach(fn () => config(['features.kabar' => true]));
+
 test('pengumuman HR tampil untuk sasarannya dan bisa ditandai sudah dibaca', function () {
     $finance = Department::query()->create(['name' => 'Keuangan', 'code' => 'FIN']);
     $it = Department::query()->create(['name' => 'IT', 'code' => 'IT']);

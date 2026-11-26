@@ -118,13 +118,13 @@ Route::middleware('auth')->group(function () {
         Route::put('pengumuman/{announcement}', [AnnouncementController::class, 'update'])->middleware('permission:announcements.update')->name('announcements.update');
         Route::delete('pengumuman/{announcement}', [AnnouncementController::class, 'destroy'])->middleware('permission:announcements.delete')->name('announcements.destroy');
 
-        Route::get('moderasi', [KabarModerationController::class, 'index'])->middleware('permission:kabar-moderation.view')->name('moderation.index');
-        Route::get('moderasi/{post}', [KabarModerationController::class, 'show'])->withTrashed()->middleware('permission:kabar-moderation.view')->name('moderation.show');
-        Route::get('moderasi/{post}/foto', [KabarModerationController::class, 'image'])->withTrashed()->middleware('permission:kabar-moderation.view')->name('moderation.image');
-        Route::patch('moderasi/{post}/sembunyikan', [KabarModerationController::class, 'hidePost'])->middleware('permission:kabar-moderation.update')->name('moderation.hide');
-        Route::patch('moderasi/{post}/tampilkan', [KabarModerationController::class, 'unhidePost'])->middleware('permission:kabar-moderation.update')->name('moderation.unhide');
-        Route::patch('moderasi/{post}/tutup-laporan', [KabarModerationController::class, 'dismissReports'])->middleware('permission:kabar-moderation.update')->name('moderation.dismiss');
-        Route::patch('moderasi/komentar/{comment}', [KabarModerationController::class, 'toggleComment'])->middleware('permission:kabar-moderation.update')->name('moderation.comment');
+        Route::get('moderasi', [KabarModerationController::class, 'index'])->middleware('feature:kabar')->middleware('permission:kabar-moderation.view')->name('moderation.index');
+        Route::get('moderasi/{post}', [KabarModerationController::class, 'show'])->withTrashed()->middleware('feature:kabar')->middleware('permission:kabar-moderation.view')->name('moderation.show');
+        Route::get('moderasi/{post}/foto', [KabarModerationController::class, 'image'])->withTrashed()->middleware('feature:kabar')->middleware('permission:kabar-moderation.view')->name('moderation.image');
+        Route::patch('moderasi/{post}/sembunyikan', [KabarModerationController::class, 'hidePost'])->middleware('feature:kabar')->middleware('permission:kabar-moderation.update')->name('moderation.hide');
+        Route::patch('moderasi/{post}/tampilkan', [KabarModerationController::class, 'unhidePost'])->middleware('feature:kabar')->middleware('permission:kabar-moderation.update')->name('moderation.unhide');
+        Route::patch('moderasi/{post}/tutup-laporan', [KabarModerationController::class, 'dismissReports'])->middleware('feature:kabar')->middleware('permission:kabar-moderation.update')->name('moderation.dismiss');
+        Route::patch('moderasi/komentar/{comment}', [KabarModerationController::class, 'toggleComment'])->middleware('feature:kabar')->middleware('permission:kabar-moderation.update')->name('moderation.comment');
     });
 
     // In-app notifications (available to every authenticated user).
@@ -364,11 +364,11 @@ Route::middleware('auth')->group(function () {
         Route::post('daily/process', [AttendanceController::class, 'process'])->middleware('permission:attendance-daily.update')->name('daily.process');
         Route::post('daily/punch', [AttendanceController::class, 'storePunch'])->middleware('permission:attendance-daily.update')->name('daily.punch');
 
-        // Absen lewat aplikasi HP: daftar absen (bertanda = penanda saja) + persetujuan ganti HP.
-        Route::get('mobile', [MobileAttendanceController::class, 'index'])->middleware('permission:mobile-attendance.view')->name('mobile.index');
-        Route::get('mobile/logs/{log}/photo', [MobileAttendanceController::class, 'photo'])->middleware('permission:mobile-attendance.view')->name('mobile.photo');
-        Route::get('mobile/devices', [MobileAttendanceController::class, 'devices'])->middleware('permission:mobile-attendance.view')->name('mobile.devices');
-        Route::patch('mobile/devices/{device}', [MobileAttendanceController::class, 'decideDevice'])->middleware('permission:mobile-attendance.update')->name('mobile.devices.decide');
+        // Absen lewat aplikasi HP: dimatikan (config/features.php), data lama tetap.
+        Route::get('mobile', [MobileAttendanceController::class, 'index'])->middleware('feature:mobile_clock')->middleware('permission:mobile-attendance.view')->name('mobile.index');
+        Route::get('mobile/logs/{log}/photo', [MobileAttendanceController::class, 'photo'])->middleware('feature:mobile_clock')->middleware('permission:mobile-attendance.view')->name('mobile.photo');
+        Route::get('mobile/devices', [MobileAttendanceController::class, 'devices'])->middleware('feature:mobile_clock')->middleware('permission:mobile-attendance.view')->name('mobile.devices');
+        Route::patch('mobile/devices/{device}', [MobileAttendanceController::class, 'decideDevice'])->middleware('feature:mobile_clock')->middleware('permission:mobile-attendance.update')->name('mobile.devices.decide');
 
         Route::get('corrections', [AttendanceCorrectionController::class, 'index'])->middleware('permission:corrections.view')->name('corrections.index');
         Route::post('corrections/bulk-approve', [AttendanceCorrectionController::class, 'bulkApprove'])->middleware('permission:corrections.update')->name('corrections.bulk-approve');
