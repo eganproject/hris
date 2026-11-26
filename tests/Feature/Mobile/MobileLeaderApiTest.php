@@ -120,6 +120,40 @@ test('tim hari ini menghitung hadir, telat, dan belum absen', function () {
         ->assertJsonPath('data.members.0.employee.name', 'Rudi');
 });
 
+test('tim hari ini bisa difilter tanggal, nama, status, dan bawahan langsung', function () {
+    [$bossUser, $boss] = mobileEmployee('Andi Atasan');
+    [, $a] = mobileEmployee('Ayu', ['manager_id' => $boss->id]);
+    [, $b] = mobileEmployee('Siti', ['manager_id' => $boss->id]);
+    [, $c] = mobileEmployee('Rudi Cucu', ['manager_id' => $a->id]);
+    $shift = teamShift();
+    $yesterday = now()->subDay()->toDateString();
+
+    foreach ([$a, $b, $c] as $member) {
+        EmployeeSchedule::query()->create(['employee_id' => $member->id, 'work_date' => $yesterday, 'shift_id' => $shift->id]);
+    }
+    Attendance::query()->create(['employee_id' => $b->id, 'work_date' => $yesterday, 'status' => 'late', 'clock_in' => now()->subDay()->setTime(7, 21), 'late_minutes' => 21]);
+    Attendance::query()->create(['employee_id' => $c->id, 'work_date' => $yesterday, 'status' => 'present', 'clock_in' => now()->subDay()->setTime(6, 50)]);
+
+    // Kemarin: Siti telat, Rudi hadir, Ayu tidak absen.
+    mobileAs($bossUser)->getJson("/api/mobile/v1/team/today?date={$yesterday}&state=late")
+        ->assertOk()
+        ->assertJsonPath('data.date', $yesterday)
+        ->assertJsonPath('data.is_today', false)
+        ->assertJsonCount(1, 'data.members')
+        ->assertJsonPath('data.members.0.employee.name', 'Siti')
+        ->assertJsonPath('data.by_state.not_yet', 1)
+        ->assertJsonPath('data.by_state.present', 1);
+
+    mobileAs($bossUser)->getJson("/api/mobile/v1/team/today?date={$yesterday}&q=rudi")
+        ->assertJsonCount(1, 'data.members')
+        ->assertJsonPath('data.members.0.employee.name', 'Rudi Cucu');
+
+    mobileAs($bossUser)->getJson("/api/mobile/v1/team/today?date={$yesterday}&direct=1")
+        ->assertJsonPath('data.team_size', 2);
+
+    mobileAs($bossUser)->getJson('/api/mobile/v1/team/today?date='.now()->addDay()->toDateString())->assertStatus(422);
+});
+
 test('atasan mengatur, menyalin, dan menerbitkan jadwal tim', function () {
     [$bossUser, $boss] = mobileEmployee('Andi Atasan');
     [$staffUser, $staff] = mobileEmployee('Dimas', ['manager_id' => $boss->id]);

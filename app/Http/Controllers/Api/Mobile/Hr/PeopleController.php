@@ -78,9 +78,16 @@ class PeopleController extends HrController
     }
 
     /** Karyawan aktif + kapan terakhir memakai aplikasi (HP aktif mana pun). */
+    /**
+     * Rekan kerja hanya yang satu lokasi kerja (cabang) dengan penggunanya. Karyawan
+     * tanpa lokasi kerja tidak melihat siapa pun selain dirinya.
+     */
     private function query(): Builder
     {
+        $me = $this->employee();
+
         return Employee::query()->active()
+            ->when($me->branch_id, fn (Builder $q, $branchId) => $q->where('branch_id', $branchId), fn (Builder $q) => $q->whereKey($me->id))
             ->with(['jobPosition', 'department'])
             ->addSelect([
                 'app_last_seen_at' => MobileDevice::query()

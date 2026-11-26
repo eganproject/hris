@@ -24,11 +24,11 @@ function seenDevice($user, $employee, $at): MobileDevice
 }
 
 test('rekan kerja menampilkan siapa yang online dan offline', function () {
-    [$meUser, $me] = mobileEmployee('Ega');
-    [$okanUser, $okan] = mobileEmployee('Okan');
-    [$sitiUser, $siti] = mobileEmployee('Siti');
-    mobileEmployee('Rudi');
-    mobileEmployee('Keluar', ['employment_status' => 'resigned']);
+    [$meUser, $me] = mobileEmployee('Ega', ['branch_id' => mobileBranch()]);
+    [$okanUser, $okan] = mobileEmployee('Okan', ['branch_id' => mobileBranch()]);
+    [$sitiUser, $siti] = mobileEmployee('Siti', ['branch_id' => mobileBranch()]);
+    mobileEmployee('Rudi', ['branch_id' => mobileBranch()]);
+    mobileEmployee('Keluar', ['branch_id' => mobileBranch(), 'employment_status' => 'resigned']);
 
     seenDevice($okanUser, $okan, now()->subMinutes(2));
     seenDevice($sitiUser, $siti, now()->subHours(2));
@@ -49,10 +49,21 @@ test('rekan kerja menampilkan siapa yang online dan offline', function () {
     mobileAs($meUser)->getJson('/api/mobile/v1/people?q=sit')->assertJsonCount(1, 'data');
 });
 
+test('rekan kerja hanya yang satu lokasi kerja', function () {
+    [$meUser] = mobileEmployee('Ega', ['branch_id' => mobileBranch()]);
+    mobileEmployee('Okan', ['branch_id' => mobileBranch()]);
+    [, $gudang] = mobileEmployee('Gudang Rudi', ['branch_id' => mobileBranch('GDG', 'Gudang')]);
+
+    $names = collect(mobileAs($meUser)->getJson('/api/mobile/v1/people')->assertOk()->json('data'))->pluck('name');
+    expect($names->all())->toContain('Okan')->not->toContain('Gudang Rudi');
+
+    mobileAs($meUser)->getJson("/api/mobile/v1/people/{$gudang->id}")->assertNotFound();
+});
+
 test('profil rekan hanya berisi data publik', function () {
-    [$meUser] = mobileEmployee('Ega');
-    [, $boss] = mobileEmployee('Andi Atasan');
-    [, $okan] = mobileEmployee('Okan', [
+    [$meUser] = mobileEmployee('Ega', ['branch_id' => mobileBranch()]);
+    [, $boss] = mobileEmployee('Andi Atasan', ['branch_id' => mobileBranch()]);
+    [, $okan] = mobileEmployee('Okan', ['branch_id' => mobileBranch(),
         'manager_id' => $boss->id, 'motto' => 'Kerja rapi', 'join_date' => '2022-03-14',
         'phone' => '08123456789', 'address' => 'Jl. Rahasia 1', 'employee_number' => 'NIK-77', 'birth_date' => '1990-01-02',
     ]);

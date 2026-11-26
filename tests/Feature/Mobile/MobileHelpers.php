@@ -1,5 +1,6 @@
 <?php
 
+use App\Models\Branch;
 use App\Models\Employee;
 use App\Models\User;
 use Illuminate\Support\Facades\Route;
@@ -64,4 +65,10 @@ function mobileEmployee(string $name, array $attributes = []): array
     ]);
 
     return [$user, $employee];
+}
+
+/** Lokasi kerja untuk tes; rekan kerja hanya terlihat bila satu lokasi. */
+function mobileBranch(string $code = 'HO', string $name = 'Kantor Pusat'): int
+{
+    return Branch::query()->firstOrCreate(['code' => $code], ['name' => $name, 'is_active' => true])->id;
 }
