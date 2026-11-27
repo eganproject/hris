@@ -3,6 +3,7 @@
 use App\Models\AppRelease;
 use App\Models\AttendanceTablet;
 use App\Models\Branch;
+use App\Models\User;
 use App\Services\AppRelease\AppReleasePublisher;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Storage;
@@ -103,7 +104,7 @@ test('superadmin menyalakan dan mematikan wajib update dari web', function () {
 
 test('hanya superadmin yang bisa mengubah wajib update', function () {
     $release = app(AppReleasePublisher::class)->publish('employee', fakeApk(UPD_EMPLOYEE_PKG, 52, '1.0.0'), null, null);
-    $user = \App\Models\User::factory()->create();
+    $user = User::factory()->create();
 
     $this->actingAs($user)->patch(route('android-apps.mandatory', $release))->assertForbidden();
     expect($release->fresh()->is_mandatory)->toBeFalse();
