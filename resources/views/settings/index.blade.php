@@ -198,7 +198,7 @@
                 <summary class="cursor-pointer text-sm font-medium text-gray-800">
                     Keadaan notifikasi per HP ({{ $pushDevices->count() }} HP{{ $pushProblems ? ', '.$pushProblems.' bermasalah' : '' }})
                 </summary>
-                <p class="mt-2 text-xs text-gray-500">"Terkirim ke Firebase" berarti server sudah mengirim. Bila tetap tidak muncul di HP itu, penyebabnya penghemat baterai HP: minta karyawan membuka aplikasi > Profil > "Notifikasi tidak muncul?".</p>
+                <p class="mt-2 text-xs text-gray-500">"Terkirim ke Firebase" berarti server sudah mengirim. Bila tetap tidak muncul di HP itu, penyebabnya penghemat baterai HP: minta karyawan membuka aplikasi > Profil > Izin aplikasi.</p>
                 @if ($pushRows->isEmpty())
                     <p class="mt-3 text-sm text-gray-500">Belum ada karyawan yang login di aplikasi HP.</p>
                 @else
