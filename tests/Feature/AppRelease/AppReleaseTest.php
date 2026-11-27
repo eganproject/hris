@@ -172,3 +172,34 @@ test('sidebar and tablet page show the link only to superadmin', function () {
 
     $this->actingAs(User::factory()->create())->get(route('profile.edit'))->assertOk()->assertDontSee(route('android-apps.index'));
 });
+
+test('upload via xhr returns json with redirect and flashes status', function () {
+    $this->actingAs(superadmin())
+        ->postJson(route('android-apps.store'), [
+            'app' => AppRelease::TABLET,
+            'apk' => fakeApk(TABLET_PKG, 2016, '1.0.0'),
+        ])
+        ->assertOk()
+        ->assertJsonPath('redirect', route('android-apps.index'))
+        ->assertSessionHas('status');
+
+    expect(AppRelease::latestFor(AppRelease::TABLET)?->version_code)->toBe(2016);
+});
+
+test('upload via xhr with wrong apk returns 422 json', function () {
+    $this->actingAs(superadmin())
+        ->postJson(route('android-apps.store'), [
+            'app' => AppRelease::TABLET,
+            'apk' => fakeApk(EMPLOYEE_PKG, 5, '1.0.0'),
+        ])
+        ->assertStatus(422)
+        ->assertJsonValidationErrors('apk');
+});
+
+test('android apps page shows upload progress script and size limit', function () {
+    $this->actingAs(superadmin())
+        ->get(route('android-apps.index'))
+        ->assertOk()
+        ->assertSee('data-apk-upload', false)
+        ->assertSee('app-arm64-v8a-release.apk');
+});

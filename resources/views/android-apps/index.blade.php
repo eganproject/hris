@@ -40,7 +40,7 @@
                     @endif
                 </div>
 
-                <form method="POST" action="{{ route('android-apps.store') }}" enctype="multipart/form-data" data-no-confirm="true" class="grid grid-cols-1 gap-3 border-b border-gray-200 bg-gray-50 px-5 py-4 sm:grid-cols-[1fr_1fr_auto] sm:items-end">
+                <form method="POST" action="{{ route('android-apps.store') }}" enctype="multipart/form-data" data-no-confirm="true" data-apk-upload class="grid grid-cols-1 gap-3 border-b border-gray-200 bg-gray-50 px-5 py-4 sm:grid-cols-[1fr_1fr_auto] sm:items-end">
                     @csrf
                     <input type="hidden" name="app" value="{{ $key }}">
                     <div>
@@ -51,8 +51,15 @@
                         <label for="notes-{{ $key }}" class="block text-xs font-medium text-gray-600">Catatan</label>
                         <input id="notes-{{ $key }}" name="notes" maxlength="1000" placeholder="Mis. perbaikan login" class="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-xs outline-none focus:border-primary focus:ring-2 focus:ring-primary/20">
                     </div>
-                    <button type="submit" class="rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-900 shadow-xs hover:bg-gray-50">Unggah</button>
-                    <p class="text-xs text-gray-500 sm:col-span-3">Versi dibaca otomatis dari APK. APK aplikasi lain ditolak. Batas unggah server saat ini {{ $maxUploadMb }} MB.</p>
+                    <button type="submit" class="rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-900 shadow-xs hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-60">Unggah</button>
+                    <div data-upload-progress hidden class="sm:col-span-3">
+                        <div class="h-2 overflow-hidden rounded-full bg-gray-200">
+                            <div data-upload-bar class="h-full w-0 rounded-full bg-primary transition-[width] duration-200"></div>
+                        </div>
+                        <p data-upload-text class="mt-1 text-xs font-medium text-gray-700"></p>
+                    </div>
+                    <p data-upload-error hidden class="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 sm:col-span-3"></p>
+                    <p class="text-xs text-gray-500 sm:col-span-3">Versi dibaca otomatis dari APK. APK aplikasi lain ditolak. Ukuran maksimal {{ $maxClientMb }} MB{{ $maxClientMb < $maxUploadMb ? ' (batas Cloudflare)' : '' }}.@if ($key === \App\Models\AppRelease::TABLET) Untuk tablet, unggah <span class="font-medium">app-arm64-v8a-release.apk</span>.@endif</p>
                 </form>
 
                 @if ($app['releases']->isNotEmpty())
@@ -96,4 +103,94 @@
             </section>
         @endforeach
     </div>
+
+    @push('scripts')
+    <script>
+        (function () {
+            const maxBytes = {{ $maxClientMb }} * 1024 * 1024;
+            const mb = (bytes) => (bytes / 1024 / 1024).toLocaleString('id-ID', { maximumFractionDigits: 1 });
+
+            document.querySelectorAll('form[data-apk-upload]').forEach((form) => {
+                const fileInput = form.querySelector('input[type="file"]');
+                const button = form.querySelector('button[type="submit"]');
+                const progress = form.querySelector('[data-upload-progress]');
+                const bar = form.querySelector('[data-upload-bar]');
+                const text = form.querySelector('[data-upload-text]');
+                const errorBox = form.querySelector('[data-upload-error]');
+
+                const showError = (message) => {
+                    errorBox.textContent = message;
+                    errorBox.hidden = false;
+                    progress.hidden = true;
+                    button.disabled = false;
+                    button.textContent = 'Unggah';
+                };
+
+                form.addEventListener('submit', (event) => {
+                    // Unggah sendiri lewat XHR (bilah kemajuan); loader umum app.js tidak dipakai.
+                    event.preventDefault();
+                    event.stopImmediatePropagation();
+                    errorBox.hidden = true;
+
+                    const file = fileInput.files[0];
+                    if (!file) {
+                        showError('Pilih berkas APK yang akan diunggah.');
+                        return;
+                    }
+                    if (file.size > maxBytes) {
+                        showError(`APK ini ${mb(file.size)} MB, melebihi batas unggah ${mb(maxBytes)} MB. Untuk tablet, pakai APK arm64 (app-arm64-v8a-release.apk) yang ukurannya lebih kecil.`);
+                        return;
+                    }
+
+                    const xhr = new XMLHttpRequest();
+                    xhr.open('POST', form.action);
+                    xhr.setRequestHeader('Accept', 'application/json');
+                    xhr.setRequestHeader('X-Requested-With', 'XMLHttpRequest');
+
+                    xhr.upload.addEventListener('progress', (e) => {
+                        if (!e.lengthComputable) return;
+                        const pct = Math.floor((e.loaded / e.total) * 100);
+                        bar.style.width = pct + '%';
+                        text.textContent = pct < 100
+                            ? `Mengunggah ${pct}% (${mb(e.loaded)} dari ${mb(e.total)} MB)…`
+                            : 'Unggahan selesai, server sedang memeriksa APK…';
+                    });
+
+                    xhr.addEventListener('load', () => {
+                        let body = null;
+                        try { body = JSON.parse(xhr.responseText); } catch (e) {}
+
+                        if (xhr.status >= 200 && xhr.status < 300 && body?.redirect) {
+                            text.textContent = 'Berhasil. Memuat ulang halaman…';
+                            window.location.href = body.redirect;
+                            return;
+                        }
+                        if (xhr.status === 422 && body?.errors) {
+                            showError(Object.values(body.errors)[0][0]);
+                            return;
+                        }
+                        if (xhr.status === 413) {
+                            showError('APK ditolak karena terlalu besar untuk server (413). Untuk tablet, pakai APK arm64.');
+                            return;
+                        }
+                        if (xhr.status === 419) {
+                            showError('Sesi halaman kedaluwarsa. Muat ulang halaman lalu unggah lagi.');
+                            return;
+                        }
+                        showError(body?.message || `Unggahan gagal (kode ${xhr.status}). Coba lagi.`);
+                    });
+                    xhr.addEventListener('error', () => showError('Koneksi terputus saat mengunggah. Periksa internet lalu coba lagi.'));
+                    xhr.addEventListener('timeout', () => showError('Unggahan terlalu lama dan dihentikan. Coba lagi dengan koneksi yang lebih cepat.'));
+
+                    button.disabled = true;
+                    button.textContent = 'Mengunggah…';
+                    bar.style.width = '0%';
+                    text.textContent = 'Mulai mengunggah…';
+                    progress.hidden = false;
+                    xhr.send(new FormData(form));
+                });
+            });
+        })();
+    </script>
+    @endpush
 </x-layouts.app>
