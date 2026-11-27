@@ -84,6 +84,7 @@ class FaceTabletController extends Controller
                 'liveness' => TabletSettings::livenessEnabled(),
                 'level' => TabletSettings::matchLevel(),
                 'pin' => TabletSettings::pinEnabled(),
+                'idle' => TabletSettings::idleMinutes(),
             ],
             'pairing' => session('pairing'),
         ]);
@@ -254,11 +255,13 @@ class FaceTabletController extends Controller
             'liveness' => ['required', 'boolean'],
             'level' => ['required', Rule::in(array_keys(TabletSettings::MATCH_LEVELS))],
             'pin' => ['required', 'boolean'],
+            'idle' => ['required', 'integer', Rule::in(array_keys(TabletSettings::IDLE_OPTIONS))],
         ]);
 
         Setting::set(TabletSettings::LIVENESS_KEY, $data['liveness'] ? '1' : '0');
         Setting::set(TabletSettings::MATCH_LEVEL_KEY, $data['level']);
         Setting::set(TabletSettings::PIN_KEY, $data['pin'] ? '1' : '0');
+        Setting::set(TabletSettings::IDLE_KEY, (string) (int) $data['idle']);
 
         ActivityLogger::log('face-tablets', 'settings', 'Mengubah pengaturan pengenalan wajah tablet.', null, $data);
 

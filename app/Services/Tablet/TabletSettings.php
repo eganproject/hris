@@ -18,6 +18,16 @@ final class TabletSettings
 
     public const PIN_KEY = 'face_tablet_pin_enabled';
 
+    public const IDLE_KEY = 'face_tablet_idle_minutes';
+
+    /** Lama tanpa wajah sebelum layar istirahat muncul (0 = tidak pernah). */
+    public const IDLE_OPTIONS = [
+        0 => 'Tidak pernah',
+        1 => '1 menit (disarankan)',
+        2 => '2 menit',
+        5 => '5 menit',
+    ];
+
     /** Ambang kemiripan kosinus per tingkat kecocokan. */
     public const MATCH_LEVELS = [
         'loose' => ['label' => 'Longgar', 'threshold' => 0.35],
@@ -53,6 +63,13 @@ final class TabletSettings
         return Setting::getBool(self::PIN_KEY, true);
     }
 
+    public static function idleMinutes(): int
+    {
+        $minutes = (int) Setting::get(self::IDLE_KEY, 1);
+
+        return array_key_exists($minutes, self::IDLE_OPTIONS) ? $minutes : 1;
+    }
+
     public static function matchLevel(): string
     {
         $level = (string) Setting::get(self::MATCH_LEVEL_KEY, 'normal');
@@ -78,6 +95,7 @@ final class TabletSettings
             'consecutive_frames' => self::CONSECUTIVE_FRAMES,
             'repeat_ignore_seconds' => self::REPEAT_IGNORE_SECONDS,
             'pin_enabled' => self::pinEnabled(),
+            'idle_minutes' => self::idleMinutes(),
         ];
     }
 }
