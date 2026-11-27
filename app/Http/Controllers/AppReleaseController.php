@@ -29,6 +29,7 @@ class AppReleaseController extends Controller
         foreach (AppRelease::APPS as $key => $meta) {
             $apps[$key] = $meta + [
                 'latest' => AppRelease::latestFor($key),
+                'minimum' => AppRelease::minimumVersionCode($key),
                 'releases' => AppRelease::query()
                     ->with('uploader:id,name')
                     ->where('app', $key)
@@ -71,6 +72,7 @@ class AppReleaseController extends Controller
             'app' => ['required', Rule::in(array_keys(AppRelease::APPS))],
             'apk' => ['required', 'file', 'max:'.(200 * 1024)],
             'notes' => ['nullable', 'string', 'max:1000'],
+            'is_mandatory' => ['nullable', 'boolean'],
         ], [
             'apk.required' => 'Pilih berkas APK yang akan diunggah.',
             'apk.uploaded' => 'APK gagal diunggah. Ukurannya mungkin melebihi batas upload server ('.self::maxUploadMb().' MB).',
@@ -78,6 +80,9 @@ class AppReleaseController extends Controller
         ]);
 
         $release = $publisher->publish($data['app'], $request->file('apk'), $data['notes'] ?? null, $request->user()->id);
+        if ($request->boolean('is_mandatory')) {
+            $release->update(['is_mandatory' => true]);
+        }
         ActivityLogger::log('app-releases', 'create', "Mengunggah {$release->label()} versi {$release->version_name}.", $release);
 
         $latest = AppRelease::latestFor($release->app);
@@ -102,6 +107,22 @@ class AppReleaseController extends Controller
         $this->authorizeSuperAdmin($request);
 
         return self::stream($release);
+    }
+
+    /** Saklar "Wajib update" per versi. */
+    public function toggleMandatory(Request $request, AppRelease $release): RedirectResponse
+    {
+        $this->authorizeSuperAdmin($request);
+
+        $release->update(['is_mandatory' => ! $release->is_mandatory]);
+        $state = $release->is_mandatory ? 'wajib' : 'tidak wajib';
+        ActivityLogger::log('app-releases', 'update', "Menandai {$release->label()} build {$release->version_code} sebagai {$state}.", $release);
+
+        $message = $release->is_mandatory
+            ? "Build {$release->version_code} kini wajib. Aplikasi di bawah build ini akan diminta update sebelum bisa dipakai."
+            : "Build {$release->version_code} tidak lagi wajib.";
+
+        return redirect()->to(route('android-apps.index').'#app-'.$release->app)->with('status', $message);
     }
 
     public function destroy(Request $request, AppRelease $release): RedirectResponse

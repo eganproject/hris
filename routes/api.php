@@ -66,6 +66,10 @@ Route::prefix('tablet/v1')->name('api.tablet.')->group(function () {
         Route::post('faces', [\App\Http\Controllers\Api\Tablet\FaceController::class, 'store'])
             ->middleware('throttle:30,1')
             ->name('faces.store');
+        Route::get('app-update', [\App\Http\Controllers\Api\AppUpdateController::class, 'tablet'])->name('app-update');
+        Route::get('app-update/apk', [\App\Http\Controllers\Api\AppUpdateController::class, 'tabletApk'])
+            ->middleware('throttle:10,1')
+            ->name('app-update.apk');
     });
 });
 
@@ -76,3 +80,10 @@ Route::prefix('tablet/v1')->name('api.tablet.')->group(function () {
 Route::post('app-releases', \App\Http\Controllers\Api\AppReleasePublishController::class)
     ->middleware('throttle:10,1')
     ->name('api.app-releases.store');
+
+/*
+| Cek wajib update aplikasi HP karyawan (publik: dipanggil juga sebelum login).
+*/
+Route::get('app-update/employee', [\App\Http\Controllers\Api\AppUpdateController::class, 'employee'])
+    ->middleware('throttle:60,1')
+    ->name('api.app-update.employee');

@@ -36,7 +36,7 @@ class AppRelease extends Model
 
     protected $fillable = [
         'app', 'package_name', 'version_code', 'version_name', 'file_path',
-        'file_size', 'sha256', 'notes', 'uploaded_by', 'source',
+        'file_size', 'sha256', 'notes', 'is_mandatory', 'uploaded_by', 'source',
     ];
 
     protected function casts(): array
@@ -44,6 +44,7 @@ class AppRelease extends Model
         return [
             'version_code' => 'integer',
             'file_size' => 'integer',
+            'is_mandatory' => 'boolean',
         ];
     }
 
@@ -60,6 +61,44 @@ class AppRelease extends Model
             ->orderByDesc('version_code')
             ->orderByDesc('id')
             ->first();
+    }
+
+    /**
+     * versionCode minimum yang masih boleh dipakai: versi wajib tertinggi.
+     * 0 berarti belum ada versi wajib (semua versi boleh dipakai).
+     */
+    public static function minimumVersionCode(string $app): int
+    {
+        return (int) static::query()->where('app', $app)->where('is_mandatory', true)->max('version_code');
+    }
+
+    /**
+     * Jawaban cek update untuk aplikasi yang sedang terpasang di versi $current.
+     *
+     * @return array<string, mixed>
+     */
+    public static function updateInfo(string $app, int $current, string $downloadUrl): array
+    {
+        $latest = static::latestFor($app);
+        $minimum = static::minimumVersionCode($app);
+        $available = $latest !== null && $latest->version_code > $current;
+
+        return [
+            'current_version_code' => $current,
+            'min_version_code' => $minimum,
+            'update_available' => $available,
+            // Hanya wajib bila memang ada APK lebih baru untuk dipasang.
+            'update_required' => $available && $current < $minimum,
+            'latest' => $latest ? [
+                'version_code' => $latest->version_code,
+                'version_name' => $latest->version_name,
+                'size' => $latest->file_size,
+                'sha256' => $latest->sha256,
+                'notes' => $latest->notes,
+                'released_at' => $latest->created_at?->toIso8601String(),
+                'download_url' => $downloadUrl,
+            ] : null,
+        ];
     }
 
     public function label(): string

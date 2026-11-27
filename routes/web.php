@@ -115,6 +115,7 @@ Route::middleware('auth')->group(function () {
     Route::get('aplikasi-android', [AppReleaseController::class, 'index'])->name('android-apps.index');
     Route::post('aplikasi-android', [AppReleaseController::class, 'store'])->name('android-apps.store');
     Route::get('aplikasi-android/{release}/unduh', [AppReleaseController::class, 'download'])->name('android-apps.download');
+    Route::patch('aplikasi-android/{release}/wajib', [AppReleaseController::class, 'toggleMandatory'])->name('android-apps.mandatory');
     Route::delete('aplikasi-android/{release}', [AppReleaseController::class, 'destroy'])->name('android-apps.destroy');
 
     Route::get('settings', [SettingsController::class, 'index'])->middleware('permission:settings.view')->name('settings.index');
