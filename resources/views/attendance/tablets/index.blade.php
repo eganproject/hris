@@ -7,6 +7,12 @@
                 <h1 class="mt-1 text-2xl font-semibold text-gray-950">Tablet Absensi Wajah</h1>
                 <p class="mt-1 text-sm text-gray-500">Karyawan absen dengan menghadapkan wajah ke tablet kantor. Wajah dicocokkan di dalam tablet, absen langsung tercatat di Absensi Harian, dan foto bukti setiap absen bisa dilihat HR di Riwayat absen.</p>
             </div>
+            @if (auth()->user()->isSuperAdmin())
+                <a href="{{ route('android-apps.index') }}#app-tablet" class="inline-flex shrink-0 items-center gap-2 rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-900 shadow-xs hover:bg-gray-50">
+                    <svg class="size-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12"></path><path d="m7 10 5 5 5-5"></path><path d="M5 21h14"></path></svg>
+                    APK tablet
+                </a>
+            @endif
         </section>
 
         @if (session('status'))

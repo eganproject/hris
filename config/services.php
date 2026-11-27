@@ -34,6 +34,11 @@ return [
         'credentials' => env('FIREBASE_CREDENTIALS'),
     ],
 
+    // GitHub Actions (repo hris-mobile) mengirim APK baru ke POST /api/app-releases.
+    'app_release' => [
+        'publish_token' => env('APP_RELEASE_PUBLISH_TOKEN', ''),
+    ],
+
     'slack' => [
         'notifications' => [
             'bot_user_oauth_token' => env('SLACK_BOT_USER_OAUTH_TOKEN'),

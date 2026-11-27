@@ -68,3 +68,11 @@ Route::prefix('tablet/v1')->name('api.tablet.')->group(function () {
             ->name('faces.store');
     });
 });
+
+/*
+| APK baru dari GitHub Actions (repo hris-mobile) → menu System > Aplikasi Android.
+| Dijaga token APP_RELEASE_PUBLISH_TOKEN; tanpa token di .env rute ini 404.
+*/
+Route::post('app-releases', \App\Http\Controllers\Api\AppReleasePublishController::class)
+    ->middleware('throttle:10,1')
+    ->name('api.app-releases.store');

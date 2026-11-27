@@ -47,6 +47,8 @@ use App\Http\Controllers\ScheduleController;
 use App\Http\Controllers\SchedulePatternController;
 use App\Http\Controllers\SearchController;
 use App\Http\Controllers\SettingsController;
+use App\Http\Controllers\AppDownloadController;
+use App\Http\Controllers\AppReleaseController;
 use App\Http\Controllers\ShiftController;
 use App\Http\Controllers\ShiftSwapAttachmentController;
 use App\Http\Controllers\ShiftSwapController;
@@ -64,6 +66,11 @@ Route::match(['GET', 'POST'], 'iclock/cdata', function (Request $request, Iclock
 });
 Route::get('iclock/getrequest', [IclockController::class, 'getrequest']);
 Route::post('iclock/devicecmd', [IclockController::class, 'devicecmd']);
+
+// Unduh aplikasi HP karyawan (publik, tanpa login). APK tablet absensi tidak
+// ada di sini: hanya superadmin yang bisa mengunduhnya dari System > Aplikasi Android.
+Route::get('unduh-aplikasi', [AppDownloadController::class, 'page'])->name('app-download.page');
+Route::get('unduh-aplikasi/apk', [AppDownloadController::class, 'download'])->middleware('throttle:30,1')->name('app-download.apk');
 
 Route::middleware('guest')->group(function () {
     Route::get('login', [AuthenticatedSessionController::class, 'create'])->name('login');
@@ -103,6 +110,12 @@ Route::middleware('auth')->group(function () {
     // dihapus lewat antarmuka — sebuah catatan audit yang bisa dirapikan pelakunya
     // sendiri tidak ada gunanya. Pemangkasan lama dilakukan perintah activity:prune.
     Route::get('activity', [ActivityLogController::class, 'index'])->middleware('permission:activity.view')->name('activity.index');
+
+    // Khusus superadmin (dicek di controller): APK aplikasi HP + tablet absensi.
+    Route::get('aplikasi-android', [AppReleaseController::class, 'index'])->name('android-apps.index');
+    Route::post('aplikasi-android', [AppReleaseController::class, 'store'])->name('android-apps.store');
+    Route::get('aplikasi-android/{release}/unduh', [AppReleaseController::class, 'download'])->name('android-apps.download');
+    Route::delete('aplikasi-android/{release}', [AppReleaseController::class, 'destroy'])->name('android-apps.destroy');
 
     Route::get('settings', [SettingsController::class, 'index'])->middleware('permission:settings.view')->name('settings.index');
     Route::put('settings', [SettingsController::class, 'update'])->middleware('permission:settings.update')->name('settings.update');

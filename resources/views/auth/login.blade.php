@@ -78,5 +78,10 @@
                 </button>
             </form>
         </div>
+
+        <a href="{{ route('app-download.page') }}" class="mt-4 flex items-center justify-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-3 text-sm font-medium text-gray-700 shadow-sm transition hover:bg-gray-50">
+            <svg class="size-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="6" y="2" width="12" height="20" rx="2"></rect><path d="M11 18h2"></path></svg>
+            Unduh aplikasi HP karyawan
+        </a>
     </div>
 </x-layouts.auth>
