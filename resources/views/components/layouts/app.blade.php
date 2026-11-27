@@ -381,8 +381,8 @@
                         </div>
                     @endif
 
-                    @canany(['access-control.view', 'settings.view', 'activity.view'])
-                        @php $g = request()->routeIs('settings.*', 'access-control.*', 'activity.*'); @endphp
+                    @if (auth()->user()->canany(['access-control.view', 'settings.view', 'activity.view']) || auth()->user()->isSuperAdmin())
+                        @php $g = request()->routeIs('settings.*', 'access-control.*', 'activity.*', 'android-apps.*'); @endphp
                         <div @class(['sidebar-group', 'is-open' => $g]) data-sidebar-group="system">
                             <button type="button" data-sidebar-group-toggle aria-expanded="{{ $g ? 'true' : 'false' }}" class="sidebar-group-toggle flex w-full items-center gap-2.5 rounded px-2.5 py-1.5 text-left transition hover:bg-white/70">
                                 <svg class="size-4 shrink-0 text-gray-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z"></path></svg>
@@ -408,9 +408,15 @@
                                         <span class="sidebar-label truncate">Aktivitas Pengguna</span>
                                     </a>
                                 @endcan
+                                @if (auth()->user()->isSuperAdmin())
+                                    <a href="{{ route('android-apps.index') }}" @class(['sidebar-nav-link flex items-center gap-2.5 rounded px-2.5 py-1.5 text-[13px] font-medium transition', 'bg-white text-gray-950 shadow-xs ring-1 ring-gray-200' => request()->routeIs('android-apps.*'), 'text-gray-600 hover:bg-white hover:text-gray-950' => ! request()->routeIs('android-apps.*')]) title="Aplikasi Android">
+                                        <svg class="size-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="6" y="2" width="12" height="20" rx="2"></rect><path d="M11 18h2"></path></svg>
+                                        <span class="sidebar-label truncate">Aplikasi Android</span>
+                                    </a>
+                                @endif
                             </div>
                         </div>
-                    @endcanany
+                    @endif
                     <p class="sidebar-filter-empty" data-sidebar-filter-empty hidden>Menu tidak ditemukan.</p>
                 </nav>
 
