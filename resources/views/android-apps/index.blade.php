@@ -28,6 +28,11 @@
                         @endif
                         @if ($latest)
                             <p class="mt-2 text-sm text-gray-700">Versi terbaru: <span class="font-semibold">{{ $latest->version_name }}</span> <span class="text-gray-400">(build {{ $latest->version_code }})</span> · {{ $latest->sizeLabel() }}</p>
+                            @if ($app['minimum'] > 0)
+                                <p class="mt-1 text-sm text-gray-700">Wajib update: aplikasi di bawah <span class="font-semibold">build {{ $app['minimum'] }}</span> tidak bisa dipakai sampai diupdate.</p>
+                            @else
+                                <p class="mt-1 text-sm text-gray-500">Belum ada versi wajib. Aplikasi lama tetap bisa dipakai dan hanya diingatkan bila ada versi baru.</p>
+                            @endif
                         @else
                             <p class="mt-2 text-sm text-amber-700">Belum ada APK yang diunggah.</p>
                         @endif
@@ -40,7 +45,7 @@
                     @endif
                 </div>
 
-                <form method="POST" action="{{ route('android-apps.store') }}" enctype="multipart/form-data" data-no-confirm="true" data-apk-upload class="grid grid-cols-1 gap-3 border-b border-gray-200 bg-gray-50 px-5 py-4 sm:grid-cols-[1fr_1fr_auto] sm:items-end">
+                <form method="POST" action="{{ route('android-apps.store') }}" enctype="multipart/form-data" data-no-confirm="true" data-apk-upload class="grid grid-cols-1 gap-3 border-b border-gray-200 bg-gray-50 px-5 py-4 sm:grid-cols-[1fr_1fr_auto_auto] sm:items-end">
                     @csrf
                     <input type="hidden" name="app" value="{{ $key }}">
                     <div>
@@ -51,15 +56,19 @@
                         <label for="notes-{{ $key }}" class="block text-xs font-medium text-gray-600">Catatan</label>
                         <input id="notes-{{ $key }}" name="notes" maxlength="1000" placeholder="Mis. perbaikan login" class="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-xs outline-none focus:border-primary focus:ring-2 focus:ring-primary/20">
                     </div>
+                    <label for="mandatory-{{ $key }}" class="flex items-center gap-2 pb-2 text-sm text-gray-700">
+                        <input id="mandatory-{{ $key }}" type="checkbox" name="is_mandatory" value="1" class="size-4 rounded border-gray-300 text-primary">
+                        Wajib update
+                    </label>
                     <button type="submit" class="rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-900 shadow-xs hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-60">Unggah</button>
-                    <div data-upload-progress hidden class="sm:col-span-3">
+                    <div data-upload-progress hidden class="sm:col-span-4">
                         <div class="h-2 overflow-hidden rounded-full bg-gray-200">
                             <div data-upload-bar class="h-full w-0 rounded-full bg-primary transition-[width] duration-200"></div>
                         </div>
                         <p data-upload-text class="mt-1 text-xs font-medium text-gray-700"></p>
                     </div>
-                    <p data-upload-error hidden class="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 sm:col-span-3"></p>
-                    <p class="text-xs text-gray-500 sm:col-span-3">Versi dibaca otomatis dari APK. APK aplikasi lain ditolak. Ukuran maksimal {{ $maxClientMb }} MB{{ $maxClientMb < $maxUploadMb ? ' (batas Cloudflare)' : '' }}.@if ($key === \App\Models\AppRelease::TABLET) Untuk tablet, unggah <span class="font-medium">app-arm64-v8a-release.apk</span>.@endif</p>
+                    <p data-upload-error hidden class="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 sm:col-span-4"></p>
+                    <p class="text-xs text-gray-500 sm:col-span-4">Versi dibaca otomatis dari APK. APK aplikasi lain ditolak. Ukuran maksimal {{ $maxClientMb }} MB{{ $maxClientMb < $maxUploadMb ? ' (batas Cloudflare)' : '' }}.@if ($key === \App\Models\AppRelease::TABLET) Untuk tablet, unggah <span class="font-medium">app-arm64-v8a-release.apk</span>.@endif</p>
                 </form>
 
                 @if ($app['releases']->isNotEmpty())
@@ -71,6 +80,7 @@
                                     <th class="px-5 py-2">Ukuran</th>
                                     <th class="px-5 py-2">Diunggah</th>
                                     <th class="px-5 py-2">Catatan</th>
+                                    <th class="px-5 py-2">Wajib update</th>
                                     <th class="px-5 py-2 text-right">Aksi</th>
                                 </tr>
                             </thead>
@@ -86,6 +96,18 @@
                                         <td class="whitespace-nowrap px-5 py-2.5 text-gray-600">{{ $release->sizeLabel() }}</td>
                                         <td class="whitespace-nowrap px-5 py-2.5 text-gray-600">{{ $release->created_at->translatedFormat('j M Y H:i') }} · {{ $release->source === 'ci' ? 'GitHub Actions' : ($release->uploader?->name ?? '-') }}</td>
                                         <td class="px-5 py-2.5 text-gray-600">{{ $release->notes ?? '-' }}</td>
+                                        <td class="whitespace-nowrap px-5 py-2.5">
+                                            <form method="POST" action="{{ route('android-apps.mandatory', $release) }}" class="inline" data-confirm-message="{{ $release->is_mandatory ? 'Matikan wajib update untuk build '.$release->version_code.'?' : 'Jadikan build '.$release->version_code.' wajib? Semua aplikasi di bawah build ini tidak bisa dipakai sampai diupdate.' }}">
+                                                @csrf
+                                                @method('PATCH')
+                                                <button type="submit" role="switch" aria-checked="{{ $release->is_mandatory ? 'true' : 'false' }}" class="inline-flex items-center gap-2 text-sm {{ $release->is_mandatory ? 'font-semibold text-gray-900' : 'text-gray-500' }}">
+                                                    <span class="relative inline-block h-5 w-9 rounded-full transition {{ $release->is_mandatory ? 'bg-primary' : 'bg-gray-300' }}">
+                                                        <span class="absolute top-0.5 size-4 rounded-full bg-white shadow transition-all {{ $release->is_mandatory ? 'left-[18px]' : 'left-0.5' }}"></span>
+                                                    </span>
+                                                    {{ $release->is_mandatory ? 'Wajib' : 'Tidak' }}
+                                                </button>
+                                            </form>
+                                        </td>
                                         <td class="whitespace-nowrap px-5 py-2.5 text-right">
                                             <a href="{{ route('android-apps.download', $release) }}" class="font-medium text-gray-900 underline">Unduh</a>
                                             <form method="POST" action="{{ route('android-apps.destroy', $release) }}" class="ml-3 inline" data-confirm-message="Hapus APK versi {{ $release->version_name }}? Berkasnya ikut terhapus dari server.">
