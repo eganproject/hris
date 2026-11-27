@@ -259,6 +259,17 @@
                         <option value="0" @selected(! $settings['pin'])>Tidak boleh</option>
                     </select>
                 </div>
+                <div class="flex flex-col justify-between gap-2 border-t border-gray-100 pt-4 sm:flex-row sm:items-center">
+                    <div>
+                        <label for="idle" class="text-sm font-medium text-gray-950">Layar istirahat</label>
+                        <p class="text-sm text-gray-500">Bila tidak ada wajah selama waktu ini, kamera dimatikan dan tablet menampilkan jam redup dengan kutipan motivasi. Ketuk layar untuk absen lagi.</p>
+                    </div>
+                    <select id="idle" name="idle" @disabled(! $canUpdate) class="rounded-md border border-gray-300 px-3 py-2 text-sm shadow-xs">
+                        @foreach (\App\Services\Tablet\TabletSettings::IDLE_OPTIONS as $minutes => $label)
+                            <option value="{{ $minutes }}" @selected($settings['idle'] === $minutes)>{{ $label }}</option>
+                        @endforeach
+                    </select>
+                </div>
                 @if ($canUpdate)
                     <div class="flex justify-end border-t border-gray-100 pt-4">
                         <button type="submit" class="rounded-md bg-primary px-4 py-2 text-sm font-semibold text-white">Simpan pengaturan</button>

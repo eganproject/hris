@@ -136,6 +136,7 @@ test('sinkron berisi karyawan lokasi tablet, data wajah, jadwal, dan pengaturan'
         ->and($data['settings']['liveness_enabled'])->toBeFalse()
         ->and($data['settings']['match_threshold'])->toBe(0.40)
         ->and($data['settings']['session_max_minutes'])->toBe(1430)
+        ->and($data['settings']['idle_minutes'])->toBe(1)
         ->and(TabletPin::verify('123456', $data['employees'][0]['pin_hash']))->toBeTrue()
         ->and(AttendanceTablet::query()->first()->queue_count)->toBe(4);
 });
@@ -324,8 +325,9 @@ test('web: daftarkan tablet, atur PIN, PIN karyawan, hapus wajah, pengaturan', f
     expect($employee->faceProfile()->sole()->hasFace())->toBeFalse()
         ->and($employee->faceProfile()->sole()->hasPin())->toBeTrue();
 
-    $this->put(route('attendance.tablets.settings'), ['liveness' => '0', 'level' => 'strict', 'pin' => '0'])->assertRedirect();
+    $this->put(route('attendance.tablets.settings'), ['liveness' => '0', 'level' => 'strict', 'pin' => '0', 'idle' => '5'])->assertRedirect();
     expect(TabletSettings::livenessEnabled())->toBeFalse()
+        ->and(TabletSettings::idleMinutes())->toBe(5)
         ->and(TabletSettings::matchThreshold())->toBe(0.45)
         ->and(TabletSettings::pinEnabled())->toBeFalse();
 
