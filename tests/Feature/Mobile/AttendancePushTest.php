@@ -292,3 +292,55 @@ test('galat isi pesan dari Firebase tidak membuang token HP', function () {
 
     expect($phone->fresh()->push_token)->toBe('fcm-token-rina');
 });
+
+test('aplikasi HP melaporkan izin notifikasi dan versinya bersama token', function () {
+    [$user] = pushEmployee();
+
+    $token = $this->postJson('/api/mobile/v1/auth/login', [
+        'login' => $user->email, 'password' => 'password', 'device_id' => 'hp-rina-0002', 'platform' => 'android', 'app_version' => '1.0.0',
+    ])->json('data.token');
+
+    $this->withToken($token)->postJson('/api/mobile/v1/push-token', ['token' => 'tok-1', 'allowed' => false, 'app_version' => '1.2.0'])->assertOk();
+    $device = MobileDevice::query()->where('device_uuid', 'hp-rina-0002')->first();
+    expect($device->push_allowed)->toBeFalse()->and($device->app_version)->toBe('1.2.0');
+
+    // Aplikasi versi lama tidak mengirim izin: nilai sebelumnya tidak dihapus.
+    $this->withToken($token)->postJson('/api/mobile/v1/push-token', ['token' => 'tok-1'])->assertOk();
+    expect($device->fresh()->push_allowed)->toBeFalse();
+});
+
+test('hasil kiriman tercatat per HP dan tampil di Pengaturan', function () {
+    [$user, $employee] = pushEmployee();
+    $ok = pushPhone($user, $employee);
+    $ok->forceFill(['model' => 'Redmi Note 12', 'push_allowed' => true])->save();
+
+    $user2 = User::factory()->create();
+    $employee2 = Employee::query()->create(['user_id' => $user2->id, 'full_name' => 'Budi Santoso', 'employment_status' => 'active']);
+    $denied = pushPhone($user2, $employee2, 'tok-budi');
+    $denied->forceFill(['push_allowed' => false])->save();
+
+    $user3 = User::factory()->create();
+    $employee3 = Employee::query()->create(['user_id' => $user3->id, 'full_name' => 'Citra Lestari', 'employment_status' => 'active']);
+    pushPhone($user3, $employee3, null);
+
+    $this->actingAs(pushHr())->from('/settings')->post('/settings/push-test', ['employee_id' => $employee->id]);
+
+    $ok->refresh();
+    expect($ok->last_push_result)->toBe('sent')->and($ok->last_push_at)->not->toBeNull()->and($ok->last_push_error)->toBeNull();
+
+    $this->actingAs(pushHr())->get('/settings')->assertOk()
+        ->assertSee('Keadaan notifikasi per HP (3 HP, 2 bermasalah)')
+        ->assertSeeInOrder(['Citra Lestari', 'Belum terdaftar', 'Budi Santoso', 'Izin notifikasi dimatikan', 'Rina Wulandari', 'Terkirim ke Firebase']);
+});
+
+test('kiriman yang ditolak Firebase tercatat dengan alasannya', function () {
+    $this->fcmResponse = Http::response(['error' => ['status' => 'INVALID_ARGUMENT', 'message' => 'Invalid value at message.data']], 400);
+    [$user, $employee] = pushEmployee();
+    $phone = pushPhone($user, $employee);
+
+    $this->actingAs(pushHr())->from('/settings')->post('/settings/push-test', ['employee_id' => $employee->id]);
+
+    $phone->refresh();
+    expect($phone->last_push_result)->toBe('failed')
+        ->and($phone->last_push_error)->toContain('INVALID_ARGUMENT');
+});

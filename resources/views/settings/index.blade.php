@@ -189,6 +189,51 @@
                 </div>
                 <button type="submit" class="rounded-md border border-gray-300 bg-white px-5 py-2.5 text-sm font-semibold text-gray-800 shadow-xs transition hover:bg-gray-50">Kirim notifikasi uji</button>
             </form>
+
+            @php
+                $pushRows = $pushDevices->map(fn ($d) => [$d, \App\Http\Controllers\SettingsController::pushState($d)]);
+                $pushProblems = $pushRows->filter(fn ($r) => $r[1][0] < 3)->count();
+            @endphp
+            <details class="mt-6 border-t border-gray-100 pt-4" @if ($pushProblems) open @endif>
+                <summary class="cursor-pointer text-sm font-medium text-gray-800">
+                    Keadaan notifikasi per HP ({{ $pushDevices->count() }} HP{{ $pushProblems ? ', '.$pushProblems.' bermasalah' : '' }})
+                </summary>
+                <p class="mt-2 text-xs text-gray-500">"Terkirim ke Firebase" berarti server sudah mengirim. Bila tetap tidak muncul di HP itu, penyebabnya penghemat baterai HP: minta karyawan membuka aplikasi > Profil > "Notifikasi tidak muncul?".</p>
+                @if ($pushRows->isEmpty())
+                    <p class="mt-3 text-sm text-gray-500">Belum ada karyawan yang login di aplikasi HP.</p>
+                @else
+                    <div class="mt-3 overflow-x-auto">
+                        <table class="min-w-full text-left text-sm">
+                            <thead class="text-xs text-gray-500">
+                                <tr>
+                                    <th class="py-2 pr-4 font-medium">Karyawan</th>
+                                    <th class="py-2 pr-4 font-medium">HP</th>
+                                    <th class="py-2 pr-4 font-medium">Versi app</th>
+                                    <th class="py-2 pr-4 font-medium">Terakhir dibuka</th>
+                                    <th class="py-2 font-medium">Notifikasi</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-gray-100">
+                                @foreach ($pushRows as [$pd, $state])
+                                    <tr>
+                                        <td class="py-2 pr-4 text-gray-900">{{ $pd->employee?->full_name ?? '—' }}</td>
+                                        <td class="py-2 pr-4 text-gray-600">{{ $pd->model ?: '—' }}</td>
+                                        <td class="py-2 pr-4 text-gray-600">{{ $pd->app_version ?: '—' }}</td>
+                                        <td class="py-2 pr-4 text-gray-600">{{ $pd->last_seen_at?->diffForHumans() ?? '—' }}</td>
+                                        <td @class([
+                                            'py-2 text-xs',
+                                            'text-red-700' => $state[1] === 'red',
+                                            'text-amber-700' => $state[1] === 'amber',
+                                            'text-emerald-700' => $state[1] === 'emerald',
+                                            'text-gray-500' => $state[1] === 'gray',
+                                        ])>{{ $state[2] }}</td>
+                                    </tr>
+                                @endforeach
+                            </tbody>
+                        </table>
+                    </div>
+                @endif
+            </details>
         </section>
     </div>
 

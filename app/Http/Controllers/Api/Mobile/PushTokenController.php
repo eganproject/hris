@@ -15,7 +15,13 @@ class PushTokenController extends Controller
 {
     public function store(Request $request): JsonResponse
     {
-        $data = $request->validate(['token' => ['required', 'string', 'max:512']]);
+        $data = $request->validate([
+            'token' => ['required', 'string', 'max:512'],
+            // Izin "tampilkan notifikasi" di HP. Tanpa izin, Firebase tetap
+            // menerima kiriman tapi HP tidak menampilkannya.
+            'allowed' => ['sometimes', 'nullable', 'boolean'],
+            'app_version' => ['sometimes', 'nullable', 'string', 'max:30'],
+        ]);
 
         /** @var MobileDevice $device */
         $device = $request->attributes->get('mobile_device');
@@ -27,7 +33,13 @@ class PushTokenController extends Controller
             ->whereKeyNot($device->id)
             ->update(['push_token' => null, 'push_token_updated_at' => now()]);
 
-        $device->forceFill(['push_token' => $data['token'], 'push_token_updated_at' => now()])->save();
+        $device->forceFill([
+            'push_token' => $data['token'],
+            'push_token_updated_at' => now(),
+            'push_allowed' => array_key_exists('allowed', $data) ? $data['allowed'] : $device->push_allowed,
+            // Supaya HR tahu HP mana yang masih memakai APK lama.
+            'app_version' => ($data['app_version'] ?? null) ?: $device->app_version,
+        ])->save();
 
         return response()->json(['data' => ['ok' => true]]);
     }

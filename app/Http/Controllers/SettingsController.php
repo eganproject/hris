@@ -40,6 +40,12 @@ class SettingsController extends Controller
             'pushMachine' => Setting::getBool(AttendancePushNotifier::MACHINE_KEY, true),
             'pushConfigured' => $fcm->configured(),
             'pushDeviceCount' => MobileDevice::query()->where('status', MobileDevice::STATUS_ACTIVE)->whereNotNull('push_token')->count(),
+            'pushDevices' => MobileDevice::query()
+                ->where('status', MobileDevice::STATUS_ACTIVE)
+                ->with('employee:id,full_name,employee_number')
+                ->get()
+                ->sortBy(fn (MobileDevice $d) => [self::pushRank($d), $d->employee?->full_name])
+                ->values(),
             'pushEmployees' => Employee::query()
                 ->whereNotNull('user_id')
                 ->where('employment_status', 'active')
@@ -150,6 +156,40 @@ class SettingsController extends Controller
         );
 
         return back()->with('status', 'Pengaturan berhasil disimpan.');
+    }
+
+    /**
+     * Keadaan notifikasi sebuah HP dalam kata-kata HR, dengan urutan: yang
+     * bermasalah tampil paling atas.
+     *
+     * @return array{0: int, 1: string, 2: string} [urutan, warna, keterangan]
+     */
+    public static function pushState(MobileDevice $device): array
+    {
+        if (! $device->push_token) {
+            return [0, 'red', 'Belum terdaftar. Pasang APK terbaru, buka aplikasinya, lalu izinkan notifikasi.'];
+        }
+
+        if ($device->push_allowed === false) {
+            return [1, 'red', 'Izin notifikasi dimatikan di HP. Nyalakan di Setelan HP > Aplikasi > HRIS COK > Notifikasi.'];
+        }
+
+        if ($device->last_push_result && $device->last_push_result !== FcmClient::SENT) {
+            return [2, 'amber', 'Kiriman terakhir gagal ('.$device->last_push_at?->diffForHumans().'): '.($device->last_push_error ?: 'tanpa keterangan')];
+        }
+
+        if ($device->last_push_result === FcmClient::SENT) {
+            $note = $device->push_allowed === null ? ' Aplikasi versi lama: izin notifikasi belum diketahui.' : '';
+
+            return [3, 'emerald', 'Terkirim ke Firebase '.$device->last_push_at?->diffForHumans().'.'.$note];
+        }
+
+        return [3, 'gray', 'Terdaftar, belum pernah dikirimi notifikasi.'];
+    }
+
+    private static function pushRank(MobileDevice $device): int
+    {
+        return self::pushState($device)[0];
     }
 
     /**

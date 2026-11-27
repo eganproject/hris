@@ -54,6 +54,8 @@ class MobileDevice extends Model
     {
         return [
             'push_token_updated_at' => 'datetime',
+            'push_allowed' => 'boolean',
+            'last_push_at' => 'datetime',
             'decided_at' => 'datetime',
             'last_seen_at' => 'datetime',
             'consented_at' => 'datetime',

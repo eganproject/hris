@@ -42,9 +42,19 @@ class PushNotifier
         foreach (self::devicesFor($user) as $device) {
             $result = $this->fcm->send($device->push_token, $title, $body, $data);
 
+            // Dicatat per HP supaya HR bisa melihat di Pengaturan HP mana yang
+            // tidak menerima notifikasi dan kenapa.
+            $device->forceFill([
+                'last_push_at' => now(),
+                'last_push_result' => $result,
+                'last_push_error' => $result === FcmClient::SENT ? null : mb_substr((string) $this->fcm->lastError, 0, 255),
+            ]);
+
             if ($result === FcmClient::INVALID_TOKEN) {
-                $device->forceFill(['push_token' => null, 'push_token_updated_at' => now()])->save();
+                $device->forceFill(['push_token' => null, 'push_token_updated_at' => now()]);
             }
+
+            $device->saveQuietly();
 
             $results[] = ['device' => $device, 'result' => $result, 'error' => $this->fcm->lastError];
         }
