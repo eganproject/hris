@@ -5,10 +5,12 @@ namespace App\Http\Controllers;
 use App\Models\AppRelease;
 use App\Services\AppRelease\AppReleasePublisher;
 use App\Support\ActivityLogger;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
@@ -41,13 +43,30 @@ class AppReleaseController extends Controller
             'apps' => $apps,
             'publicPageUrl' => route('app-download.page'),
             'maxUploadMb' => self::maxUploadMb(),
+            // Situs berada di belakang Cloudflare yang menolak permintaan >100 MB.
+            'maxClientMb' => min(self::maxUploadMb() ?: 100, 99),
         ]);
     }
 
-    public function store(Request $request, AppReleasePublisher $publisher): RedirectResponse
+    public function store(Request $request, AppReleasePublisher $publisher): RedirectResponse|JsonResponse
     {
         $this->authorizeSuperAdmin($request);
 
+        try {
+            return $this->storeRelease($request, $publisher);
+        } catch (ValidationException $e) {
+            // Aplikasi hanya merender JSON untuk api/*; unggahan XHR halaman ini
+            // butuh galatnya sebagai JSON agar bisa ditampilkan tanpa muat ulang.
+            if ($request->expectsJson()) {
+                return response()->json(['message' => $e->getMessage(), 'errors' => $e->errors()], 422);
+            }
+
+            throw $e;
+        }
+    }
+
+    private function storeRelease(Request $request, AppReleasePublisher $publisher): RedirectResponse|JsonResponse
+    {
         $data = $request->validate([
             'app' => ['required', Rule::in(array_keys(AppRelease::APPS))],
             'apk' => ['required', 'file', 'max:'.(200 * 1024)],
@@ -65,6 +84,14 @@ class AppReleaseController extends Controller
         $message = "{$release->label()} versi {$release->version_name} berhasil diunggah.";
         if (! $latest?->is($release)) {
             $message .= " Versi {$latest?->version_name} lebih baru, jadi itu yang tetap diunduh.";
+        }
+
+        // Halaman mengunggah lewat XHR (bilah kemajuan); hasilnya ditampilkan
+        // setelah halaman dimuat ulang dari pesan sesi yang sama.
+        if ($request->expectsJson()) {
+            session()->flash('status', $message);
+
+            return response()->json(['message' => $message, 'redirect' => route('android-apps.index')]);
         }
 
         return redirect()->route('android-apps.index')->with('status', $message);
